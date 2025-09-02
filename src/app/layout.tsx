@@ -6,6 +6,7 @@ import { Providers } from "@/providers";
 import { Analytics } from "@/components/analytics/Analytics";
 import { Toaster } from "@/components/ui/toaster";
 import { getThemeScript } from "./theme-script";
+import { ProductionErrorBoundary } from "@/components/error-boundary/ProductionErrorBoundary";
 
 // Font configuration
 const geistSans = Geist({
@@ -65,8 +66,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          {children}
-          <Toaster />
+          <ProductionErrorBoundary level="page" maxRetries={3}>
+            {children}
+            <Toaster />
+          </ProductionErrorBoundary>
         </Providers>
         <Analytics />
       </body>

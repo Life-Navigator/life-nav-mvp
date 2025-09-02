@@ -3,7 +3,8 @@
  * Provides caching strategies and utilities for the application
  */
 
-import redis, { redisHelper } from './redis-client';
+import redis from './redis-client';
+import { redisHelper } from './redis-client';
 
 export interface CacheOptions {
   ttl?: number; // Time to live in seconds
