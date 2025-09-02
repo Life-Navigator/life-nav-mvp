@@ -1,3 +1,7 @@
+// LifeNavigator Comprehensive Database Schema for Azure PostgreSQL
+// Version: 1.0.0 - Production Ready
+// Includes: Core models, Goals system, Risk Assessment, and all domain models
+
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["driverAdapters"]
@@ -8,20 +12,55 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// The rest of your schema model definitions remain the same
+//=====================
+// AUTHENTICATION & USERS
+//=====================
+
 model User {
-  id                  String                @id @default(cuid())
-  name                String?
-  email               String                @unique
-  emailVerified       DateTime?
-  image               String?
-  password            String?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  setupCompleted      Boolean               @default(false)
-  accounts            Account[]
-  sessions            Session[]
+  id                    String                  @id @default(cuid())
+  email                 String                  @unique
+  name                  String?
+  password              String?
+  emailVerified         DateTime?
+  image                 String?
+  role                  String                  @default("user")
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+  setupCompleted        Boolean                 @default(false)
+  lastLogin             DateTime?
+  isActive              Boolean                 @default(true)
+  failedLoginAttempts   Int                     @default(0)
+  lockedUntil           DateTime?
+  mfaEnabled            Boolean                 @default(false)
+  mfaSecret             String?
   
+  // Relations
+  accounts              Account[]
+  sessions              Session[]
+  goals                 Goal[]
+  riskAssessments       RiskAssessment[]
+  financialAccounts     FinancialAccount[]
+  financialTransactions Transaction[]
+  financialAssets       Asset[]
+  financialGoals        FinancialGoal[]
+  healthRecords         HealthRecord[]
+  healthMetrics         HealthMetric[]
+  educationRecords      EducationRecord[]
+  educationCourses      EducationCourse[]
+  careerProfiles        CareerProfile[]
+  careerApplications    JobApplication[]
+  documents             Document[]
+  notifications         Notification[]
+  preferences           UserPreference?
+  securityAuditLogs     SecurityAuditLog[]
+  securityTokens        SecurityToken[]
+  revokedTokens         RevokedToken[]
+  userDevices           UserDevice[]
+  integrations          UserIntegration[]
+  benefitRankings       BenefitRanking[]
+  
+  @@index([email])
+  @@index([createdAt])
   @@map("users")
 }
 
@@ -31,16 +70,17 @@ model Account {
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String?
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String?
+  id_token          String? @db.Text
   session_state     String?
   user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
   @@map("accounts")
 }
 
@@ -51,6 +91,7 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId])
   @@map("sessions")
 }
 
@@ -61,4 +102,794 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+model RevokedToken {
+  id        String   @id @default(cuid())
+  jti       String   @unique
+  userId    String
+  revokedAt DateTime @default(now())
+  expiresAt DateTime
+  reason    String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([jti])
+  @@map("revoked_tokens")
+}
+
+model SecurityAuditLog {
+  id           String   @id @default(cuid())
+  userId       String
+  action       String   // CREATE, READ, UPDATE, DELETE per HIPAA
+  resourceType String   // Type of resource accessed
+  resourceId   String   // ID of resource accessed
+  eventType    String?  // Legacy field
+  ipAddress    String?
+  userAgent    String?
+  data         Json?
+  metadata     String?  @db.Text
+  timestamp    DateTime @default(now())
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([action])
+  @@index([resourceType])
+  @@index([timestamp])
+  @@index([createdAt])
+  @@map("security_audit_logs")
+}
+
+model SecurityToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique // Hashed token
+  purpose   String   // password_reset, email_verification, etc.
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("security_tokens")
+}
+
+model UserDevice {
+  id        String   @id @default(cuid())
+  userId    String
+  deviceId  String   @unique
+  name      String?
+  type      String?  // mobile, desktop, tablet
+  os        String?
+  browser   String?
+  ipAddress String?
+  userAgent String?
+  lastSeen  DateTime @default(now())
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([deviceId])
+  @@map("user_devices")
+}
+
+model BenefitRanking {
+  id        String   @id @default(cuid())
+  userId    String
+  domain    String   // financial, career, health, education, lifestyle
+  tagId     String   // Reference to benefit tag ID
+  rank      Int      // 1 is highest priority
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, domain, tagId])
+  @@index([userId, domain])
+  @@index([rank])
+  @@map("benefit_rankings")
+}
+
+//=====================
+// GOALS SYSTEM
+//=====================
+
+model Goal {
+  id              String           @id @default(cuid())
+  userId          String
+  title           String
+  description     String?
+  category        GoalCategory     @relation(fields: [categoryId], references: [id])
+  categoryId      String
+  targetDate      DateTime?
+  targetValue     Float?           // For measurable goals
+  currentValue    Float?           @default(0)
+  unit            String?          // e.g., "dollars", "pounds", "hours"
+  priority        String           @default("medium") // low, medium, high, critical
+  status          String           @default("active") // draft, active, completed, paused, abandoned
+  isSmartGoal     Boolean          @default(false)
+  specific        String?          // SMART goal components
+  measurable      String?
+  achievable      String?
+  relevant        String?
+  timeBound       String?
+  completedAt     DateTime?
+  progress        Float            @default(0) // 0-100 percentage
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestones      GoalMilestone[]
+  benefits        GoalBenefit[]
+  updates         GoalUpdate[]
+  reminders       GoalReminder[]
+  dependencies    GoalDependency[] @relation("DependentGoal")
+  dependents      GoalDependency[] @relation("PrerequisiteGoal")
+  
+  @@index([userId])
+  @@index([categoryId])
+  @@index([status])
+  @@index([targetDate])
+  @@map("goals")
+}
+
+model GoalCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  icon        String?
+  color       String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  goals       Goal[]
+  
+  @@map("goal_categories")
+}
+
+model GoalMilestone {
+  id           String    @id @default(cuid())
+  goalId       String
+  title        String
+  description  String?
+  targetDate   DateTime?
+  targetValue  Float?
+  isCompleted  Boolean   @default(false)
+  completedAt  DateTime?
+  order        Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  // Relations
+  goal         Goal      @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  
+  @@index([goalId])
+  @@map("goal_milestones")
+}
+
+model GoalBenefit {
+  id          String   @id @default(cuid())
+  goalId      String
+  benefitType String   // health, wealth, relationships, personal_growth, career, happiness
+  description String
+  impact      String   @default("medium") // low, medium, high
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  
+  @@index([goalId])
+  @@index([benefitType])
+  @@map("goal_benefits")
+}
+
+model GoalUpdate {
+  id          String   @id @default(cuid())
+  goalId      String
+  updateType  String   // progress, note, milestone_completed, status_change
+  content     String?
+  oldValue    Float?
+  newValue    Float?
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  goal        Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  
+  @@index([goalId])
+  @@index([createdAt])
+  @@map("goal_updates")
+}
+
+model GoalReminder {
+  id           String   @id @default(cuid())
+  goalId       String
+  reminderType String   // deadline, milestone, check_in
+  message      String
+  sendAt       DateTime
+  isSent       Boolean  @default(false)
+  sentAt       DateTime?
+  createdAt    DateTime @default(now())
+  
+  // Relations
+  goal         Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  
+  @@index([goalId])
+  @@index([sendAt])
+  @@map("goal_reminders")
+}
+
+model GoalDependency {
+  id              String   @id @default(cuid())
+  dependentId     String   // The goal that depends on another
+  prerequisiteId  String   // The goal that must be completed first
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  dependent       Goal     @relation("DependentGoal", fields: [dependentId], references: [id], onDelete: Cascade)
+  prerequisite    Goal     @relation("PrerequisiteGoal", fields: [prerequisiteId], references: [id], onDelete: Cascade)
+  
+  @@unique([dependentId, prerequisiteId])
+  @@map("goal_dependencies")
+}
+
+//=====================
+// RISK ASSESSMENT
+//=====================
+
+model RiskAssessment {
+  id                String                 @id @default(cuid())
+  userId            String
+  assessmentType    String                 // initial, periodic, goal_specific
+  status            String                 @default("in_progress") // in_progress, completed, expired
+  completedAt       DateTime?
+  expiresAt         DateTime?              // When reassessment is needed
+  overallRiskScore  Float?                 // 0-100
+  riskLevel         String?                // low, medium, high, critical
+  theta             Float?                 // Calculated theta value from conversation
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+  
+  // Relations
+  user              User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answers           AssessmentAnswer[]
+  categoryScores    RiskCategoryScore[]
+  recommendations   RiskRecommendation[]
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("risk_assessments")
+}
+
+model AssessmentQuestion {
+  id              String              @id @default(cuid())
+  category        String              // financial, health, career, personal, family
+  subcategory     String?
+  question        String
+  questionType    String              // multiple_choice, scale, yes_no, text
+  options         Json?               // For multiple choice questions
+  minValue        Int?                // For scale questions
+  maxValue        Int?                // For scale questions
+  weight          Float               @default(1.0) // Importance in scoring
+  order           Int                 @default(0)
+  isActive        Boolean             @default(true)
+  requiredFor     String[]            // User segments this applies to
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  
+  // Relations
+  answers         AssessmentAnswer[]
+  
+  @@index([category])
+  @@index([isActive])
+  @@map("assessment_questions")
+}
+
+model AssessmentAnswer {
+  id              String              @id @default(cuid())
+  assessmentId    String
+  questionId      String
+  answerValue     String?             // Text or selected option
+  answerScore     Float?              // Numerical value for scales
+  riskImpact      Float?              // How this answer affects risk score
+  confidence      Float?              // User's confidence in their answer (0-1)
+  notes           String?
+  createdAt       DateTime            @default(now())
+  
+  // Relations
+  assessment      RiskAssessment      @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  question        AssessmentQuestion  @relation(fields: [questionId], references: [id])
+  
+  @@unique([assessmentId, questionId])
+  @@index([assessmentId])
+  @@map("assessment_answers")
+}
+
+model RiskCategoryScore {
+  id              String           @id @default(cuid())
+  assessmentId    String
+  category        String           // financial, health, career, personal, family
+  score           Float            // 0-100
+  riskLevel       String           // low, medium, high, critical
+  factors         Json?            // Key factors contributing to this score
+  createdAt       DateTime         @default(now())
+  
+  // Relations
+  assessment      RiskAssessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  
+  @@unique([assessmentId, category])
+  @@index([assessmentId])
+  @@map("risk_category_scores")
+}
+
+model RiskRecommendation {
+  id              String           @id @default(cuid())
+  assessmentId    String
+  category        String
+  priority        String           // immediate, high, medium, low
+  title           String
+  description     String
+  actionItems     Json?            // Array of specific actions
+  resources       Json?            // Links, tools, etc.
+  estimatedImpact String?          // Expected improvement
+  createdAt       DateTime         @default(now())
+  
+  // Relations
+  assessment      RiskAssessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  
+  @@index([assessmentId])
+  @@index([priority])
+  @@map("risk_recommendations")
+}
+
+//=====================
+// USER PREFERENCES
+//=====================
+
+model UserPreference {
+  id                   String  @id @default(cuid())
+  userId               String  @unique
+  theme                String  @default("system") // light, dark, system
+  currency             String  @default("USD")
+  language             String  @default("en")
+  timezone             String  @default("UTC")
+  emailNotifications   Boolean @default(true)
+  pushNotifications    Boolean @default(true)
+  smsNotifications     Boolean @default(false)
+  newsletterSubscribed Boolean @default(true)
+  dateFormat           String  @default("MM/DD/YYYY")
+  timeFormat           String  @default("12h") // 12h, 24h
+  firstDayOfWeek       Int     @default(0) // 0=Sunday, 1=Monday
+  dashboardLayout      Json?   // Custom dashboard configuration
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_preferences")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String    // info, success, warning, error, reminder
+  category  String?   // goals, finance, health, etc.
+  priority  String    @default("normal") // low, normal, high, urgent
+  read      Boolean   @default(false)
+  actionUrl String?   // Link to relevant page
+  metadata  Json?     // Additional data
+  createdAt DateTime  @default(now())
+  readAt    DateTime?
+  expiresAt DateTime?
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+//=====================
+// FINANCIAL MODELS
+//=====================
+
+model FinancialAccount {
+  id                String        @id @default(cuid())
+  userId            String
+  name              String
+  type              String        // checking, savings, investment, credit, loan, crypto
+  subtype           String?       // specific account subtype
+  institution       String
+  accountNumber     String?       // encrypted
+  routingNumber     String?       // encrypted
+  balance           Float
+  availableBalance  Float?
+  creditLimit       Float?        // for credit accounts
+  interestRate      Float?        // for loans/savings
+  currency          String        @default("USD")
+  isActive          Boolean       @default(true)
+  isPrimary         Boolean       @default(false)
+  lastSynced        DateTime      @default(now())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  notes             String?
+  integrationId     String?       // ID for third-party integration
+  
+  // Relations
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions      Transaction[]
+  
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([type])
+  @@map("financial_accounts")
+}
+
+model Transaction {
+  id                String           @id @default(cuid())
+  userId            String
+  accountId         String
+  amount            Float
+  currency          String           @default("USD")
+  description       String
+  category          String
+  subcategory       String?
+  date              DateTime
+  type              String           // income, expense, transfer, investment
+  status            String           @default("completed") // pending, completed, failed, cancelled
+  isRecurring       Boolean          @default(false)
+  recurringId       String?          // Link to recurring transaction pattern
+  merchantName      String?
+  merchantCategory  String?
+  reference         String?          // External reference number
+  notes             String?
+  tags              String[]
+  locationLat       Float?
+  locationLong      Float?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  
+  // Relations
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account           FinancialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([accountId])
+  @@index([date])
+  @@index([category])
+  @@map("transactions")
+}
+
+model Asset {
+  id                String   @id @default(cuid())
+  userId            String
+  name              String
+  type              String   // real_estate, vehicle, cryptocurrency, collectible, business, other
+  subtype           String?
+  value             Float
+  currency          String   @default("USD")
+  purchaseDate      DateTime?
+  purchasePrice     Float?
+  currentValue      Float
+  lastValuationDate DateTime @default(now())
+  location          String?
+  description       String?
+  notes             String?
+  documents         Json?    // Related document IDs
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([type])
+  @@map("assets")
+}
+
+model FinancialGoal {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  description   String?
+  type          String   // savings, debt_payoff, investment, retirement, purchase
+  targetAmount  Float
+  currentAmount Float    @default(0)
+  currency      String   @default("USD")
+  targetDate    DateTime?
+  priority      String   @default("medium") // low, medium, high, critical
+  status        String   @default("active") // draft, active, completed, paused, abandoned
+  category      String   // retirement, education, home, emergency, vacation, other
+  strategy      Json?    // Saving/investment strategy details
+  milestones    Json?    // Array of milestone objects
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  completedAt   DateTime?
+  
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([status])
+  @@map("financial_goals")
+}
+
+//=====================
+// HEALTH MODELS
+//=====================
+
+model HealthRecord {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String   // medical_visit, procedure, diagnosis, medication, immunization, lab_result
+  category          String?  // preventive, emergency, routine, specialist
+  providerName      String?
+  providerType      String?  // doctor, specialist, hospital, clinic
+  facilityName      String?
+  date              DateTime
+  title             String
+  description       String
+  diagnosis         String?
+  treatment         String?
+  prescription      Json?    // Medication details
+  followUpDate      DateTime?
+  attachmentUrls    String[] // URLs to secure documents
+  notes             String?
+  isConfidential    Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([date])
+  @@index([type])
+  @@map("health_records")
+}
+
+model HealthMetric {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   // weight, blood_pressure, heart_rate, blood_sugar, cholesterol, sleep, steps
+  value       Float
+  unit        String
+  systolic    Float?   // For blood pressure
+  diastolic   Float?   // For blood pressure
+  date        DateTime
+  time        String?  // Time of day for certain metrics
+  notes       String?
+  source      String   @default("manual") // manual, device, integration
+  deviceId    String?
+  deviceName  String?
+  isAbnormal  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([date])
+  @@index([type])
+  @@map("health_metrics")
+}
+
+//=====================
+// EDUCATION MODELS
+//=====================
+
+model EducationRecord {
+  id           String    @id @default(cuid())
+  userId       String
+  type         String    // degree, certification, course, training, workshop
+  institution  String
+  degree       String?
+  major        String?
+  minor        String?
+  gpa          Float?
+  credits      Float?
+  startDate    DateTime
+  endDate      DateTime?
+  status       String    @default("in_progress") // in_progress, completed, on_hold, dropped
+  isVerified   Boolean   @default(false)
+  certificateUrl String?
+  transcriptUrl String?
+  description  String?
+  achievements Json?     // Honors, awards, etc.
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  // Relations
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([status])
+  @@map("education_records")
+}
+
+model EducationCourse {
+  id                String    @id @default(cuid())
+  userId            String
+  title             String
+  provider          String
+  platform          String?   // Coursera, Udemy, etc.
+  instructorName    String?
+  url               String?
+  courseCode        String?
+  credits           Float?
+  startDate         DateTime?
+  endDate           DateTime?
+  expectedEndDate   DateTime?
+  status            String    @default("enrolled") // enrolled, in_progress, completed, dropped
+  progress          Float     @default(0) // 0 to 100
+  grade             String?
+  certificateEarned Boolean   @default(false)
+  certificateUrl    String?
+  certificateDate   DateTime?
+  skills            String[]  // Skills gained
+  notes             String?
+  cost              Float?
+  isPaid            Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([status])
+  @@map("education_courses")
+}
+
+//=====================
+// CAREER MODELS
+//=====================
+
+model CareerProfile {
+  id                String    @id @default(cuid())
+  userId            String
+  title             String?
+  company           String?
+  industry          String?
+  yearsExperience   Int?
+  currentSalary     Float?
+  desiredSalary     Float?
+  skills            String[]
+  certifications    String[]
+  languages         Json?     // Languages and proficiency levels
+  bio               String?
+  resumeUrl         String?
+  resumeUpdatedAt   DateTime?
+  linkedInUrl       String?
+  githubUrl         String?
+  portfolioUrl      String?
+  websiteUrl        String?
+  availableFrom     DateTime?
+  preferredLocation String?
+  remotePreference  String?   // remote, hybrid, onsite
+  jobSearchStatus   String    @default("not_looking") // active, passive, not_looking
+  visibility        String    @default("private") // public, connections, private
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@map("career_profiles")
+}
+
+model JobApplication {
+  id              String    @id @default(cuid())
+  userId          String
+  companyName     String
+  position        String
+  department      String?
+  jobUrl          String?
+  jobDescription  String?
+  applicationDate DateTime
+  source          String?   // where you found the job
+  status          String    // applied, screening, interviewing, offer, rejected, accepted, withdrawn
+  stage           String?   // phone_screen, technical, onsite, final
+  salary          Float?
+  salaryMin       Float?
+  salaryMax       Float?
+  location        String?
+  workType        String?   // remote, hybrid, onsite
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  notes           String?
+  interviewDates  Json?     // Array of interview dates and types
+  offerDate       DateTime?
+  offerDeadline   DateTime?
+  startDate       DateTime?
+  rejectionReason String?
+  followUpDate    DateTime?
+  documents       Json?     // Resume version, cover letter, etc.
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([status])
+  @@index([applicationDate])
+  @@map("job_applications")
+}
+
+//=====================
+// DOCUMENT MODELS
+//=====================
+
+model Document {
+  id            String   @id @default(cuid())
+  userId        String
+  title         String
+  description   String?
+  category      String   // financial, health, education, career, legal, personal, tax
+  subcategory   String?
+  fileUrl       String   // URL to the encrypted document
+  thumbnailUrl  String?
+  fileName      String
+  fileType      String
+  mimeType      String?
+  fileSize      Int
+  fileHash      String?  // SHA-256 hash for integrity
+  tags          String[]
+  isEncrypted   Boolean  @default(true)
+  encryptionKey String?  // Reference to encryption key (not the key itself)
+  isArchived    Boolean  @default(false)
+  expiresAt     DateTime?
+  metadata      Json?    // Additional file metadata
+  ocrText       String?  // Extracted text for searchability
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([category])
+  @@index([createdAt])
+  @@map("documents")
+}
+
+//=====================
+// INTEGRATION MODELS
+//=====================
+
+model UserIntegration {
+  id              String    @id @default(cuid())
+  userId          String
+  provider        String    // plaid, mint, fitbit, google_fit, linkedin, etc.
+  providerUserId  String?
+  accessToken     String?   @db.Text // Encrypted
+  refreshToken    String?   @db.Text // Encrypted
+  tokenExpiresAt  DateTime?
+  scopes          String[]
+  status          String    @default("active") // active, revoked, expired, error
+  lastSyncedAt    DateTime?
+  lastError       String?
+  syncFrequency   String?   // realtime, daily, weekly, manual
+  settings        Json?     // Provider-specific settings
+  metadata        Json?     // Provider-specific metadata
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, provider])
+  @@index([provider])
+  @@index([status])
+  @@map("user_integrations")
 }

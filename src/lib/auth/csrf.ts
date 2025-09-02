@@ -25,11 +25,11 @@ export async function generateCsrfToken(): Promise<string> {
   // Generate a random secret
   const secret = randomBytes(32).toString('hex');
   
-  // Get the cookies instance
-  const cookieStore = cookies();
+  // Get the cookies instance - await it in Next.js 15
+  const cookieStore = await cookies();
   
-  // Set the secret in a secure cookie - make sure to await it
-  await cookieStore.set(CSRF_SECRET_COOKIE, secret, CSRF_COOKIE_OPTS);
+  // Set the secret in a secure cookie
+  cookieStore.set(CSRF_SECRET_COOKIE, secret, CSRF_COOKIE_OPTS);
   
   // Generate a token based on the secret
   return createCsrfToken(secret);

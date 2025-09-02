@@ -63,17 +63,33 @@ class MockDB {
     findMany: async () => []
   };
   
+  securityToken = {
+    create: async () => ({}),
+    findUnique: async () => null,
+    findMany: async () => [],
+    update: async () => ({})
+  };
+  
   revokedToken = {
     create: async () => ({}),
     findUnique: async () => null,
     findMany: async () => []
   };
   
+  benefitRanking = {
+    create: async () => ({}),
+    createMany: async () => ({ count: 0 }),
+    findMany: async () => [],
+    deleteMany: async () => ({ count: 0 }),
+    findUnique: async () => null,
+    update: async () => ({})
+  };
+  
   // Mock the $queryRaw method for testing database connectivity
-  $queryRaw: async <T = any>(...args: any[]) => {
-    return [{ result: 2 }] as T;
-  }
-}
+  $queryRaw = (async (..._args: any[]) => {
+    return [{ result: 2 }];
+  }) as any;
+};
 
 // Determine if we should use mock database or real Prisma
 // Use environment variables to control this behavior

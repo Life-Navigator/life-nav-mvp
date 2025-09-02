@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import TransactionFilters from '@/components/financial/transactions/TransactionFilters';
 import TransactionList from '@/components/financial/transactions/TransactionList';
 import { EnhancedTransaction } from '@/types/financial';
-import { mockAccounts, mockTransactions, getTransactionsByAccount, getTransactionsByDateRange } from '@/lib/mock/financialAccounts';
+// Removed mock data import - will fetch from database
 
 export default function TransactionsPage() {
   // Initialize with last 30 days as default
@@ -17,26 +17,48 @@ export default function TransactionsPage() {
   const [endDate, setEndDate] = useState(new Date());
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<EnhancedTransaction[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   
-  // Initialize by selecting all accounts
+  // Fetch accounts and transactions from database
   useEffect(() => {
-    setSelectedAccountIds(mockAccounts.map(account => account.id));
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        // TODO: Implement API endpoints for fetching accounts and transactions
+        // const accountsRes = await fetch('/api/finance/accounts');
+        // const transactionsRes = await fetch('/api/finance/transactions');
+        // setAccounts(await accountsRes.json());
+        // setTransactions(await transactionsRes.json());
+        setAccounts([]);
+        setTransactions([]);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, []);
   
   // Filter transactions when criteria change
   useEffect(() => {
-    let transactions = [...mockTransactions];
+    let filtered = [...transactions];
     
     // Filter by date range
-    transactions = getTransactionsByDateRange(transactions, startDate, endDate);
+    filtered = filtered.filter(txn => {
+      const txnDate = new Date(txn.date);
+      return txnDate >= startDate && txnDate <= endDate;
+    });
     
     // Filter by selected accounts
     if (selectedAccountIds.length > 0) {
-      transactions = transactions.filter(txn => selectedAccountIds.includes(txn.accountId));
+      filtered = filtered.filter(txn => selectedAccountIds.includes(txn.accountId));
     }
     
     // Sort transactions by date (newest first)
-    transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     
     setFilteredTransactions(transactions);
   }, [startDate, endDate, selectedAccountIds]);
@@ -107,10 +129,20 @@ export default function TransactionsPage() {
       />
       
       {/* Transaction List */}
-      <TransactionList
-        transactions={filteredTransactions}
-        accounts={mockAccounts}
-      />
+      {loading ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500 dark:text-gray-400">Loading transactions...</p>
+        </div>
+      ) : filteredTransactions.length > 0 ? (
+        <TransactionList
+          transactions={filteredTransactions}
+          accounts={accounts}
+        />
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
+          <p className="text-gray-500 dark:text-gray-400">No transactions found for the selected filters.</p>
+        </div>
+      )}
     </div>
   );
 }

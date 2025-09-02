@@ -7,19 +7,47 @@ import NetWorthSummary from '@/components/financial/accounts/NetWorthSummary';
 import InstitutionGroup from '@/components/financial/accounts/InstitutionGroup';
 import AddAccountButton from '@/components/financial/accounts/AddAccountButton';
 import ConnectAccountModal from '@/components/financial/accounts/ConnectAccountModal';
-import { mockAccounts, getAccountsByType, getAccountsByInstitution } from '@/lib/mock/financialAccounts';
+// Removed mock data import - will fetch from database
 
 export default function AccountsPage() {
   const [selectedType, setSelectedType] = useState<AccountType | 'all'>('all');
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  // Fetch accounts from database
+  React.useEffect(() => {
+    const fetchAccounts = async () => {
+      try {
+        setLoading(true);
+        // TODO: Implement API endpoint for fetching financial accounts
+        // const response = await fetch('/api/finance/accounts');
+        // const data = await response.json();
+        // setAccounts(data);
+        setAccounts([]); // Empty for now
+      } catch (error) {
+        console.error('Error fetching accounts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAccounts();
+  }, []);
   
   // Filter accounts based on selected type
   const filteredAccounts = selectedType === 'all' 
-    ? mockAccounts 
-    : getAccountsByType(mockAccounts, selectedType);
+    ? accounts 
+    : accounts.filter(acc => acc.type === selectedType);
   
   // Group accounts by institution
-  const accountGroups = getAccountsByInstitution(filteredAccounts);
+  const accountGroups = filteredAccounts.reduce((groups: any, account: any) => {
+    const institution = account.institution || 'Other';
+    if (!groups[institution]) {
+      groups[institution] = [];
+    }
+    groups[institution].push(account);
+    return groups;
+  }, {});
   
   // Handle account click
   const handleAccountClick = (accountId: string) => {
@@ -59,17 +87,22 @@ export default function AccountsPage() {
       </div>
       
       {/* Net Worth Summary */}
-      <NetWorthSummary accounts={mockAccounts} />
+      <NetWorthSummary accounts={filteredAccounts} />
       
       {/* Account Type Filter */}
       <AccountTypeFilter selectedType={selectedType} onChange={setSelectedType} />
       
       {/* Institution Groups */}
-      {accountGroups.length > 0 ? (
-        accountGroups.map((group) => (
+      {loading ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500 dark:text-gray-400">Loading accounts...</p>
+        </div>
+      ) : Object.keys(accountGroups).length > 0 ? (
+        Object.entries(accountGroups).map(([institution, accounts]: [string, any]) => (
           <InstitutionGroup
-            key={group.institution.id}
-            accountGroup={group}
+            key={institution}
+            institutionName={institution}
+            accounts={accounts}
             onAccountClick={handleAccountClick}
           />
         ))

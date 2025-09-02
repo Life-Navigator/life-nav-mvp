@@ -1,142 +1,74 @@
-# Life Navigator
+# LifeNavigator
 
-Life Navigator is a comprehensive life management platform designed to help users manage multiple aspects of their lives including Finance, Career, Education, and Healthcare.
+A comprehensive life planning and goal management platform built with Next.js, TypeScript, and Azure.
 
-## Project Overview
+## 🚀 Features
 
-The platform offers tools for tracking financial health, career progression, educational achievements, and health metrics, all in one integrated dashboard.
+### Core Functionality
+- **Benefits Discovery**: Interactive drag-and-drop interface to discover personal motivations
+- **MyBlocks Goals**: Visual goal planning system inspired by MoneyGuidePro
+- **What-What-Why Conversations**: AI-powered multi-agent system for discovering true motivations
+- **Risk Assessment**: Comprehensive risk profiling (coming soon)
 
-## Technology Stack
+### Technical Features
+- HIPAA-compliant architecture
+- Real-time collaboration capabilities
+- Multi-factor authentication
+- End-to-end encryption for sensitive data
+- Comprehensive audit logging
 
-- **Frontend**: Next.js 15 with React 19 and TypeScript
-- **Styling**: Tailwind CSS
-- **Database**: PostgreSQL with Prisma ORM
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend**: Next.js API Routes, Prisma ORM
+- **Database**: PostgreSQL (Azure Database)
+- **Cache**: Redis
+- **Queue**: Bull with Redis
 - **Authentication**: NextAuth.js
-- **Infrastructure**: AWS via Terraform (ECS, RDS, S3, CloudFront)
-- **CI/CD**: GitHub Actions
-- **Local Development**: Docker Compose
+- **Infrastructure**: Azure (App Service, PostgreSQL, Redis, Key Vault)
+- **Deployment**: Docker, Terraform
 
-## Prerequisites
-
-- Node.js 20+
-- Docker and Docker Compose
-- Git
-
-## Getting Started
-
-### 1. Clone the repository
+## 📦 Installation
 
 ```bash
-git clone https://github.com/yourusername/lifenavigator.git
-cd lifenavigator
+# Install dependencies (requires pnpm v9+)
+pnpm install
+
+# Set up environment variables
+cp .env.example .env.local
+
+# Run database migrations
+pnpm prisma migrate dev
+
+# Start development server
+pnpm dev
 ```
 
-### 2. Install dependencies
+## 🏗️ Project Structure
 
-```bash
-npm install
+```
+src/
+├── app/           # Next.js app directory
+├── components/    # React components
+├── lib/          # Core libraries and utilities
+│   ├── auth/     # Authentication
+│   ├── benefits/ # Benefits discovery system
+│   ├── conversation/ # What-What-Why conversation engine
+│   ├── goals/    # Goal management
+│   ├── security/ # Security and HIPAA compliance
+│   └── queue/    # Background job processing
+├── styles/       # Global styles
+└── types/        # TypeScript type definitions
 ```
 
-### 3. Set up environment variables
+## 🚀 Deployment
 
-Copy the example environment file:
+See [AZURE_DEPLOYMENT.md](./AZURE_DEPLOYMENT.md) for detailed Azure deployment instructions.
 
-```bash
-cp .env.example .env
-```
+## 📄 License
 
-Edit the `.env` file with your configuration values if needed.
+Proprietary - All Rights Reserved
 
-### 4. Start the database
+## 🤝 Contributing
 
-Start the PostgreSQL database using Docker Compose:
-
-```bash
-docker-compose up -d
-```
-
-This will start a PostgreSQL instance accessible at `localhost:5432`.
-
-### 5. Initialize the database
-
-Generate the Prisma client, run migrations, and seed the database:
-
-```bash
-npm run prisma:generate
-npm run prisma:migrate-dev
-npm run db:seed
-```
-
-### 6. Start the development server
-
-```bash
-npm run dev
-```
-
-The application should now be running at [http://localhost:3000](http://localhost:3000).
-
-### Login Details
-
-For the demo account:
-- **Email**: demo@lifenavigator.com
-- **Password**: password123
-
-## Available Scripts
-
-- `npm run dev` - Start the development server
-- `npm run build` - Build the application for production
-- `npm run start` - Start the production server
-- `npm run lint` - Lint the codebase
-- `npm run prisma:generate` - Generate Prisma client
-- `npm run prisma:migrate-dev` - Create and apply migrations
-- `npm run prisma:deploy` - Apply migrations in production
-- `npm run prisma:studio` - Open Prisma Studio for database management
-- `npm run db:push` - Push schema changes to the database
-- `npm run db:seed` - Seed the database with initial data
-
-## Database Schema
-
-The database schema includes models for users, financial records, career tracking, education progress, health data, and roadmap planning. See the [Prisma schema](./prisma/schema.prisma) for details.
-
-## Infrastructure Setup
-
-This project uses Terraform to provision AWS infrastructure. The configuration files are located in the `terraform` directory.
-
-### Deploying Infrastructure
-
-1. Install Terraform
-2. Configure AWS credentials
-3. Initialize Terraform:
-
-```bash
-cd terraform
-terraform init
-```
-
-4. Deploy infrastructure:
-
-```bash
-terraform apply -var="environment=dev"
-```
-
-## CI/CD Pipeline
-
-The project uses GitHub Actions for continuous integration and deployment. The workflow files are located in the `.github/workflows` directory.
-
-- `ci.yml` - Runs linting, type checking, tests, and builds the application
-- `deploy.yml` - Deploys the application to AWS using Terraform
-
-## Project Structure
-
-- `/src/app` - Next.js App Router pages
-- `/src/components` - React components
-- `/src/lib` - Utility functions and API clients
-- `/src/hooks` - Custom React hooks
-- `/src/types` - TypeScript type definitions
-- `/prisma` - Database schema and migrations
-- `/terraform` - Infrastructure as code
-- `/public` - Static assets
-
-## License
-
-This project is licensed under the MIT License.
+This is a private repository. Please contact the team for contribution guidelines.

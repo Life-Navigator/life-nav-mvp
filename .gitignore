@@ -46,8 +46,18 @@ prisma/*.backup
 # encryption keys
 *.key
 
-# vercel
-.vercel
+# Azure
+.azure/
+*.publishsettings
+*.pubxml
+*.deployment
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars.local
+terraform.tfplan
 
 # typescript
 *.tsbuildinfo

@@ -1,0 +1,12 @@
+{
+  "bindings": [
+    {
+      "name": "dataRetentionTimer",
+      "type": "timerTrigger",
+      "direction": "in",
+      "schedule": "0 0 2 * * *",
+      "comment": "Runs daily at 2 AM"
+    }
+  ],
+  "scriptFile": "../dist/DataRetention/index.js"
+}
