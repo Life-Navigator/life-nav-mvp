@@ -1,0 +1,228 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector extension for structured data and vector search
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: lna-postgres
+    environment:
+      POSTGRES_DB: life_navigator_agents
+      POSTGRES_USER: lna_user
+      POSTGRES_PASSWORD: lna_dev_password_2024
+      POSTGRES_INITDB_ARGS: "-E UTF8 --locale=en_US.utf8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/init-scripts/postgres:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lna_user -d life_navigator_agents"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lna-network
+
+  # Redis for fast pub/sub messaging and caching
+  redis:
+    image: redis:7-alpine
+    container_name: lna-redis
+    command: redis-server --appendonly yes --requirepass lna_redis_password
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lna-network
+
+  # RabbitMQ for reliable task queuing
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: lna-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: lna_user
+      RABBITMQ_DEFAULT_PASS: lna_rabbitmq_password
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - lna-network
+
+  # Qdrant for vector similarity search
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: lna-qdrant
+    ports:
+      - "6333:6333" # HTTP API
+      - "6334:6334" # gRPC API
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT_ALLOW_RECOVERY_MODE: "true"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lna-network
+
+  # Neptune is AWS-managed, so we use a localstack simulation for local dev
+  # In production, this would be replaced with actual Neptune cluster
+  localstack:
+    image: localstack/localstack:latest
+    container_name: lna-localstack
+    environment:
+      SERVICES: neptune
+      DEBUG: 1
+      DATA_DIR: /tmp/localstack/data
+      NEPTUNE_PORT: 8182
+    ports:
+      - "4566:4566"   # LocalStack edge
+      - "8182:8182"   # Neptune port
+    volumes:
+      - localstack_data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - lna-network
+
+  # vLLM instance 1 - Llama 4 Maverick (GPU-accelerated)
+  # Note: Requires NVIDIA GPU and nvidia-container-toolkit
+  # Comment out if running without GPU
+  vllm-1:
+    image: vllm/vllm-openai:latest
+    container_name: lna-vllm-1
+    environment:
+      MODEL_NAME: meta-llama/Llama-3.1-70B-Instruct
+      TENSOR_PARALLEL_SIZE: 2
+      MAX_MODEL_LEN: 8192
+      GPU_MEMORY_UTILIZATION: 0.9
+    ports:
+      - "8000:8000"
+    volumes:
+      - vllm_cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 2
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - lna-network
+    # Comment out if model weights are not available
+    profiles:
+      - gpu
+
+  # vLLM instance 2 - Load balancing (GPU-accelerated)
+  vllm-2:
+    image: vllm/vllm-openai:latest
+    container_name: lna-vllm-2
+    environment:
+      MODEL_NAME: meta-llama/Llama-3.1-70B-Instruct
+      TENSOR_PARALLEL_SIZE: 2
+      MAX_MODEL_LEN: 8192
+      GPU_MEMORY_UTILIZATION: 0.9
+    ports:
+      - "8001:8000"
+    volumes:
+      - vllm_cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 2
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - lna-network
+    profiles:
+      - gpu
+
+  # Application container (optional - for running the agent system)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lna-app
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=life_navigator_agents
+      - POSTGRES_USER=lna_user
+      - POSTGRES_PASSWORD=lna_dev_password_2024
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=lna_redis_password
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=lna_user
+      - RABBITMQ_PASSWORD=lna_rabbitmq_password
+      - QDRANT_URL=http://qdrant:6333
+      - NEPTUNE_CLUSTER_ENDPOINT=localstack
+      - NEPTUNE_PORT=8182
+      - VLLM_INSTANCE_1=http://vllm-1:8000
+      - VLLM_INSTANCE_2=http://vllm-2:8000
+      - APP_ENVIRONMENT=development
+      - APP_DEBUG=true
+      - APP_LOG_LEVEL=INFO
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+    networks:
+      - lna-network
+    profiles:
+      - app
+
+networks:
+  lna-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  qdrant_data:
+    driver: local
+  localstack_data:
+    driver: local
+  vllm_cache:
+    driver: local
