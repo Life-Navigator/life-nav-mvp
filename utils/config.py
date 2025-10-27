@@ -36,7 +36,7 @@ class LLMConfig(BaseSettings):
         default="http://localhost:8001", description="Second vLLM instance URL"
     )
     model_name: str = Field(
-        default="meta-llama/Llama-3.1-70B-Instruct", description="LLM model name"
+        default="meta-llama/Llama-4-Maverick-17B-128E", description="LLM model name"
     )
     timeout: int = Field(
         default=30, ge=1, le=300, description="Request timeout in seconds"

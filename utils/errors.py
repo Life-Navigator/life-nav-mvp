@@ -249,6 +249,11 @@ class MessageConsumptionError(MessagingError):
     http_status_code = 500
 
 
+# Aliases for convenience
+MessageBusError = MessagingError
+MessageBusConnectionError = MessagingError
+
+
 # =============================================================================
 # LLM Errors
 # =============================================================================
