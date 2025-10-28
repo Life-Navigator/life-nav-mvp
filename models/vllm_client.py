@@ -24,6 +24,7 @@ logger = get_logger(__name__)
 class LLMModel(str, Enum):
     """Supported LLM models"""
     LLAMA_4_MAVERICK = "meta-llama/Llama-4-Maverick-17B-128E"
+    LLAMA_4_MAVERICK_INSTRUCT = "meta-llama/Llama-4-Maverick-17B-128E-Instruct"  # 749GB MoE model (local)
     LLAMA_4_MAVERICK_70B = "meta-llama/Llama-4-Maverick-70B-Instruct"  # Alternative larger model
 
 
@@ -75,7 +76,7 @@ class VLLMClient:
     def __init__(
         self,
         instances: Optional[List[str]] = None,
-        model: str = LLMModel.LLAMA_4_MAVERICK,
+        model: str = LLMModel.LLAMA_4_MAVERICK_INSTRUCT,
         timeout: float = 30.0,
         max_retries: int = 3,
         enable_caching: bool = True
