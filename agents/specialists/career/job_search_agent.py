@@ -1226,3 +1226,38 @@ What should they focus on to make the best impression?"""
         except Exception:
             # Fallback insights
             return f"For your {interview_type} interview at {company}, thoroughly research their products and recent initiatives. Prepare specific examples that demonstrate your expertise in {job_title} responsibilities using the STAR method. Show genuine enthusiasm for their mission and ask thoughtful questions about team dynamics and growth opportunities."
+
+    async def handle_query(self, query: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle read-only job search queries.
+
+        Supported query types:
+        - search_jobs: Search for job opportunities
+        - get_resume_tips: Get resume improvement tips
+        - get_interview_prep: Get interview preparation advice
+
+        Args:
+            query: Query dict with query_type and parameters
+
+        Returns:
+            Dict with query results
+        """
+        query_type = query.get("query_type")
+        params = query.get("parameters", {})
+
+        if query_type == "search_jobs":
+            return await self._search_jobs(params.get("user_id"), params)
+        elif query_type == "get_resume_tips":
+            return await self._get_resume_tips(params.get("user_id"), params)
+        elif query_type == "get_interview_prep":
+            return await self._prepare_interview(params.get("user_id"), params)
+        else:
+            return {
+                "success": False,
+                "error": f"Unsupported query type: {query_type}",
+                "supported_types": [
+                    "search_jobs",
+                    "get_resume_tips",
+                    "get_interview_prep"
+                ]
+            }

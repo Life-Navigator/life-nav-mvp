@@ -1365,3 +1365,38 @@ How should they optimize their skills section?"""
                 return f"You're missing {required_missing} required skills. If you have these skills but didn't list them, add them immediately. If you lack them, consider quick online courses or highlight transferable skills."
             else:
                 return f"Skills alignment is {score:.1f}%. All required skills are present. Strengthen your application by adding more preferred skills and providing concrete examples of using key skills in your experience."
+
+    async def handle_query(self, query: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle read-only resume queries.
+
+        Supported query types:
+        - analyze_resume: Analyze resume content
+        - get_templates: Get resume templates
+        - get_improvement_tips: Get resume improvement tips
+
+        Args:
+            query: Query dict with query_type and parameters
+
+        Returns:
+            Dict with query results
+        """
+        query_type = query.get("query_type")
+        params = query.get("parameters", {})
+
+        if query_type == "analyze_resume":
+            return await self._analyze_resume(params.get("user_id"), params)
+        elif query_type == "get_templates":
+            return await self._suggest_templates(params.get("user_id"), params)
+        elif query_type == "get_improvement_tips":
+            return await self._optimize_keywords(params.get("user_id"), params)
+        else:
+            return {
+                "success": False,
+                "error": f"Unsupported query type: {query_type}",
+                "supported_types": [
+                    "analyze_resume",
+                    "get_templates",
+                    "get_improvement_tips"
+                ]
+            }

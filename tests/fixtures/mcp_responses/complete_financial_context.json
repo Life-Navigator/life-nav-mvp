@@ -1,175 +1,49 @@
 {
-  "description": "Complete financial context for budget analysis (combines multiple tool responses)",
-  "use_case": "Budget Specialist testing - all data needed for spending analysis",
-  "context": {
-    "accounts": [
-      {
-        "account_id": "acc_chase_checking_001",
-        "institution_name": "Chase",
-        "account_type": "checking",
-        "mask": "1234",
-        "current_balance": 5420.50,
-        "currency_code": "USD"
-      },
-      {
-        "account_id": "acc_chase_savings_001",
-        "institution_name": "Chase",
-        "account_type": "savings",
-        "mask": "5678",
-        "current_balance": 12450.80,
-        "currency_code": "USD"
-      },
-      {
-        "account_id": "acc_amex_credit_001",
-        "institution_name": "American Express",
-        "account_type": "credit_card",
-        "mask": "4321",
-        "current_balance": -2150.25,
-        "currency_code": "USD"
-      }
-    ],
-    "transactions_count": 142,
-    "spending_by_category": [
-      {
-        "category": "Food and Drink",
-        "transaction_count": 45,
-        "total_spent": -1250.80,
-        "avg_transaction": -27.80,
-        "largest_transaction": -125.50,
-        "percentage_of_total": 23.5
-      },
-      {
-        "category": "Housing",
-        "transaction_count": 3,
-        "total_spent": -3750.00,
-        "avg_transaction": -1250.00,
-        "largest_transaction": -1250.00,
-        "percentage_of_total": 70.3
-      },
-      {
-        "category": "Transportation",
-        "transaction_count": 12,
-        "total_spent": -480.00,
-        "avg_transaction": -40.00,
-        "largest_transaction": -85.00,
-        "percentage_of_total": 9.0
-      },
-      {
-        "category": "Entertainment",
-        "transaction_count": 8,
-        "total_spent": -240.50,
-        "avg_transaction": -30.06,
-        "largest_transaction": -50.00,
-        "percentage_of_total": 4.5
-      },
-      {
-        "category": "Shopping",
-        "transaction_count": 6,
-        "total_spent": -620.00,
-        "avg_transaction": -103.33,
-        "largest_transaction": -200.00,
-        "percentage_of_total": 11.6
-      },
-      {
-        "category": "Healthcare",
-        "transaction_count": 2,
-        "total_spent": -300.00,
-        "avg_transaction": -150.00,
-        "largest_transaction": -250.00,
-        "percentage_of_total": 5.6
-      },
-      {
-        "category": "Utilities",
-        "transaction_count": 4,
-        "total_spent": -385.00,
-        "avg_transaction": -96.25,
-        "largest_transaction": -145.00,
-        "percentage_of_total": 7.2
-      }
-    ],
-    "recurring_transactions": [
-      {
-        "merchant_name": "Property Management Co",
-        "recurring_pattern": "monthly",
-        "avg_amount": -1250.00,
-        "occurrence_count": 3,
-        "last_occurrence_date": "2025-10-22",
-        "next_expected_date": "2025-11-22",
-        "confidence_score": 1.0
-      },
-      {
-        "merchant_name": "Blue Cross",
-        "recurring_pattern": "monthly",
-        "avg_amount": -250.00,
-        "occurrence_count": 3,
-        "last_occurrence_date": "2025-10-21",
-        "next_expected_date": "2025-11-21",
-        "confidence_score": 0.98
-      },
-      {
-        "merchant_name": "Fidelity",
-        "recurring_pattern": "biweekly",
-        "avg_amount": -350.00,
-        "occurrence_count": 6,
-        "last_occurrence_date": "2025-10-01",
-        "next_expected_date": "2025-10-15",
-        "confidence_score": 1.0
-      },
-      {
-        "merchant_name": "Comcast",
-        "recurring_pattern": "monthly",
-        "avg_amount": -145.00,
-        "occurrence_count": 3,
-        "last_occurrence_date": "2025-10-08",
-        "next_expected_date": "2025-11-08",
-        "confidence_score": 0.95
-      },
-      {
-        "merchant_name": "Verizon",
-        "recurring_pattern": "monthly",
-        "avg_amount": -95.00,
-        "occurrence_count": 3,
-        "last_occurrence_date": "2025-10-18",
-        "next_expected_date": "2025-11-18",
-        "confidence_score": 0.92
-      },
-      {
-        "merchant_name": "Planet Fitness",
-        "recurring_pattern": "monthly",
-        "avg_amount": -50.00,
-        "occurrence_count": 3,
-        "last_occurrence_date": "2025-10-14",
-        "next_expected_date": "2025-11-14",
-        "confidence_score": 0.90
-      },
-      {
-        "merchant_name": "Netflix",
-        "recurring_pattern": "monthly",
-        "avg_amount": -15.99,
-        "occurrence_count": 3,
-        "last_occurrence_date": "2025-10-23",
-        "next_expected_date": "2025-11-23",
-        "confidence_score": 1.0
-      },
-      {
-        "merchant_name": "Spotify",
-        "recurring_pattern": "monthly",
-        "avg_amount": -12.99,
-        "occurrence_count": 3,
-        "last_occurrence_date": "2025-10-19",
-        "next_expected_date": "2025-11-19",
-        "confidence_score": 1.0
-      }
-    ],
-    "summary": {
-      "period_days": 90,
-      "total_income": 10500.00,
-      "total_expenses": -5331.30,
-      "net_savings": 5168.70,
-      "savings_rate": 0.492,
-      "monthly_avg_income": 3500.00,
-      "monthly_avg_expenses": -1777.10,
-      "recurring_monthly_obligations": -1718.99
+  "transactions": [
+    {
+      "transaction_id": "txn_001",
+      "date": "2025-10-20",
+      "description": "Whole Foods Market",
+      "amount": -127.43,
+      "category": "groceries",
+      "merchant": "Whole Foods"
+    },
+    {
+      "transaction_id": "txn_002",
+      "date": "2025-10-19",
+      "description": "Netflix Subscription",
+      "amount": -15.99,
+      "category": "entertainment",
+      "merchant": "Netflix"
+    },
+    {
+      "transaction_id": "txn_003",
+      "date": "2025-10-18",
+      "description": "Salary Deposit",
+      "amount": 5000.00,
+      "category": "income",
+      "merchant": "Acme Corp"
     }
+  ],
+  "accounts": [
+    {
+      "account_id": "acc_checking_001",
+      "name": "Chase Checking",
+      "type": "checking",
+      "balance": 3250.00,
+      "currency": "USD"
+    },
+    {
+      "account_id": "acc_savings_001",
+      "name": "Chase Savings",
+      "type": "savings",
+      "balance": 12500.00,
+      "currency": "USD"
+    }
+  ],
+  "summary": {
+    "total_income": 6500.00,
+    "total_expenses": 2515.99,
+    "net_cashflow": 3984.01
   }
 }

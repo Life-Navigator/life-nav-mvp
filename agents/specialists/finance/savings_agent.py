@@ -1281,3 +1281,38 @@ Provide specific recommendations for optimizing this plan:"""
                     f"Excellent savings plan! Your {savings_rate:.1f}% savings rate fully funds all {len(allocations)} goals. "
                     f"Stay disciplined with your monthly contributions to achieve your financial objectives on schedule."
                 )
+
+    async def handle_query(self, query: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Handle read-only savings queries.
+
+        Supported query types:
+        - get_savings_rate: Get current savings rate
+        - get_goals_summary: Get summary of all savings goals
+        - get_emergency_fund_status: Get emergency fund status
+
+        Args:
+            query: Query dict with query_type and parameters
+
+        Returns:
+            Dict with query results
+        """
+        query_type = query.get("query_type")
+        params = query.get("parameters", {})
+
+        if query_type == "get_savings_rate":
+            return await self._analyze_savings(params.get("user_id"), params)
+        elif query_type == "get_goals_summary":
+            return await self._track_goals(params.get("user_id"), params)
+        elif query_type == "get_emergency_fund_status":
+            return await self._recommend_emergency_fund(params.get("user_id"), params)
+        else:
+            return {
+                "success": False,
+                "error": f"Unsupported query type: {query_type}",
+                "supported_types": [
+                    "get_savings_rate",
+                    "get_goals_summary",
+                    "get_emergency_fund_status"
+                ]
+            }
