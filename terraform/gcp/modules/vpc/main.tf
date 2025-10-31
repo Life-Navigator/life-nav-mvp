@@ -1,0 +1,162 @@
+# ===========================================================================
+# VPC Module - Network infrastructure
+# ===========================================================================
+
+variable "project_id" {
+  description = "GCP project ID"
+  type        = string
+}
+
+variable "region" {
+  description = "GCP region"
+  type        = string
+}
+
+variable "env" {
+  description = "Environment (dev/staging/prod)"
+  type        = string
+}
+
+variable "vpc_name" {
+  description = "VPC network name"
+  type        = string
+}
+
+variable "subnets" {
+  description = "List of subnets to create"
+  type = list(object({
+    name          = string
+    ip_cidr_range = string
+    region        = string
+  }))
+}
+
+# VPC Network
+resource "google_compute_network" "vpc" {
+  name                    = var.vpc_name
+  auto_create_subnetworks = false
+  project                 = var.project_id
+}
+
+# Subnets
+resource "google_compute_subnetwork" "subnets" {
+  count = length(var.subnets)
+
+  name          = "${var.vpc_name}-${var.subnets[count.index].name}"
+  ip_cidr_range = var.subnets[count.index].ip_cidr_range
+  region        = var.subnets[count.index].region
+  network       = google_compute_network.vpc.id
+  project       = var.project_id
+
+  # Enable private Google access for managed services
+  private_ip_google_access = true
+
+  # Enable flow logs for dev/staging/prod
+  log_config {
+    aggregation_interval = "INTERVAL_5_SEC"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }
+}
+
+# Cloud Router for NAT
+resource "google_compute_router" "router" {
+  name    = "${var.vpc_name}-router"
+  network = google_compute_network.vpc.id
+  region  = var.region
+  project = var.project_id
+}
+
+# Cloud NAT for outbound internet access
+resource "google_compute_router_nat" "nat" {
+  name                               = "${var.vpc_name}-nat"
+  router                             = google_compute_router.router.name
+  region                             = var.region
+  nat_ip_allocate_option             = "AUTO_ONLY"
+  source_subnetwork_ip_ranges_to_nat = "ALL_SUBNETWORKS_ALL_IP_RANGES"
+  project                            = var.project_id
+
+  log_config {
+    enable = true
+    filter = "ERRORS_ONLY"
+  }
+}
+
+# Firewall Rules
+resource "google_compute_firewall" "allow_internal" {
+  name    = "${var.vpc_name}-allow-internal"
+  network = google_compute_network.vpc.id
+  project = var.project_id
+
+  allow {
+    protocol = "tcp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "udp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "icmp"
+  }
+
+  source_ranges = [for subnet in var.subnets : subnet.ip_cidr_range]
+}
+
+resource "google_compute_firewall" "allow_ssh" {
+  name    = "${var.vpc_name}-allow-ssh"
+  network = google_compute_network.vpc.id
+  project = var.project_id
+
+  allow {
+    protocol = "tcp"
+    ports    = ["22"]
+  }
+
+  # Restrict to IAP range for secure SSH
+  source_ranges = ["35.235.240.0/20"]
+}
+
+# Private Service Connection for Cloud SQL
+resource "google_compute_global_address" "private_ip_address" {
+  name          = "${var.vpc_name}-private-ip"
+  purpose       = "VPC_PEERING"
+  address_type  = "INTERNAL"
+  prefix_length = 16
+  network       = google_compute_network.vpc.id
+  project       = var.project_id
+}
+
+resource "google_service_networking_connection" "private_vpc_connection" {
+  network                 = google_compute_network.vpc.id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.private_ip_address.name]
+}
+
+# Outputs
+output "network_id" {
+  description = "VPC network ID"
+  value       = google_compute_network.vpc.id
+}
+
+output "network_name" {
+  description = "VPC network name"
+  value       = google_compute_network.vpc.name
+}
+
+output "network_self_link" {
+  description = "VPC network self link"
+  value       = google_compute_network.vpc.self_link
+}
+
+output "subnet_ids" {
+  description = "Subnet IDs"
+  value       = [for subnet in google_compute_subnetwork.subnets : subnet.id]
+}
+
+output "subnet_names" {
+  description = "Subnet names"
+  value       = [for subnet in google_compute_subnetwork.subnets : subnet.name]
+}
