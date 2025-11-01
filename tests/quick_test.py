@@ -8,8 +8,10 @@ import httpx
 import sys
 from pathlib import Path
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add mcp-server directory to path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "mcp-server"))
 
 GREEN = '\033[92m'
 RED = '\033[91m'
@@ -36,9 +38,9 @@ async def test_maverick():
             response = await client.post(
                 "http://localhost:8090/v1/chat/completions",
                 json={
-                    "model": "maverick",
-                    "messages": [{"role": "user", "content": "Hello"}],
-                    "max_tokens": 50
+                    "messages": [{"role": "user", "content": "Say: test"}],
+                    "max_tokens": 10,
+                    "temperature": 0.7
                 },
                 timeout=30.0
             )
@@ -64,7 +66,7 @@ async def test_embeddings():
     print(f"\n{BLUE}Testing Embedding Generation...{RESET}")
 
     try:
-        from mcp_server.ingestion.extractors import EmbeddingGenerator
+        from ingestion.extractors import EmbeddingGenerator
 
         generator = EmbeddingGenerator(use_local=True)
         embeddings = await generator.generate_embeddings(["Test sentence"])
@@ -86,7 +88,7 @@ async def test_parsers():
     print(f"\n{BLUE}Testing Document Parsers...{RESET}")
 
     try:
-        from mcp_server.ingestion.parsers import ParserFactory
+        from ingestion.parsers import ParserFactory
 
         # Test markdown
         test_file = Path("/tmp/test.md")
