@@ -18,12 +18,14 @@ mod checkpoint;
 mod metrics;
 mod parser;
 mod text_processor;
+mod graph;
 
 use preprocessor::DataPreprocessor;
 use checkpoint::CheckpointManager;
 use metrics::MetricsAggregator;
 use parser::{DocumentParser, ParsedDocument};
 use text_processor::TextProcessor;
+use graph::{InMemoryGraph, Entity, Relationship, VectorSimilarity, ResultRanker};
 
 /// Life Navigator Rust Training Module
 #[pymodule]
@@ -31,11 +33,11 @@ fn life_navigator_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     // Data preprocessing
     m.add_class::<DataPreprocessor>()?;
 
-    // Document parsing (NEW!)
+    // Document parsing
     m.add_class::<DocumentParser>()?;
     m.add_class::<ParsedDocument>()?;
 
-    // Text processing (NEW!)
+    // Text processing
     m.add_class::<TextProcessor>()?;
 
     // Checkpoint management
@@ -43,6 +45,13 @@ fn life_navigator_rs(_py: Python, m: &PyModule) -> PyResult<()> {
 
     // Metrics aggregation
     m.add_class::<MetricsAggregator>()?;
+
+    // Graph operations (NEW!)
+    m.add_class::<InMemoryGraph>()?;
+    m.add_class::<Entity>()?;
+    m.add_class::<Relationship>()?;
+    m.add_class::<VectorSimilarity>()?;
+    m.add_class::<ResultRanker>()?;
 
     // Version info
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
