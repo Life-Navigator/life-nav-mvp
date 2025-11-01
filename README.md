@@ -1,118 +1,96 @@
-# 🧠 Life Navigator Agents
+# Life Navigator - Multi-Agent GraphRAG System
 
-Hierarchical multi-agent system with dual GraphRAG and GPU-accelerated AI agents.
+**Production-ready multi-agent system with hybrid GraphRAG, 4-tier memory, and automated data ingestion**
 
-## Hardware Requirements
+---
 
-### Standard Setup
-- Python 3.12+
-- 8GB RAM minimum
-- PostgreSQL, Redis, RabbitMQ
+## 🌟 Key Features
 
-### GPU Setup (DGX-Spark)
-- NVIDIA GB10 GPU (24GB VRAM)
-- CUDA 13.0
-- Driver Version 580.95.05
-- Ubuntu 24.04.3 LTS
+### 🧠 Hybrid GraphRAG
+- Knowledge Graph (Neo4j) + Vector Store (Qdrant)
+- Row-level security for multi-tenancy
+- Centralized & personalized knowledge bases
 
-## Quick Start
+### 💾 4-Tier Memory System
+- Short-term (Redis), Working (Redis), Long-term (PostgreSQL), Episodic (Neo4j)
+- Automatic memory consolidation
 
-### Standard Setup (No GPU)
-```bash
-# Install
-python3.12 -m venv venv
-source venv/bin/activate
-pip install -e ".[dev]"
+### 🤖 A2A Multi-Agent Framework
+- Research, Analyst, Writer agents
+- Message bus, coordinator, workflow engine
 
-# Run
-python main.py
-```
+### 📄 Automated Data Ingestion
+- 8 document formats: TXT, MD, PDF, DOCX, HTML, CSV, JSON
+- Entity & concept extraction with Maverick LLM
+- Background processing with progress tracking
 
-### GPU Setup (DGX-Spark)
-```bash
-# Automated setup with GPU support
-chmod +x setup_dgx_spark.sh
-./setup_dgx_spark.sh
+### 🎨 Beautiful Admin UI
+- Reflex-based responsive interface
+- Drag & drop uploads
+- Real-time progress monitoring
 
-# Verify GPU installation
-python3.12 verify_gpu_setup.py
+### 🚀 FastAPI REST API
+- Document upload, job tracking, statistics
+- GraphRAG queries, tool invocation
 
-# Run
-python main.py
-```
+---
 
-The GPU setup script will:
-- Install PyTorch 2.9.0 with CUDA 13.0 support
-- Install HuggingFace Transformers, PEFT, BitsAndBytes
-- Configure GPU acceleration for all AI agents
-- Run verification tests
-
-## Running the UI
+## 🚀 Quick Start
 
 ```bash
-# Activate environment
-source venv/bin/activate
+# 1. Install dependencies
+pip install -r requirements.txt
+pip install PyPDF2 python-docx beautifulsoup4 sentence-transformers
 
-# Start Streamlit UI
-streamlit run ui/chat_app.py
+# 2. Start databases
+docker-compose up -d
+
+# 3. Start Maverick
+./scripts/start_maverick_gpu.sh
+
+# 4. Start MCP Server
+cd mcp-server
+uvicorn core.server:app --reload
+
+# 5. Start Admin UI
+cd admin_ui
+./run_admin.sh
 ```
 
-Or use the provided scripts:
-```bash
-# Linux/Mac
-./ui/run_chat.sh
+**Verify**: http://localhost:8000/health
 
-# Windows
-ui\run_chat.bat
-```
+---
 
-## Documentation
+## 📖 Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Implementation Guide](docs/IMPLEMENTATION_GUIDE.md)
-- [GPU Setup Guide](docs/GPU_SETUP.md) - DGX-Spark configuration
+- [Deployment Guide](DEPLOYMENT.md) - Complete setup
+- [API Documentation](mcp-server/API_USAGE.md) - REST API reference
+- [Admin UI Guide](admin_ui/README.md) - UI documentation
 
-## Project Structure
+---
+
+## 🏗️ Architecture
 
 ```
-life-navigator-agents/
-├── agents/              # Agent implementations
-│   ├── core/           # Core agent functionality
-│   ├── specialists/    # Domain-specific agents
-│   └── coordinator/    # Agent coordination
-├── graphrag/           # Dual GraphRAG system
-├── models/             # LLM models and configs
-├── messaging/          # Message bus (RabbitMQ)
-├── utils/              # Utilities and config
-├── api/                # REST API endpoints
-├── ui/                 # Streamlit chat interface
-├── tests/              # Test suite
-└── docs/               # Documentation
+Maverick LLM → MCP Server → GraphRAG/Memory/A2A
+                  ↓
+            Neo4j + Qdrant + PostgreSQL + Redis
 ```
 
-## Key Features
+---
 
-- **Hierarchical Agent System**: Coordinator, specialists, and executor agents
-- **Dual GraphRAG**: Personal + World knowledge graphs
-- **GPU Acceleration**: Optimized for NVIDIA GB10
-- **Memory-Efficient**: 8-bit quantization with BitsAndBytes
-- **LoRA Fine-Tuning**: Parameter-efficient model adaptation
-- **Real-time Chat UI**: Streamlit-based interface
-- **Audit Trail**: Compliance-ready logging
+## 📊 System Status
 
-## Development
+✅ MCP Server (FastAPI)  
+✅ GraphRAG Plugin (Neo4j + Qdrant)  
+✅ 4-Tier Memory System  
+✅ A2A Multi-Agent Framework  
+✅ Data Ingestion Pipeline  
+✅ Admin UI (Reflex)  
+✅ REST API Endpoints  
 
-```bash
-# Install with dev dependencies
-pip install -e ".[dev,ui]"
+**Ready for production deployment!**
 
-# Run tests
-pytest
+---
 
-# Format code
-black .
-ruff check .
-
-# Type checking
-mypy .
-```
+Built with Claude Code
