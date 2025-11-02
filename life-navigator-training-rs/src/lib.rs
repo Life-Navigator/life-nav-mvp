@@ -40,7 +40,7 @@ use parser::{DocumentParser, ParsedDocument};
 use text_processor::TextProcessor;
 use graph::{InMemoryGraph, Entity, Relationship, VectorSimilarity, ResultRanker};
 use database_fixed::{PyNeo4jConfigFixed, PyNeo4jClientFixed, PyQdrantConfigFixed, PyQdrantClientFixed};
-use graph_algorithms::{PyCompactGraph, PyBfsResult, PyDfsResult, PyDijkstraResult, PyPageRankResult, PyCommunityResult, PyGraphStats, PyAStarResult, PyBellmanFordResult, PyBetweennessCentralityResult, PyParallelBfsResult};
+use graph_algorithms::{PyCompactGraph, PyIncrementalGraph, PyBfsResult, PyDfsResult, PyDijkstraResult, PyPageRankResult, PyCommunityResult, PyGraphStats, PyAStarResult, PyBellmanFordResult, PyBetweennessCentralityResult, PyParallelBfsResult};
 
 /// Life Navigator Rust Training Module
 #[pymodule]
@@ -76,6 +76,7 @@ fn life_navigator_rs(_py: Python, m: &PyModule) -> PyResult<()> {
 
     // Graph algorithms (elite-level performance: 10-1000x faster than Python!)
     m.add_class::<PyCompactGraph>()?;
+    m.add_class::<PyIncrementalGraph>()?;  // NEW: Real-time updates with incremental PageRank
     m.add_class::<PyBfsResult>()?;
     m.add_class::<PyDfsResult>()?;
     m.add_class::<PyDijkstraResult>()?;
