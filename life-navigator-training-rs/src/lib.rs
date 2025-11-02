@@ -32,6 +32,7 @@ mod observability;
 mod retry;
 mod cache;
 mod graph_algorithms;  // NEW: Elite graph algorithms (10-1000x faster than Python!)
+mod mmap_graph;  // NEW: Memory-mapped graphs for billion-node support!
 
 use preprocessor::DataPreprocessor;
 use checkpoint::CheckpointManager;
@@ -41,6 +42,7 @@ use text_processor::TextProcessor;
 use graph::{InMemoryGraph, Entity, Relationship, VectorSimilarity, ResultRanker};
 use database_fixed::{PyNeo4jConfigFixed, PyNeo4jClientFixed, PyQdrantConfigFixed, PyQdrantClientFixed};
 use graph_algorithms::{PyCompactGraph, PyIncrementalGraph, PyBfsResult, PyDfsResult, PyDijkstraResult, PyPageRankResult, PyCommunityResult, PyGraphStats, PyAStarResult, PyBellmanFordResult, PyBetweennessCentralityResult, PyParallelBfsResult};
+use mmap_graph::PyMmapGraph;
 
 /// Life Navigator Rust Training Module
 #[pymodule]
@@ -87,6 +89,9 @@ fn life_navigator_rs(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyBellmanFordResult>()?;
     m.add_class::<PyBetweennessCentralityResult>()?;
     m.add_class::<PyParallelBfsResult>()?;
+
+    // Memory-mapped graphs (billion-node support!)
+    m.add_class::<PyMmapGraph>()?;
 
     // Version info
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
