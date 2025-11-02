@@ -59,6 +59,12 @@ url = "2.5"
 parking_lot = "0.12"  # High-performance RwLock for cache and metrics
 rand = "0.8"          # Random number generation for jitter in retry logic
 
+# Week 4: Advanced graph algorithm optimizations
+crossbeam = "0.8"     # Lock-free data structures for parallel algorithms
+sprs = "0.11"         # Sparse matrix library for optimized PageRank
+num-traits = "0.2"    # Numeric traits for generic algorithms
+ordered-float = "4.0" # Total ordering for floats in collections
+
 [profile.release]
 opt-level = 3        # Maximum optimization
 lto = true           # Link-time optimization

@@ -651,6 +651,246 @@ pub fn calculate_stats(graph: &CompactGraph) -> GraphStats {
 }
 
 // ============================================================================
+// A* Pathfinding (Week 4: Advanced Algorithms)
+// ============================================================================
+
+use ordered_float::OrderedFloat;
+
+/// A* node with f-score for priority queue
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct AStarNode {
+    index: usize,
+    f_score: OrderedFloat<f64>,
+}
+
+impl PartialOrd for AStarNode {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        // Reverse for min-heap
+        other.f_score.partial_cmp(&self.f_score)
+    }
+}
+
+impl Ord for AStarNode {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+    }
+}
+
+/// A* result
+#[derive(Debug, Clone)]
+pub struct AStarResult {
+    pub path: Vec<String>,
+    pub total_cost: f64,
+    pub nodes_visited: usize,
+    pub duration_ms: f64,
+}
+
+/// A* pathfinding with heuristic function
+pub fn a_star<H>(
+    graph: &CompactGraph,
+    start: &str,
+    goal: &str,
+    heuristic: H,
+    metrics: Option<Arc<OperationMetrics>>,
+) -> DbResult<Option<AStarResult>>
+where
+    H: Fn(&str, &str) -> f64,
+{
+    let timer = metrics.as_ref().map(|m| OpTimer::new("a_star", m.clone()));
+
+    let start_idx = graph.get_index(start)
+        .ok_or_else(|| DatabaseError::NotFound {
+            resource_type: "Node".to_string(),
+            identifier: start.to_string(),
+        })?;
+
+    let goal_idx = graph.get_index(goal)
+        .ok_or_else(|| DatabaseError::NotFound {
+            resource_type: "Node".to_string(),
+            identifier: goal.to_string(),
+        })?;
+
+    let mut open_set = BinaryHeap::new();
+    let mut came_from: HashMap<usize, usize> = HashMap::new();
+    let mut g_score: HashMap<usize, f64> = HashMap::new();
+    let mut nodes_visited = 0;
+
+    g_score.insert(start_idx, 0.0);
+
+    let h = heuristic(start, goal);
+    open_set.push(AStarNode {
+        index: start_idx,
+        f_score: OrderedFloat(h),
+    });
+
+    while let Some(current_node) = open_set.pop() {
+        let current = current_node.index;
+        nodes_visited += 1;
+
+        if current == goal_idx {
+            // Reconstruct path
+            let mut path = Vec::new();
+            let mut node = goal_idx;
+
+            loop {
+                path.push(graph.get_node_id(node).unwrap().to_string());
+                if node == start_idx {
+                    break;
+                }
+                node = came_from[&node];
+            }
+
+            path.reverse();
+
+            let result = AStarResult {
+                path,
+                total_cost: g_score[&goal_idx],
+                nodes_visited,
+                duration_ms: timer.as_ref().map(|t| t.elapsed_ms()).unwrap_or(0.0),
+            };
+
+            if let Some(t) = timer {
+                t.complete(true);
+            }
+
+            return Ok(Some(result));
+        }
+
+        let current_g = g_score[&current];
+
+        for &(neighbor, weight) in graph.neighbors(current) {
+            let tentative_g = current_g + weight;
+
+            if tentative_g < g_score.get(&neighbor).copied().unwrap_or(f64::INFINITY) {
+                came_from.insert(neighbor, current);
+                g_score.insert(neighbor, tentative_g);
+
+                let h = heuristic(
+                    graph.get_node_id(neighbor).unwrap(),
+                    goal
+                );
+                let f = tentative_g + h;
+
+                open_set.push(AStarNode {
+                    index: neighbor,
+                    f_score: OrderedFloat(f),
+                });
+            }
+        }
+    }
+
+    if let Some(t) = timer {
+        t.complete(true);
+    }
+
+    Ok(None) // No path found
+}
+
+// ============================================================================
+// Bellman-Ford Algorithm (Negative Weights Support)
+// ============================================================================
+
+/// Bellman-Ford result
+#[derive(Debug, Clone)]
+pub struct BellmanFordResult {
+    pub distances: HashMap<String, f64>,
+    pub predecessors: HashMap<String, Option<String>>,
+    pub has_negative_cycle: bool,
+    pub duration_ms: f64,
+}
+
+/// Bellman-Ford single-source shortest paths (supports negative weights)
+pub fn bellman_ford(
+    graph: &CompactGraph,
+    start: &str,
+    metrics: Option<Arc<OperationMetrics>>,
+) -> DbResult<BellmanFordResult> {
+    let timer = metrics.as_ref().map(|m| OpTimer::new("bellman_ford", m.clone()));
+
+    let start_idx = graph.get_index(start)
+        .ok_or_else(|| DatabaseError::NotFound {
+            resource_type: "Node".to_string(),
+            identifier: start.to_string(),
+        })?;
+
+    let n = graph.node_count();
+    let mut distances = vec![f64::INFINITY; n];
+    let mut predecessors = vec![None; n];
+
+    distances[start_idx] = 0.0;
+
+    // Relax edges V-1 times
+    for _ in 0..n-1 {
+        let mut changed = false;
+
+        for from in 0..n {
+            if distances[from] == f64::INFINITY {
+                continue;
+            }
+
+            for &(to, weight) in graph.neighbors(from) {
+                let new_dist = distances[from] + weight;
+                if new_dist < distances[to] {
+                    distances[to] = new_dist;
+                    predecessors[to] = Some(from);
+                    changed = true;
+                }
+            }
+        }
+
+        if !changed {
+            break; // Early termination
+        }
+    }
+
+    // Check for negative cycles
+    let mut has_negative_cycle = false;
+    for from in 0..n {
+        if distances[from] == f64::INFINITY {
+            continue;
+        }
+
+        for &(to, weight) in graph.neighbors(from) {
+            if distances[from] + weight < distances[to] {
+                has_negative_cycle = true;
+                break;
+            }
+        }
+
+        if has_negative_cycle {
+            break;
+        }
+    }
+
+    // Convert to string-based results
+    let distances_map: HashMap<String, f64> = graph.index_node.iter()
+        .enumerate()
+        .map(|(i, id)| (id.clone(), distances[i]))
+        .collect();
+
+    let predecessors_map: HashMap<String, Option<String>> = graph.index_node.iter()
+        .enumerate()
+        .map(|(i, id)| {
+            let pred = predecessors[i].map(|p| graph.get_node_id(p).unwrap().to_string());
+            (id.clone(), pred)
+        })
+        .collect();
+
+    let result = BellmanFordResult {
+        distances: distances_map,
+        predecessors: predecessors_map,
+        has_negative_cycle,
+        duration_ms: timer.as_ref().map(|t| t.elapsed_ms()).unwrap_or(0.0),
+    };
+
+    if let Some(t) = timer {
+        t.complete(true);
+    }
+
+    Ok(result)
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
