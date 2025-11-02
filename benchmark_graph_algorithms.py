@@ -346,6 +346,55 @@ def main():
         )
         results.append(result)
 
+        # WEEK 4: Benchmark A* (using zero heuristic = Dijkstra equivalent)
+        print(f"   Running A* benchmarks...")
+        result = benchmark_algorithm(
+            f"A* ({n_nodes} nodes)",
+            lambda: rust_graph.a_star_zero_heuristic('node_0', f'node_{n_nodes-1}'),
+            lambda: python_graph.dijkstra('node_0', f'node_{n_nodes-1}'),  # Use Dijkstra as comparison
+            n_runs=20
+        )
+        results.append(result)
+
+        # WEEK 4: Benchmark Bellman-Ford
+        print(f"   Running Bellman-Ford benchmarks...")
+        result = benchmark_algorithm(
+            f"Bellman-Ford ({n_nodes} nodes)",
+            lambda: rust_graph.bellman_ford('node_0'),
+            lambda: python_graph.dijkstra('node_0', f'node_{n_nodes-1}'),  # Python comparison
+            n_runs=20
+        )
+        results.append(result)
+
+        # WEEK 4: Benchmark Betweenness Centrality
+        print(f"   Running Betweenness Centrality benchmarks...")
+        # Note: Python implementation would be complex, skipping for now
+        rust_times = []
+        for _ in range(10):
+            start = time.perf_counter()
+            rust_graph.betweenness_centrality(normalized=True)
+            elapsed = time.perf_counter() - start
+            rust_times.append(elapsed * 1000)
+
+        results.append({
+            'name': f"Betweenness Centrality ({n_nodes} nodes)",
+            'rust_avg_ms': statistics.mean(rust_times),
+            'rust_std_ms': statistics.stdev(rust_times) if len(rust_times) > 1 else 0,
+            'python_avg_ms': 0,  # No Python comparison
+            'python_std_ms': 0,
+            'speedup': 0
+        })
+
+        # WEEK 4: Benchmark Parallel BFS
+        print(f"   Running Parallel BFS benchmarks...")
+        result = benchmark_algorithm(
+            f"Parallel BFS ({n_nodes} nodes)",
+            lambda: rust_graph.parallel_bfs('node_0', None),
+            lambda: python_graph.bfs('node_0', f'node_{n_nodes-1}'),
+            n_runs=20
+        )
+        results.append(result)
+
         # Print results
         print_benchmark_results(results)
 
