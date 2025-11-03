@@ -26,12 +26,87 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 try:
     from graphrag.client import get_graphrag_client
     from graphrag.document_ingestion import get_ingestion_pipeline
+    from utils.metrics_client import get_metrics_client
     from utils.logging import get_logger
+    # Phase 4: REAL security - validation, auditing
+    from utils.security_validator import SecurityValidator
+    from utils.audit_logger import get_audit_logger, AuditAction, AuditStatus
 except ImportError as e:
     st.error(f"Failed to import modules: {e}")
     st.stop()
 
 logger = get_logger(__name__)
+
+
+# Helper function to get real or mock data
+async def get_usage_stats_async(metrics_client, mock_mode):
+    """Get usage stats from database or mock data."""
+    if mock_mode or metrics_client is None:
+        return get_mock_usage_stats()
+    else:
+        return await metrics_client.get_usage_stats()
+
+
+async def get_guardrail_stats_async(metrics_client, mock_mode):
+    """Get guardrail stats from database or mock data."""
+    if mock_mode or metrics_client is None:
+        return get_mock_guardrail_data()
+    else:
+        return await metrics_client.get_guardrail_stats()
+
+
+async def get_traffic_stats_async(metrics_client, mock_mode):
+    """Get traffic stats from database or mock data."""
+    if mock_mode or metrics_client is None:
+        return get_mock_traffic_data()
+    else:
+        return await metrics_client.get_traffic_analytics()
+
+
+async def get_user_analytics_async(metrics_client, mock_mode):
+    """Get user analytics from database or mock data."""
+    if mock_mode or metrics_client is None:
+        top_users = get_mock_usage_stats()["top_users"]
+        least_active = get_mock_usage_stats()["least_active_users"]
+        return {"top_users": top_users, "least_active_users": least_active}
+    else:
+        return await metrics_client.get_user_analytics()
+
+
+# Synchronous wrappers for Streamlit
+def get_usage_stats(mock_mode=True):
+    """Get usage stats (sync wrapper)."""
+    if mock_mode or st.session_state.metrics_client is None:
+        return get_mock_usage_stats()
+    else:
+        return asyncio.run(st.session_state.metrics_client.get_usage_stats())
+
+
+def get_guardrail_stats(mock_mode=True):
+    """Get guardrail stats (sync wrapper)."""
+    if mock_mode or st.session_state.metrics_client is None:
+        return get_mock_guardrail_data()
+    else:
+        return asyncio.run(st.session_state.metrics_client.get_guardrail_stats())
+
+
+def get_traffic_stats(mock_mode=True):
+    """Get traffic stats (sync wrapper)."""
+    if mock_mode or st.session_state.metrics_client is None:
+        return get_mock_traffic_data()
+    else:
+        return asyncio.run(st.session_state.metrics_client.get_traffic_analytics())
+
+
+def get_user_analytics(mock_mode=True):
+    """Get user analytics (sync wrapper)."""
+    if mock_mode or st.session_state.metrics_client is None:
+        top_users = get_mock_usage_stats()["top_users"]
+        least_active = get_mock_usage_stats()["least_active_users"]
+        return {"top_users": top_users, "least_active_users": least_active}
+    else:
+        return asyncio.run(st.session_state.metrics_client.get_user_analytics())
+
 
 # Page config
 st.set_page_config(
@@ -86,6 +161,10 @@ if 'graphrag_client' not in st.session_state:
     st.session_state.graphrag_client = None
 if 'ingestion_pipeline' not in st.session_state:
     st.session_state.ingestion_pipeline = None
+if 'metrics_client' not in st.session_state:
+    st.session_state.metrics_client = None
+if 'audit_logger' not in st.session_state:
+    st.session_state.audit_logger = None  # Phase 4: Audit logging
 if 'mock_mode' not in st.session_state:
     st.session_state.mock_mode = True  # Use mock data for demo
 
@@ -213,6 +292,7 @@ page = st.sidebar.selectbox(
     [
         "📊 Overview",
         "📤 Document Ingestion",
+        "🔍 Document Search",
         "📈 Usage Analytics",
         "🛡️ Guardrail Monitoring",
         "🚦 Traffic & Performance",
@@ -239,8 +319,8 @@ if st.sidebar.button("Toggle Mock/Live Mode"):
 if page == "📊 Overview":
     st.markdown('<div class="main-header">📊 System Overview</div>', unsafe_allow_html=True)
 
-    stats = get_mock_usage_stats()
-    guardrails = get_mock_guardrail_data()
+    stats = get_usage_stats(st.session_state.mock_mode)
+    guardrails = get_guardrail_stats(st.session_state.mock_mode)
 
     # Key metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -378,9 +458,37 @@ elif page == "📤 Document Ingestion":
         submitted = st.form_submit_button("Upload Document", type="primary")
 
     if submitted and uploaded_file is not None:
-        # Save uploaded file
+        # Phase 4: Validate file BEFORE saving
+        st.info(f"🔍 Validating file: {uploaded_file.name}...")
+
+        # Create security validator
+        validator = SecurityValidator()
+
+        # Save to temp location for validation
         temp_path = Path(f"/tmp/{uploaded_file.name}")
         temp_path.write_bytes(uploaded_file.getvalue())
+
+        # Validate the file
+        validation_result = validator.validate_file_upload(
+            file_path=str(temp_path),
+            filename=uploaded_file.name
+        )
+
+        if not validation_result.valid:
+            # Validation failed - show error and delete temp file
+            st.error(f"❌ File validation failed: {validation_result.error_message}")
+            temp_path.unlink()  # Delete the invalid file
+            st.stop()
+
+        # Show warnings if any
+        if validation_result.warnings:
+            for warning in validation_result.warnings:
+                st.warning(f"⚠️ {warning}")
+
+        # File is valid - show info
+        st.success(f"✅ File validated successfully!")
+        st.info(f"📊 File size: {validation_result.file_info['size']:,} bytes")
+        st.info(f"📄 MIME type: {validation_result.file_info['mime_type']}")
 
         try:
             st.info(f"📤 Ingesting document: {uploaded_file.name}...")
@@ -431,6 +539,30 @@ elif page == "📤 Document Ingestion":
                     </ul>
                 </div>
                 """, unsafe_allow_html=True)
+
+                # Phase 4: Log successful upload to audit trail
+                try:
+                    if st.session_state.audit_logger is None and not st.session_state.mock_mode:
+                        st.session_state.audit_logger = asyncio.run(get_audit_logger())
+
+                    if st.session_state.audit_logger is not None:
+                        asyncio.run(st.session_state.audit_logger.log_document_action(
+                            action=AuditAction.DOCUMENT_UPLOADED,
+                            user_id="admin",  # Local admin user
+                            document_id=result['document_id'],
+                            details={
+                                'filename': uploaded_file.name,
+                                'file_size': validation_result.file_info['size'],
+                                'mime_type': validation_result.file_info['mime_type'],
+                                'document_type': doc_type[0],
+                                'source': source,
+                                'chunks': result['chunks_stored']
+                            },
+                            status=AuditStatus.SUCCESS
+                        ))
+                except Exception as audit_error:
+                    # Don't fail the upload if audit logging fails
+                    logger.warning(f"Audit logging failed: {audit_error}")
             elif result['status'] == 'duplicate_skipped':
                 st.markdown(f"""
                 <div class="info-box">
@@ -481,6 +613,379 @@ elif page == "📤 Document Ingestion":
         use_container_width=True,
         hide_index=True
     )
+
+
+# ============================================================================
+# PAGE: Document Search
+# ============================================================================
+
+elif page == "🔍 Document Search":
+    st.markdown('<div class="main-header">🔍 Document Search & Discovery</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    Search and explore documents in the centralized GraphRAG knowledge base.
+    - **Text Search**: Find documents by keywords in title, content, or metadata
+    - **Semantic Search**: Find documents by meaning using AI embeddings
+    - **Advanced Filters**: Filter by type, source, date range
+    """)
+
+    st.divider()
+
+    # Search tabs
+    search_tab = st.tabs(["📝 Text Search", "🧠 Semantic Search", "📋 Browse All"])
+
+    # ========================================================================
+    # TAB 1: Text Search
+    # ========================================================================
+    with search_tab[0]:
+        st.subheader("Text Search")
+
+        with st.form("text_search_form"):
+            col1, col2 = st.columns([3, 1])
+
+            with col1:
+                search_query = st.text_input(
+                    "Search Query",
+                    placeholder="e.g., FINRA Rule 2111, suitability requirements, tax deductions...",
+                    help="Search in document titles, content, and metadata"
+                )
+
+            with col2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                search_button = st.form_submit_button("🔍 Search", type="primary", use_container_width=True)
+
+            # Advanced filters
+            with st.expander("🎚️ Advanced Filters"):
+                filter_col1, filter_col2, filter_col3 = st.columns(3)
+
+                with filter_col1:
+                    filter_type = st.selectbox(
+                        "Document Type",
+                        ["All Types", "FINRA", "CFP", "Tax Law", "Regulation", "Compliance", "Best Practice"],
+                        help="Filter by document category"
+                    )
+
+                with filter_col2:
+                    filter_source = st.text_input(
+                        "Source",
+                        placeholder="e.g., FINRA Manual, IRS Code...",
+                        help="Filter by document source"
+                    )
+
+                with filter_col3:
+                    filter_date_from = st.date_input("Date From", value=None, help="Filter documents after this date")
+                    filter_date_to = st.date_input("Date To", value=None, help="Filter documents before this date")
+
+        if search_button or search_query:
+            if not search_query.strip():
+                st.warning("⚠️ Please enter a search query")
+            else:
+                st.info(f"🔍 Searching for: **{search_query}**")
+
+                try:
+                    if not st.session_state.mock_mode and st.session_state.ingestion_pipeline:
+                        # Real search
+                        # Map filter type to document type code
+                        type_map = {
+                            "All Types": None,
+                            "FINRA": "finra",
+                            "CFP": "cfp",
+                            "Tax Law": "tax_law",
+                            "Regulation": "regulation",
+                            "Compliance": "compliance",
+                            "Best Practice": "best_practice"
+                        }
+
+                        doc_type = type_map.get(filter_type)
+
+                        results = asyncio.run(
+                            st.session_state.ingestion_pipeline.search_documents(
+                                search_query=search_query,
+                                document_type=doc_type,
+                                source=filter_source if filter_source else None,
+                                date_from=filter_date_from.isoformat() if filter_date_from else None,
+                                date_to=filter_date_to.isoformat() if filter_date_to else None,
+                                limit=50
+                            )
+                        )
+                    else:
+                        # Mock results
+                        results = [
+                            {
+                                "document_id": "doc_001",
+                                "entity_type": "finra_document",
+                                "properties": {
+                                    "title": "FINRA Rule 2111 - Suitability",
+                                    "chunk_count": 5,
+                                    "content_preview": "Financial advisors must have a reasonable basis..."
+                                },
+                                "metadata": {
+                                    "source": "FINRA Rulebook 2024",
+                                    "rule_number": "2111",
+                                    "file_name": "finra_rule_2111.pdf",
+                                    "file_size": 45231
+                                },
+                                "created_at": "2024-11-01T10:30:00",
+                                "updated_at": "2024-11-01T10:30:00"
+                            },
+                            {
+                                "document_id": "doc_002",
+                                "entity_type": "cfp_document",
+                                "properties": {
+                                    "title": "CFP Board Code of Ethics",
+                                    "chunk_count": 8,
+                                    "content_preview": "A CFP professional must act with integrity..."
+                                },
+                                "metadata": {
+                                    "source": "CFP Board Standards",
+                                    "file_name": "cfp_code_of_ethics.pdf",
+                                    "file_size": 78493
+                                },
+                                "created_at": "2024-10-28T14:20:00",
+                                "updated_at": "2024-10-28T14:20:00"
+                            }
+                        ] if "finra" in search_query.lower() or "cfp" in search_query.lower() else []
+
+                    # Display results
+                    if len(results) == 0:
+                        st.warning(f"No documents found matching '{search_query}'")
+                    else:
+                        st.success(f"✅ Found **{len(results)}** documents")
+
+                        for result in results:
+                            props = result.get('properties', {})
+                            meta = result.get('metadata', {})
+                            doc_id = result['document_id']
+
+                            # Document card
+                            with st.expander(f"📄 {props.get('title', 'Untitled Document')}", expanded=False):
+                                col1, col2 = st.columns([3, 1])
+
+                                with col1:
+                                    st.markdown(f"**Document ID**: `{doc_id}`")
+                                    st.markdown(f"**Type**: {result.get('entity_type', 'N/A').replace('_document', '').upper()}")
+                                    st.markdown(f"**Source**: {meta.get('source', 'N/A')}")
+                                    st.markdown(f"**Chunks**: {props.get('chunk_count', 'N/A')}")
+                                    st.markdown(f"**Created**: {result.get('created_at', 'N/A')[:10]}")
+
+                                    if 'file_name' in meta:
+                                        st.markdown(f"**File**: {meta.get('file_name')}")
+                                    if 'file_size' in meta:
+                                        size_kb = meta.get('file_size', 0) / 1024
+                                        st.markdown(f"**Size**: {size_kb:.1f} KB")
+
+                                with col2:
+                                    if st.button("👁️ Preview", key=f"preview_{doc_id}", use_container_width=True):
+                                        st.session_state[f'show_preview_{doc_id}'] = True
+
+                                    if st.button("📥 Download Metadata", key=f"download_{doc_id}", use_container_width=True):
+                                        import json
+                                        metadata_json = json.dumps(result, indent=2)
+                                        st.download_button(
+                                            label="💾 Save JSON",
+                                            data=metadata_json,
+                                            file_name=f"{doc_id}_metadata.json",
+                                            mime="application/json",
+                                            key=f"download_btn_{doc_id}"
+                                        )
+
+                                # Preview section
+                                if st.session_state.get(f'show_preview_{doc_id}', False):
+                                    st.markdown("---")
+                                    st.markdown("### 📖 Document Preview")
+
+                                    if not st.session_state.mock_mode and st.session_state.ingestion_pipeline:
+                                        # Real preview
+                                        preview = asyncio.run(
+                                            st.session_state.ingestion_pipeline.get_document_preview(
+                                                document_id=doc_id,
+                                                max_chunks=3
+                                            )
+                                        )
+
+                                        if 'error' in preview:
+                                            st.error(f"❌ {preview['error']}")
+                                        else:
+                                            st.markdown(f"**Showing {preview['showing_chunks']} of {preview['total_chunks']} chunks**")
+                                            st.text_area(
+                                                "Content Preview",
+                                                preview['preview_text'],
+                                                height=300,
+                                                key=f"preview_text_{doc_id}"
+                                            )
+                                    else:
+                                        # Mock preview
+                                        mock_preview = props.get('content_preview', 'No preview available')
+                                        st.text_area(
+                                            "Content Preview",
+                                            mock_preview + "\n\n[Additional content would be shown here...]",
+                                            height=300,
+                                            key=f"preview_text_{doc_id}"
+                                        )
+
+                except Exception as e:
+                    st.error(f"❌ Search failed: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
+
+    # ========================================================================
+    # TAB 2: Semantic Search
+    # ========================================================================
+    with search_tab[1]:
+        st.subheader("Semantic Search")
+        st.markdown("Find documents by **meaning**, not just keywords. Uses AI embeddings to understand intent.")
+
+        with st.form("semantic_search_form"):
+            semantic_query = st.text_area(
+                "Search Query",
+                placeholder="e.g., What are the rules about giving financial advice to clients?\nHow should I handle client suitability assessments?",
+                help="Describe what you're looking for in natural language",
+                height=100
+            )
+
+            col1, col2 = st.columns([3, 1])
+
+            with col1:
+                semantic_type = st.selectbox(
+                    "Document Type (optional)",
+                    ["All Types", "FINRA", "CFP", "Tax Law", "Regulation", "Compliance", "Best Practice"]
+                )
+
+            with col2:
+                semantic_limit = st.number_input("Results", min_value=1, max_value=50, value=10)
+
+            semantic_button = st.form_submit_button("🧠 Semantic Search", type="primary")
+
+        if semantic_button and semantic_query:
+            st.info(f"🧠 Searching semantically for: **{semantic_query[:100]}...**")
+
+            try:
+                if not st.session_state.mock_mode and st.session_state.ingestion_pipeline:
+                    # Real semantic search
+                    type_map = {
+                        "All Types": None,
+                        "FINRA": "finra",
+                        "CFP": "cfp",
+                        "Tax Law": "tax_law",
+                        "Regulation": "regulation",
+                        "Compliance": "compliance",
+                        "Best Practice": "best_practice"
+                    }
+
+                    doc_type = type_map.get(semantic_type)
+
+                    results = asyncio.run(
+                        st.session_state.ingestion_pipeline.semantic_search(
+                            query_text=semantic_query,
+                            document_type=doc_type,
+                            k=semantic_limit
+                        )
+                    )
+
+                    if len(results) == 0:
+                        st.warning("No relevant documents found")
+                    else:
+                        st.success(f"✅ Found **{len(results)}** relevant document chunks")
+
+                        for i, result in enumerate(results, 1):
+                            chunk_props = result.get('chunk_properties', {})
+                            doc_props = result.get('document_properties', {})
+                            doc_meta = result.get('document_metadata', {})
+                            similarity = result.get('similarity', 0)
+
+                            with st.expander(f"#{i} - {doc_props.get('title', 'Untitled')} (Similarity: {similarity:.1%})"):
+                                st.markdown(f"**Document**: {doc_props.get('title', 'N/A')}")
+                                st.markdown(f"**Source**: {doc_meta.get('source', 'N/A')}")
+                                st.markdown(f"**Chunk {chunk_props.get('chunk_index', 'N/A')} of {doc_props.get('chunk_count', 'N/A')}**")
+                                st.markdown(f"**Relevance**: {similarity:.1%}")
+
+                                st.markdown("---")
+                                st.markdown("**Content:**")
+                                st.text_area(
+                                    "Matching Content",
+                                    chunk_props.get('content', 'No content'),
+                                    height=200,
+                                    key=f"semantic_result_{i}"
+                                )
+                else:
+                    # Mock semantic results
+                    st.info("🔧 Semantic search requires live mode. Toggle off mock mode to use this feature.")
+
+            except Exception as e:
+                st.error(f"❌ Semantic search failed: {e}")
+                import traceback
+                st.code(traceback.format_exc())
+
+    # ========================================================================
+    # TAB 3: Browse All
+    # ========================================================================
+    with search_tab[2]:
+        st.subheader("Browse All Documents")
+
+        browse_col1, browse_col2 = st.columns([2, 1])
+
+        with browse_col1:
+            browse_type = st.selectbox(
+                "Filter by Type",
+                ["All Types", "FINRA", "CFP", "Tax Law", "Regulation", "Compliance", "Best Practice"],
+                key="browse_type"
+            )
+
+        with browse_col2:
+            browse_limit = st.number_input("Documents per page", min_value=10, max_value=100, value=25, step=5)
+
+        if st.button("📋 Load Documents", type="primary"):
+            try:
+                if not st.session_state.mock_mode and st.session_state.ingestion_pipeline:
+                    # Real browse
+                    type_map = {
+                        "All Types": None,
+                        "FINRA": "finra",
+                        "CFP": "cfp",
+                        "Tax Law": "tax_law",
+                        "Regulation": "regulation",
+                        "Compliance": "compliance",
+                        "Best Practice": "best_practice"
+                    }
+
+                    doc_type = type_map.get(browse_type)
+
+                    documents = asyncio.run(
+                        st.session_state.ingestion_pipeline.list_documents(
+                            document_type=doc_type,
+                            limit=browse_limit
+                        )
+                    )
+
+                    if len(documents) == 0:
+                        st.info("📭 No documents found")
+                    else:
+                        st.success(f"📚 Loaded **{len(documents)}** documents")
+
+                        # Display as table
+                        doc_data = []
+                        for doc in documents:
+                            props = doc.get('properties', {})
+                            meta = doc.get('metadata', {})
+
+                            doc_data.append({
+                                "Title": props.get('title', 'Untitled')[:50],
+                                "Type": doc.get('entity_type', 'N/A').replace('_document', '').upper(),
+                                "Source": meta.get('source', 'N/A')[:30],
+                                "Chunks": props.get('chunk_count', 'N/A'),
+                                "Created": doc.get('created_at', 'N/A')[:10],
+                                "ID": doc['document_id'][:8]
+                            })
+
+                        df = pd.DataFrame(doc_data)
+                        st.dataframe(df, use_container_width=True, height=400)
+
+                else:
+                    # Mock browse
+                    st.info("🔧 Browse all requires live mode. Toggle off mock mode to use this feature.")
+
+            except Exception as e:
+                st.error(f"❌ Failed to load documents: {e}")
 
 
 # ============================================================================
