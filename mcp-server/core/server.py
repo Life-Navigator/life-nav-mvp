@@ -38,6 +38,7 @@ logger = get_logger(__name__)
 db_manager: DatabaseManager = None
 plugin_manager: PluginManager = None
 context_builder: ContextBuilder = None
+agent_storage = None  # AgentStorage instance
 mcp_protocol: MCPProtocol = None
 ingestion_pipeline: IngestionPipeline = None
 
@@ -57,12 +58,24 @@ async def lifespan(app: FastAPI):
         version=settings.app_version
     )
 
-    global db_manager, plugin_manager, context_builder, mcp_protocol, ingestion_pipeline
+    global db_manager, plugin_manager, context_builder, mcp_protocol, ingestion_pipeline, agent_storage
 
     try:
         # Initialize database connections
         db_manager = DatabaseManager(settings)
         await db_manager.initialize()
+
+        # Initialize agent storage
+        import sys
+        from pathlib import Path
+        mcp_server_path = Path(__file__).parent.parent
+        if str(mcp_server_path) not in sys.path:
+            sys.path.insert(0, str(mcp_server_path))
+
+        from agents.storage import AgentStorage
+        agent_storage = AgentStorage(db_manager._pg_pool)
+        await agent_storage.initialize()
+        logger.info("agent_storage_initialized")
 
         # Initialize plugin manager
         plugin_manager = PluginManager()
@@ -159,10 +172,15 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS middleware
+    # CORS middleware - Allow frontend to connect
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Configure for production
+        allow_origins=[
+            "http://localhost:3000",      # Your frontend
+            "http://127.0.0.1:3000",
+            "http://localhost:8501",      # Admin dashboard
+            "*",                          # Allow all for development (remove in production)
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -580,6 +598,388 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to get statistics: {str(e)}"
+            )
+
+    # ==========================================================================
+    # Agent Management Endpoints
+    # ==========================================================================
+
+    @app.get("/agents/templates", response_model=List[dict])
+    async def get_agent_templates():
+        """Get available agent templates"""
+        from agents.storage import AgentTemplate
+        return AgentTemplate.get_templates()
+
+    @app.post("/agents", response_model=dict)
+    async def create_agent(request: dict, user_id: str = "default_user"):
+        """Create a new agent"""
+        from agents.storage import AgentStorage
+
+        try:
+            agent_storage = AgentStorage(db_manager._pg_pool)
+
+            agent = await agent_storage.create_agent(
+                user_id=user_id,
+                name=request["name"],
+                description=request["description"],
+                agent_type=request["agent_type"],
+                capabilities=request.get("capabilities", []),
+                system_prompt=request["system_prompt"],
+                tools=request.get("tools", []),
+                max_concurrent_tasks=request.get("max_concurrent_tasks", 5),
+                task_timeout_seconds=request.get("task_timeout_seconds", 300),
+                custom_config=request.get("custom_config", {})
+            )
+
+            return agent
+        except Exception as e:
+            logger.error("agent_creation_failed", error=str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create agent: {str(e)}"
+            )
+
+    @app.get("/agents", response_model=dict)
+    async def list_agents(
+        user_id: str = "default_user",
+        include_inactive: bool = False
+    ):
+        """List all agents for a user"""
+        from agents.storage import AgentStorage
+
+        try:
+            agent_storage = AgentStorage(db_manager._pg_pool)
+            agents = await agent_storage.list_agents(user_id, include_inactive)
+            return {
+                "agents": agents,
+                "total": len(agents)
+            }
+        except Exception as e:
+            logger.error("agent_list_failed", error=str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to list agents: {str(e)}"
+            )
+
+    @app.get("/agents/{agent_id}", response_model=dict)
+    async def get_agent(agent_id: str, user_id: str = "default_user"):
+        """Get agent by ID"""
+        from agents.storage import AgentStorage
+
+        try:
+            agent_storage = AgentStorage(db_manager._pg_pool)
+            agent = await agent_storage.get_agent(agent_id, user_id)
+
+            if not agent:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Agent not found"
+                )
+
+            return agent
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("agent_get_failed", error=str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get agent: {str(e)}"
+            )
+
+    @app.put("/agents/{agent_id}", response_model=dict)
+    async def update_agent(
+        agent_id: str,
+        request: dict,
+        user_id: str = "default_user"
+    ):
+        """Update an agent"""
+        from agents.storage import AgentStorage
+
+        try:
+            agent_storage = AgentStorage(db_manager._pg_pool)
+            agent = await agent_storage.update_agent(agent_id, user_id, **request)
+
+            if not agent:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Agent not found"
+                )
+
+            return agent
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("agent_update_failed", error=str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to update agent: {str(e)}"
+            )
+
+    @app.delete("/agents/{agent_id}")
+    async def delete_agent(agent_id: str, user_id: str = "default_user"):
+        """Delete an agent (soft delete)"""
+        from agents.storage import AgentStorage
+
+        try:
+            agent_storage = AgentStorage(db_manager._pg_pool)
+            deleted = await agent_storage.delete_agent(agent_id, user_id)
+
+            if not deleted:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Agent not found"
+                )
+
+            return {"success": True, "message": "Agent deleted"}
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error("agent_delete_failed", error=str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to delete agent: {str(e)}"
+            )
+
+    @app.get("/agents/stats/summary", response_model=dict)
+    async def get_agent_stats(user_id: str = "default_user"):
+        """Get agent statistics"""
+        from agents.storage import AgentStorage
+
+        try:
+            agent_storage = AgentStorage(db_manager._pg_pool)
+            stats = await agent_storage.get_agent_stats(user_id)
+            return stats
+        except Exception as e:
+            logger.error("agent_stats_failed", error=str(e), exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get agent stats: {str(e)}"
+            )
+
+    # =============================================================================
+    # TASK EXECUTION & MODEL INTEGRATION ENDPOINTS
+    # =============================================================================
+
+    from ..schemas.tasks import (
+        TaskRequest as TaskReq, TaskResponse as TaskResp,
+        ChatRequest, ChatResponse, ModelInferenceRequest, ModelInferenceResponse,
+        TaskStatusResponse, TaskListResponse
+    )
+
+    # In-memory task storage (replace with database in production)
+    tasks_storage = {}
+
+    @app.post("/tasks", response_model=TaskResp)
+    async def execute_task(request: TaskReq, user_id: str = "default_user"):
+        """Execute a task with an agent"""
+        try:
+            import uuid
+            from datetime import datetime
+
+            task_id = str(uuid.uuid4())
+
+            # Get agent configuration
+            agent = await agent_storage.get_agent(request.agent_id, user_id)
+            if not agent:
+                raise HTTPException(status_code=404, detail="Agent not found")
+
+            # Create task record
+            task = {
+                "task_id": task_id,
+                "agent_id": request.agent_id,
+                "status": "pending",
+                "result": None,
+                "metadata": {
+                    "task_type": request.task_type,
+                    "input_text": request.input_text,
+                    "context": request.context
+                },
+                "created_at": datetime.utcnow(),
+                "completed_at": None,
+                "error": None
+            }
+
+            tasks_storage[task_id] = task
+
+            # Execute task asynchronously (simulated for now)
+            # In production, this would dispatch to agent framework
+            task["status"] = "running"
+
+            # Simulate task execution with MCP tools
+            try:
+                # Get available tools for the agent
+                available_tools = agent.get("tools", [])
+
+                # Simple task routing based on type
+                result_text = f"Task '{request.task_type}' executed by agent '{agent['name']}' with input: {request.input_text[:100]}..."
+
+                # If it's a query task, use MCP tools
+                if request.task_type in ["query", "research", "search"]:
+                    # Simulate tool invocation (in production, use actual MCP tools)
+                    result_text = f"Executed research task using tools: {', '.join(available_tools[:3])}"
+
+                task["status"] = "completed"
+                task["result"] = result_text
+                task["completed_at"] = datetime.utcnow()
+
+            except Exception as e:
+                task["status"] = "failed"
+                task["error"] = str(e)
+                task["completed_at"] = datetime.utcnow()
+
+            return TaskResp(**task)
+
+        except Exception as e:
+            logger.error(f"Task execution failed: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to execute task: {str(e)}"
+            )
+
+    @app.get("/tasks/{task_id}", response_model=TaskStatusResponse)
+    async def get_task_status(task_id: str):
+        """Get status of a running task"""
+        task = tasks_storage.get(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        return TaskStatusResponse(
+            task_id=task["task_id"],
+            agent_id=task["agent_id"],
+            status=task["status"],
+            result=task.get("result"),
+            error=task.get("error"),
+            created_at=task["created_at"],
+            updated_at=task.get("completed_at") or task["created_at"]
+        )
+
+    @app.get("/tasks", response_model=TaskListResponse)
+    async def list_tasks(agent_id: Optional[str] = None, limit: int = 50):
+        """List tasks, optionally filtered by agent"""
+        task_list = []
+        for task in tasks_storage.values():
+            if agent_id is None or task["agent_id"] == agent_id:
+                task_list.append(TaskStatusResponse(
+                    task_id=task["task_id"],
+                    agent_id=task["agent_id"],
+                    status=task["status"],
+                    result=task.get("result"),
+                    error=task.get("error"),
+                    created_at=task["created_at"],
+                    updated_at=task.get("completed_at") or task["created_at"]
+                ))
+
+        return TaskListResponse(
+            tasks=task_list[:limit],
+            total=len(task_list)
+        )
+
+    @app.post("/chat", response_model=ChatResponse)
+    async def chat_with_agent(request: ChatRequest, user_id: str = "default_user"):
+        """Chat with an agent using Maverick model"""
+        try:
+            import uuid
+            import requests as req
+            from datetime import datetime
+
+            # Get agent configuration
+            agent = await agent_storage.get_agent(request.agent_id, user_id)
+            if not agent:
+                raise HTTPException(status_code=404, detail="Agent not found")
+
+            conversation_id = request.conversation_id or str(uuid.uuid4())
+
+            # Get system prompt from agent or override
+            system_prompt = request.system_prompt_override or agent.get("system_prompt", "You are a helpful AI assistant.")
+
+            # Call Maverick model
+            try:
+                maverick_response = req.post(
+                    "http://localhost:8090/completion",
+                    json={
+                        "prompt": f"{system_prompt}\n\nUser: {request.message}\n\nAssistant:",
+                        "n_predict": 500,
+                        "temperature": 0.7,
+                        "stop": ["\nUser:", "\n\n"],
+                        "stream": False
+                    },
+                    timeout=60
+                )
+                data = maverick_response.json()
+                agent_response = data.get("content", "").strip()
+            except req.exceptions.ConnectionError:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Maverick server not running. Start it with: ./START_MAVERICK_QUICKSTART.sh"
+                )
+
+            return ChatResponse(
+                conversation_id=conversation_id,
+                agent_id=request.agent_id,
+                message=agent_response,
+                metadata={
+                    "agent_name": agent["name"],
+                    "agent_type": agent["agent_type"],
+                    "model": "maverick-q4",
+                    "tokens": data.get("tokens_predicted", 0) + data.get("tokens_evaluated", 0)
+                },
+                timestamp=datetime.utcnow()
+            )
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Chat failed: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Chat failed: {str(e)}"
+            )
+
+    @app.post("/inference", response_model=ModelInferenceResponse)
+    async def model_inference(request: ModelInferenceRequest):
+        """Direct model inference endpoint - Using LOCAL Maverick Model"""
+        try:
+            import requests as req
+            from datetime import datetime
+
+            # Call your local Maverick llama.cpp server
+            maverick_response = req.post(
+                "http://localhost:8090/completion",
+                json={
+                    "prompt": f"{request.system_prompt or 'You are a helpful AI assistant.'}\n\nUser: {request.prompt}\n\nAssistant:",
+                    "n_predict": request.max_tokens,
+                    "temperature": request.temperature,
+                    "stop": ["\nUser:", "\n\n"],
+                    "stream": False
+                },
+                timeout=60
+            )
+
+            data = maverick_response.json()
+            response_text = data.get("content", "")
+
+            return ModelInferenceResponse(
+                response=response_text,
+                model="maverick-q4",
+                tokens_used=data.get("tokens_predicted", 0) + data.get("tokens_evaluated", 0),
+                metadata={
+                    "temperature": request.temperature,
+                    "max_tokens": request.max_tokens,
+                    "timestamp": datetime.utcnow().isoformat(),
+                    "model_path": "maverick-q4_k_m.gguf"
+                }
+            )
+
+        except req.exceptions.ConnectionError:
+            raise HTTPException(
+                status_code=503,
+                detail="Maverick server not running. Start it with: ./START_MAVERICK_QUICKSTART.sh"
+            )
+        except Exception as e:
+            logger.error(f"Inference failed: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Inference failed: {str(e)}"
             )
 
     @app.get("/metrics")
