@@ -1,0 +1,441 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix schema: <https://schema.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ============================================================================
+# Finance Domain - Investment Strategies and Budget Plans
+# ============================================================================
+
+# Core Strategy Classes
+ln:FinancialStrategy a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Financial Strategy"@en ;
+    rdfs:comment "A strategic approach to managing finances, investments, or budgets"@en .
+
+ln:InvestmentStrategy a owl:Class ;
+    rdfs:subClassOf ln:FinancialStrategy ;
+    rdfs:label "Investment Strategy"@en ;
+    rdfs:comment "A strategy for allocating and managing investments"@en .
+
+ln:BudgetPlan a owl:Class ;
+    rdfs:subClassOf ln:FinancialStrategy ;
+    rdfs:label "Budget Plan"@en ;
+    rdfs:comment "A plan for allocating income and managing expenses"@en .
+
+ln:SavingsGoal a owl:Class ;
+    rdfs:subClassOf ln:FinancialStrategy ;
+    rdfs:label "Savings Goal"@en ;
+    rdfs:comment "A specific savings target with timeline"@en .
+
+ln:DebtPayoffPlan a owl:Class ;
+    rdfs:subClassOf ln:FinancialStrategy ;
+    rdfs:label "Debt Payoff Plan"@en ;
+    rdfs:comment "Strategy for paying down debt (snowball, avalanche, etc.)"@en .
+
+# Investment Strategy Types
+ln:ValueInvesting a owl:Class ;
+    rdfs:subClassOf ln:InvestmentStrategy ;
+    rdfs:label "Value Investing"@en ;
+    rdfs:comment "Buying undervalued stocks with strong fundamentals"@en .
+
+ln:GrowthInvesting a owl:Class ;
+    rdfs:subClassOf ln:InvestmentStrategy ;
+    rdfs:label "Growth Investing"@en ;
+    rdfs:comment "Investing in companies with high growth potential"@en .
+
+ln:IndexInvesting a owl:Class ;
+    rdfs:subClassOf ln:InvestmentStrategy ;
+    rdfs:label "Index Investing"@en ;
+    rdfs:comment "Passive investing tracking market indices"@en .
+
+ln:DividendInvesting a owl:Class ;
+    rdfs:subClassOf ln:InvestmentStrategy ;
+    rdfs:label "Dividend Investing"@en ;
+    rdfs:comment "Focusing on stocks with high dividend yields"@en .
+
+ln:DollarCostAveraging a owl:Class ;
+    rdfs:subClassOf ln:InvestmentStrategy ;
+    rdfs:label "Dollar-Cost Averaging"@en ;
+    rdfs:comment "Regular fixed-amount investments regardless of price"@en .
+
+ln:PortfolioRebalancing a owl:Class ;
+    rdfs:subClassOf ln:InvestmentStrategy ;
+    rdfs:label "Portfolio Rebalancing"@en ;
+    rdfs:comment "Periodic adjustment to maintain target asset allocation"@en .
+
+ln:TaxLossHarvesting a owl:Class ;
+    rdfs:subClassOf ln:InvestmentStrategy ;
+    rdfs:label "Tax-Loss Harvesting"@en ;
+    rdfs:comment "Selling losing positions to offset capital gains"@en .
+
+# Asset Allocation Models
+ln:AssetAllocation a owl:Class ;
+    rdfs:subClassOf ln:InvestmentStrategy ;
+    rdfs:label "Asset Allocation"@en ;
+    rdfs:comment "Distribution of portfolio across asset classes"@en .
+
+ln:AggressiveAllocation a owl:Class ;
+    rdfs:subClassOf ln:AssetAllocation ;
+    rdfs:label "Aggressive Allocation"@en ;
+    rdfs:comment "High equity allocation (80-100% stocks)"@en .
+
+ln:ModerateAllocation a owl:Class ;
+    rdfs:subClassOf ln:AssetAllocation ;
+    rdfs:label "Moderate Allocation"@en ;
+    rdfs:comment "Balanced allocation (50-70% stocks)"@en .
+
+ln:ConservativeAllocation a owl:Class ;
+    rdfs:subClassOf ln:AssetAllocation ;
+    rdfs:label "Conservative Allocation"@en ;
+    rdfs:comment "Low equity allocation (20-40% stocks)"@en .
+
+# Budget Plan Types
+ln:ZeroBasedBudget a owl:Class ;
+    rdfs:subClassOf ln:BudgetPlan ;
+    rdfs:label "Zero-Based Budget"@en ;
+    rdfs:comment "Every dollar assigned to a category (income - expenses = 0)"@en .
+
+ln:FiftyThirtyTwentyBudget a owl:Class ;
+    rdfs:subClassOf ln:BudgetPlan ;
+    rdfs:label "50/30/20 Budget"@en ;
+    rdfs:comment "50% needs, 30% wants, 20% savings/debt"@en .
+
+ln:EnvelopeBudget a owl:Class ;
+    rdfs:subClassOf ln:BudgetPlan ;
+    rdfs:label "Envelope Budget"@en ;
+    rdfs:comment "Cash allocated to physical or virtual envelopes per category"@en .
+
+ln:PayYourselfFirstBudget a owl:Class ;
+    rdfs:subClassOf ln:BudgetPlan ;
+    rdfs:label "Pay Yourself First Budget"@en ;
+    rdfs:comment "Savings/investments deducted first, then expenses"@en .
+
+# Budget Categories
+ln:BudgetCategory a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Budget Category"@en ;
+    rdfs:comment "A category for tracking income or expenses"@en .
+
+ln:IncomeCategory a owl:Class ;
+    rdfs:subClassOf ln:BudgetCategory ;
+    rdfs:label "Income Category"@en .
+
+ln:ExpenseCategory a owl:Class ;
+    rdfs:subClassOf ln:BudgetCategory ;
+    rdfs:label "Expense Category"@en .
+
+ln:FixedExpense a owl:Class ;
+    rdfs:subClassOf ln:ExpenseCategory ;
+    rdfs:label "Fixed Expense"@en ;
+    rdfs:comment "Recurring expense with consistent amount (rent, insurance)"@en .
+
+ln:VariableExpense a owl:Class ;
+    rdfs:subClassOf ln:ExpenseCategory ;
+    rdfs:label "Variable Expense"@en ;
+    rdfs:comment "Expense that varies month-to-month (groceries, utilities)"@en .
+
+ln:DiscretionaryExpense a owl:Class ;
+    rdfs:subClassOf ln:ExpenseCategory ;
+    rdfs:label "Discretionary Expense"@en ;
+    rdfs:comment "Optional spending (entertainment, dining out)"@en .
+
+# Strategy Properties
+ln:strategyName a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialStrategy ;
+    rdfs:range xsd:string ;
+    rdfs:label "strategy name"@en .
+
+ln:strategyDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialStrategy ;
+    rdfs:range xsd:string ;
+    rdfs:label "strategy description"@en .
+
+ln:strategyStartDate a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialStrategy ;
+    rdfs:range xsd:date ;
+    rdfs:label "strategy start date"@en .
+
+ln:strategyEndDate a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialStrategy ;
+    rdfs:range xsd:date ;
+    rdfs:label "strategy end date"@en .
+
+ln:isActiveStrategy a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialStrategy ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is active strategy"@en .
+
+ln:riskTolerance a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentStrategy ;
+    rdfs:range xsd:string ;
+    rdfs:label "risk tolerance"@en ;
+    rdfs:comment "Risk level: CONSERVATIVE, MODERATE, AGGRESSIVE"@en .
+
+ln:timeHorizon a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentStrategy ;
+    rdfs:range xsd:string ;
+    rdfs:label "time horizon"@en ;
+    rdfs:comment "Investment timeline: SHORT_TERM (<3y), MEDIUM_TERM (3-10y), LONG_TERM (>10y)"@en .
+
+# Asset Allocation Properties
+ln:equityAllocation a owl:DatatypeProperty ;
+    rdfs:domain ln:AssetAllocation ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "equity allocation"@en ;
+    rdfs:comment "Percentage allocated to stocks"@en .
+
+ln:fixedIncomeAllocation a owl:DatatypeProperty ;
+    rdfs:domain ln:AssetAllocation ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "fixed income allocation"@en ;
+    rdfs:comment "Percentage allocated to bonds"@en .
+
+ln:cashAllocation a owl:DatatypeProperty ;
+    rdfs:domain ln:AssetAllocation ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "cash allocation"@en ;
+    rdfs:comment "Percentage in cash/money market"@en .
+
+ln:alternativeAllocation a owl:DatatypeProperty ;
+    rdfs:domain ln:AssetAllocation ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "alternative allocation"@en ;
+    rdfs:comment "Percentage in alternatives (real estate, commodities, crypto)"@en .
+
+ln:domesticAllocation a owl:DatatypeProperty ;
+    rdfs:domain ln:AssetAllocation ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "domestic allocation"@en .
+
+ln:internationalAllocation a owl:DatatypeProperty ;
+    rdfs:domain ln:AssetAllocation ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "international allocation"@en .
+
+# Budget Properties
+ln:budgetPeriod a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetPlan ;
+    rdfs:range xsd:string ;
+    rdfs:label "budget period"@en ;
+    rdfs:comment "Budgeting frequency: WEEKLY, BIWEEKLY, MONTHLY, ANNUAL"@en .
+
+ln:totalIncome a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetPlan ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "total income"@en .
+
+ln:totalExpenses a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetPlan ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "total expenses"@en .
+
+ln:totalSavings a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetPlan ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "total savings"@en .
+
+ln:budgetSurplus a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetPlan ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "budget surplus"@en ;
+    rdfs:comment "Positive value: income > expenses"@en .
+
+ln:budgetDeficit a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetPlan ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "budget deficit"@en ;
+    rdfs:comment "Negative value: expenses > income"@en .
+
+# Budget Category Properties
+ln:categoryName a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetCategory ;
+    rdfs:range xsd:string ;
+    rdfs:label "category name"@en .
+
+ln:budgetedAmount a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetCategory ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "budgeted amount"@en ;
+    rdfs:comment "Planned amount for this category"@en .
+
+ln:actualAmount a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetCategory ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "actual amount"@en ;
+    rdfs:comment "Actual spending/income in this category"@en .
+
+ln:remainingAmount a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetCategory ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "remaining amount"@en .
+
+ln:percentageOfTotal a owl:DatatypeProperty ;
+    rdfs:domain ln:BudgetCategory ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "percentage of total"@en ;
+    rdfs:comment "Category as percentage of total budget"@en .
+
+# Savings Goal Properties
+ln:goalName a owl:DatatypeProperty ;
+    rdfs:domain ln:SavingsGoal ;
+    rdfs:range xsd:string ;
+    rdfs:label "goal name"@en .
+
+ln:targetAmount a owl:DatatypeProperty ;
+    rdfs:domain ln:SavingsGoal ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "target amount"@en .
+
+ln:currentSaved a owl:DatatypeProperty ;
+    rdfs:domain ln:SavingsGoal ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "current saved"@en .
+
+ln:targetDate a owl:DatatypeProperty ;
+    rdfs:domain ln:SavingsGoal ;
+    rdfs:range xsd:date ;
+    rdfs:label "target date"@en .
+
+ln:monthlyContribution a owl:DatatypeProperty ;
+    rdfs:domain ln:SavingsGoal ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "monthly contribution"@en .
+
+ln:progressPercentage a owl:DatatypeProperty ;
+    rdfs:domain ln:SavingsGoal ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "progress percentage"@en .
+
+ln:goalPriority a owl:DatatypeProperty ;
+    rdfs:domain ln:SavingsGoal ;
+    rdfs:range xsd:string ;
+    rdfs:label "goal priority"@en ;
+    rdfs:comment "Priority level: LOW, MEDIUM, HIGH, CRITICAL"@en .
+
+# Debt Payoff Properties
+ln:payoffMethod a owl:DatatypeProperty ;
+    rdfs:domain ln:DebtPayoffPlan ;
+    rdfs:range xsd:string ;
+    rdfs:label "payoff method"@en ;
+    rdfs:comment "Method: SNOWBALL (smallest first), AVALANCHE (highest interest first)"@en .
+
+ln:totalDebt a owl:DatatypeProperty ;
+    rdfs:domain ln:DebtPayoffPlan ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "total debt"@en .
+
+ln:debtPaid a owl:DatatypeProperty ;
+    rdfs:domain ln:DebtPayoffPlan ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "debt paid"@en .
+
+ln:remainingDebt a owl:DatatypeProperty ;
+    rdfs:domain ln:DebtPayoffPlan ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "remaining debt"@en .
+
+ln:projectedPayoffDate a owl:DatatypeProperty ;
+    rdfs:domain ln:DebtPayoffPlan ;
+    rdfs:range xsd:date ;
+    rdfs:label "projected payoff date"@en .
+
+ln:extraPaymentAmount a owl:DatatypeProperty ;
+    rdfs:domain ln:DebtPayoffPlan ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "extra payment amount"@en ;
+    rdfs:comment "Additional monthly payment towards debt"@en .
+
+# Performance Tracking
+ln:expectedReturn a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentStrategy ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "expected return"@en ;
+    rdfs:comment "Projected annual return (%)"@en .
+
+ln:actualReturn a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentStrategy ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "actual return"@en ;
+    rdfs:comment "Realized annual return (%)"@en .
+
+ln:benchmarkReturn a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentStrategy ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "benchmark return"@en ;
+    rdfs:comment "Comparison benchmark performance (%)"@en .
+
+ln:sharpeRatio a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentStrategy ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "Sharpe ratio"@en ;
+    rdfs:comment "Risk-adjusted return metric"@en .
+
+# Relationships - Strategy Ownership
+ln:hasStrategy a owl:ObjectProperty ;
+    rdfs:domain ln:Person ;
+    rdfs:range ln:FinancialStrategy ;
+    rdfs:label "has strategy"@en ;
+    owl:inverseOf ln:strategyOwnedBy .
+
+ln:strategyOwnedBy a owl:ObjectProperty ;
+    rdfs:domain ln:FinancialStrategy ;
+    rdfs:range ln:Person ;
+    rdfs:label "strategy owned by"@en ;
+    owl:inverseOf ln:hasStrategy .
+
+# Relationships - Strategy to Accounts
+ln:appliesTo a owl:ObjectProperty ;
+    rdfs:domain ln:InvestmentStrategy ;
+    rdfs:range ln:InvestmentAccount ;
+    rdfs:label "applies to"@en ;
+    rdfs:comment "Investment strategy applied to specific account"@en .
+
+ln:budgetFor a owl:ObjectProperty ;
+    rdfs:domain ln:BudgetPlan ;
+    rdfs:range ln:FinancialAccount ;
+    rdfs:label "budget for"@en ;
+    rdfs:comment "Budget plan managing specific account"@en .
+
+# Relationships - Budget Categories
+ln:hasCategory a owl:ObjectProperty ;
+    rdfs:domain ln:BudgetPlan ;
+    rdfs:range ln:BudgetCategory ;
+    rdfs:label "has category"@en ;
+    owl:inverseOf ln:categoryOf .
+
+ln:categoryOf a owl:ObjectProperty ;
+    rdfs:domain ln:BudgetCategory ;
+    rdfs:range ln:BudgetPlan ;
+    rdfs:label "category of"@en ;
+    owl:inverseOf ln:hasCategory .
+
+# Relationships - Savings Goal to Account
+ln:savesTo a owl:ObjectProperty ;
+    rdfs:domain ln:SavingsGoal ;
+    rdfs:range ln:FinancialAccount ;
+    rdfs:label "saves to"@en ;
+    rdfs:comment "Account where savings are accumulated"@en .
+
+# Relationships - Debt Payoff to Loan
+ln:paysOff a owl:ObjectProperty ;
+    rdfs:domain ln:DebtPayoffPlan ;
+    rdfs:range ln:Loan ;
+    rdfs:label "pays off"@en ;
+    rdfs:comment "Loan account targeted by payoff plan"@en .
+
+# Multi-tenancy
+ln:tenantId a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialStrategy ;
+    rdfs:range xsd:string ;
+    rdfs:label "tenant ID"@en ;
+    rdfs:comment "Multi-tenant isolation identifier (HIPAA compliant)"@en .
+
+# Metadata
+<https://ln.life/ontology/finance/strategies> a owl:Ontology ;
+    dc:title "Life Navigator Finance Strategies Ontology"@en ;
+    dc:description "Ontology for investment strategies, budget plans, savings goals, and debt payoff"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" .

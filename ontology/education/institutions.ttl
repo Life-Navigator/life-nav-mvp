@@ -1,0 +1,455 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix schema: <https://schema.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ============================================================================
+# Education Domain - Educational Institutions and Platforms
+# ============================================================================
+
+# Core Institution Classes
+ln:EducationalInstitution a owl:Class ;
+    rdfs:subClassOf schema:Organization ;
+    rdfs:label "Educational Institution"@en ;
+    rdfs:comment "An organization providing education or training"@en .
+
+ln:University a owl:Class ;
+    rdfs:subClassOf ln:EducationalInstitution ;
+    rdfs:label "University"@en ;
+    rdfs:comment "Four-year university or college"@en .
+
+ln:CommunityCollege a owl:Class ;
+    rdfs:subClassOf ln:EducationalInstitution ;
+    rdfs:label "Community College"@en ;
+    rdfs:comment "Two-year community or junior college"@en .
+
+ln:OnlineLearningPlatform a owl:Class ;
+    rdfs:subClassOf ln:EducationalInstitution ;
+    rdfs:label "Online Learning Platform"@en ;
+    rdfs:comment "Platform offering online courses (Coursera, Udemy, edX, etc.)"@en .
+
+ln:Bootcamp a owl:Class ;
+    rdfs:subClassOf ln:EducationalInstitution ;
+    rdfs:label "Bootcamp"@en ;
+    rdfs:comment "Intensive coding or skills bootcamp organization"@en .
+
+ln:TrainingCenter a owl:Class ;
+    rdfs:subClassOf ln:EducationalInstitution ;
+    rdfs:label "Training Center"@en ;
+    rdfs:comment "Professional training or continuing education center"@en .
+
+ln:VocationalSchool a owl:Class ;
+    rdfs:subClassOf ln:EducationalInstitution ;
+    rdfs:label "Vocational School"@en ;
+    rdfs:comment "Trade or technical school"@en .
+
+ln:GraduateSchool a owl:Class ;
+    rdfs:subClassOf ln:EducationalInstitution ;
+    rdfs:label "Graduate School"@en ;
+    rdfs:comment "School offering graduate degrees (Master's, PhD)"@en .
+
+ln:BusinessSchool a owl:Class ;
+    rdfs:subClassOf ln:GraduateSchool ;
+    rdfs:label "Business School"@en ;
+    rdfs:comment "School offering MBA and business degrees"@en .
+
+ln:LawSchool a owl:Class ;
+    rdfs:subClassOf ln:GraduateSchool ;
+    rdfs:label "Law School"@en .
+
+ln:MedicalSchool a owl:Class ;
+    rdfs:subClassOf ln:GraduateSchool ;
+    rdfs:label "Medical School"@en .
+
+# Academic Department Classes
+ln:AcademicDepartment a owl:Class ;
+    rdfs:subClassOf schema:Organization ;
+    rdfs:label "Academic Department"@en ;
+    rdfs:comment "Department within a university (Computer Science, Business, etc.)"@en .
+
+ln:Faculty a owl:Class ;
+    rdfs:subClassOf schema:Organization ;
+    rdfs:label "Faculty"@en ;
+    rdfs:comment "Faculty or school within a university (Faculty of Engineering)"@en .
+
+# Certification Body Classes
+ln:CertificationBody a owl:Class ;
+    rdfs:subClassOf schema:Organization ;
+    rdfs:label "Certification Body"@en ;
+    rdfs:comment "Organization that issues professional certifications"@en .
+
+ln:ProfessionalAssociation a owl:Class ;
+    rdfs:subClassOf schema:Organization ;
+    rdfs:label "Professional Association"@en ;
+    rdfs:comment "Industry association offering certifications (PMI, IEEE, etc.)"@en .
+
+# Institution Properties
+ln:institutionName a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "institution name"@en .
+
+ln:institutionType a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "institution type"@en ;
+    rdfs:comment "PUBLIC, PRIVATE, FOR_PROFIT, NON_PROFIT, ONLINE"@en .
+
+ln:foundingYear a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:integer ;
+    rdfs:label "founding year"@en .
+
+ln:institutionUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "institution URL"@en .
+
+ln:institutionAddress a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "institution address"@en .
+
+ln:city a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "city"@en .
+
+ln:state a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "state"@en ;
+    rdfs:comment "State or province"@en .
+
+ln:country a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "country"@en .
+
+ln:zipCode a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "zip code"@en .
+
+# University-specific Properties
+ln:ranking a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:integer ;
+    rdfs:label "ranking"@en ;
+    rdfs:comment "University ranking (US News, QS, etc.)"@en .
+
+ln:rankingSource a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:string ;
+    rdfs:label "ranking source"@en ;
+    rdfs:comment "US_NEWS, QS, TIMES, ARWU"@en .
+
+ln:studentPopulation a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:integer ;
+    rdfs:label "student population"@en .
+
+ln:acceptanceRate a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "acceptance rate"@en ;
+    rdfs:comment "Admission acceptance rate (0.0-1.0)"@en .
+
+ln:tuitionCost a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "tuition cost"@en ;
+    rdfs:comment "Annual tuition"@en .
+
+ln:endowment a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "endowment"@en ;
+    rdfs:comment "University endowment in USD"@en .
+
+ln:motto a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:string ;
+    rdfs:label "motto"@en .
+
+ln:campusType a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:string ;
+    rdfs:label "campus type"@en ;
+    rdfs:comment "URBAN, SUBURBAN, RURAL"@en .
+
+ln:athleticConference a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:string ;
+    rdfs:label "athletic conference"@en ;
+    rdfs:comment "NCAA conference (SEC, Big Ten, etc.)"@en .
+
+ln:hasGreekLife a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "has Greek life"@en .
+
+# Accreditation
+ln:accreditation a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "accreditation"@en ;
+    rdfs:comment "Accrediting body (ABET, AACSB, regional accreditor)"@en .
+
+ln:isAccredited a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is accredited"@en .
+
+ln:accreditationDate a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:date ;
+    rdfs:label "accreditation date"@en .
+
+# Online Platform Properties
+ln:platformName a owl:DatatypeProperty ;
+    rdfs:domain ln:OnlineLearningPlatform ;
+    rdfs:range xsd:string ;
+    rdfs:label "platform name"@en ;
+    rdfs:comment "Coursera, Udemy, edX, Udacity, Pluralsight, LinkedIn Learning, etc."@en .
+
+ln:totalCourses a owl:DatatypeProperty ;
+    rdfs:domain ln:OnlineLearningPlatform ;
+    rdfs:range xsd:integer ;
+    rdfs:label "total courses"@en ;
+    rdfs:comment "Number of courses available"@en .
+
+ln:totalStudents a owl:DatatypeProperty ;
+    rdfs:domain ln:OnlineLearningPlatform ;
+    rdfs:range xsd:integer ;
+    rdfs:label "total students"@en ;
+    rdfs:comment "Registered learners on platform"@en .
+
+ln:subscriptionModel a owl:DatatypeProperty ;
+    rdfs:domain ln:OnlineLearningPlatform ;
+    rdfs:range xsd:string ;
+    rdfs:label "subscription model"@en ;
+    rdfs:comment "FREE, FREEMIUM, SUBSCRIPTION, PAY_PER_COURSE"@en .
+
+ln:subscriptionPrice a owl:DatatypeProperty ;
+    rdfs:domain ln:OnlineLearningPlatform ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "subscription price"@en ;
+    rdfs:comment "Monthly subscription cost"@en .
+
+ln:hasMobilApp a owl:DatatypeProperty ;
+    rdfs:domain ln:OnlineLearningPlatform ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "has mobile app"@en .
+
+ln:offersCredentials a owl:DatatypeProperty ;
+    rdfs:domain ln:OnlineLearningPlatform ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "offers credentials"@en ;
+    rdfs:comment "Whether platform offers certificates or degrees"@en .
+
+ln:partnerInstitutions a owl:DatatypeProperty ;
+    rdfs:domain ln:OnlineLearningPlatform ;
+    rdfs:range xsd:string ;
+    rdfs:label "partner institutions"@en ;
+    rdfs:comment "Comma-separated list of university partners"@en .
+
+# Bootcamp Properties
+ln:bootcampDuration a owl:DatatypeProperty ;
+    rdfs:domain ln:Bootcamp ;
+    rdfs:range xsd:integer ;
+    rdfs:label "bootcamp duration"@en ;
+    rdfs:comment "Duration in weeks"@en .
+
+ln:bootcampCost a owl:DatatypeProperty ;
+    rdfs:domain ln:Bootcamp ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "bootcamp cost"@en .
+
+ln:bootcampFormat a owl:DatatypeProperty ;
+    rdfs:domain ln:Bootcamp ;
+    rdfs:range xsd:string ;
+    rdfs:label "bootcamp format"@en ;
+    rdfs:comment "FULL_TIME, PART_TIME, ONLINE, HYBRID"@en .
+
+ln:jobPlacementRate a owl:DatatypeProperty ;
+    rdfs:domain ln:Bootcamp ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "job placement rate"@en ;
+    rdfs:comment "Graduate job placement rate (0.0-1.0)"@en .
+
+ln:averageStartingSalary a owl:DatatypeProperty ;
+    rdfs:domain ln:Bootcamp ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "average starting salary"@en ;
+    rdfs:comment "Average salary for graduates"@en .
+
+ln:hasJobGuarantee a owl:DatatypeProperty ;
+    rdfs:domain ln:Bootcamp ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "has job guarantee"@en .
+
+ln:specialization a owl:DatatypeProperty ;
+    rdfs:domain ln:Bootcamp ;
+    rdfs:range xsd:string ;
+    rdfs:label "specialization"@en ;
+    rdfs:comment "Coding, Data Science, UX Design, Cybersecurity, etc."@en .
+
+# Department Properties
+ln:departmentName a owl:DatatypeProperty ;
+    rdfs:domain ln:AcademicDepartment ;
+    rdfs:range xsd:string ;
+    rdfs:label "department name"@en .
+
+ln:departmentCode a owl:DatatypeProperty ;
+    rdfs:domain ln:AcademicDepartment ;
+    rdfs:range xsd:string ;
+    rdfs:label "department code"@en ;
+    rdfs:comment "CS, MATH, BUS, etc."@en .
+
+ln:facultyCount a owl:DatatypeProperty ;
+    rdfs:domain ln:AcademicDepartment ;
+    rdfs:range xsd:integer ;
+    rdfs:label "faculty count"@en ;
+    rdfs:comment "Number of faculty members"@en .
+
+ln:majorOffered a owl:DatatypeProperty ;
+    rdfs:domain ln:AcademicDepartment ;
+    rdfs:range xsd:string ;
+    rdfs:label "major offered"@en ;
+    rdfs:comment "Comma-separated list of majors"@en .
+
+ln:graduateProgramsOffered a owl:DatatypeProperty ;
+    rdfs:domain ln:AcademicDepartment ;
+    rdfs:range xsd:string ;
+    rdfs:label "graduate programs offered"@en .
+
+ln:researchAreas a owl:DatatypeProperty ;
+    rdfs:domain ln:AcademicDepartment ;
+    rdfs:range xsd:string ;
+    rdfs:label "research areas"@en .
+
+# Certification Body Properties
+ln:certificationBodyName a owl:DatatypeProperty ;
+    rdfs:domain ln:CertificationBody ;
+    rdfs:range xsd:string ;
+    rdfs:label "certification body name"@en .
+
+ln:certificationsOffered a owl:DatatypeProperty ;
+    rdfs:domain ln:CertificationBody ;
+    rdfs:range xsd:string ;
+    rdfs:label "certifications offered"@en ;
+    rdfs:comment "Comma-separated list of certifications"@en .
+
+ln:industryFocus a owl:DatatypeProperty ;
+    rdfs:domain ln:CertificationBody ;
+    rdfs:range xsd:string ;
+    rdfs:label "industry focus"@en ;
+    rdfs:comment "Tech, Finance, Healthcare, Management, etc."@en .
+
+ln:globalRecognition a owl:DatatypeProperty ;
+    rdfs:domain ln:CertificationBody ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "global recognition"@en .
+
+ln:membershipRequired a owl:DatatypeProperty ;
+    rdfs:domain ln:CertificationBody ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "membership required"@en .
+
+ln:membershipFee a owl:DatatypeProperty ;
+    rdfs:domain ln:CertificationBody ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "membership fee"@en ;
+    rdfs:comment "Annual membership fee"@en .
+
+# Contact Information
+ln:contactEmail a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact email"@en .
+
+ln:contactPhone a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact phone"@en .
+
+ln:admissionsEmail a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:string ;
+    rdfs:label "admissions email"@en .
+
+ln:admissionsPhone a owl:DatatypeProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range xsd:string ;
+    rdfs:label "admissions phone"@en .
+
+# Social Media
+ln:linkedInUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "LinkedIn URL"@en .
+
+ln:twitterHandle a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "Twitter handle"@en .
+
+ln:facebookPage a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "Facebook page"@en .
+
+ln:youtubeChannel a owl:DatatypeProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "YouTube channel"@en .
+
+# Relationships - Department to University
+ln:departmentOf a owl:ObjectProperty ;
+    rdfs:domain ln:AcademicDepartment ;
+    rdfs:range ln:University ;
+    rdfs:label "department of"@en ;
+    owl:inverseOf ln:hasDepartment .
+
+ln:hasDepartment a owl:ObjectProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range ln:AcademicDepartment ;
+    rdfs:label "has department"@en ;
+    owl:inverseOf ln:departmentOf .
+
+# Relationships - Faculty to University
+ln:facultyOf a owl:ObjectProperty ;
+    rdfs:domain ln:Faculty ;
+    rdfs:range ln:University ;
+    rdfs:label "faculty of"@en ;
+    owl:inverseOf ln:hasFaculty .
+
+ln:hasFaculty a owl:ObjectProperty ;
+    rdfs:domain ln:University ;
+    rdfs:range ln:Faculty ;
+    rdfs:label "has faculty"@en ;
+    owl:inverseOf ln:facultyOf .
+
+# Relationships - Platform Partnerships
+ln:partneredWith a owl:ObjectProperty ;
+    rdfs:domain ln:OnlineLearningPlatform ;
+    rdfs:range ln:University ;
+    rdfs:label "partnered with"@en ;
+    rdfs:comment "University partnership for offering courses/degrees"@en .
+
+# Relationships - Accreditation
+ln:accreditedBy a owl:ObjectProperty ;
+    rdfs:domain ln:EducationalInstitution ;
+    rdfs:range schema:Organization ;
+    rdfs:label "accredited by"@en ;
+    rdfs:comment "Accrediting body"@en .
+
+# Metadata
+<https://ln.life/ontology/education/institutions> a owl:Ontology ;
+    dc:title "Life Navigator Education Institutions Ontology"@en ;
+    dc:description "Ontology for educational institutions, universities, online platforms, bootcamps, and certification bodies"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" .

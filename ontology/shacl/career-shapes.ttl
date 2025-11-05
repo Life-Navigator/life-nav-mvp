@@ -1,0 +1,519 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# ============================================================================
+# SHACL Validation Shapes for Career Domain
+# ============================================================================
+
+# Career Profile Shape
+ln:CareerProfileShape
+    a sh:NodeShape ;
+    sh:targetClass ln:CareerProfile ;
+    sh:property [
+        sh:path ln:profileSummary ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "Career profile can have at most one profileSummary"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:yearsOfExperience ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:maxInclusive 75 ;
+        sh:message "Years of experience must be between 0 and 75"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:desiredSalary ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Desired salary must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:willingToRelocate ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Profile can have at most one willingToRelocate flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:openToRemote ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Profile can have at most one openToRemote flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:profileOf ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Career profile must belong to exactly one Person"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Career profile must have exactly one non-empty tenantId"@en ;
+    ] .
+
+# Job Experience Shape
+ln:JobExperienceShape
+    a sh:NodeShape ;
+    sh:targetClass ln:JobExperience ;
+    sh:property [
+        sh:path ln:jobTitle ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Job experience must have exactly one non-empty jobTitle"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:companyName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Job experience must have exactly one non-empty companyName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:jobStartDate ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Job experience must have exactly one jobStartDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:jobEndDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Job experience can have at most one jobEndDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isCurrentJob ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Job experience can have at most one isCurrentJob flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:employmentType ;
+        sh:datatype xsd:string ;
+        sh:in ("FULL_TIME" "PART_TIME" "CONTRACT" "INTERNSHIP" "FREELANCE") ;
+        sh:maxCount 1 ;
+        sh:message "Employment type must be valid employment type"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:jobLevel ;
+        sh:datatype xsd:string ;
+        sh:in ("ENTRY" "MID" "SENIOR" "LEAD" "MANAGER" "DIRECTOR" "VP" "C_LEVEL") ;
+        sh:maxCount 1 ;
+        sh:message "Job level must be valid job level"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:salary ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Salary must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:experienceOf ;
+        sh:class ln:CareerProfile ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Job experience must belong to exactly one CareerProfile"@en ;
+    ] .
+
+# Skill Shape
+ln:SkillShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Skill ;
+    sh:property [
+        sh:path ln:skillName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Skill must have exactly one non-empty skillName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:proficiencyLevel ;
+        sh:datatype xsd:string ;
+        sh:in ("BEGINNER" "INTERMEDIATE" "ADVANCED" "EXPERT") ;
+        sh:maxCount 1 ;
+        sh:message "Proficiency level must be valid proficiency level"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:yearsOfPractice ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:maxInclusive 75 ;
+        sh:message "Years of practice must be between 0 and 75"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:lastUsedDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Skill can have at most one lastUsedDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isPrimarySkill ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Skill can have at most one isPrimarySkill flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:endorsementCount ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:message "Endorsement count must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:skillOf ;
+        sh:class ln:CareerProfile ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Skill must belong to exactly one CareerProfile"@en ;
+    ] .
+
+# Achievement Shape
+ln:AchievementShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Achievement ;
+    sh:property [
+        sh:path ln:achievementTitle ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Achievement must have exactly one non-empty achievementTitle"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:achievementDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Achievement can have at most one achievementDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:issuingOrganization ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "Achievement can have at most one issuingOrganization"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:achievementOf ;
+        sh:class ln:CareerProfile ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Achievement must belong to exactly one CareerProfile"@en ;
+    ] .
+
+# Certification Shape (Career version)
+ln:CertificationShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Certification ;
+    sh:property [
+        sh:path ln:certificationName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Certification must have exactly one non-empty certificationName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:certificationIssuer ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "Certification can have at most one certificationIssuer"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:certificationDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Certification can have at most one certificationDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:expirationDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Certification can have at most one expirationDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:credentialUrl ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:pattern "^https?://.*" ;
+        sh:message "Credential URL must be a valid HTTP/HTTPS URL"@en ;
+    ] .
+
+# Job Posting Shape
+ln:JobPostingShape
+    a sh:NodeShape ;
+    sh:targetClass ln:JobPosting ;
+    sh:property [
+        sh:path ln:postingTitle ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Job posting must have exactly one non-empty postingTitle"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:postingCompany ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Job posting must have exactly one non-empty postingCompany"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:postedDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Job posting can have at most one postedDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:applicationDeadline ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Job posting can have at most one applicationDeadline"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:salaryMin ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Minimum salary must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:salaryMax ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Maximum salary must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:employmentType ;
+        sh:datatype xsd:string ;
+        sh:in ("FULL_TIME" "PART_TIME" "CONTRACT" "INTERNSHIP" "TEMPORARY") ;
+        sh:maxCount 1 ;
+        sh:message "Employment type must be valid employment type"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:workArrangement ;
+        sh:datatype xsd:string ;
+        sh:in ("REMOTE" "HYBRID" "ON_SITE") ;
+        sh:maxCount 1 ;
+        sh:message "Work arrangement must be valid work arrangement"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:postingIsActive ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Job posting can have at most one postingIsActive flag"@en ;
+    ] .
+
+# Job Application Shape
+ln:JobApplicationShape
+    a sh:NodeShape ;
+    sh:targetClass ln:JobApplication ;
+    sh:property [
+        sh:path ln:applicationStatus ;
+        sh:datatype xsd:string ;
+        sh:in ("SAVED" "APPLIED" "UNDER_REVIEW" "INTERVIEWING" "OFFERED" "REJECTED" "WITHDRAWN" "ACCEPTED") ;
+        sh:maxCount 1 ;
+        sh:message "Application status must be valid application status"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:appliedDate ;
+        sh:datatype xsd:dateTime ;
+        sh:maxCount 1 ;
+        sh:message "Job application can have at most one appliedDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:lastUpdateDate ;
+        sh:datatype xsd:dateTime ;
+        sh:maxCount 1 ;
+        sh:message "Job application can have at most one lastUpdateDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:followUpDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Job application can have at most one followUpDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:applicationPriority ;
+        sh:datatype xsd:string ;
+        sh:in ("LOW" "MEDIUM" "HIGH" "TOP_CHOICE") ;
+        sh:maxCount 1 ;
+        sh:message "Application priority must be valid priority level"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:matchScore ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 1.0 ;
+        sh:message "Match score must be between 0.0 and 1.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:applicationBy ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Job application must be by exactly one Person"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:applicationFor ;
+        sh:class ln:JobPosting ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Job application must be for exactly one JobPosting"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Job application must have exactly one non-empty tenantId"@en ;
+    ] .
+
+# Interview Shape
+ln:InterviewShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Interview ;
+    sh:property [
+        sh:path ln:interviewType ;
+        sh:datatype xsd:string ;
+        sh:in ("PHONE" "VIDEO" "IN_PERSON" "TECHNICAL" "BEHAVIORAL" "PANEL") ;
+        sh:maxCount 1 ;
+        sh:message "Interview type must be valid interview type"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:interviewDate ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Interview must have exactly one interviewDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:interviewDuration ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 5 ;
+        sh:maxInclusive 480 ;
+        sh:message "Interview duration must be between 5 and 480 minutes"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:interviewOutcome ;
+        sh:datatype xsd:string ;
+        sh:in ("PASSED" "FAILED" "PENDING" "CANCELLED") ;
+        sh:maxCount 1 ;
+        sh:message "Interview outcome must be valid outcome"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:interviewFor ;
+        sh:class ln:JobApplication ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Interview must be for exactly one JobApplication"@en ;
+    ] .
+
+# Job Offer Shape
+ln:JobOfferShape
+    a sh:NodeShape ;
+    sh:targetClass ln:JobOffer ;
+    sh:property [
+        sh:path ln:offerDate ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Job offer must have exactly one offerDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:offerDeadline ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Job offer can have at most one offerDeadline"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:offerSalary ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Offer salary must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:signingBonus ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Signing bonus must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:startDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Job offer can have at most one startDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:offerStatus ;
+        sh:datatype xsd:string ;
+        sh:in ("PENDING" "ACCEPTED" "DECLINED" "NEGOTIATING") ;
+        sh:maxCount 1 ;
+        sh:message "Offer status must be valid offer status"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:offerFor ;
+        sh:class ln:JobApplication ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Job offer must be for exactly one JobApplication"@en ;
+    ] .
+
+# Resume Shape
+ln:ResumeShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Resume ;
+    sh:property [
+        sh:path ln:resumeTitle ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Resume must have exactly one non-empty resumeTitle"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:resumeFormat ;
+        sh:datatype xsd:string ;
+        sh:in ("PDF" "DOCX" "TXT") ;
+        sh:maxCount 1 ;
+        sh:message "Resume format must be PDF, DOCX, or TXT"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:createdDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Resume can have at most one createdDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:lastModifiedDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Resume can have at most one lastModifiedDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isDefaultResume ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Resume can have at most one isDefaultResume flag"@en ;
+    ] .

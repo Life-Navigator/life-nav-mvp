@@ -1,0 +1,244 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix schema: <https://schema.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ============================================================================
+# Finance Domain - Accounts, Transactions, Investments
+# ============================================================================
+
+# Core Account Classes
+ln:FinancialAccount a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Financial Account"@en ;
+    rdfs:comment "A bank account, credit card, investment account, or other financial account"@en .
+
+ln:CheckingAccount a owl:Class ;
+    rdfs:subClassOf ln:FinancialAccount ;
+    rdfs:label "Checking Account"@en .
+
+ln:SavingsAccount a owl:Class ;
+    rdfs:subClassOf ln:FinancialAccount ;
+    rdfs:label "Savings Account"@en .
+
+ln:CreditCard a owl:Class ;
+    rdfs:subClassOf ln:FinancialAccount ;
+    rdfs:label "Credit Card"@en .
+
+ln:InvestmentAccount a owl:Class ;
+    rdfs:subClassOf ln:FinancialAccount ;
+    rdfs:label "Investment Account"@en .
+
+ln:RetirementAccount a owl:Class ;
+    rdfs:subClassOf ln:InvestmentAccount ;
+    rdfs:label "Retirement Account"@en .
+
+ln:Loan a owl:Class ;
+    rdfs:subClassOf ln:FinancialAccount ;
+    rdfs:label "Loan"@en .
+
+ln:Mortgage a owl:Class ;
+    rdfs:subClassOf ln:Loan ;
+    rdfs:label "Mortgage"@en .
+
+# Transaction Classes
+ln:Transaction a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Financial Transaction"@en ;
+    rdfs:comment "A financial transaction between accounts or with merchants"@en .
+
+ln:Income a owl:Class ;
+    rdfs:subClassOf ln:Transaction ;
+    rdfs:label "Income"@en ;
+    rdfs:comment "Money received (salary, dividends, interest, etc.)"@en .
+
+ln:Expense a owl:Class ;
+    rdfs:subClassOf ln:Transaction ;
+    rdfs:label "Expense"@en ;
+    rdfs:comment "Money spent on goods or services"@en .
+
+ln:Transfer a owl:Class ;
+    rdfs:subClassOf ln:Transaction ;
+    rdfs:label "Transfer"@en ;
+    rdfs:comment "Movement of money between accounts"@en .
+
+ln:Investment a owl:Class ;
+    rdfs:subClassOf ln:Transaction ;
+    rdfs:label "Investment Transaction"@en ;
+    rdfs:comment "Purchase or sale of investment instruments"@en .
+
+# Investment Holdings
+ln:InvestmentHolding a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Investment Holding"@en ;
+    rdfs:comment "Ownership of a specific investment instrument"@en .
+
+# Financial Institution
+ln:FinancialInstitution a owl:Class ;
+    rdfs:subClassOf schema:Organization ;
+    rdfs:label "Financial Institution"@en ;
+    rdfs:comment "A bank, credit union, brokerage, or other financial services provider"@en .
+
+# Properties - Account Ownership
+ln:hasAccount a owl:ObjectProperty ;
+    rdfs:domain ln:Person ;
+    rdfs:range ln:FinancialAccount ;
+    rdfs:label "has account"@en ;
+    owl:inverseOf ln:accountOwnedBy .
+
+ln:accountOwnedBy a owl:ObjectProperty ;
+    rdfs:domain ln:FinancialAccount ;
+    rdfs:range ln:Person ;
+    rdfs:label "account owned by"@en ;
+    owl:inverseOf ln:hasAccount .
+
+# Properties - Account Details
+ln:accountNumber a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialAccount ;
+    rdfs:range xsd:string ;
+    rdfs:label "account number"@en .
+
+ln:accountName a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialAccount ;
+    rdfs:range xsd:string ;
+    rdfs:label "account name"@en .
+
+ln:accountBalance a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialAccount ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "account balance"@en ;
+    rdfs:comment "Current balance in the account"@en .
+
+ln:currency a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialAccount ;
+    rdfs:range xsd:string ;
+    rdfs:label "currency"@en ;
+    rdfs:comment "ISO 4217 currency code (e.g., USD, EUR)"@en .
+
+ln:accountIsActive a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialAccount ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "account is active"@en .
+
+ln:interestRate a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialAccount ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "interest rate"@en ;
+    rdfs:comment "Annual interest rate as a percentage"@en .
+
+# Properties - Account Relationships
+ln:heldAt a owl:ObjectProperty ;
+    rdfs:domain ln:FinancialAccount ;
+    rdfs:range ln:FinancialInstitution ;
+    rdfs:label "held at"@en ;
+    rdfs:comment "The institution where the account is held"@en .
+
+# Properties - Transaction Details
+ln:transactionAmount a owl:DatatypeProperty ;
+    rdfs:domain ln:Transaction ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "transaction amount"@en .
+
+ln:transactionDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Transaction ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "transaction date"@en .
+
+ln:transactionDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:Transaction ;
+    rdfs:range xsd:string ;
+    rdfs:label "transaction description"@en .
+
+ln:merchant a owl:DatatypeProperty ;
+    rdfs:domain ln:Transaction ;
+    rdfs:range xsd:string ;
+    rdfs:label "merchant"@en ;
+    rdfs:comment "The merchant or payee"@en .
+
+ln:category a owl:DatatypeProperty ;
+    rdfs:domain ln:Transaction ;
+    rdfs:range xsd:string ;
+    rdfs:label "category"@en ;
+    rdfs:comment "Transaction category (e.g., groceries, utilities, entertainment)"@en .
+
+# Properties - Transaction Relationships
+ln:fromAccount a owl:ObjectProperty ;
+    rdfs:domain ln:Transaction ;
+    rdfs:range ln:FinancialAccount ;
+    rdfs:label "from account"@en ;
+    rdfs:comment "The account money is coming from"@en .
+
+ln:toAccount a owl:ObjectProperty ;
+    rdfs:domain ln:Transaction ;
+    rdfs:range ln:FinancialAccount ;
+    rdfs:label "to account"@en ;
+    rdfs:comment "The account money is going to"@en .
+
+ln:hasTransaction a owl:ObjectProperty ;
+    rdfs:domain ln:FinancialAccount ;
+    rdfs:range ln:Transaction ;
+    rdfs:label "has transaction"@en ;
+    owl:inverseOf ln:transactionIn .
+
+ln:transactionIn a owl:ObjectProperty ;
+    rdfs:domain ln:Transaction ;
+    rdfs:range ln:FinancialAccount ;
+    rdfs:label "transaction in"@en ;
+    owl:inverseOf ln:hasTransaction .
+
+# Properties - Investment Holdings
+ln:hasHolding a owl:ObjectProperty ;
+    rdfs:domain ln:InvestmentAccount ;
+    rdfs:range ln:InvestmentHolding ;
+    rdfs:label "has holding"@en .
+
+ln:quantity a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentHolding ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "quantity"@en ;
+    rdfs:comment "Number of shares or units held"@en .
+
+ln:costBasis a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentHolding ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "cost basis"@en ;
+    rdfs:comment "Original purchase price"@en .
+
+ln:currentValue a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentHolding ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "current value"@en ;
+    rdfs:comment "Current market value"@en .
+
+ln:purchaseDate a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentHolding ;
+    rdfs:range xsd:date ;
+    rdfs:label "purchase date"@en .
+
+# Properties - Financial Institution
+ln:institutionName a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "institution name"@en .
+
+ln:routingNumber a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialInstitution ;
+    rdfs:range xsd:string ;
+    rdfs:label "routing number"@en ;
+    rdfs:comment "Bank routing number (ABA number in the US)"@en .
+
+# Properties - Multi-tenancy
+ln:tenantId a owl:DatatypeProperty ;
+    rdfs:domain ln:FinancialAccount ;
+    rdfs:range xsd:string ;
+    rdfs:label "tenant ID"@en ;
+    rdfs:comment "Multi-tenant isolation identifier (HIPAA compliant)"@en .
+
+# Metadata
+<https://ln.life/ontology/finance/accounts> a owl:Ontology ;
+    dc:title "Life Navigator Finance Accounts Ontology"@en ;
+    dc:description "Ontology for financial accounts, transactions, and investments"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" .

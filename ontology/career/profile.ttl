@@ -1,0 +1,538 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix schema: <https://schema.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ============================================================================
+# Career Domain - Professional Profile, Experience, Skills
+# ============================================================================
+
+# Core Career Classes
+ln:CareerProfile a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Career Profile"@en ;
+    rdfs:comment "Complete professional profile including experience, skills, and achievements"@en .
+
+ln:JobExperience a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Job Experience"@en ;
+    rdfs:comment "Work experience at a company or organization"@en .
+
+ln:Skill a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Skill"@en ;
+    rdfs:comment "Professional skill or competency"@en .
+
+ln:TechnicalSkill a owl:Class ;
+    rdfs:subClassOf ln:Skill ;
+    rdfs:label "Technical Skill"@en ;
+    rdfs:comment "Hard skill in a specific technology or methodology"@en .
+
+ln:SoftSkill a owl:Class ;
+    rdfs:subClassOf ln:Skill ;
+    rdfs:label "Soft Skill"@en ;
+    rdfs:comment "Interpersonal or transferable skill (leadership, communication)"@en .
+
+ln:ProgrammingSkill a owl:Class ;
+    rdfs:subClassOf ln:TechnicalSkill ;
+    rdfs:label "Programming Skill"@en .
+
+ln:LanguageSkill a owl:Class ;
+    rdfs:subClassOf ln:Skill ;
+    rdfs:label "Language Skill"@en ;
+    rdfs:comment "Proficiency in a spoken/written language"@en .
+
+# Achievement and Recognition Classes
+ln:Achievement a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Achievement"@en ;
+    rdfs:comment "Professional accomplishment or milestone"@en .
+
+ln:Award a owl:Class ;
+    rdfs:subClassOf ln:Achievement ;
+    rdfs:label "Award"@en ;
+    rdfs:comment "Recognition or honor received"@en .
+
+ln:Publication a owl:Class ;
+    rdfs:subClassOf ln:Achievement ;
+    rdfs:label "Publication"@en ;
+    rdfs:comment "Published article, paper, or book"@en .
+
+ln:Patent a owl:Class ;
+    rdfs:subClassOf ln:Achievement ;
+    rdfs:label "Patent"@en .
+
+ln:Certification a owl:Class ;
+    rdfs:subClassOf ln:Achievement ;
+    rdfs:label "Certification"@en ;
+    rdfs:comment "Professional certification or credential"@en .
+
+# Project Classes
+ln:Project a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Project"@en ;
+    rdfs:comment "Work project or major contribution"@en .
+
+ln:OpenSourceProject a owl:Class ;
+    rdfs:subClassOf ln:Project ;
+    rdfs:label "Open Source Project"@en .
+
+ln:Portfolio a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Portfolio"@en ;
+    rdfs:comment "Collection of work samples and projects"@en .
+
+# Career Profile Properties
+ln:profileSummary a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:string ;
+    rdfs:label "profile summary"@en ;
+    rdfs:comment "Professional summary or elevator pitch"@en .
+
+ln:linkedInUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:string ;
+    rdfs:label "LinkedIn URL"@en .
+
+ln:githubUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:string ;
+    rdfs:label "GitHub URL"@en .
+
+ln:portfolioUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:string ;
+    rdfs:label "portfolio URL"@en .
+
+ln:careerGoals a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:string ;
+    rdfs:label "career goals"@en .
+
+ln:yearsOfExperience a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:integer ;
+    rdfs:label "years of experience"@en .
+
+ln:currentJobTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:string ;
+    rdfs:label "current job title"@en .
+
+ln:desiredJobTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:string ;
+    rdfs:label "desired job title"@en .
+
+ln:desiredSalary a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "desired salary"@en .
+
+ln:willingToRelocate a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "willing to relocate"@en .
+
+ln:openToRemote a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "open to remote work"@en .
+
+# Job Experience Properties
+ln:jobTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:string ;
+    rdfs:label "job title"@en .
+
+ln:companyName a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:string ;
+    rdfs:label "company name"@en .
+
+ln:jobLocation a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:string ;
+    rdfs:label "job location"@en ;
+    rdfs:comment "City, state/country where job was performed"@en .
+
+ln:jobStartDate a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:date ;
+    rdfs:label "job start date"@en .
+
+ln:jobEndDate a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:date ;
+    rdfs:label "job end date"@en ;
+    rdfs:comment "Null if current position"@en .
+
+ln:isCurrentJob a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is current job"@en .
+
+ln:jobDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:string ;
+    rdfs:label "job description"@en .
+
+ln:responsibilities a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:string ;
+    rdfs:label "responsibilities"@en ;
+    rdfs:comment "Key duties and responsibilities"@en .
+
+ln:accomplishments a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:string ;
+    rdfs:label "accomplishments"@en ;
+    rdfs:comment "Major achievements in this role"@en .
+
+ln:employmentType a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:string ;
+    rdfs:label "employment type"@en ;
+    rdfs:comment "FULL_TIME, PART_TIME, CONTRACT, INTERNSHIP, FREELANCE"@en .
+
+ln:jobLevel a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:string ;
+    rdfs:label "job level"@en ;
+    rdfs:comment "ENTRY, MID, SENIOR, LEAD, MANAGER, DIRECTOR, VP, C_LEVEL"@en .
+
+ln:salary a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "salary"@en .
+
+ln:salaryCurrency a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:string ;
+    rdfs:label "salary currency"@en .
+
+ln:teamSize a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:integer ;
+    rdfs:label "team size"@en ;
+    rdfs:comment "Size of team managed or worked with"@en .
+
+ln:industryDomain a owl:DatatypeProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range xsd:string ;
+    rdfs:label "industry domain"@en ;
+    rdfs:comment "Industry sector (Tech, Healthcare, Finance, etc.)"@en .
+
+# Skill Properties
+ln:skillName a owl:DatatypeProperty ;
+    rdfs:domain ln:Skill ;
+    rdfs:range xsd:string ;
+    rdfs:label "skill name"@en .
+
+ln:skillCategory a owl:DatatypeProperty ;
+    rdfs:domain ln:Skill ;
+    rdfs:range xsd:string ;
+    rdfs:label "skill category"@en ;
+    rdfs:comment "Category grouping (e.g., Programming, Cloud, DevOps)"@en .
+
+ln:proficiencyLevel a owl:DatatypeProperty ;
+    rdfs:domain ln:Skill ;
+    rdfs:range xsd:string ;
+    rdfs:label "proficiency level"@en ;
+    rdfs:comment "BEGINNER, INTERMEDIATE, ADVANCED, EXPERT"@en .
+
+ln:yearsOfPractice a owl:DatatypeProperty ;
+    rdfs:domain ln:Skill ;
+    rdfs:range xsd:integer ;
+    rdfs:label "years of practice"@en .
+
+ln:lastUsedDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Skill ;
+    rdfs:range xsd:date ;
+    rdfs:label "last used date"@en .
+
+ln:isPrimarySkill a owl:DatatypeProperty ;
+    rdfs:domain ln:Skill ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is primary skill"@en ;
+    rdfs:comment "Core competency vs. supporting skill"@en .
+
+ln:endorsementCount a owl:DatatypeProperty ;
+    rdfs:domain ln:Skill ;
+    rdfs:range xsd:integer ;
+    rdfs:label "endorsement count"@en ;
+    rdfs:comment "Number of LinkedIn-style endorsements"@en .
+
+# Programming Skill Properties
+ln:programmingLanguage a owl:DatatypeProperty ;
+    rdfs:domain ln:ProgrammingSkill ;
+    rdfs:range xsd:string ;
+    rdfs:label "programming language"@en .
+
+ln:framework a owl:DatatypeProperty ;
+    rdfs:domain ln:ProgrammingSkill ;
+    rdfs:range xsd:string ;
+    rdfs:label "framework"@en .
+
+ln:linesOfCode a owl:DatatypeProperty ;
+    rdfs:domain ln:ProgrammingSkill ;
+    rdfs:range xsd:integer ;
+    rdfs:label "lines of code"@en ;
+    rdfs:comment "Approximate total LOC written"@en .
+
+# Language Skill Properties
+ln:languageName a owl:DatatypeProperty ;
+    rdfs:domain ln:LanguageSkill ;
+    rdfs:range xsd:string ;
+    rdfs:label "language name"@en .
+
+ln:languageProficiency a owl:DatatypeProperty ;
+    rdfs:domain ln:LanguageSkill ;
+    rdfs:range xsd:string ;
+    rdfs:label "language proficiency"@en ;
+    rdfs:comment "ELEMENTARY, LIMITED_WORKING, PROFESSIONAL_WORKING, FULL_PROFESSIONAL, NATIVE"@en .
+
+# Achievement Properties
+ln:achievementTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:Achievement ;
+    rdfs:range xsd:string ;
+    rdfs:label "achievement title"@en .
+
+ln:achievementDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:Achievement ;
+    rdfs:range xsd:string ;
+    rdfs:label "achievement description"@en .
+
+ln:achievementDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Achievement ;
+    rdfs:range xsd:date ;
+    rdfs:label "achievement date"@en .
+
+ln:issuingOrganization a owl:DatatypeProperty ;
+    rdfs:domain ln:Achievement ;
+    rdfs:range xsd:string ;
+    rdfs:label "issuing organization"@en .
+
+# Certification Properties
+ln:certificationName a owl:DatatypeProperty ;
+    rdfs:domain ln:Certification ;
+    rdfs:range xsd:string ;
+    rdfs:label "certification name"@en .
+
+ln:certificationIssuer a owl:DatatypeProperty ;
+    rdfs:domain ln:Certification ;
+    rdfs:range xsd:string ;
+    rdfs:label "certification issuer"@en ;
+    rdfs:comment "Organization that issued the certification (AWS, Google, etc.)"@en .
+
+ln:certificationDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Certification ;
+    rdfs:range xsd:date ;
+    rdfs:label "certification date"@en .
+
+ln:expirationDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Certification ;
+    rdfs:range xsd:date ;
+    rdfs:label "expiration date"@en ;
+    rdfs:comment "Null if certification doesn't expire"@en .
+
+ln:credentialId a owl:DatatypeProperty ;
+    rdfs:domain ln:Certification ;
+    rdfs:range xsd:string ;
+    rdfs:label "credential ID"@en .
+
+ln:credentialUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:Certification ;
+    rdfs:range xsd:string ;
+    rdfs:label "credential URL"@en .
+
+# Publication Properties
+ln:publicationTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:Publication ;
+    rdfs:range xsd:string ;
+    rdfs:label "publication title"@en .
+
+ln:publicationDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Publication ;
+    rdfs:range xsd:date ;
+    rdfs:label "publication date"@en .
+
+ln:publisher a owl:DatatypeProperty ;
+    rdfs:domain ln:Publication ;
+    rdfs:range xsd:string ;
+    rdfs:label "publisher"@en .
+
+ln:publicationUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:Publication ;
+    rdfs:range xsd:string ;
+    rdfs:label "publication URL"@en .
+
+ln:doi a owl:DatatypeProperty ;
+    rdfs:domain ln:Publication ;
+    rdfs:range xsd:string ;
+    rdfs:label "DOI"@en ;
+    rdfs:comment "Digital Object Identifier"@en .
+
+ln:citationCount a owl:DatatypeProperty ;
+    rdfs:domain ln:Publication ;
+    rdfs:range xsd:integer ;
+    rdfs:label "citation count"@en .
+
+# Project Properties
+ln:projectName a owl:DatatypeProperty ;
+    rdfs:domain ln:Project ;
+    rdfs:range xsd:string ;
+    rdfs:label "project name"@en .
+
+ln:projectDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:Project ;
+    rdfs:range xsd:string ;
+    rdfs:label "project description"@en .
+
+ln:projectUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:Project ;
+    rdfs:range xsd:string ;
+    rdfs:label "project URL"@en .
+
+ln:projectStartDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Project ;
+    rdfs:range xsd:date ;
+    rdfs:label "project start date"@en .
+
+ln:projectEndDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Project ;
+    rdfs:range xsd:date ;
+    rdfs:label "project end date"@en .
+
+ln:projectRole a owl:DatatypeProperty ;
+    rdfs:domain ln:Project ;
+    rdfs:range xsd:string ;
+    rdfs:label "project role"@en ;
+    rdfs:comment "Role in project (Developer, Lead, Architect, etc.)"@en .
+
+ln:technologiesUsed a owl:DatatypeProperty ;
+    rdfs:domain ln:Project ;
+    rdfs:range xsd:string ;
+    rdfs:label "technologies used"@en ;
+    rdfs:comment "Comma-separated list of technologies"@en .
+
+ln:isActiveProject a owl:DatatypeProperty ;
+    rdfs:domain ln:Project ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is active project"@en .
+
+# Open Source Project Properties
+ln:repositoryUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:OpenSourceProject ;
+    rdfs:range xsd:string ;
+    rdfs:label "repository URL"@en .
+
+ln:stars a owl:DatatypeProperty ;
+    rdfs:domain ln:OpenSourceProject ;
+    rdfs:range xsd:integer ;
+    rdfs:label "stars"@en ;
+    rdfs:comment "GitHub stars or similar metric"@en .
+
+ln:forks a owl:DatatypeProperty ;
+    rdfs:domain ln:OpenSourceProject ;
+    rdfs:range xsd:integer ;
+    rdfs:label "forks"@en .
+
+ln:contributors a owl:DatatypeProperty ;
+    rdfs:domain ln:OpenSourceProject ;
+    rdfs:range xsd:integer ;
+    rdfs:label "contributors"@en .
+
+ln:license a owl:DatatypeProperty ;
+    rdfs:domain ln:OpenSourceProject ;
+    rdfs:range xsd:string ;
+    rdfs:label "license"@en ;
+    rdfs:comment "Open source license (MIT, Apache, GPL, etc.)"@en .
+
+# Relationships - Person to Profile
+ln:hasCareerProfile a owl:ObjectProperty ;
+    rdfs:domain ln:Person ;
+    rdfs:range ln:CareerProfile ;
+    rdfs:label "has career profile"@en ;
+    owl:inverseOf ln:profileOf .
+
+ln:profileOf a owl:ObjectProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range ln:Person ;
+    rdfs:label "profile of"@en ;
+    owl:inverseOf ln:hasCareerProfile .
+
+# Relationships - Profile to Experience
+ln:hasExperience a owl:ObjectProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range ln:JobExperience ;
+    rdfs:label "has experience"@en ;
+    owl:inverseOf ln:experienceOf .
+
+ln:experienceOf a owl:ObjectProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range ln:CareerProfile ;
+    rdfs:label "experience of"@en ;
+    owl:inverseOf ln:hasExperience .
+
+# Relationships - Profile to Skills
+ln:hasSkill a owl:ObjectProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range ln:Skill ;
+    rdfs:label "has skill"@en ;
+    owl:inverseOf ln:skillOf .
+
+ln:skillOf a owl:ObjectProperty ;
+    rdfs:domain ln:Skill ;
+    rdfs:range ln:CareerProfile ;
+    rdfs:label "skill of"@en ;
+    owl:inverseOf ln:hasSkill .
+
+# Relationships - Experience to Skills
+ln:usedSkill a owl:ObjectProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range ln:Skill ;
+    rdfs:label "used skill"@en ;
+    rdfs:comment "Skill utilized in this job"@en .
+
+# Relationships - Profile to Achievements
+ln:hasAchievement a owl:ObjectProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range ln:Achievement ;
+    rdfs:label "has achievement"@en ;
+    owl:inverseOf ln:achievementOf .
+
+ln:achievementOf a owl:ObjectProperty ;
+    rdfs:domain ln:Achievement ;
+    rdfs:range ln:CareerProfile ;
+    rdfs:label "achievement of"@en ;
+    owl:inverseOf ln:hasAchievement .
+
+# Relationships - Experience to Projects
+ln:workedOn a owl:ObjectProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range ln:Project ;
+    rdfs:label "worked on"@en ;
+    rdfs:comment "Project completed during this job"@en .
+
+# Relationships - Experience to Organization
+ln:employedBy a owl:ObjectProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range schema:Organization ;
+    rdfs:label "employed by"@en .
+
+# Multi-tenancy
+ln:tenantId a owl:DatatypeProperty ;
+    rdfs:domain ln:CareerProfile ;
+    rdfs:range xsd:string ;
+    rdfs:label "tenant ID"@en ;
+    rdfs:comment "Multi-tenant isolation identifier (HIPAA compliant)"@en .
+
+# Metadata
+<https://ln.life/ontology/career/profile> a owl:Ontology ;
+    dc:title "Life Navigator Career Profile Ontology"@en ;
+    dc:description "Ontology for career profiles, job experience, skills, achievements, and projects"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" .
