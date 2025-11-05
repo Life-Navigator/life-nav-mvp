@@ -1,0 +1,56 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix fhir: <http://hl7.org/fhir/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix snomed: <http://snomed.info/id/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Condition Class (FHIR-aligned)
+ln:Condition a owl:Class ;
+  rdfs:subClassOf ln:LNEntity ;
+  rdfs:label "Medical Condition"@en ;
+  rdfs:comment "A health condition or diagnosis aligned with FHIR Condition resource"@en .
+
+# Physician Classes
+ln:Physician a owl:Class ;
+  rdfs:subClassOf ln:Person ;
+  rdfs:label "Physician"@en ;
+  rdfs:comment "A medical doctor"@en .
+
+ln:Cardiologist a owl:Class ;
+  rdfs:subClassOf ln:Physician ;
+  rdfs:label "Cardiologist"@en .
+
+ln:Dermatologist a owl:Class ;
+  rdfs:subClassOf ln:Physician ;
+  rdfs:label "Dermatologist"@en .
+
+# Object Properties
+ln:hasCondition a owl:ObjectProperty ;
+  rdfs:domain ln:Person ;
+  rdfs:range ln:Condition ;
+  rdfs:label "has condition"@en .
+
+ln:treats a owl:ObjectProperty ;
+  rdfs:domain ln:Physician ;
+  rdfs:range ln:Condition ;
+  rdfs:label "treats"@en ;
+  owl:inverseOf ln:treatedBy .
+
+ln:treatedBy a owl:ObjectProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range ln:Physician ;
+  rdfs:label "treated by"@en ;
+  owl:inverseOf ln:treats .
+
+# Data Properties
+ln:diagnosisDate a owl:DatatypeProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range xsd:date ;
+  rdfs:label "Diagnosis Date"@en .
+
+ln:conditionCode a owl:DatatypeProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range xsd:string ;
+  rdfs:label "SNOMED CT Code"@en ;
+  rdfs:comment "SNOMED CT code for the condition"@en .

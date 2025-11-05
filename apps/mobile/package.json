@@ -1,0 +1,29 @@
+{
+  "name": "@life-navigator/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "build": "echo 'Mobile build placeholder'",
+    "test": "jest",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf node_modules .expo"
+  },
+  "dependencies": {
+    "@life-navigator/api-client": "workspace:*",
+    "@life-navigator/ui-components": "workspace:*",
+    "expo": "~52.0.0",
+    "react": "19.0.0",
+    "react-native": "0.76.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-native": "^0.76",
+    "typescript": "^5"
+  }
+}

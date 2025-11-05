@@ -1,0 +1,14 @@
+{
+  "name": "@life-navigator/agents",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "poetry run uvicorn mcp-server.core.server:app --reload --host 0.0.0.0 --port 8080",
+    "build": "poetry build",
+    "test": "poetry run pytest -v --cov=agents --cov=mcp-server --cov-report=html",
+    "lint": "poetry run ruff check . && poetry run black --check .",
+    "format": "poetry run black . && poetry run ruff check --fix .",
+    "type-check": "poetry run mypy agents/ mcp-server/",
+    "clean": "rm -rf dist build *.egg-info .pytest_cache"
+  }
+}
