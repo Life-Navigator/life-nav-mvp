@@ -1,0 +1,51 @@
+// Add these models to the existing schema.prisma file
+
+model RevokedToken {
+  id        String   @id @default(cuid())
+  userId    String
+  jti       String   @unique
+  expiresAt DateTime
+  revokedAt DateTime @default(now())
+  reason    String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([jti])
+  @@map("revoked_tokens")
+}
+
+model UserDevice {
+  id           String   @id @default(cuid())
+  userId       String
+  deviceId     String
+  ipAddress    String?
+  userAgent    String?
+  lastUsedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  isRevoked    Boolean  @default(false)
+  latitude     Float?
+  longitude    Float?
+  locationName String?
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@index([deviceId])
+  @@map("user_devices")
+}
+
+model SecurityAuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  eventType  String
+  ipAddress  String?
+  userAgent  String?
+  deviceId   String?
+  data       Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eventType])
+  @@map("security_audit_log")
+}

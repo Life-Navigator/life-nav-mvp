@@ -1,0 +1,62 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
+import { validateCsrfToken } from '@/lib/auth/csrf';
+
+export async function middleware(request: NextRequest) {
+  const path = request.nextUrl.pathname;
+
+  // Root path handling - always redirect to login page
+  if (path === '/') {
+    return NextResponse.redirect(new URL('/auth/login', request.url));
+  }
+  
+  // Define protected routes (routes that require authentication)
+  const isProtectedRoute = (path.startsWith('/dashboard') && !path.includes('/healthcare/wellness')) ||
+                          path.startsWith('/onboarding') ||
+                          (path.startsWith('/api/') &&
+                          !path.startsWith('/api/auth'));
+  
+  // Define public routes (routes that should be accessible without auth)
+  const isPublicRoute = path.startsWith('/auth/') || 
+                       path.startsWith('/api/auth') || 
+                       path.includes('/_next') || 
+                       path.includes('/static') ||
+                       path.includes('/images') ||
+                       path.includes('/favicon');
+  
+  // Get the user token if not already obtained
+  const token = path === '/' ? null : await getToken({ 
+    req: request, 
+    secret: process.env.NEXTAUTH_SECRET 
+  });
+  
+  // If the path is a protected route and no token exists, redirect to login
+  if (isProtectedRoute && !token && !isPublicRoute) {
+    return NextResponse.redirect(new URL('/auth/login', request.url));
+  }
+  
+  // Check if user needs to complete onboarding - applies to dashboard and root path
+  const requiresSetup = path === '/' || path.startsWith('/dashboard');
+  if (requiresSetup && token && token.user && !token.user.setupCompleted) {
+    // Get the user ID from the token
+    const userId = token.sub || '';
+    
+    return NextResponse.redirect(
+      new URL(`/onboarding/questionnaire?userId=${userId}`, request.url)
+    );
+  }
+  
+  // Continue normal request processing
+  return NextResponse.next();
+}
+
+// Configure which paths this middleware is run for
+export const config = {
+  matcher: [
+    '/',
+    '/dashboard/:path*',
+    '/api/:path*',
+    '/onboarding/:path*'
+  ],
+};
