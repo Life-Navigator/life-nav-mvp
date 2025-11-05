@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="250" viewBox="0 0 400 250" xmlns="http://www.w3.org/2000/svg">
+  <rect width="400" height="250" fill="#4F46E5" />
+  <rect x="40" y="40" width="320" height="170" rx="10" fill="#F9FAFB" />
+  
+  <!-- Graph Bars -->
+  <rect x="70" y="100" width="40" height="80" fill="#93C5FD" />
+  <rect x="130" y="80" width="40" height="100" fill="#60A5FA" />
+  <rect x="190" y="60" width="40" height="120" fill="#3B82F6" />
+  <rect x="250" y="90" width="40" height="90" fill="#2563EB" />
+  <rect x="310" y="110" width="40" height="70" fill="#1D4ED8" />
+  
+  <!-- Title -->
+  <text x="200" y="30" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle">Budget Planner</text>
+  
+  <!-- Dollar Sign -->
+  <text x="50" y="75" font-family="Arial, sans-serif" font-size="60" font-weight="bold" fill="#10B981" text-anchor="middle">$</text>
+</svg>

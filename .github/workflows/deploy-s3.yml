@@ -1,0 +1,235 @@
+name: Deploy to S3/CloudFront
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - production
+
+env:
+  AWS_REGION: us-east-1
+  NODE_VERSION: '18'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production') || 'dev' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set environment variables
+        id: set-env
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production') || 'dev' }}"
+          
+          if [ "$ENVIRONMENT" == "production" ]; then
+            echo "S3_BUCKET=lifenavigator-prod-static-assets" >> $GITHUB_ENV
+            echo "APP_ENV=prod" >> $GITHUB_ENV
+          elif [ "$ENVIRONMENT" == "staging" ]; then
+            echo "S3_BUCKET=lifenavigator-staging-static-assets" >> $GITHUB_ENV
+            echo "APP_ENV=staging" >> $GITHUB_ENV
+          else
+            echo "S3_BUCKET=lifenavigator-dev-static-assets" >> $GITHUB_ENV
+            echo "APP_ENV=dev" >> $GITHUB_ENV
+          fi
+          
+          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_ENV
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+
+      - name: Create production env file
+        run: |
+          cat > .env << EOF
+          # Core Configuration
+          NODE_ENV=production
+          NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }}
+          APP_ENV=${{ env.APP_ENV }}
+
+          # Skip validation/prisma for static build
+          SKIP_ENV_VALIDATION=true
+          EOF
+
+      - name: Build Next.js app
+        run: |
+          SKIP_ENV_VALIDATION=true NODE_ENV=production npx next build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Create S3 bucket if it doesn't exist
+        run: |
+          if ! aws s3api head-bucket --bucket ${{ env.S3_BUCKET }} 2>/dev/null; then
+            echo "Creating S3 bucket: ${{ env.S3_BUCKET }}"
+            aws s3api create-bucket --bucket ${{ env.S3_BUCKET }} --region ${{ env.AWS_REGION }}
+            
+            # Enable S3 website hosting
+            aws s3 website s3://${{ env.S3_BUCKET }} --index-document index.html --error-document 404.html
+            
+            # Set bucket policy for public read access
+            cat > /tmp/bucket-policy.json << EOF
+          {
+              "Version": "2012-10-17",
+              "Statement": [
+                  {
+                      "Sid": "PublicReadGetObject",
+                      "Effect": "Allow",
+                      "Principal": "*",
+                      "Action": "s3:GetObject",
+                      "Resource": "arn:aws:s3:::${{ env.S3_BUCKET }}/*"
+                  }
+              ]
+          }
+          EOF
+            aws s3api put-bucket-policy --bucket ${{ env.S3_BUCKET }} --policy file:///tmp/bucket-policy.json
+          fi
+
+      - name: Get CloudFront distribution ID
+        id: get-cloudfront-id
+        run: |
+          if [ -n "${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" ]; then
+            echo "CLOUDFRONT_ID=${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_ENV
+          else
+            # Try to find CloudFront distribution ID for this S3 bucket
+            DISTRIBUTION_INFO=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[].DomainName, '${{ env.S3_BUCKET }}.s3.amazonaws.com')].{Id:Id,DomainName:DomainName}" --output json)
+            
+            if [ "$DISTRIBUTION_INFO" != "[]" ]; then
+              CLOUDFRONT_ID=$(echo $DISTRIBUTION_INFO | jq -r '.[0].Id')
+              echo "Found CloudFront distribution: $CLOUDFRONT_ID"
+              echo "CLOUDFRONT_ID=$CLOUDFRONT_ID" >> $GITHUB_ENV
+            else
+              echo "No CloudFront distribution found. Skipping CloudFront invalidation."
+            fi
+          fi
+
+      - name: Clear S3 bucket
+        run: aws s3 rm s3://${{ env.S3_BUCKET }} --recursive
+        continue-on-error: true
+
+      - name: Deploy to S3 - static assets
+        run: |
+          aws s3 sync ./out s3://${{ env.S3_BUCKET }} \
+            --delete \
+            --cache-control "max-age=31536000,public" \
+            --exclude "*.html" --exclude "sw.js" --exclude "workbox-*.js"
+
+      - name: Deploy to S3 - HTML files
+        run: |
+          aws s3 sync ./out s3://${{ env.S3_BUCKET }} \
+            --exclude "*" --include "*.html" --include "sw.js" --include "workbox-*.js" \
+            --cache-control "no-cache,no-store,must-revalidate" \
+            --content-type "text/html"
+
+      - name: Invalidate CloudFront cache
+        if: env.CLOUDFRONT_ID != ''
+        run: |
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id ${{ env.CLOUDFRONT_ID }} \
+            --paths "/*" \
+            --query "Invalidation.Id" \
+            --output text)
+            
+          echo "Created CloudFront invalidation: $INVALIDATION_ID"
+          echo "Waiting for invalidation to complete..."
+          
+          aws cloudfront wait invalidation-completed \
+            --distribution-id ${{ env.CLOUDFRONT_ID }} \
+            --id $INVALIDATION_ID
+            
+          echo "CloudFront invalidation completed"
+
+      - name: Post-deployment notification
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && '✅ Deployment successful!' || '❌ Deployment failed!' }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "${{ job.status == 'success' && '✅ *LifeNavigator deployment successful!*' || '❌ *LifeNavigator deployment failed!*' }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Environment:*\n${{ env.ENVIRONMENT }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*S3 Bucket:*\n${{ env.S3_BUCKET }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*CloudFront:*\n${{ env.CLOUDFRONT_ID || 'Not configured' }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Triggered by:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Details"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

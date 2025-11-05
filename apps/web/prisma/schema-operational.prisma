@@ -1,0 +1,597 @@
+// LifeNavigator Operational Extensions for Production Grade Database
+// This file contains all operational tables and modifications needed for production
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters", "postgresqlExtensions", "multiSchema"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto, "uuid-ossp", pg_stat_statements, pg_cron]
+  schemas    = ["public", "audit", "operational"]
+}
+
+//=====================
+// SOFT DELETE MIXIN (Applied to all tables)
+//=====================
+
+// This would be applied as fields to EVERY table in main schema
+// Example of enhanced User model with soft delete:
+model UserWithSoftDelete {
+  id                    String                  @id @default(cuid())
+  // ... all existing fields ...
+  
+  // Soft Delete Fields (ADD TO EVERY TABLE)
+  isDeleted             Boolean                 @default(false)
+  deletedAt             DateTime?
+  deletedBy             String?
+  deletedReason         String?
+  
+  // Audit Fields (ADD TO EVERY TABLE)
+  createdBy             String?
+  updatedBy             String?
+  version               Int                     @default(1)
+  lastModifiedAt        DateTime                @updatedAt
+  
+  // Backup/Recovery Fields
+  lastBackupAt          DateTime?
+  backupVersion         String?
+  recoveryCheckpoint    String?
+  
+  @@index([isDeleted, deletedAt])
+  @@map("users")
+  @@schema("public")
+}
+
+//=====================
+// VERSIONING & HISTORY SYSTEM
+//=====================
+
+model ChangeHistory {
+  id                String    @id @default(cuid())
+  entityId          String    // ID of the record that changed
+  entityType        String    // Table name
+  operation         String    // INSERT, UPDATE, DELETE, RESTORE
+  oldValues         Json?     // Previous state
+  newValues         Json?     // New state
+  changedFields     String[]  // List of fields that changed
+  changeReason      String?   // Why the change was made
+  changeSource      String    // API, UI, SYSTEM, MIGRATION
+  userId            String?   // Who made the change
+  userName          String?
+  userRole          String?
+  ipAddress         String?
+  userAgent         String?
+  sessionId         String?
+  version           Int       // Version number
+  timestamp         DateTime  @default(now())
+  isSystemChange    Boolean   @default(false)
+  
+  // For regulatory compliance
+  complianceFlags   String[]  // GDPR, HIPAA, SOX, etc.
+  requiresApproval  Boolean   @default(false)
+  approvedBy        String?
+  approvedAt        DateTime?
+  
+  @@index([entityId, entityType])
+  @@index([userId])
+  @@index([timestamp])
+  @@index([operation])
+  @@map("change_history")
+  @@schema("audit")
+}
+
+model DataSnapshot {
+  id                String    @id @default(cuid())
+  snapshotId        String    @unique @default(uuid())
+  entityId          String
+  entityType        String
+  snapshotData      Json      // Complete record state
+  snapshotReason    String    // BACKUP, AUDIT, COMPLIANCE, ROLLBACK
+  metadata          Json?     // Additional context
+  createdAt         DateTime  @default(now())
+  expiresAt         DateTime? // When this snapshot can be deleted
+  isEncrypted       Boolean   @default(true)
+  compressionType   String?   // gzip, brotli, none
+  checksum          String    // SHA-256 hash for integrity
+  
+  @@index([entityId, entityType])
+  @@index([createdAt])
+  @@index([snapshotReason])
+  @@map("data_snapshots")
+  @@schema("audit")
+}
+
+//=====================
+// DATA RETENTION & LIFECYCLE
+//=====================
+
+model DataRetentionPolicy {
+  id                  String    @id @default(cuid())
+  tableName           String    @unique
+  retentionDays       Int       // How long to keep active data
+  archiveAfterDays    Int?      // When to move to archive
+  deleteAfterDays     Int       // When to permanently delete
+  complianceReason    String    // GDPR, HIPAA, CCPA, Business
+  piiFields           String[]  // Fields containing PII
+  encryptedFields     String[]  // Fields that are encrypted
+  
+  // Purge configuration
+  purgeEnabled        Boolean   @default(true)
+  purgeSchedule       String    // Cron expression
+  lastPurgeAt         DateTime?
+  lastPurgeCount      Int?
+  nextPurgeAt         DateTime?
+  
+  // Archive configuration  
+  archiveEnabled      Boolean   @default(false)
+  archiveLocation     String?   // S3, Azure Blob, etc.
+  archiveFormat       String?   // parquet, json, csv
+  
+  // Exceptions
+  excludeConditions   Json?     // Conditions to exclude from purge
+  vipUserRetention    Int?      // Extended retention for VIP users
+  legalHoldActive     Boolean   @default(false)
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  @@map("data_retention_policies")
+  @@schema("operational")
+}
+
+model PurgeHistory {
+  id                String    @id @default(cuid())
+  tableName         String
+  purgeType         String    // SOFT_DELETE, ARCHIVE, PERMANENT_DELETE
+  recordCount       Int
+  startedAt         DateTime
+  completedAt       DateTime?
+  status            String    // RUNNING, COMPLETED, FAILED
+  errorMessage      String?
+  conditions        Json      // What criteria were used
+  performedBy       String    // User or SYSTEM
+  
+  @@index([tableName])
+  @@index([startedAt])
+  @@map("purge_history")
+  @@schema("operational")
+}
+
+//=====================
+// BACKUP & RECOVERY METADATA
+//=====================
+
+model BackupMetadata {
+  id                String    @id @default(cuid())
+  backupId          String    @unique @default(uuid())
+  backupType        String    // FULL, INCREMENTAL, DIFFERENTIAL, SNAPSHOT
+  backupStatus      String    // RUNNING, COMPLETED, FAILED, CORRUPTED
+  startedAt         DateTime
+  completedAt       DateTime?
+  
+  // Backup details
+  databaseName      String
+  schemaVersion     String
+  tablesIncluded    String[]
+  recordCount       BigInt
+  backupSize        BigInt    // Bytes
+  compressedSize    BigInt?   // Bytes after compression
+  
+  // Storage information
+  storageLocation   String    // S3, Azure Blob, Local, etc.
+  storageUrl        String
+  encryptionKeyId   String
+  checksum          String    // For integrity verification
+  
+  // Recovery information
+  recoveryPoint     DateTime  // Point in time this backup represents
+  recoveryTime      Int?      // Estimated recovery time in seconds
+  tested            Boolean   @default(false)
+  lastTestedAt      DateTime?
+  testResult        String?
+  
+  // Retention
+  expiresAt         DateTime
+  isArchived        Boolean   @default(false)
+  
+  @@index([backupType])
+  @@index([startedAt])
+  @@index([recoveryPoint])
+  @@map("backup_metadata")
+  @@schema("operational")
+}
+
+model RecoveryPoint {
+  id                String    @id @default(cuid())
+  recoveryPointId   String    @unique @default(uuid())
+  recoveryType      String    // POINT_IN_TIME, BACKUP, SNAPSHOT
+  recoveryTime      DateTime
+  description       String?
+  
+  // What can be recovered
+  dataAvailable     Json      // List of tables and record counts
+  consistencyLevel  String    // FULL, PARTIAL, UNKNOWN
+  
+  // Dependencies
+  backupIds         String[]  // Related backup IDs
+  transactionLog    String?   // WAL location
+  
+  createdAt         DateTime  @default(now())
+  validUntil        DateTime
+  
+  @@index([recoveryTime])
+  @@map("recovery_points")
+  @@schema("operational")
+}
+
+//=====================
+// FEATURE FLAGS & CONFIGURATION
+//=====================
+
+model FeatureFlag {
+  id                String    @id @default(cuid())
+  flagKey           String    @unique
+  flagName          String
+  description       String?
+  flagType          String    // BOOLEAN, PERCENTAGE, VARIANT, SCHEDULE
+  
+  // Control
+  isEnabled         Boolean   @default(false)
+  rolloutPercentage Float?    @default(0) // 0-100
+  
+  // Targeting
+  targetUsers       String[]  // Specific user IDs
+  targetRoles       String[]  // Role-based targeting
+  targetSegments    Json?     // Complex targeting rules
+  
+  // Variants (for A/B testing)
+  variants          Json?     // Array of variant configurations
+  defaultVariant    String?
+  
+  // Schedule
+  enabledFrom       DateTime?
+  enabledUntil      DateTime?
+  
+  // Safety
+  killSwitch        Boolean   @default(false)
+  dependencies      String[]  // Other flags this depends on
+  
+  // Metadata
+  createdBy         String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  lastEvaluatedAt   DateTime?
+  evaluationCount   BigInt    @default(0)
+  
+  @@index([flagKey])
+  @@index([isEnabled])
+  @@map("feature_flags")
+  @@schema("operational")
+}
+
+model SystemConfiguration {
+  id                String    @id @default(cuid())
+  configKey         String    @unique
+  configValue       Json
+  configType        String    // STRING, NUMBER, BOOLEAN, JSON, SECRET
+  category          String    // DATABASE, SECURITY, FEATURES, LIMITS
+  
+  // Validation
+  validator         String?   // Regex or validation rule
+  allowedValues     Json?     // List of allowed values
+  minValue          Float?
+  maxValue          Float?
+  
+  // Environment
+  environment       String    @default("all") // all, development, staging, production
+  isSecret          Boolean   @default(false)
+  isEncrypted       Boolean   @default(false)
+  
+  // Change tracking
+  previousValue     Json?
+  changedBy         String?
+  changedAt         DateTime?
+  changeReason      String?
+  requiresRestart   Boolean   @default(false)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([category])
+  @@index([environment])
+  @@map("system_configuration")
+  @@schema("operational")
+}
+
+//=====================
+// HEALTH & MONITORING
+//=====================
+
+model DatabaseHealth {
+  id                String    @id @default(cuid())
+  checkTime         DateTime  @default(now())
+  
+  // Connection health
+  connectionCount   Int
+  activeQueries     Int
+  idleConnections   Int
+  maxConnections    Int
+  
+  // Performance metrics
+  avgQueryTime      Float     // milliseconds
+  slowQueries       Int       // queries > 1000ms
+  deadlocks         Int
+  blockingQueries   Int
+  cacheHitRatio     Float     // percentage
+  
+  // Storage metrics
+  databaseSize      BigInt    // bytes
+  tableCount        Int
+  indexCount        Int
+  unusedIndexes     String[]
+  bloatPercentage   Float
+  
+  // Replication health (if applicable)
+  replicationLag    Int?      // seconds
+  replicationStatus String?
+  
+  // System resources
+  cpuUsage          Float     // percentage
+  memoryUsage       Float     // percentage
+  diskUsage         Float     // percentage
+  iopsRead          Int
+  iopsWrite         Int
+  
+  // Alert status
+  healthStatus      String    // HEALTHY, DEGRADED, CRITICAL
+  alerts            Json?     // Active alerts
+  
+  @@index([checkTime])
+  @@index([healthStatus])
+  @@map("database_health")
+  @@schema("operational")
+}
+
+model QueryPerformance {
+  id                String    @id @default(cuid())
+  queryHash         String    // Hash of the query
+  queryText         String?   @db.Text
+  tableName         String
+  operation         String    // SELECT, INSERT, UPDATE, DELETE
+  
+  // Performance stats
+  executionCount    BigInt
+  totalTime         Float     // Total time across all executions
+  avgTime           Float     // Average execution time
+  minTime           Float
+  maxTime           Float
+  stdDevTime        Float
+  
+  // Resource usage
+  avgRowsRead       Float
+  avgRowsWritten    Float
+  avgCpuTime        Float
+  avgIoTime         Float
+  
+  // Issues
+  timeouts          Int       @default(0)
+  errors            Int       @default(0)
+  
+  // Optimization
+  hasIndex          Boolean
+  suggestedIndex    String?
+  optimizationNotes String?
+  
+  firstSeen         DateTime
+  lastSeen          DateTime
+  
+  @@unique([queryHash])
+  @@index([tableName])
+  @@index([avgTime])
+  @@map("query_performance")
+  @@schema("operational")
+}
+
+model MaintenanceWindow {
+  id                String    @id @default(cuid())
+  windowType        String    // PLANNED, EMERGENCY, RECURRING
+  
+  // Schedule
+  startTime         DateTime
+  endTime           DateTime
+  duration          Int       // minutes
+  
+  // Work to be done
+  description       String
+  operations        String[]  // List of operations
+  affectedTables    String[]
+  affectedFeatures  String[]
+  
+  // Impact
+  expectedDowntime  Int?      // minutes
+  readOnly          Boolean   @default(false)
+  dataModification  Boolean   @default(false)
+  schemaChanges     Boolean   @default(false)
+  
+  // Status
+  status            String    // SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+  actualStartTime   DateTime?
+  actualEndTime     DateTime?
+  
+  // Communication
+  notificationSent  Boolean   @default(false)
+  createdBy         String
+  approvedBy        String?
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([startTime])
+  @@index([status])
+  @@map("maintenance_windows")
+  @@schema("operational")
+}
+
+//=====================
+// MIGRATION & DEPLOYMENT
+//=====================
+
+model MigrationHistory {
+  id                String    @id @default(cuid())
+  migrationName     String    @unique
+  version           String
+  
+  // Execution details
+  executedAt        DateTime
+  executionTime     Int       // milliseconds
+  executedBy        String
+  
+  // Migration content
+  upScript          String    @db.Text
+  downScript        String?   @db.Text
+  checksum          String
+  
+  // Status
+  status            String    // PENDING, RUNNING, COMPLETED, FAILED, ROLLED_BACK
+  errorMessage      String?
+  
+  // Rollback information
+  canRollback       Boolean   @default(true)
+  rolledBackAt      DateTime?
+  rolledBackBy      String?
+  
+  // Environment
+  environment       String    // development, staging, production
+  databaseVersion   String
+  appVersion        String
+  
+  @@index([executedAt])
+  @@index([status])
+  @@map("migration_history")
+  @@schema("operational")
+}
+
+model DeploymentTracking {
+  id                String    @id @default(cuid())
+  deploymentId      String    @unique @default(uuid())
+  
+  // Version info
+  version           String
+  previousVersion   String?
+  gitCommit         String
+  gitBranch         String
+  
+  // Deployment details
+  environment       String    // development, staging, production
+  deploymentType    String    // ROLLING, BLUE_GREEN, CANARY, INSTANT
+  
+  // Timing
+  startedAt         DateTime
+  completedAt       DateTime?
+  rollbackAt        DateTime?
+  
+  // Status
+  status            String    // PENDING, IN_PROGRESS, COMPLETED, FAILED, ROLLED_BACK
+  healthCheckPassed Boolean   @default(false)
+  smokeTestPassed   Boolean   @default(false)
+  
+  // Migrations
+  migrationsRun     String[]
+  seedDataApplied   Boolean   @default(false)
+  
+  // Metrics
+  deploymentTime    Int?      // seconds
+  downtime          Int?      // seconds
+  affectedUsers     Int?
+  
+  // Rollback
+  rollbackReason    String?
+  rollbackVersion   String?
+  
+  deployedBy        String
+  approvedBy        String?
+  
+  @@index([environment])
+  @@index([startedAt])
+  @@index([status])
+  @@map("deployment_tracking")
+  @@schema("operational")
+}
+
+//=====================
+// OPERATIONAL METRICS
+//=====================
+
+model OperationalMetrics {
+  id                String    @id @default(cuid())
+  metricTime        DateTime  @default(now())
+  metricType        String    // PERFORMANCE, AVAILABILITY, RELIABILITY, SECURITY
+  
+  // Key metrics
+  uptime            Float     // percentage
+  errorRate         Float     // percentage
+  responseTime      Float     // milliseconds p50
+  responseTimeP95   Float     // milliseconds p95
+  responseTimeP99   Float     // milliseconds p99
+  
+  // Throughput
+  requestsPerSecond Float
+  transactionsPerSecond Float
+  activeUsers       Int
+  
+  // Database specific
+  connectionPoolUsage Float   // percentage
+  queryQueueLength  Int
+  replicationLag    Int?      // milliseconds
+  
+  // Business metrics
+  signupsToday      Int?
+  revenueToday      Float?
+  
+  // SLA tracking
+  slaTarget         Float     // percentage
+  slaMet            Boolean
+  
+  @@index([metricTime])
+  @@index([metricType])
+  @@map("operational_metrics")
+  @@schema("operational")
+}
+
+//=====================
+// DISASTER RECOVERY
+//=====================
+
+model DisasterRecoveryPlan {
+  id                String    @id @default(cuid())
+  planName          String    @unique
+  planVersion       String
+  
+  // Recovery objectives
+  rtoMinutes        Int       // Recovery Time Objective
+  rpoMinutes        Int       // Recovery Point Objective
+  
+  // Procedures
+  procedures        Json      // Step-by-step procedures
+  runbooks          Json      // Automated runbooks
+  contactList       Json      // Emergency contacts
+  
+  // Testing
+  lastTestedAt      DateTime?
+  testResults       Json?
+  nextTestDate      DateTime
+  
+  // Activation
+  lastActivatedAt   DateTime?
+  activationReason  String?
+  
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@map("disaster_recovery_plans")
+  @@schema("operational")
+}

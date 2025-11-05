@@ -1,0 +1,170 @@
+version: '3.8'
+
+services:
+  # Main PostgreSQL database for Prisma
+  postgres:
+    image: postgres:16
+    container_name: lifenavigator-postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: lifenavigator
+      POSTGRES_PASSWORD: lifenavigator_password
+      POSTGRES_DB: lifenavigator
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./prisma/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh
+    command: postgres -c 'max_connections=1000' -c 'shared_buffers=256MB'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lifenavigator"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Financial domain PostgreSQL database
+  financial-db:
+    image: postgres:16
+    container_name: lifenavigator-financial-db
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: financial_user
+      POSTGRES_PASSWORD: financial_password
+      POSTGRES_DB: financial_db
+    volumes:
+      - financial_db_data:/var/lib/postgresql/data
+    command: postgres -c 'max_connections=500' -c 'shared_buffers=128MB'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U financial_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Healthcare domain PostgreSQL database
+  healthcare-db:
+    image: postgres:16
+    container_name: lifenavigator-healthcare-db
+    restart: always
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: healthcare_user
+      POSTGRES_PASSWORD: healthcare_password
+      POSTGRES_DB: healthcare_db
+    volumes:
+      - healthcare_db_data:/var/lib/postgresql/data
+    command: postgres -c 'max_connections=500' -c 'shared_buffers=128MB'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U healthcare_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # DynamoDB Local for high-throughput operations
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: lifenavigator-dynamodb
+    restart: always
+    ports:
+      - "8000:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb -optimizeDbBeforeStartup -dbPath ./data"
+    volumes:
+      - dynamodb_data:/home/dynamodblocal/data
+
+  # MinIO (S3-compatible object storage) for document vault
+  minio:
+    image: minio/minio:latest
+    container_name: lifenavigator-minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minio_access_key
+      MINIO_ROOT_PASSWORD: minio_secret_key
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Frontend Next.js application
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lifenavigator-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://lifenavigator:lifenavigator_password@postgres:5432/lifenavigator
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: your-development-secret
+      NODE_ENV: development
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/.next
+
+  # FastAPI Financial Service
+  financial-api:
+    build:
+      context: ./lifenavigator-api
+      dockerfile: Dockerfile
+    container_name: lifenavigator-financial-api
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - financial-db
+      - dynamodb-local
+    environment:
+      DATABASE_URL: postgresql://financial_user:financial_password@financial-db:5432/financial_db
+      DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      AWS_REGION: us-east-1
+      ENV: development
+    volumes:
+      - ./lifenavigator-api:/app
+
+  # Redis for caching and session storage
+  redis:
+    image: redis:7
+    container_name: lifenavigator-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass redis_password
+
+  # Adminer for database management (optional)
+  adminer:
+    image: adminer:latest
+    container_name: lifenavigator-adminer
+    restart: always
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+      - financial-db
+      - healthcare-db
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+volumes:
+  postgres_data:
+  financial_db_data:
+  healthcare_db_data:
+  dynamodb_data:
+  minio_data:
+  redis_data:
