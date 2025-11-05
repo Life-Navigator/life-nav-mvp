@@ -33,6 +33,10 @@ ahash = "0.8"
 # Memory-mapped files
 memmap2 = "0.9"
 
+# UUID and datetime support for agents
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
 # Error handling
 anyhow = "1.0"
 thiserror = "1.0"

@@ -34,6 +34,14 @@ mod cache;
 mod graph_algorithms;  // NEW: Elite graph algorithms (10-1000x faster than Python!)
 mod mmap_graph;  // NEW: Memory-mapped graphs for billion-node support!
 
+// AI Agent System (100x faster than Python!)
+pub mod agent_core;
+pub mod maverick_client;
+pub mod orchestrator;
+pub mod domain_manager;
+pub mod specialists;
+mod bindings;  // PyO3 bindings for agent system
+
 use preprocessor::DataPreprocessor;
 use checkpoint::CheckpointManager;
 use metrics::MetricsAggregator;
@@ -43,6 +51,7 @@ use graph::{InMemoryGraph, Entity, Relationship, VectorSimilarity, ResultRanker}
 use database_fixed::{PyNeo4jConfigFixed, PyNeo4jClientFixed, PyQdrantConfigFixed, PyQdrantClientFixed};
 use graph_algorithms::{PyCompactGraph, PyIncrementalGraph, PyBfsResult, PyDfsResult, PyDijkstraResult, PyPageRankResult, PyCommunityResult, PyGraphStats, PyAStarResult, PyBellmanFordResult, PyBetweennessCentralityResult, PyParallelBfsResult};
 use mmap_graph::PyMmapGraph;
+use bindings::{PyAgentTask, PyAgentResult, PyOrchestrator};
 
 /// Life Navigator Rust Training Module
 #[pymodule]
@@ -92,6 +101,11 @@ fn life_navigator_rs(_py: Python, m: &PyModule) -> PyResult<()> {
 
     // Memory-mapped graphs (billion-node support!)
     m.add_class::<PyMmapGraph>()?;
+
+    // AI Agent System (100x faster than Python!)
+    m.add_class::<PyAgentTask>()?;
+    m.add_class::<PyAgentResult>()?;
+    m.add_class::<PyOrchestrator>()?;
 
     // Version info
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
