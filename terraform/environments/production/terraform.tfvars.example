@@ -1,0 +1,58 @@
+# Example Terraform Variables for Production Environment
+# Copy this file to terraform.tfvars and fill in your actual values
+# IMPORTANT: Never commit terraform.tfvars to version control
+
+# AWS Region
+aws_region = "us-east-1"
+
+# Container Image
+# REQUIRED: Update with your ECR repository URI
+container_image = "123456789.dkr.ecr.us-east-1.amazonaws.com/agent-api:v1.0.0"
+
+# ACM Certificate ARN
+# REQUIRED: Create an ACM certificate for your domain first
+# aws acm request-certificate --domain-name api.yourdomain.com --validation-method DNS
+certificate_arn = "arn:aws:acm:us-east-1:123456789:certificate/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx"
+
+# ALB Logs Bucket
+# REQUIRED: Create an S3 bucket for ALB access logs
+# aws s3 mb s3://your-company-alb-logs --region us-east-1
+alb_logs_bucket = "your-company-alb-logs"
+
+# vLLM Endpoint
+# REQUIRED: URL of your vLLM inference server
+vllm_endpoint = "https://vllm.yourdomain.com/v1"
+
+# MCP Server URL
+# REQUIRED: URL of the Life Navigator app's MCP endpoint
+mcp_server_url = "https://app.yourdomain.com/mcp"
+
+# S3 Bucket ARNs
+# Optional: List of S3 buckets the agent system needs access to
+s3_bucket_arns = [
+  "arn:aws:s3:::your-vector-storage-bucket",
+  "arn:aws:s3:::your-vector-storage-bucket/*"
+]
+
+# Critical Alert Emails
+# REQUIRED: On-call team for immediate response
+critical_alert_emails = [
+  "oncall@yourdomain.com",
+  "cto@yourdomain.com"
+]
+
+# Warning Alert Emails
+# REQUIRED: Engineering team for monitoring
+warning_alert_emails = [
+  "engineering@yourdomain.com",
+  "devops@yourdomain.com"
+]
+
+# KMS Key ID (optional but recommended)
+# Create a KMS key for encrypting SNS topics:
+# aws kms create-key --description "Life Navigator SNS encryption"
+kms_key_id = "arn:aws:kms:us-east-1:123456789:key/xxxxx-xxxx-xxxx-xxxx-xxxxxxxxxx"
+
+# Enable WAF
+# Recommended for production to protect against common web exploits
+enable_waf = true
