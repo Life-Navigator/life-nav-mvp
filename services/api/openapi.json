@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Life Navigator API",
-    "description": "Production-grade AI life management platform backend with comprehensive APIs for users, goals, health, finance, career, and education",
+    "description": "Production-grade AI life management platform backend with comprehensive APIs for users, goals, health, finance, career, education, and AI agents powered by Maverick LLM",
     "version": "0.1.0"
   },
   "paths": {
@@ -1481,6 +1481,752 @@
         ]
       }
     },
+    "/api/v1/agents/": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Agents",
+        "description": "List all agents for the current user",
+        "operationId": "list_agents_api_v1_agents__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "agent_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AgentType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Agent Type"
+            }
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgentResponse"
+                  },
+                  "title": "Response List Agents Api V1 Agents  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Create Agent",
+        "description": "Create a new agent",
+        "operationId": "create_agent_api_v1_agents__post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Agent",
+        "description": "Get agent by ID",
+        "operationId": "get_agent_api_v1_agents__agent_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Update Agent",
+        "description": "Update agent configuration",
+        "operationId": "update_agent_api_v1_agents__agent_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Delete Agent",
+        "description": "Delete agent",
+        "operationId": "delete_agent_api_v1_agents__agent_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/tasks": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Execute Task",
+        "description": "Execute a task with the specified agent",
+        "operationId": "execute_task_api_v1_agents__agent_id__tasks_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskExecute"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Tasks",
+        "description": "List tasks for an agent",
+        "operationId": "list_tasks_api_v1_agents__agent_id__tasks_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "status_filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TaskStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status Filter"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TaskResponse"
+                  },
+                  "title": "Response List Tasks Api V1 Agents  Agent Id  Tasks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/tasks/{task_id}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Task",
+        "description": "Get task by ID",
+        "operationId": "get_task_api_v1_agents__agent_id__tasks__task_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/chat": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Chat With Agent",
+        "description": "Chat with an agent using Maverick LLM",
+        "operationId": "chat_with_agent_api_v1_agents__agent_id__chat_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/conversations": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Conversations",
+        "description": "List conversations for an agent",
+        "operationId": "list_conversations_api_v1_agents__agent_id__conversations_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationResponse"
+                  },
+                  "title": "Response List Conversations Api V1 Agents  Agent Id  Conversations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Conversation",
+        "description": "Get conversation with full message history",
+        "operationId": "get_conversation_api_v1_agents__agent_id__conversations__conversation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/{agent_id}/metrics": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Agent Metrics",
+        "description": "Get performance metrics for an agent",
+        "operationId": "get_agent_metrics_api_v1_agents__agent_id__metrics_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agent Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentMetrics"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agents/stats/aggregate": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get Aggregate Stats",
+        "description": "Get aggregate statistics across all user's agents",
+        "operationId": "get_aggregate_stats_api_v1_agents_stats_aggregate_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentStats"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/": {
       "get": {
         "summary": "Root",
@@ -1532,6 +2278,534 @@
         ],
         "title": "AccountType",
         "description": "Financial account types"
+      },
+      "AgentCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "agent_type": {
+            "$ref": "#/components/schemas/AgentType"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilities",
+            "default": []
+          },
+          "max_concurrent_tasks": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Concurrent Tasks",
+            "default": 5
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "maximum": 300.0,
+            "minimum": 1.0,
+            "title": "Timeout Seconds",
+            "default": 30.0
+          },
+          "retry_attempts": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Retry Attempts",
+            "default": 3
+          },
+          "temperature": {
+            "type": "number",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Temperature",
+            "default": 0.7
+          },
+          "max_tokens": {
+            "type": "integer",
+            "maximum": 4096.0,
+            "minimum": 1.0,
+            "title": "Max Tokens",
+            "default": 500
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "agent_type"
+        ],
+        "title": "AgentCreate",
+        "description": "Agent creation schema"
+      },
+      "AgentMetrics": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Agent Id"
+          },
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "current_state": {
+            "$ref": "#/components/schemas/AgentState"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "total_tasks": {
+            "type": "integer",
+            "title": "Total Tasks"
+          },
+          "successful_tasks": {
+            "type": "integer",
+            "title": "Successful Tasks"
+          },
+          "failed_tasks": {
+            "type": "integer",
+            "title": "Failed Tasks"
+          },
+          "average_duration_ms": {
+            "type": "number",
+            "title": "Average Duration Ms"
+          },
+          "average_tokens": {
+            "type": "number",
+            "title": "Average Tokens"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "title": "Total Tokens"
+          },
+          "active_conversations": {
+            "type": "integer",
+            "title": "Active Conversations"
+          },
+          "uptime_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uptime Seconds"
+          },
+          "last_active_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Active At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_id",
+          "agent_name",
+          "current_state",
+          "is_active",
+          "total_tasks",
+          "successful_tasks",
+          "failed_tasks",
+          "average_duration_ms",
+          "average_tokens",
+          "total_tokens",
+          "active_conversations",
+          "uptime_seconds",
+          "last_active_at"
+        ],
+        "title": "AgentMetrics",
+        "description": "Agent performance metrics"
+      },
+      "AgentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "agent_type": {
+            "$ref": "#/components/schemas/AgentType"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
+          },
+          "capabilities": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Capabilities"
+          },
+          "max_concurrent_tasks": {
+            "type": "integer",
+            "title": "Max Concurrent Tasks"
+          },
+          "timeout_seconds": {
+            "type": "number",
+            "title": "Timeout Seconds"
+          },
+          "retry_attempts": {
+            "type": "integer",
+            "title": "Retry Attempts"
+          },
+          "current_state": {
+            "$ref": "#/components/schemas/AgentState"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "temperature": {
+            "type": "number",
+            "title": "Temperature"
+          },
+          "max_tokens": {
+            "type": "integer",
+            "title": "Max Tokens"
+          },
+          "last_active_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Active At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "name",
+          "description",
+          "agent_type",
+          "system_prompt",
+          "capabilities",
+          "max_concurrent_tasks",
+          "timeout_seconds",
+          "retry_attempts",
+          "current_state",
+          "is_active",
+          "model_name",
+          "temperature",
+          "max_tokens",
+          "last_active_at"
+        ],
+        "title": "AgentResponse",
+        "description": "Agent response schema"
+      },
+      "AgentState": {
+        "type": "string",
+        "enum": [
+          "idle",
+          "processing",
+          "completed",
+          "error",
+          "shutdown"
+        ],
+        "title": "AgentState",
+        "description": "Agent execution states"
+      },
+      "AgentStats": {
+        "properties": {
+          "total_agents": {
+            "type": "integer",
+            "title": "Total Agents"
+          },
+          "active_agents": {
+            "type": "integer",
+            "title": "Active Agents"
+          },
+          "total_tasks_today": {
+            "type": "integer",
+            "title": "Total Tasks Today"
+          },
+          "total_conversations": {
+            "type": "integer",
+            "title": "Total Conversations"
+          },
+          "total_messages_today": {
+            "type": "integer",
+            "title": "Total Messages Today"
+          },
+          "average_response_time_ms": {
+            "type": "number",
+            "title": "Average Response Time Ms"
+          },
+          "total_tokens_today": {
+            "type": "integer",
+            "title": "Total Tokens Today"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_agents",
+          "active_agents",
+          "total_tasks_today",
+          "total_conversations",
+          "total_messages_today",
+          "average_response_time_ms",
+          "total_tokens_today"
+        ],
+        "title": "AgentStats",
+        "description": "Aggregate agent statistics"
+      },
+      "AgentType": {
+        "type": "string",
+        "enum": [
+          "orchestrator",
+          "domain_manager",
+          "specialist",
+          "tool_user"
+        ],
+        "title": "AgentType",
+        "description": "Agent hierarchy levels"
+      },
+      "AgentUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt"
+          },
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilities"
+          },
+          "max_concurrent_tasks": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Concurrent Tasks"
+          },
+          "timeout_seconds": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 300.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeout Seconds"
+          },
+          "retry_attempts": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Attempts"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4096.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata"
+          }
+        },
+        "type": "object",
+        "title": "AgentUpdate",
+        "description": "Agent update schema"
       },
       "CareerProfileCreate": {
         "properties": {
@@ -1746,6 +3020,251 @@
           "is_active"
         ],
         "title": "CertificationResponse"
+      },
+      "ChatRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Message"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid4"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id"
+          },
+          "system_prompt_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt Override"
+          },
+          "temperature": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 2.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Temperature"
+          },
+          "max_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4096.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Tokens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "ChatRequest",
+        "description": "Chat request schema"
+      },
+      "ChatResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Conversation Id"
+          },
+          "message_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Message Id"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Agent Id"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "tokens_used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Used"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "confidence_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Score"
+          },
+          "reasoning_steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Steps"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "message_id",
+          "agent_id",
+          "message",
+          "tokens_used",
+          "model_name",
+          "confidence_score",
+          "reasoning_steps",
+          "timestamp"
+        ],
+        "title": "ChatResponse",
+        "description": "Chat response schema"
+      },
+      "ConversationResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Agent Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "message_count": {
+            "type": "integer",
+            "title": "Message Count"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "title": "Total Tokens"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageResponse"
+            },
+            "type": "array",
+            "title": "Messages",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "agent_id",
+          "title",
+          "summary",
+          "is_active",
+          "message_count",
+          "total_tokens",
+          "last_message_at"
+        ],
+        "title": "ConversationResponse",
+        "description": "Conversation response schema"
       },
       "CourseCreate": {
         "properties": {
@@ -3233,6 +4752,94 @@
         ],
         "title": "MedicationResponse"
       },
+      "MessageResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id"
+          },
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Conversation Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "tokens_used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Used"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name"
+          },
+          "confidence_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Score"
+          },
+          "reasoning_steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Steps"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "conversation_id",
+          "role",
+          "content",
+          "tokens_used",
+          "model_name",
+          "confidence_score",
+          "reasoning_steps",
+          "created_at"
+        ],
+        "title": "MessageResponse",
+        "description": "Message response schema"
+      },
       "RecordType": {
         "type": "string",
         "enum": [
@@ -3363,6 +4970,237 @@
           "years_of_experience"
         ],
         "title": "SkillResponse"
+      },
+      "TaskExecute": {
+        "properties": {
+          "task_type": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Task Type"
+          },
+          "input_text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Input Text"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_type",
+          "input_text"
+        ],
+        "title": "TaskExecute",
+        "description": "Task execution schema (without agent_id)"
+      },
+      "TaskResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "agent_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Agent Id"
+          },
+          "task_type": {
+            "type": "string",
+            "title": "Task Type"
+          },
+          "input_text": {
+            "type": "string",
+            "title": "Input Text"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "tokens_used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens Used"
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries"
+          },
+          "reasoning_steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning Steps"
+          },
+          "confidence_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence Score"
+          },
+          "sources": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sources"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "agent_id",
+          "task_type",
+          "input_text",
+          "context",
+          "status",
+          "result",
+          "error_message",
+          "duration_ms",
+          "tokens_used",
+          "retries",
+          "reasoning_steps",
+          "confidence_score",
+          "sources",
+          "started_at",
+          "completed_at"
+        ],
+        "title": "TaskResponse",
+        "description": "Task response schema"
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "running",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "TaskStatus",
+        "description": "Task execution status"
       },
       "Token": {
         "properties": {

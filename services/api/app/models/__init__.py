@@ -7,6 +7,7 @@ from app.models.health import HealthRecord, Medication, HealthProvider
 from app.models.finance import FinancialAccount, Transaction, Investment
 from app.models.career import CareerProfile, JobExperience, Skill
 from app.models.education import EducationRecord, Course, Certification
+from app.models.agent import Agent, AgentTask, Conversation, ConversationMessage, AgentType, AgentState, TaskStatus
 
 __all__ = [
     "User",
@@ -24,4 +25,11 @@ __all__ = [
     "EducationRecord",
     "Course",
     "Certification",
+    "Agent",
+    "AgentTask",
+    "Conversation",
+    "ConversationMessage",
+    "AgentType",
+    "AgentState",
+    "TaskStatus",
 ]

@@ -2,7 +2,7 @@
 API v1 routing
 """
 from fastapi import APIRouter
-from app.api.v1.endpoints import users, goals, health, finance, career, education, auth
+from app.api.v1.endpoints import users, goals, health, finance, career, education, auth, agents
 
 api_router = APIRouter()
 
@@ -14,3 +14,4 @@ api_router.include_router(health.router, prefix="/health", tags=["health"])
 api_router.include_router(finance.router, prefix="/finance", tags=["finance"])
 api_router.include_router(career.router, prefix="/career", tags=["career"])
 api_router.include_router(education.router, prefix="/education", tags=["education"])
+api_router.include_router(agents.router, prefix="/agents", tags=["agents"])

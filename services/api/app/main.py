@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.core.database import init_db, close_db
 from app.api.v1 import api_router
+from app.services.maverick_client import get_maverick_client, shutdown_maverick_client
 
 
 @asynccontextmanager
@@ -17,8 +18,11 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events"""
     # Startup
     await init_db()
+    # Initialize Maverick client
+    await get_maverick_client()
     yield
     # Shutdown
+    await shutdown_maverick_client()
     await close_db()
 
 
@@ -26,7 +30,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Production-grade AI life management platform backend with comprehensive APIs for users, goals, health, finance, career, and education",
+    description="Production-grade AI life management platform backend with comprehensive APIs for users, goals, health, finance, career, education, and AI agents powered by Maverick LLM",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
