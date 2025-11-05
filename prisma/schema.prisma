@@ -33,7 +33,8 @@ model User {
   lockedUntil           DateTime?
   mfaEnabled            Boolean                 @default(false)
   mfaSecret             String?
-  
+  recoveryCodes         String?                 // JSON array of hashed recovery codes
+
   // Relations
   accounts              Account[]
   sessions              Session[]
@@ -52,13 +53,21 @@ model User {
   documents             Document[]
   notifications         Notification[]
   preferences           UserPreference?
+  profile               UserProfile?
   securityAuditLogs     SecurityAuditLog[]
   securityTokens        SecurityToken[]
   revokedTokens         RevokedToken[]
   userDevices           UserDevice[]
   integrations          UserIntegration[]
   benefitRankings       BenefitRanking[]
-  
+  familyMembers         FamilyMember[]
+  pets                  Pet[]
+  familyAppointments    FamilyAppointment[]
+  plaidItems            PlaidItem[]
+  calendarConnections   CalendarConnection[]
+  socialNetworkConnections SocialNetworkConnection[]
+  networkValueInsights  NetworkValueInsight[]
+
   @@index([email])
   @@index([createdAt])
   @@map("users")
@@ -470,8 +479,67 @@ model UserPreference {
   firstDayOfWeek       Int     @default(0) // 0=Sunday, 1=Monday
   dashboardLayout      Json?   // Custom dashboard configuration
   user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@map("user_preferences")
+}
+
+model UserProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Demographics
+  dateOfBirth    DateTime?
+  gender         String?   // male, female, non-binary, prefer not to say
+  phoneNumber    String?
+  address        String?
+  city           String?
+  state          String?
+  zipCode        String?
+  country        String?   @default("US")
+  maritalStatus  String?   // single, married, divorced, widowed, partnered
+  dependents     Int?      @default(0)
+
+  // Professional Information
+  occupation        String?
+  employer          String?
+  industry          String?
+  yearsOfExperience Int?
+  educationLevel    String?  // high_school, associates, bachelors, masters, doctorate, other
+  skills            String?  @db.Text  // JSON array of skills
+  linkedInUrl       String?
+  websiteUrl        String?
+
+  // Financial Information
+  incomeRange       String?  // <25k, 25k-50k, 50k-75k, 75k-100k, 100k-150k, 150k-200k, 200k+
+  netWorthRange     String?  // <0, 0-50k, 50k-100k, 100k-250k, 250k-500k, 500k-1m, 1m+
+  financialGoals    String?  @db.Text  // JSON array
+  riskTolerance     String?  // conservative, moderate, aggressive
+  retirementAge     Int?
+
+  // Health & Wellness
+  healthStatus      String?  // excellent, good, fair, poor
+  fitnessLevel      String?  // sedentary, lightly_active, moderately_active, very_active, extremely_active
+  fitnessGoals      String?  @db.Text  // JSON array
+  dietaryPreferences String? // none, vegetarian, vegan, pescatarian, keto, paleo, other
+  medicalConditions  String? @db.Text  // JSON array (optional, encrypted)
+
+  // Lifestyle & Preferences
+  bio               String?  @db.Text
+  interests         String?  @db.Text  // JSON array
+  hobbies           String?  @db.Text  // JSON array
+  values            String?  @db.Text  // JSON array
+  lifeGoals         String?  @db.Text  // JSON array
+
+  // Profile Completion
+  profileCompletion Int      @default(0)  // 0-100 percentage
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_profiles")
 }
 
 model Notification {
@@ -499,6 +567,84 @@ model Notification {
 //=====================
 // FINANCIAL MODELS
 //=====================
+
+// Plaid Integration Models
+model PlaidItem {
+  id               String           @id @default(cuid())
+  userId           String
+  itemId           String           // Plaid item ID
+  accessToken      String           @db.Text // Encrypted access token
+  institutionId    String
+  institutionName  String
+  status           String           @default("active") // active, error, needs_update
+  lastSyncedAt     DateTime         @default(now())
+  error            String?          @db.Text
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  // Relations
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts         PlaidAccount[]
+  transactions     PlaidTransaction[]
+
+  @@unique([userId, itemId])
+  @@index([userId])
+  @@index([status])
+  @@map("plaid_items")
+}
+
+model PlaidAccount {
+  id               String            @id @default(cuid())
+  plaidItemId      String
+  accountId        String            // Plaid account ID
+  name             String
+  officialName     String?
+  type             String            // depository, credit, loan, investment
+  subtype          String?           // checking, savings, credit card, etc.
+  mask             String?           // Last 4 digits
+  currentBalance   Float?
+  availableBalance Float?
+  limit            Float?            // Credit limit
+  currency         String            @default("USD")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  // Relations
+  plaidItem        PlaidItem         @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
+  transactions     PlaidTransaction[]
+
+  @@unique([plaidItemId, accountId])
+  @@index([plaidItemId])
+  @@map("plaid_accounts")
+}
+
+model PlaidTransaction {
+  id                  String       @id @default(cuid())
+  plaidItemId         String
+  plaidAccountId      String
+  transactionId       String       // Plaid transaction ID
+  amount              Float
+  date                DateTime
+  name                String
+  merchantName        String?
+  category            String[]     // Array of category strings
+  pending             Boolean      @default(false)
+  paymentChannel      String?      // online, in store, etc.
+  transactionType     String?      // place, digital, etc.
+  isoCurrencyCode     String       @default("USD")
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  // Relations
+  plaidItem           PlaidItem    @relation(fields: [plaidItemId], references: [id], onDelete: Cascade)
+  plaidAccount        PlaidAccount @relation(fields: [plaidAccountId], references: [id], onDelete: Cascade)
+
+  @@unique([plaidItemId, transactionId])
+  @@index([plaidItemId])
+  @@index([plaidAccountId])
+  @@index([date])
+  @@map("plaid_transactions")
+}
 
 model FinancialAccount {
   id                String        @id @default(cuid())
@@ -892,4 +1038,351 @@ model UserIntegration {
   @@index([provider])
   @@index([status])
   @@map("user_integrations")
+}
+
+//=====================
+// FAMILY MODELS
+//=====================
+
+model FamilyMember {
+  id              String              @id @default(cuid())
+  userId          String
+  firstName       String
+  lastName        String?
+  nickname        String?
+  relationship    String              // spouse, partner, child, parent, sibling, grandparent, grandchild, other
+  dateOfBirth     DateTime?
+  gender          String?             // male, female, non-binary, prefer not to say
+  email           String?
+  phoneNumber     String?
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  country         String?
+
+  // Medical Information (optional)
+  bloodType       String?
+  allergies       String?             @db.Text
+  medications     String?             @db.Text
+  medicalNotes    String?             @db.Text
+  emergencyContact String?
+  emergencyPhone  String?
+
+  // Additional Information
+  occupation      String?
+  employer        String?
+  school          String?
+  grade           String?
+  photoUrl        String?
+  notes           String?             @db.Text
+  favoriteThings  Json?               // Favorite colors, foods, activities, etc.
+
+  // Settings
+  isDependent     Boolean             @default(false)
+  isEmergencyContact Boolean          @default(false)
+  isPrimary       Boolean             @default(false) // Primary contact/spouse
+  isActive        Boolean             @default(true)
+
+  // Metadata
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Relations
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments    FamilyAppointment[]
+
+  @@index([userId])
+  @@index([relationship])
+  @@index([isActive])
+  @@map("family_members")
+}
+
+model Pet {
+  id              String              @id @default(cuid())
+  userId          String
+  name            String
+  species         String              // dog, cat, bird, fish, reptile, rabbit, hamster, other
+  breed           String?
+  color           String?
+  gender          String?             // male, female, unknown
+  dateOfBirth     DateTime?
+  adoptionDate    DateTime?
+  age             Int?                // Age in years
+  weight          Float?              // Weight in pounds/kg
+  weightUnit      String?             @default("lbs")
+
+  // Medical Information
+  microchipNumber String?
+  vetName         String?
+  vetPhone        String?
+  vetEmail        String?
+  vetAddress      String?
+  allergies       String?             @db.Text
+  medications     String?             @db.Text
+  medicalConditions String?           @db.Text
+  medicalNotes    String?             @db.Text
+
+  // Care Information
+  feedingSchedule Json?               // Times and food types
+  exerciseNeeds   String?
+  specialNeeds    String?             @db.Text
+  behaviorNotes   String?             @db.Text
+
+  // Additional Information
+  photoUrl        String?
+  photos          String[]            // Array of photo URLs
+  insuranceProvider String?
+  insurancePolicyNumber String?
+  notes           String?             @db.Text
+
+  // Settings
+  isActive        Boolean             @default(true)
+  isServiceAnimal Boolean             @default(false)
+
+  // Metadata
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  // Relations
+  user            User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments    FamilyAppointment[]
+
+  @@index([userId])
+  @@index([species])
+  @@index([isActive])
+  @@map("pets")
+}
+
+model FamilyAppointment {
+  id              String        @id @default(cuid())
+  userId          String
+  familyMemberId  String?       // Reference to family member
+  petId           String?       // Reference to pet
+
+  // Appointment Details
+  title           String
+  description     String?       @db.Text
+  type            String        // medical, dental, vet, school, activity, other
+  category        String?       // checkup, emergency, routine, follow_up, consultation
+
+  // Location Information
+  providerName    String?
+  facilityName    String?
+  address         String?
+  city            String?
+  state           String?
+  zipCode         String?
+  phone           String?
+
+  // Timing
+  appointmentDate DateTime
+  startTime       String?       // HH:MM format
+  endTime         String?       // HH:MM format
+  duration        Int?          // Duration in minutes
+  timezone        String?       @default("UTC")
+
+  // Status & Reminders
+  status          String        @default("scheduled") // scheduled, confirmed, completed, cancelled, no_show
+  reminderSent    Boolean       @default(false)
+  reminderTime    DateTime?     // When to send reminder
+
+  // Additional Information
+  reason          String?
+  notes           String?       @db.Text
+  cost            Float?
+  isPaid          Boolean       @default(false)
+  insuranceClaimed Boolean      @default(false)
+  documents       String[]      // URLs to related documents
+
+  // Recurrence
+  isRecurring     Boolean       @default(false)
+  recurrenceRule  String?       // RRULE format for recurring appointments
+  recurrenceId    String?       // Link to recurring appointment series
+
+  // Metadata
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  completedAt     DateTime?
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  familyMember    FamilyMember? @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+  pet             Pet?          @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyMemberId])
+  @@index([petId])
+  @@index([appointmentDate])
+  @@index([status])
+  @@index([type])
+  @@map("family_appointments")
+}
+//=====================
+// CALENDAR INTEGRATION
+//=====================
+
+model CalendarConnection {
+  id               String          @id @default(cuid())
+  userId           String
+  provider         String          // google, microsoft, apple
+  email            String
+  accessToken      String          @db.Text
+  refreshToken     String?         @db.Text
+  expiresAt        DateTime?
+  scope            String?
+  isPrimary        Boolean         @default(false)
+  status           String          @default("active") // active, error, expired
+  lastSyncedAt     DateTime        @default(now())
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  // Relations
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events           CalendarEvent[]
+
+  @@unique([userId, provider, email])
+  @@index([userId])
+  @@index([provider])
+  @@map("calendar_connections")
+}
+
+model CalendarEvent {
+  id                  String             @id @default(cuid())
+  calendarConnectionId String
+  eventId             String             // External event ID
+  title               String
+  description         String?            @db.Text
+  location            String?
+  startTime           DateTime
+  endTime             DateTime
+  isAllDay            Boolean            @default(false)
+  status              String             @default("confirmed") // confirmed, tentative, cancelled
+  attendees           String?            @db.Text // JSON array
+  recurrence          String?            // Recurrence rule
+  reminderMinutes     Int?
+  meetingLink         String?
+  calendarName        String?
+  color               String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  // Relations
+  calendarConnection  CalendarConnection @relation(fields: [calendarConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarConnectionId, eventId])
+  @@index([calendarConnectionId])
+  @@index([startTime])
+  @@index([status])
+  @@map("calendar_events")
+}
+
+//=====================
+// SOCIAL NETWORK INTEGRATION
+//=====================
+
+model SocialNetworkConnection {
+  id               String               @id @default(cuid())
+  userId           String
+  platform         String               // linkedin, instagram, twitter, tiktok
+  username         String
+  displayName      String?
+  profileUrl       String?
+  profileImageUrl  String?
+  accessToken      String?              @db.Text
+  refreshToken     String?              @db.Text
+  expiresAt        DateTime?
+  status           String               @default("active") // active, error, expired
+  lastSyncedAt     DateTime             @default(now())
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  // Relations
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metrics          SocialNetworkMetric[]
+  followers        SocialNetworkFollower[]
+
+  @@unique([userId, platform, username])
+  @@index([userId])
+  @@index([platform])
+  @@map("social_network_connections")
+}
+
+model SocialNetworkMetric {
+  id                     String                  @id @default(cuid())
+  socialNetworkConnectionId String
+  date                   DateTime                @default(now())
+  followersCount         Int                     @default(0)
+  followingCount         Int                     @default(0)
+  postsCount             Int                     @default(0)
+  engagementRate         Float?                  // Percentage
+  impressions            Int?
+  reach                  Int?
+  profileViews           Int?
+  linkClicks             Int?
+  estimatedValue         Float?                  // Calculated network value in USD
+  createdAt              DateTime                @default(now())
+
+  // Relations
+  socialNetworkConnection SocialNetworkConnection @relation(fields: [socialNetworkConnectionId], references: [id], onDelete: Cascade)
+
+  @@index([socialNetworkConnectionId])
+  @@index([date])
+  @@map("social_network_metrics")
+}
+
+model SocialNetworkFollower {
+  id                     String                  @id @default(cuid())
+  socialNetworkConnectionId String
+  followerId             String                  // External follower ID
+  username               String
+  displayName            String?
+  profileUrl             String?
+  followerCount          Int?                    // Their follower count
+  verifiedStatus         Boolean                 @default(false)
+  influenceScore         Float?                  // Calculated influence 0-100
+  industry               String?
+  location               String?
+  bio                    String?                 @db.Text
+  engagementRate         Float?
+  lastInteraction        DateTime?
+  addedAt                DateTime                @default(now())
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  // Relations
+  socialNetworkConnection SocialNetworkConnection @relation(fields: [socialNetworkConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([socialNetworkConnectionId, followerId])
+  @@index([socialNetworkConnectionId])
+  @@index([influenceScore])
+  @@map("social_network_followers")
+}
+
+//=====================
+// NETWORK VALUE INSIGHTS
+//=====================
+
+model NetworkValueInsight {
+  id               String   @id @default(cuid())
+  userId           String
+  platform         String   // linkedin, instagram, twitter, tiktok, overall
+  insightType      String   // growth_rate, engagement_trend, high_value_connections, monetization_potential
+  title            String
+  description      String   @db.Text
+  value            Float?   // Quantified value if applicable
+  score            Int?     // Score 0-100
+  recommendations  String?  @db.Text // JSON array of recommendations
+  dataPoints       String?  @db.Text // JSON data supporting the insight
+  generatedAt      DateTime @default(now())
+  validUntil       DateTime?
+  createdAt        DateTime @default(now())
+
+  // Relations
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([platform])
+  @@index([generatedAt])
+  @@map("network_value_insights")
 }

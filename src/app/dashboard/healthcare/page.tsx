@@ -33,22 +33,22 @@ const HealthcareDashboard = () => {
     const fetchHealthData = async () => {
       try {
         setLoading(true);
-        
-        // Mock API calls
-        const scoreData = await fetchHealthScoreHistory();
-        const vitalsData = await fetchVitalSigns();
-        const activityData = await fetchActivityData();
-        const sleepData = await fetchSleepData();
-        const appointmentsData = await fetchUpcomingAppointments();
-        const medicationData = await fetchMedicationAdherence();
-        
+
+        // Call real API endpoint
+        const response = await fetch('/api/healthcare');
+        if (!response.ok) {
+          throw new Error('Failed to fetch healthcare data');
+        }
+
+        const data = await response.json();
+
         setHealthData({
-          healthScoreHistory: scoreData,
-          vitalSigns: vitalsData,
-          activityData,
-          sleepData,
-          upcomingAppointments: appointmentsData,
-          medicationAdherence: medicationData
+          healthScoreHistory: data.healthScoreHistory,
+          vitalSigns: data.vitalSigns,
+          activityData: data.activityData,
+          sleepData: data.sleepData,
+          upcomingAppointments: data.upcomingAppointments,
+          medicationAdherence: data.medicationAdherence
         });
         setLoading(false);
       } catch (err) {
@@ -56,135 +56,13 @@ const HealthcareDashboard = () => {
         setLoading(false);
       }
     };
-    
+
     fetchHealthData();
   }, []);
 
-  // Mock data fetching functions
-  const fetchHealthScoreHistory = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const data = [];
-    const today = new Date();
-    
-    for (let i = 30; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(today.getDate() - i);
-      
-      // Generate some realistic health score fluctuations (70-85 range)
-      const baseScore = 75;
-      const variation = Math.sin(i / 5) * 5;
-      const improvement = i > 15 ? 0 : (15 - i) / 3; // Gradual improvement in recent days
-      
-      data.push({
-        date: date.toISOString().split('T')[0],
-        score: Math.round(baseScore + variation + improvement)
-      });
-    }
-    
-    return data;
-  };
-  
-  const fetchVitalSigns = async () => {
-    await new Promise(resolve => setTimeout(resolve, 450));
-    return {
-      bloodPressure: { systolic: 125, diastolic: 82, date: '2025-05-28' },
-      heartRate: { value: 68, date: '2025-05-28' },
-      weight: { value: 165.5, date: '2025-05-28' }
-    };
-  };
-  
-  const fetchActivityData = async () => {
-    await new Promise(resolve => setTimeout(resolve, 550));
-    const data = [];
-    const today = new Date();
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(today.getDate() - i);
-      
-      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-      const isWeekend = [0, 6].includes(date.getDay());
-      
-      // More steps on weekends, random variation on weekdays
-      const baseSteps = isWeekend ? 9000 : 7000;
-      const stepsVariation = Math.random() * 2000 - 1000;
-      
-      // More active minutes on weekends
-      const baseActiveMinutes = isWeekend ? 45 : 30;
-      const activeVariation = Math.random() * 20 - 10;
-      
-      data.push({
-        day: dayName,
-        steps: Math.round(baseSteps + stepsVariation),
-        activeMinutes: Math.round(baseActiveMinutes + activeVariation)
-      });
-    }
-    
-    return data;
-  };
-  
-  const fetchSleepData = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const data = [];
-    const today = new Date();
-    
-    for (let i = 6; i >= 0; i--) {
-      const date = new Date();
-      date.setDate(today.getDate() - i);
-      
-      const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-      const isWeekend = [0, 6].includes(date.getDay());
-      
-      // More sleep on weekends, less on weekdays
-      const baseSleep = isWeekend ? 8 : 7;
-      const sleepVariation = Math.random() * 1.5 - 0.75;
-      
-      data.push({
-        day: dayName,
-        hours: Math.round((baseSleep + sleepVariation) * 10) / 10,
-        quality: Math.round(Math.random() * 30 + 60) // Sleep quality 60-90
-      });
-    }
-    
-    return data;
-  };
-  
-  const fetchUpcomingAppointments = async () => {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    return [
-      { id: 'apt1', doctor: 'Dr. Smith', specialty: 'Primary Care', date: '2025-06-15', time: '10:30 AM' },
-      { id: 'apt2', doctor: 'Dr. Johnson', specialty: 'Dermatology', date: '2025-07-03', time: '2:15 PM' },
-      { id: 'apt3', doctor: 'Dr. Williams', specialty: 'Dentist', date: '2025-06-28', time: '9:00 AM' },
-    ];
-  };
-  
-  const fetchMedicationAdherence = async () => {
-    await new Promise(resolve => setTimeout(resolve, 450));
-    return {
-      adherence: 85,
-      medications: [
-        { name: 'Vitamin D', adherence: 95 },
-        { name: 'Allergy Medication', adherence: 85 },
-        { name: 'Multivitamin', adherence: 75 }
-      ]
-    };
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-xl font-semibold">Loading health data...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-xl font-semibold text-red-500">{error}</div>
-      </div>
-    );
-  }
+  const hasHealthData = healthData.healthScoreHistory.length > 0 ||
+                        healthData.upcomingAppointments.length > 0 ||
+                        healthData.activityData.length > 0;
 
   return (
     <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
@@ -212,18 +90,43 @@ const HealthcareDashboard = () => {
                   fill="none"
                   stroke="#ef4444"
                   strokeWidth="3"
-                  strokeDasharray="78, 100"
+                  strokeDasharray={`${healthData.healthScoreHistory.length > 0 ? healthData.healthScoreHistory[healthData.healthScoreHistory.length - 1].score : 0}, 100`}
                 />
-                <text x="18" y="20.35" className="text-xs" textAnchor="middle" fill="#ef4444" fontWeight="bold">78</text>
+                <text x="18" y="20.35" className="text-xs" textAnchor="middle" fill="#ef4444" fontWeight="bold">
+                  {healthData.healthScoreHistory.length > 0 ? healthData.healthScoreHistory[healthData.healthScoreHistory.length - 1].score : 0}
+                </text>
               </svg>
             </div>
             <div className="ml-4">
-              <div className="text-3xl font-bold text-red-600 dark:text-red-500">78</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">Good</div>
+              <div className="text-3xl font-bold text-red-600 dark:text-red-500">
+                {healthData.healthScoreHistory.length > 0 ? healthData.healthScoreHistory[healthData.healthScoreHistory.length - 1].score : 0}
+              </div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {(() => {
+                  const score = healthData.healthScoreHistory.length > 0 ? healthData.healthScoreHistory[healthData.healthScoreHistory.length - 1].score : 0;
+                  if (score >= 80) return 'Excellent';
+                  if (score >= 70) return 'Good';
+                  if (score >= 60) return 'Fair';
+                  return 'Needs Attention';
+                })()}
+              </div>
             </div>
           </div>
           <div className="mt-2 text-sm text-green-600 dark:text-green-400">
-            ↑ 5% improvement this month
+            {(() => {
+              if (healthData.healthScoreHistory.length < 2) return 'Add more data to track progress';
+              const currentScore = healthData.healthScoreHistory[healthData.healthScoreHistory.length - 1].score;
+              const previousScore = healthData.healthScoreHistory[Math.max(0, healthData.healthScoreHistory.length - 8)].score;
+              const change = currentScore - previousScore;
+              const percentChange = previousScore > 0 ? Math.round((change / previousScore) * 100) : 0;
+
+              if (change > 0) {
+                return `↑ ${percentChange}% improvement this month`;
+              } else if (change < 0) {
+                return `↓ ${Math.abs(percentChange)}% decrease this month`;
+              }
+              return 'No change this month';
+            })()}
           </div>
         </div>
         
@@ -294,55 +197,81 @@ const HealthcareDashboard = () => {
         {/* Health score trend */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Health Score Trend</h2>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={healthData.healthScoreHistory}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="date" 
-                  tickFormatter={(dateStr) => {
-                    const date = new Date(dateStr);
-                    return `${date.getMonth() + 1}/${date.getDate()}`;
-                  }}
-                  interval={6}
-                />
-                <YAxis domain={[60, 90]} />
-                <Tooltip 
-                  formatter={(value) => [`${value}`, 'Health Score']}
-                  labelFormatter={(dateStr) => {
-                    const date = new Date(dateStr);
-                    return date.toLocaleDateString();
-                  }}
-                />
-                <Line type="monotone" dataKey="score" stroke="#ef4444" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {healthData.healthScoreHistory.length > 0 ? (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={healthData.healthScoreHistory}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(dateStr) => {
+                      const date = new Date(dateStr);
+                      return `${date.getMonth() + 1}/${date.getDate()}`;
+                    }}
+                    interval={6}
+                  />
+                  <YAxis domain={[60, 90]} />
+                  <Tooltip
+                    formatter={(value) => [`${value}`, 'Health Score']}
+                    labelFormatter={(dateStr) => {
+                      const date = new Date(dateStr);
+                      return date.toLocaleDateString();
+                    }}
+                  />
+                  <Line type="monotone" dataKey="score" stroke="#ef4444" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-80 text-center">
+              <div className="text-6xl mb-4">📈</div>
+              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Health Score Data</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Start tracking your health metrics to see your score trend over time
+              </p>
+              <button className="px-6 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg transition-colors">
+                Add Health Data
+              </button>
+            </div>
+          )}
         </div>
         
         {/* Activity data */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Weekly Activity</h2>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={healthData.activityData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis yAxisId="left" orientation="left" stroke="#ef4444" />
-                <YAxis yAxisId="right" orientation="right" stroke="#3b82f6" />
-                <Tooltip />
-                <Legend />
-                <Bar yAxisId="left" dataKey="steps" name="Steps" fill="#ef4444" />
-                <Bar yAxisId="right" dataKey="activeMinutes" name="Active Minutes" fill="#3b82f6" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {healthData.activityData.length > 0 ? (
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={healthData.activityData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" />
+                  <YAxis yAxisId="left" orientation="left" stroke="#ef4444" />
+                  <YAxis yAxisId="right" orientation="right" stroke="#3b82f6" />
+                  <Tooltip />
+                  <Legend />
+                  <Bar yAxisId="left" dataKey="steps" name="Steps" fill="#ef4444" />
+                  <Bar yAxisId="right" dataKey="activeMinutes" name="Active Minutes" fill="#3b82f6" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-80 text-center">
+              <div className="text-6xl mb-4">🏃</div>
+              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Activity Data</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Connect a fitness tracker or manually log your activity
+              </p>
+              <button className="px-6 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg transition-colors">
+                Connect Device
+              </button>
+            </div>
+          )}
         </div>
       </div>
       
@@ -350,51 +279,77 @@ const HealthcareDashboard = () => {
         {/* Sleep data */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Sleep Quality</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={healthData.sleepData}
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="day" />
-                <YAxis yAxisId="left" orientation="left" stroke="#8b5cf6" />
-                <YAxis yAxisId="right" orientation="right" stroke="#14b8a6" domain={[0, 100]} />
-                <Tooltip />
-                <Legend />
-                <Line yAxisId="left" type="monotone" dataKey="hours" name="Sleep Hours" stroke="#8b5cf6" strokeWidth={2} />
-                <Line yAxisId="right" type="monotone" dataKey="quality" name="Sleep Quality %" stroke="#14b8a6" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {healthData.sleepData.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={healthData.sleepData}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="day" />
+                  <YAxis yAxisId="left" orientation="left" stroke="#8b5cf6" />
+                  <YAxis yAxisId="right" orientation="right" stroke="#14b8a6" domain={[0, 100]} />
+                  <Tooltip />
+                  <Legend />
+                  <Line yAxisId="left" type="monotone" dataKey="hours" name="Sleep Hours" stroke="#8b5cf6" strokeWidth={2} />
+                  <Line yAxisId="right" type="monotone" dataKey="quality" name="Sleep Quality %" stroke="#14b8a6" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <div className="text-6xl mb-4">😴</div>
+              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Sleep Data</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Track your sleep patterns for better health insights
+              </p>
+              <button className="px-6 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg transition-colors">
+                Log Sleep Data
+              </button>
+            </div>
+          )}
         </div>
         
         {/* Upcoming appointments */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Upcoming Appointments</h2>
-          <div className="space-y-4">
-            {healthData.upcomingAppointments.map((appointment) => (
-              <div key={appointment.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                <div className="flex justify-between">
-                  <div>
-                    <h3 className="font-medium text-gray-900 dark:text-white">{appointment.doctor}</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{appointment.specialty}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {new Date(appointment.date).toLocaleDateString()}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{appointment.time}</p>
+          {healthData.upcomingAppointments.length > 0 ? (
+            <div className="space-y-4">
+              {healthData.upcomingAppointments.map((appointment) => (
+                <div key={appointment.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="flex justify-between">
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-white">{appointment.doctor}</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{appointment.specialty}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-gray-900 dark:text-white">
+                        {new Date(appointment.date).toLocaleDateString()}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{appointment.time}</p>
+                    </div>
                   </div>
                 </div>
+              ))}
+              <div className="mt-4 text-center">
+                <button className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium">
+                  Schedule New Appointment
+                </button>
               </div>
-            ))}
-            <div className="mt-4 text-center">
-              <button className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium">
-                Schedule New Appointment
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="text-6xl mb-4">🏥</div>
+              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Upcoming Appointments</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Schedule your health checkups and specialist visits
+              </p>
+              <button className="px-6 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg transition-colors">
+                Schedule Appointment
               </button>
             </div>
-          </div>
+          )}
         </div>
       </div>
       
@@ -447,7 +402,7 @@ const HealthcareDashboard = () => {
           <div className="flex items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
             <DocumentIcon className="h-8 w-8 text-gray-400 dark:text-gray-500 mr-3" />
             <div>
-              <div className="text-sm font-medium text-gray-900 dark:text-white">8</div>
+              <div className="text-sm font-medium text-gray-900 dark:text-white">-</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">Stored Documents</div>
             </div>
           </div>
@@ -472,32 +427,130 @@ const HealthcareDashboard = () => {
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Health Insights</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400 p-4">
-            <div className="flex">
-              <div>
-                <p className="font-medium text-green-800 dark:text-green-200">Consistency</p>
-                <p className="text-sm text-green-700 dark:text-green-300 mt-1">Your daily step count has been consistent this week. Keep up the good work!</p>
-              </div>
-            </div>
-          </div>
+          {(() => {
+            const insights = [];
 
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4">
-            <div className="flex">
-              <div>
-                <p className="font-medium text-yellow-800 dark:text-yellow-200">Recommendation</p>
-                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">Consider adding 30 minutes of meditation to improve your sleep quality.</p>
-              </div>
-            </div>
-          </div>
+            // Activity consistency insight
+            if (healthData.activityData.length > 0) {
+              const avgSteps = healthData.activityData.reduce((sum, day) => sum + day.steps, 0) / healthData.activityData.length;
+              const variance = healthData.activityData.reduce((sum, day) => sum + Math.abs(day.steps - avgSteps), 0) / healthData.activityData.length;
+              const isConsistent = variance < avgSteps * 0.3;
 
-          <div className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 p-4">
-            <div className="flex">
-              <div>
-                <p className="font-medium text-blue-800 dark:text-blue-200">Reminder</p>
-                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">Your annual physical check-up is due next month. Schedule it soon.</p>
-              </div>
-            </div>
-          </div>
+              if (isConsistent && avgSteps > 5000) {
+                insights.push(
+                  <div key="activity" className="bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400 p-4">
+                    <div className="flex">
+                      <div>
+                        <p className="font-medium text-green-800 dark:text-green-200">Activity Consistency</p>
+                        <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+                          Your daily step count is consistent at {Math.round(avgSteps).toLocaleString()} steps. Keep up the good work!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              } else if (avgSteps < 5000) {
+                insights.push(
+                  <div key="activity" className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4">
+                    <div className="flex">
+                      <div>
+                        <p className="font-medium text-yellow-800 dark:text-yellow-200">Recommendation</p>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                          Try to increase your daily steps to at least 5,000. Small walks throughout the day can make a big difference!
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+            }
+
+            // Sleep quality insight
+            if (healthData.sleepData.length > 0) {
+              const avgSleep = healthData.sleepData.reduce((sum, night) => sum + night.hours, 0) / healthData.sleepData.length;
+              const avgQuality = healthData.sleepData.reduce((sum, night) => sum + night.quality, 0) / healthData.sleepData.length;
+
+              if (avgSleep < 7) {
+                insights.push(
+                  <div key="sleep" className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4">
+                    <div className="flex">
+                      <div>
+                        <p className="font-medium text-yellow-800 dark:text-yellow-200">Sleep Recommendation</p>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                          You're averaging {avgSleep.toFixed(1)} hours of sleep. Aim for 7-9 hours for optimal health.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              } else if (avgQuality < 70) {
+                insights.push(
+                  <div key="sleep" className="bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-yellow-400 p-4">
+                    <div className="flex">
+                      <div>
+                        <p className="font-medium text-yellow-800 dark:text-yellow-200">Sleep Quality</p>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                          Consider improving your sleep quality with a consistent bedtime routine or reducing screen time before bed.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+            }
+
+            // Appointments reminder
+            if (healthData.upcomingAppointments.length > 0) {
+              const nextAppt = healthData.upcomingAppointments[0];
+              const daysUntil = Math.ceil((new Date(nextAppt.date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+
+              if (daysUntil <= 7) {
+                insights.push(
+                  <div key="appointment" className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 p-4">
+                    <div className="flex">
+                      <div>
+                        <p className="font-medium text-blue-800 dark:text-blue-200">Upcoming Appointment</p>
+                        <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                          You have an appointment with {nextAppt.doctor} in {daysUntil} day{daysUntil !== 1 ? 's' : ''}.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+            } else {
+              insights.push(
+                <div key="appointment" className="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400 p-4">
+                  <div className="flex">
+                    <div>
+                      <p className="font-medium text-blue-800 dark:text-blue-200">Schedule Check-up</p>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        Don't forget to schedule your regular health check-up if it's been a while.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            // Fill with placeholder if we don't have enough insights
+            while (insights.length < 3) {
+              insights.push(
+                <div key={`placeholder-${insights.length}`} className="bg-gray-50 dark:bg-gray-700/50 border-l-4 border-gray-300 dark:border-gray-600 p-4">
+                  <div className="flex">
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-gray-200">Add More Data</p>
+                      <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                        Track more health metrics to receive personalized insights and recommendations.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            return insights.slice(0, 3);
+          })()}
         </div>
       </div>
     </div>

@@ -12,10 +12,11 @@ export const metadata: Metadata = {
 export default async function AuthErrorPage({
   searchParams,
 }: {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 }) {
   // Get the error message from the URL query
-  const errorMessage = getErrorMessage(searchParams.error);
+  const params = await searchParams;
+  const errorMessage = getErrorMessage(params.error);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 sm:px-6 lg:px-8">

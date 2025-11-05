@@ -11,82 +11,8 @@ import EventModal from '@/components/calendar/EventModal';
 import { CalendarEvent, CalendarSource } from '@/types/calendar';
 import { addDays, format, parse, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
 
-// Placeholder data for calendar sources
-const mockCalendarSources: CalendarSource[] = [
-  { id: '1', name: 'Personal', color: '#3b82f6', isEnabled: true },
-  { id: '2', name: 'Work', color: '#10b981', isEnabled: true },
-  { id: '3', name: 'Family', color: '#f59e0b', isEnabled: true },
-  { id: '4', name: 'Health', color: '#ef4444', isEnabled: true },
-  { id: '5', name: 'Finance', color: '#8b5cf6', isEnabled: true }
-];
-
-// Mock events generator
-const generateMockEvents = (): CalendarEvent[] => {
-  const today = new Date();
-  const startOfMonthDate = startOfMonth(today);
-  const endOfMonthDate = endOfMonth(today);
-  const startDate = startOfWeek(startOfMonthDate);
-  const endDate = endOfWeek(endOfMonthDate);
-  
-  const events: CalendarEvent[] = [];
-  const eventTypes = [
-    { title: 'Meet with Financial Advisor', calendar: 'Finance', duration: 60 },
-    { title: 'Doctor Appointment', calendar: 'Health', duration: 45 },
-    { title: 'Team Meeting', calendar: 'Work', duration: 60 },
-    { title: 'Weekly Planning', calendar: 'Personal', duration: 30 },
-    { title: 'Family Dinner', calendar: 'Family', duration: 120 },
-    { title: 'Budget Review', calendar: 'Finance', duration: 45 },
-    { title: 'Workout', calendar: 'Health', duration: 60 },
-    { title: 'Project Deadline', calendar: 'Work', duration: 0 },
-    { title: 'Grocery Shopping', calendar: 'Personal', duration: 60 },
-    { title: 'Kids School Event', calendar: 'Family', duration: 90 }
-  ];
-  
-  // Calendar source lookup for colors
-  const calendarSourceMap = mockCalendarSources.reduce((acc, source) => {
-    acc[source.name] = source;
-    return acc;
-  }, {} as Record<string, CalendarSource>);
-  
-  // Generate 50 random events across the current month view
-  for (let i = 0; i < 50; i++) {
-    const eventType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
-    const daysToAdd = Math.floor(Math.random() * 35); // Events across ~5 weeks
-    const startHour = 8 + Math.floor(Math.random() * 10); // Events between 8am and 6pm
-    const startMinute = Math.random() < 0.5 ? 0 : 30; // Start on hour or half hour
-    
-    const eventDate = addDays(startDate, daysToAdd);
-    
-    // Set event time
-    eventDate.setHours(startHour);
-    eventDate.setMinutes(startMinute);
-    eventDate.setSeconds(0);
-    eventDate.setMilliseconds(0);
-    
-    // Create end time based on duration
-    const endDate = new Date(eventDate);
-    endDate.setMinutes(endDate.getMinutes() + eventType.duration);
-    
-    // Assign a calendar source
-    const calendarSource = calendarSourceMap[eventType.calendar];
-    
-    events.push({
-      id: `event-${i}`,
-      title: eventType.title,
-      start: eventDate.toISOString(),
-      end: endDate.toISOString(),
-      allDay: eventType.duration === 0,
-      calendarId: calendarSource.id,
-      color: calendarSource.color,
-      description: `This is a mock ${eventType.calendar.toLowerCase()} event.`,
-      location: eventType.calendar === 'Work' ? 'Office' : 
-                eventType.calendar === 'Health' ? 'Health Center' : 
-                eventType.calendar === 'Family' ? 'Home' : ''
-    });
-  }
-  
-  return events;
-};
+// Calendar sources will be fetched from API - empty for now
+const emptyCalendarSources: CalendarSource[] = [];
 
 // ViewType type definition
 type ViewType = 'month' | 'week' | 'day';
@@ -94,14 +20,29 @@ type ViewType = 'month' | 'week' | 'day';
 export default function CalendarPage() {
   const [viewType, setViewType] = useState<ViewType>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [calendarSources, setCalendarSources] = useState<CalendarSource[]>(mockCalendarSources);
+  const [calendarSources, setCalendarSources] = useState<CalendarSource[]>(emptyCalendarSources);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showEventModal, setShowEventModal] = useState(false);
   
-  // Generate mock events on component mount
+  // Fetch events from API on component mount
   useEffect(() => {
-    setEvents(generateMockEvents());
+    const fetchEvents = async () => {
+      try {
+        // TODO: Implement API endpoint for fetching calendar events
+        // const response = await fetch('/api/calendar/events');
+        // const data = await response.json();
+        // setEvents(data);
+
+        // For now, set empty array - will be populated when users create events
+        setEvents([]);
+      } catch (error) {
+        console.error('Error fetching calendar events:', error);
+        setEvents([]);
+      }
+    };
+
+    fetchEvents();
   }, []);
   
   // Filter events based on enabled calendar sources

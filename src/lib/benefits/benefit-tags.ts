@@ -382,29 +382,30 @@ export function getBenefitById(id: string): BenefitTag | undefined {
 }
 
 /**
- * Category colors for UI
+ * Category colors for UI with dark mode support
+ * Using higher contrast colors that work in both light and dark modes
  */
 export const CATEGORY_COLORS: Record<BenefitCategory, string> = {
-  security: 'bg-blue-100 border-blue-300 text-blue-900',
-  growth: 'bg-green-100 border-green-300 text-green-900',
-  impact: 'bg-purple-100 border-purple-300 text-purple-900',
-  control: 'bg-orange-100 border-orange-300 text-orange-900',
-  achievement: 'bg-yellow-100 border-yellow-300 text-yellow-900',
-  purpose: 'bg-indigo-100 border-indigo-300 text-indigo-900',
-  flexibility: 'bg-teal-100 border-teal-300 text-teal-900',
-  prevention: 'bg-red-100 border-red-300 text-red-900',
-  management: 'bg-gray-100 border-gray-300 text-gray-900',
-  lifestyle: 'bg-pink-100 border-pink-300 text-pink-900',
-  access: 'bg-cyan-100 border-cyan-300 text-cyan-900'
+  security: 'bg-blue-50 dark:bg-blue-900/30 border-blue-400 dark:border-blue-600 text-blue-800 dark:text-blue-100',
+  growth: 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-400 dark:border-emerald-600 text-emerald-800 dark:text-emerald-100',
+  impact: 'bg-purple-50 dark:bg-purple-900/30 border-purple-400 dark:border-purple-600 text-purple-800 dark:text-purple-100',
+  control: 'bg-orange-50 dark:bg-orange-900/30 border-orange-400 dark:border-orange-600 text-orange-800 dark:text-orange-100',
+  achievement: 'bg-amber-50 dark:bg-amber-900/30 border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-100',
+  purpose: 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-400 dark:border-indigo-600 text-indigo-800 dark:text-indigo-100',
+  flexibility: 'bg-teal-50 dark:bg-teal-900/30 border-teal-400 dark:border-teal-600 text-teal-800 dark:text-teal-100',
+  prevention: 'bg-rose-50 dark:bg-rose-900/30 border-rose-400 dark:border-rose-600 text-rose-800 dark:text-rose-100',
+  management: 'bg-slate-50 dark:bg-slate-900/30 border-slate-400 dark:border-slate-600 text-slate-800 dark:text-slate-100',
+  lifestyle: 'bg-pink-50 dark:bg-pink-900/30 border-pink-400 dark:border-pink-600 text-pink-800 dark:text-pink-100',
+  access: 'bg-cyan-50 dark:bg-cyan-900/30 border-cyan-400 dark:border-cyan-600 text-cyan-800 dark:text-cyan-100'
 };
 
 /**
- * Domain colors for UI
+ * Domain colors for UI with dark mode support
  */
 export const DOMAIN_COLORS: Record<Domain, string> = {
-  financial: 'bg-green-500',
-  career: 'bg-blue-500',
-  health: 'bg-red-500',
-  education: 'bg-purple-500',
-  lifestyle: 'bg-yellow-500'
+  financial: 'bg-emerald-500 dark:bg-emerald-600',
+  career: 'bg-blue-500 dark:bg-blue-600',
+  health: 'bg-rose-500 dark:bg-rose-600',
+  education: 'bg-purple-500 dark:bg-purple-600',
+  lifestyle: 'bg-amber-500 dark:bg-amber-600'
 };

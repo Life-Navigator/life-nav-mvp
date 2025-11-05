@@ -95,6 +95,16 @@ function ChartBarIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function TargetIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="10"></circle>
+      <circle cx="12" cy="12" r="6"></circle>
+      <circle cx="12" cy="12" r="2"></circle>
+    </svg>
+  );
+}
+
 function PuzzlePieceIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -173,27 +183,14 @@ function EmailIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-// Mock email accounts data for the dropdown
-const emailAccounts = [
-  {
-    id: '1',
-    provider: 'Gmail',
-    email: 'thomas.riffe@gmail.com',
-    unread: 5,
-  },
-  {
-    id: '2',
-    provider: 'Outlook',
-    email: 'thomas.riffe@outlook.com',
-    unread: 2,
-  },
-  {
-    id: '3',
-    provider: 'Work',
-    email: 'thomas.riffe@company.com',
-    unread: 8,
-  }
-];
+// Email accounts will be fetched from API
+// For now, empty array - will be populated when email integration is connected
+const emailAccounts: Array<{
+  id: string;
+  provider: string;
+  email: string;
+  unread: number;
+}> = [];
 
 // Navigation items with sections and child items
 const navigation = [
@@ -201,6 +198,12 @@ const navigation = [
     name: 'Dashboard',
     href: '/dashboard',
     icon: HomeIcon,
+    current: false
+  },
+  {
+    name: 'Goals & Assessment',
+    href: '/dashboard/goals',
+    icon: TargetIcon,
     current: false
   },
   {
@@ -553,48 +556,65 @@ export default function Sidebar() {
 
                 {/* Email accounts dropdown */}
                 {item.hasDropdown && isHovered && (!isCollapsed || isMobile) && (
-                  <div 
+                  <div
                     className="absolute left-full top-0 ml-2 bg-white dark:bg-gray-800 shadow-lg rounded-md p-2 min-w-48 z-50 border border-gray-200 dark:border-gray-700"
                     onMouseEnter={() => handleMouseEnter(item.name)}
                     onMouseLeave={handleMouseLeave}
                   >
                     <div className="py-1 text-sm">
                       <div className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
-                        Connected Accounts
+                        Email Accounts
                       </div>
                       <div className="mt-1 space-y-1">
-                        {emailAccounts.map((account) => (
-                          <div 
-                            key={account.id}
-                            className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer flex items-center justify-between"
-                          >
-                            <div className="flex items-center">
-                              <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                              <span>{account.email.split('@')[0]}</span>
+                        {emailAccounts.length > 0 ? (
+                          emailAccounts.map((account) => (
+                            <div
+                              key={account.id}
+                              className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer flex items-center justify-between"
+                            >
+                              <div className="flex items-center">
+                                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                                <span>{account.email.split('@')[0]}</span>
+                              </div>
+                              {account.unread > 0 && (
+                                <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                  {account.unread}
+                                </span>
+                              )}
                             </div>
-                            {account.unread > 0 && (
-                              <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                {account.unread}
-                              </span>
-                            )}
+                          ))
+                        ) : (
+                          <div className="px-3 py-3 text-center text-gray-500 dark:text-gray-400 text-xs">
+                            <p>No email accounts connected</p>
+                            <Link
+                              href="/dashboard/integrations"
+                              className="mt-2 inline-block px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                              onClick={() => setIsOpen(false)}
+                            >
+                              Connect Account
+                            </Link>
                           </div>
-                        ))}
+                        )}
                       </div>
-                      <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
-                      <Link
-                        href="/email"
-                        className="block px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                        onClick={() => setIsOpen(false)}
-                      >
-                        Open Email App
-                      </Link>
+                      {emailAccounts.length > 0 && (
+                        <>
+                          <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                          <Link
+                            href="/email"
+                            className="block px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                            onClick={() => setIsOpen(false)}
+                          >
+                            Open Email App
+                          </Link>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
 
                 {/* Collapsed mode dropdown tooltip */}
                 {item.hasDropdown && isHovered && isCollapsed && !isMobile && (
-                  <div 
+                  <div
                     className="absolute left-full top-0 ml-2 bg-white dark:bg-gray-800 shadow-lg rounded-md p-2 min-w-48 z-50 border border-gray-200 dark:border-gray-700"
                     onMouseEnter={() => handleMouseEnter(item.name)}
                     onMouseLeave={handleMouseLeave}
@@ -606,30 +626,45 @@ export default function Sidebar() {
                       <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                       {item.hasDropdown && item.dropdownContent && (
                         <div className="mt-1 space-y-1">
-                          {emailAccounts.map((account) => (
-                            <div 
-                              key={account.id}
-                              className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer flex items-center justify-between"
-                            >
-                              <div className="flex items-center">
-                                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                                <span className="text-sm">{account.email.split('@')[0]}</span>
-                              </div>
-                              {account.unread > 0 && (
-                                <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                  {account.unread}
-                                </span>
-                              )}
+                          {emailAccounts.length > 0 ? (
+                            <>
+                              {emailAccounts.map((account) => (
+                                <div
+                                  key={account.id}
+                                  className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer flex items-center justify-between"
+                                >
+                                  <div className="flex items-center">
+                                    <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                                    <span className="text-sm">{account.email.split('@')[0]}</span>
+                                  </div>
+                                  {account.unread > 0 && (
+                                    <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                      {account.unread}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                              <Link
+                                href="/email"
+                                className="block px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-sm"
+                                onClick={() => setIsOpen(false)}
+                              >
+                                Open Email App
+                              </Link>
+                            </>
+                          ) : (
+                            <div className="px-3 py-3 text-center text-gray-500 dark:text-gray-400 text-xs">
+                              <p>No email accounts connected</p>
+                              <Link
+                                href="/dashboard/integrations"
+                                className="mt-2 inline-block px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
+                                onClick={() => setIsOpen(false)}
+                              >
+                                Connect Account
+                              </Link>
                             </div>
-                          ))}
-                          <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-                          <Link
-                            href="/email"
-                            className="block px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-sm"
-                            onClick={() => setIsOpen(false)}
-                          >
-                            Open Email App
-                          </Link>
+                          )}
                         </div>
                       )}
                     </div>

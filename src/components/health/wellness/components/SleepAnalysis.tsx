@@ -1,67 +1,100 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/cards/Card';
+import Link from 'next/link';
 import format from 'date-fns/format';
 import subDays from 'date-fns/subDays';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
   BarChart,
   Bar
 } from 'recharts';
-// import { useSleep } from '@/hooks/useHealth';
 import { Button } from '@/components/ui/buttons/Button';
 
-// Mock data for sleep tracking
-const generateWeeklySleepData = () => {
-  const data = [];
-  const today = new Date();
-  
-  for (let i = 6; i >= 0; i--) {
-    const date = subDays(today, i);
-    const formattedDate = format(date, 'E');
-    
-    // Generate random sleep data between 5-9 hours
-    const totalSleep = Math.round((5 + Math.random() * 4) * 10) / 10;
-    const deepSleep = Math.round((totalSleep * (0.15 + Math.random() * 0.15)) * 10) / 10;
-    const remSleep = Math.round((totalSleep * (0.2 + Math.random() * 0.15)) * 10) / 10;
-    const lightSleep = Math.round((totalSleep - deepSleep - remSleep) * 10) / 10;
-    
-    data.push({
-      date: formattedDate,
-      fullDate: format(date, 'MMM dd'),
-      total: totalSleep,
-      deep: deepSleep,
-      rem: remSleep,
-      light: lightSleep,
-      score: Math.round(60 + Math.random() * 40) // Sleep score between 60-100
-    });
-  }
-  
-  return data;
-};
-
-const mockSleepData = {
-  weeklySleep: generateWeeklySleepData(),
+interface SleepData {
+  weeklySleep: Array<{
+    date: string;
+    fullDate: string;
+    total: number;
+    deep: number;
+    rem: number;
+    light: number;
+    score: number;
+  }>;
   today: {
-    bedtime: '23:30',
-    wakeTime: '07:15',
-    timeInBed: 7.75,
-    timeAsleep: 7.1,
-    timesWokenUp: 2,
-    sleepScore: 82
-  }
-};
+    bedtime: string;
+    wakeTime: string;
+    timeInBed: number;
+    timeAsleep: number;
+    timesWokenUp: number;
+    sleepScore: number;
+  };
+}
 
 export default function SleepAnalysis() {
-  const [data, setData] = useState(mockSleepData);
+  const [data, setData] = useState<SleepData | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState('week');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchSleepData = async () => {
+      try {
+        // TODO: Implement API endpoint for fetching sleep data
+        // const response = await fetch('/api/wellness/sleep');
+        // const sleepData = await response.json();
+        // setData(sleepData);
+
+        // For now, set null - will be populated when users connect sleep tracking devices
+        setData(null);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching sleep data:', error);
+        setData(null);
+        setLoading(false);
+      }
+    };
+
+    fetchSleepData();
+  }, []);
+
+  if (loading) {
+    return (
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Sleep Analysis</h2>
+        <p className="text-gray-500 dark:text-gray-400">Loading sleep data...</p>
+      </Card>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Sleep Analysis</h2>
+        <div className="text-center py-8">
+          <div className="text-4xl mb-4">😴</div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            No Sleep Data Connected
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Connect your sleep tracker or smartwatch to automatically monitor your sleep quality and patterns.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Link href="/dashboard/integrations">
+              <Button variant="default">Connect Device</Button>
+            </Link>
+            <Button variant="outline">Log Sleep Manually</Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
   
   // Calculate averages
   const averageSleep = data.weeklySleep.reduce((sum, day) => sum + day.total, 0) / data.weeklySleep.length;

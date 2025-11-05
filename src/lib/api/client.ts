@@ -3,7 +3,7 @@
  */
 'use client';
 
-import { useCsrf } from '@/components/ui/csrf-provider';
+import { getCsrfToken } from 'next-auth/react';
 
 type FetchOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -15,7 +15,7 @@ type FetchOptions = {
 
 export class ApiError extends Error {
   status: number;
-  
+
   constructor(message: string, status: number) {
     super(message);
     this.name = 'ApiError';
@@ -41,7 +41,7 @@ async function fetchAPI<T = any>(
   } = options;
 
   const requestHeaders = { ...defaultHeaders, ...headers };
-  
+
   // Add CSRF token header for mutation requests
   if (csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
     requestHeaders['x-csrf-token'] = csrfToken;
@@ -82,23 +82,29 @@ async function fetchAPI<T = any>(
 
 // Client-side API client
 export function useApiClient() {
-  const { csrfToken } = useCsrf();
-  
   return {
     get: <T = any>(endpoint: string, options: Omit<FetchOptions, 'method' | 'body'> = {}) =>
-      fetchAPI<T>(endpoint, { ...options, method: 'GET' }, csrfToken),
-      
-    post: <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) =>
-      fetchAPI<T>(endpoint, { ...options, method: 'POST', body: data }, csrfToken),
-      
-    put: <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) =>
-      fetchAPI<T>(endpoint, { ...options, method: 'PUT', body: data }, csrfToken),
-      
-    patch: <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) =>
-      fetchAPI<T>(endpoint, { ...options, method: 'PATCH', body: data }, csrfToken),
-      
-    delete: <T = any>(endpoint: string, options: Omit<FetchOptions, 'method'> = {}) =>
-      fetchAPI<T>(endpoint, { ...options, method: 'DELETE' }, csrfToken),
+      fetchAPI<T>(endpoint, { ...options, method: 'GET' }),
+
+    post: async <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) => {
+      const csrfToken = await getCsrfToken();
+      return fetchAPI<T>(endpoint, { ...options, method: 'POST', body: data }, csrfToken);
+    },
+
+    put: async <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) => {
+      const csrfToken = await getCsrfToken();
+      return fetchAPI<T>(endpoint, { ...options, method: 'PUT', body: data }, csrfToken);
+    },
+
+    patch: async <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) => {
+      const csrfToken = await getCsrfToken();
+      return fetchAPI<T>(endpoint, { ...options, method: 'PATCH', body: data }, csrfToken);
+    },
+
+    delete: async <T = any>(endpoint: string, options: Omit<FetchOptions, 'method'> = {}) => {
+      const csrfToken = await getCsrfToken();
+      return fetchAPI<T>(endpoint, { ...options, method: 'DELETE' }, csrfToken);
+    },
   };
 }
 

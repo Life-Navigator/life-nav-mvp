@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, FC } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
+import { signOut } from 'next-auth/react';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { DirectThemeToggle } from '@/components/theme/DirectThemeToggle';
 
@@ -310,6 +311,7 @@ const Header: FC = () => {
                     </Link>
                     <button
                       type="button"
+                      onClick={() => signOut({ callbackUrl: '/auth/login' })}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       Sign out

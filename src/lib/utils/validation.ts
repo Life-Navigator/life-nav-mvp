@@ -52,6 +52,19 @@ export function validate<T extends Record<string, any>>(
 }
 
 /**
+ * Safely parse JSON from a request body
+ * Throws ValidationError if JSON is invalid
+ */
+export async function safeParseJSON<T = any>(request: Request): Promise<T> {
+  try {
+    const data = await request.json() as T;
+    return data;
+  } catch (error) {
+    throw new ValidationError('Invalid JSON in request body');
+  }
+}
+
+/**
  * Parse and validate a request body
  * Throws ValidationError if validation fails
  */
@@ -59,20 +72,14 @@ export async function validateRequestBody<T extends Record<string, any>>(
   request: Request,
   schema: ValidationSchema<T>
 ): Promise<T> {
-  let data: T;
-  
-  try {
-    data = await request.json() as T;
-  } catch (error) {
-    throw new ValidationError('Invalid JSON in request body');
-  }
-  
+  const data = await safeParseJSON<T>(request);
+
   const validationResult = validate(data, schema);
-  
+
   if (!validationResult.valid) {
     throw new ValidationError('Validation failed', validationResult.errors);
   }
-  
+
   return data;
 }
 

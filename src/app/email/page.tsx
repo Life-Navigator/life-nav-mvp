@@ -16,36 +16,24 @@ export default function EmailPage() {
   const [activeFolder, setActiveFolder] = useState('inbox');
   
   const { services, loading: servicesLoading } = useConnectedServices('email');
-  
-  const emailAccounts = [
-    {
-      id: '1',
-      provider: 'Gmail',
-      email: 'thomas.riffe@gmail.com',
-      connected: true,
-      lastSync: 'Just now',
-      unread: 5,
-      folders: ['inbox', 'sent', 'drafts', 'trash', 'spam', 'important']
-    },
-    {
-      id: '2',
-      provider: 'Outlook',
-      email: 'thomas.riffe@outlook.com',
-      connected: true,
-      lastSync: '5 minutes ago',
-      unread: 2,
-      folders: ['inbox', 'sent', 'drafts', 'trash', 'junk', 'archive']
-    },
-    {
-      id: '3',
-      provider: 'Work',
-      email: 'thomas.riffe@company.com',
-      connected: true,
-      lastSync: '10 minutes ago',
-      unread: 8,
-      folders: ['inbox', 'sent', 'drafts', 'trash', 'spam', 'work', 'projects']
-    }
-  ];
+  const [emailAccounts, setEmailAccounts] = useState<any[]>([]);
+
+  // Fetch email accounts from API
+  useEffect(() => {
+    const fetchEmailAccounts = async () => {
+      try {
+        // TODO: Implement API endpoint for fetching connected email accounts
+        // const response = await fetch('/api/email/accounts');
+        // const data = await response.json();
+        // setEmailAccounts(data);
+        setEmailAccounts([]); // Empty for now - will be populated when users connect accounts
+      } catch (error) {
+        console.error('Error fetching email accounts:', error);
+        setEmailAccounts([]);
+      }
+    };
+    fetchEmailAccounts();
+  }, []);
 
   // Set the first account as active if none is selected
   useEffect(() => {

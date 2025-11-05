@@ -73,7 +73,7 @@ const DraggableBenefitTag: React.FC<{
       {...listeners}
       className={`
         relative cursor-move select-none
-        bg-white rounded-lg p-4 shadow-md border-2
+        rounded-lg p-4 shadow-md border-2
         transition-all duration-200
         ${isDragging ? 'scale-105 shadow-xl z-50' : 'hover:scale-102 hover:shadow-lg'}
         ${CATEGORY_COLORS[tag.category]}
@@ -83,7 +83,7 @@ const DraggableBenefitTag: React.FC<{
         <div className="text-2xl flex-shrink-0">{tag.emoji}</div>
         <div className="flex-1">
           <h3 className="font-semibold text-sm mb-1">{tag.title}</h3>
-          <p className="text-xs opacity-90">{tag.description}</p>
+          <p className="text-xs opacity-80">{tag.description}</p>
         </div>
       </div>
     </div>
@@ -115,12 +115,12 @@ const DropZone: React.FC<{
       ref={setNodeRef}
       className={`
         ${color} rounded-lg p-4 border-2 border-dashed min-h-[200px] transition-all
-        ${isOver ? 'border-blue-500 bg-blue-50 scale-102' : ''}
-        ${isHighlighted ? 'ring-2 ring-blue-400 ring-offset-2' : ''}
+        ${isOver ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/20 scale-102' : ''}
+        ${isHighlighted ? 'ring-2 ring-blue-400 dark:ring-blue-500 ring-offset-2 dark:ring-offset-slate-900' : ''}
       `}
     >
-      <h3 className="font-semibold text-gray-800 mb-1">{title}</h3>
-      <p className="text-sm text-gray-600 mb-4">{subtitle}</p>
+      <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-1">{title}</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{subtitle}</p>
       
       <div className="space-y-2">
         <SortableContext
@@ -134,12 +134,12 @@ const DropZone: React.FC<{
       </div>
       
       {tags.length === 0 && (
-        <div className="text-center py-8 text-gray-400">
+        <div className="text-center py-8 text-gray-400 dark:text-gray-500">
           <p className="text-sm">Drag benefits here</p>
         </div>
       )}
-      
-      <div className="text-xs text-gray-500 mt-4">
+
+      <div className="text-xs text-gray-500 dark:text-gray-400 mt-4">
         {tags.length}/{maxItems} items
       </div>
     </div>
@@ -256,20 +256,20 @@ export const BenefitsDiscovery: React.FC<BenefitsDiscoveryProps> = ({
   const activeTag = activeId ? getBenefitById(activeId) : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-8"
         >
-          <h1 className="text-4xl font-bold text-slate-900 mb-4">
+          <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100 mb-4">
             {domain === 'financial' ? '💰' : domain === 'career' ? '💼' : '🏥'} {' '}
             {domain.charAt(0).toUpperCase() + domain.slice(1)} Motivations Discovery
           </h1>
-          <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-            Drag the motivations that resonate most with YOU into priority order. 
+          <p className="text-xl text-slate-600 dark:text-slate-300 max-w-3xl mx-auto">
+            Drag the motivations that resonate most with YOU into priority order.
             Don't think about what sounds "responsible" - think about what actually drives you.
           </p>
         </motion.div>
@@ -283,8 +283,8 @@ export const BenefitsDiscovery: React.FC<BenefitsDiscoveryProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Available Tags */}
             <div className="lg:col-span-2">
-              <h2 className="text-2xl font-semibold text-slate-800 mb-4">Available Motivations</h2>
-              <div className="bg-white rounded-lg p-6 shadow-lg">
+              <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-200 mb-4">Available Motivations</h2>
+              <div className="bg-white dark:bg-slate-800 rounded-lg p-6 shadow-lg">
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <SortableContext
                     items={containers.available}
@@ -296,9 +296,9 @@ export const BenefitsDiscovery: React.FC<BenefitsDiscoveryProps> = ({
                     })}
                   </SortableContext>
                 </div>
-                
+
                 {containers.available.length === 0 && (
-                  <div className="text-center py-12 text-gray-400">
+                  <div className="text-center py-12 text-gray-400 dark:text-gray-500">
                     <p>All motivations have been prioritized!</p>
                   </div>
                 )}
@@ -313,17 +313,17 @@ export const BenefitsDiscovery: React.FC<BenefitsDiscoveryProps> = ({
                 subtitle="Most important to you"
                 tags={containers.top5.map(id => getBenefitById(id)!).filter(Boolean)}
                 maxItems={5}
-                color="bg-blue-50 border-blue-200"
+                color="bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700"
                 isHighlighted={containers.top5.length < 3}
               />
-              
+
               <DropZone
                 id="important"
                 title="⭐ ALSO IMPORTANT"
                 subtitle="Matters, but not critical"
                 tags={containers.important.map(id => getBenefitById(id)!).filter(Boolean)}
                 maxItems={7}
-                color="bg-green-50 border-green-200"
+                color="bg-emerald-50 dark:bg-emerald-900/20 border-emerald-300 dark:border-emerald-700"
               />
             </div>
           </div>
@@ -348,16 +348,17 @@ export const BenefitsDiscovery: React.FC<BenefitsDiscoveryProps> = ({
           <button
             disabled={!canProceed}
             onClick={handleContinue}
-            className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold
-                     hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-400
+            className="px-8 py-3 bg-blue-600 dark:bg-blue-500 text-white rounded-lg font-semibold
+                     hover:bg-blue-700 dark:hover:bg-blue-600 disabled:cursor-not-allowed
+                     disabled:bg-gray-400 dark:disabled:bg-gray-600
                      transition-all transform hover:scale-105"
           >
             Continue to Goals Creation →
           </button>
         </motion.div>
-        
+
         {!canProceed && (
-          <p className="text-center mt-4 text-amber-600">
+          <p className="text-center mt-4 text-amber-600 dark:text-amber-400">
             Please select at least 3 top priorities to continue
           </p>
         )}

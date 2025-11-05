@@ -27,69 +27,7 @@ interface Appointment {
   status: 'upcoming' | 'completed' | 'cancelled';
 }
 
-// Mock appointments data (would be fetched from API in a real app)
-const mockAppointments: Appointment[] = [
-  {
-    id: 'apt1',
-    doctor: 'Dr. Emily Smith',
-    specialty: 'Primary Care Physician',
-    date: '2025-06-15',
-    time: '10:30 AM',
-    location: 'HealthFirst Medical Center, Suite 302',
-    notes: 'Annual physical examination. Remember to fast for 12 hours before appointment.',
-    status: 'upcoming'
-  },
-  {
-    id: 'apt2',
-    doctor: 'Dr. James Johnson',
-    specialty: 'Dermatology',
-    date: '2025-07-03',
-    time: '2:15 PM',
-    location: 'Downtown Medical Plaza, Room 205',
-    notes: 'Follow-up for skin condition. Bring previous prescription.',
-    status: 'upcoming'
-  },
-  {
-    id: 'apt3',
-    doctor: 'Dr. Sarah Williams',
-    specialty: 'Dentist',
-    date: '2025-06-28',
-    time: '9:00 AM',
-    location: 'Bright Smile Dental Clinic',
-    notes: 'Regular dental cleaning and checkup.',
-    status: 'upcoming'
-  },
-  {
-    id: 'apt4',
-    doctor: 'Dr. Michael Chen',
-    specialty: 'Cardiology',
-    date: '2025-03-12',
-    time: '11:15 AM',
-    location: 'Heart Health Institute, Building B',
-    notes: 'Regular heart checkup with ECG.',
-    status: 'completed'
-  },
-  {
-    id: 'apt5',
-    doctor: 'Dr. Lisa Rodriguez',
-    specialty: 'Ophthalmology',
-    date: '2025-02-24',
-    time: '3:45 PM',
-    location: 'Vision Care Center',
-    notes: 'Annual eye exam.',
-    status: 'completed'
-  },
-  {
-    id: 'apt6',
-    doctor: 'Dr. Robert Taylor',
-    specialty: 'Orthopedics',
-    date: '2025-04-05',
-    time: '10:00 AM',
-    location: 'Sports Medicine Clinic',
-    notes: 'Knee pain consultation.',
-    status: 'cancelled'
-  }
-];
+// Appointments will be fetched from API - empty for now
 
 export default function AppointmentsPage() {
   const { data: session, status } = useSession();
@@ -120,9 +58,13 @@ export default function AppointmentsPage() {
     const fetchAppointments = async () => {
       setLoading(true);
       try {
-        // In a real app, this would be an API call
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setAppointments(mockAppointments);
+        // TODO: Implement API endpoint for fetching appointments
+        // const response = await fetch('/api/healthcare/appointments');
+        // const data = await response.json();
+        // setAppointments(data);
+
+        // For now, set empty array - will be populated when users schedule appointments
+        setAppointments([]);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching appointments:', err);
@@ -130,7 +72,7 @@ export default function AppointmentsPage() {
         setLoading(false);
       }
     };
-    
+
     if (status === 'authenticated') {
       fetchAppointments();
     } else if (status === 'unauthenticated') {

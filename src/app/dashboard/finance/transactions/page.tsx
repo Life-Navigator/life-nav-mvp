@@ -59,9 +59,9 @@ export default function TransactionsPage() {
     
     // Sort transactions by date (newest first)
     filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    setFilteredTransactions(transactions);
-  }, [startDate, endDate, selectedAccountIds]);
+
+    setFilteredTransactions(filtered);
+  }, [startDate, endDate, selectedAccountIds, transactions]);
   
   // Handle date range change
   const handleDateRangeChange = (start: Date, end: Date) => {
@@ -120,7 +120,7 @@ export default function TransactionsPage() {
       
       {/* Filters */}
       <TransactionFilters
-        accounts={mockAccounts}
+        accounts={accounts}
         selectedAccountIds={selectedAccountIds}
         startDate={startDate}
         endDate={endDate}

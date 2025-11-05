@@ -7,6 +7,7 @@ import { Analytics } from "@/components/analytics/Analytics";
 import { Toaster } from "@/components/ui/toaster";
 import { getThemeScript } from "./theme-script";
 import { ProductionErrorBoundary } from "@/components/error-boundary/ProductionErrorBoundary";
+import ChatSidebar from "@/components/chat/ChatSidebar";
 
 // Font configuration
 const geistSans = Geist({
@@ -64,11 +65,13 @@ export default function RootLayout({
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         <Providers>
           <ProductionErrorBoundary level="page" maxRetries={3}>
             {children}
             <Toaster />
+            <ChatSidebar />
           </ProductionErrorBoundary>
         </Providers>
         <Analytics />

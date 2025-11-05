@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { db as prisma } from "@/lib/db";
 import { encryptObjectFields, decryptObjectFields } from "@/lib/encryption/model-encryption";
 
 // Define sensitive fields for each model

@@ -41,110 +41,14 @@ export default function DocumentVaultPage() {
     const fetchDocuments = async () => {
       try {
         setLoading(true);
-        
-        // Mock API call - would be replaced with actual API call
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        const mockDocuments: SecureDocument[] = [
-          {
-            id: 'doc1',
-            filename: 'Health_Insurance_Policy.pdf',
-            type: 'PDF',
-            category: 'insurance',
-            size: '1.2 MB',
-            uploadDate: '2025-04-15',
-            lastAccessed: '2025-05-08',
-            tags: ['insurance', 'healthcare', 'policy'],
-            encrypted: true,
-            favorite: true
-          },
-          {
-            id: 'doc2',
-            filename: 'Passport_Scan.pdf',
-            type: 'PDF',
-            category: 'identification',
-            size: '3.8 MB',
-            uploadDate: '2025-03-22',
-            lastAccessed: '2025-05-02',
-            tags: ['identification', 'travel', 'government'],
-            encrypted: true,
-            favorite: false
-          },
-          {
-            id: 'doc3',
-            filename: 'Medical_Records_2025.pdf',
-            type: 'PDF',
-            category: 'medical',
-            size: '5.4 MB',
-            uploadDate: '2025-05-01',
-            lastAccessed: '2025-05-09',
-            tags: ['medical', 'records', 'annual'],
-            encrypted: true,
-            favorite: true
-          },
-          {
-            id: 'doc4',
-            filename: 'Vaccination_Card.jpg',
-            type: 'IMAGE',
-            category: 'medical',
-            size: '2.1 MB',
-            uploadDate: '2025-01-15',
-            lastAccessed: '2025-04-20',
-            tags: ['medical', 'vaccination', 'covid'],
-            encrypted: true,
-            favorite: false
-          },
-          {
-            id: 'doc5',
-            filename: 'Birth_Certificate.pdf',
-            type: 'PDF',
-            category: 'identification',
-            size: '1.8 MB',
-            uploadDate: '2024-12-10',
-            lastAccessed: '2025-03-15',
-            tags: ['identification', 'government', 'personal'],
-            encrypted: true,
-            favorite: true
-          },
-          {
-            id: 'doc6',
-            filename: 'Living_Will.pdf',
-            type: 'PDF',
-            category: 'legal',
-            size: '0.9 MB',
-            uploadDate: '2025-02-28',
-            lastAccessed: '2025-04-28',
-            tags: ['legal', 'will', 'estate'],
-            encrypted: true,
-            favorite: false
-          },
-          {
-            id: 'doc7',
-            filename: 'Power_of_Attorney.pdf',
-            type: 'PDF',
-            category: 'legal',
-            size: '1.1 MB',
-            uploadDate: '2025-02-28',
-            lastAccessed: '2025-04-28',
-            tags: ['legal', 'power of attorney', 'estate'],
-            encrypted: true,
-            favorite: false
-          },
-          {
-            id: 'doc8',
-            filename: 'Tax_Return_2024.pdf',
-            type: 'PDF',
-            category: 'financial',
-            size: '3.2 MB',
-            uploadDate: '2025-04-10',
-            lastAccessed: '2025-05-01',
-            tags: ['financial', 'tax', '2024'],
-            encrypted: true,
-            favorite: false
-          }
-        ];
-        
-        setDocuments(mockDocuments);
+
+        // TODO: Implement API endpoint for fetching secure documents
+        // const response = await fetch('/api/documents');
+        // const data = await response.json();
+        // setDocuments(data);
+
+        // For now, set empty array - will be populated when users upload documents
+        setDocuments([]);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching documents:', err);
@@ -152,7 +56,7 @@ export default function DocumentVaultPage() {
         setLoading(false);
       }
     };
-    
+
     fetchDocuments();
   }, []);
 

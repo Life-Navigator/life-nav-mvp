@@ -1,63 +1,44 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/cards/Card';
 import { Button } from '@/components/ui/buttons/Button';
-import { Input } from '@/components/ui/forms/Input';
+import Link from 'next/link';
 
-// Mock data for nutrition tracking
-const mockNutritionData = {
+interface FoodItem {
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
+
+interface Meal {
+  id: string;
+  name: string;
+  time: string;
+  foods: FoodItem[];
+}
+
+interface NutritionData {
   dailyGoals: {
-    calories: 2100,
-    protein: 120,
-    carbs: 230,
-    fat: 70
-  },
-  meals: [
-    {
-      id: '1',
-      name: 'Breakfast',
-      time: '07:30',
-      foods: [
-        { name: 'Oatmeal', calories: 150, protein: 5, carbs: 27, fat: 3 },
-        { name: 'Banana', calories: 105, protein: 1, carbs: 27, fat: 0 },
-        { name: 'Almond Milk', calories: 30, protein: 1, carbs: 1, fat: 2 }
-      ]
-    },
-    {
-      id: '2',
-      name: 'Lunch',
-      time: '12:30',
-      foods: [
-        { name: 'Chicken Salad', calories: 350, protein: 30, carbs: 10, fat: 20 },
-        { name: 'Whole Grain Bread', calories: 120, protein: 4, carbs: 20, fat: 2 },
-        { name: 'Apple', calories: 95, protein: 0, carbs: 25, fat: 0 }
-      ]
-    },
-    {
-      id: '3',
-      name: 'Dinner',
-      time: '18:45',
-      foods: [
-        { name: 'Salmon', calories: 280, protein: 39, carbs: 0, fat: 13 },
-        { name: 'Brown Rice', calories: 215, protein: 5, carbs: 45, fat: 2 },
-        { name: 'Steamed Broccoli', calories: 55, protein: 4, carbs: 11, fat: 0 }
-      ]
-    },
-    {
-      id: '4',
-      name: 'Snack',
-      time: '15:30',
-      foods: [
-        { name: 'Greek Yogurt', calories: 130, protein: 12, carbs: 8, fat: 4 },
-        { name: 'Mixed Berries', calories: 85, protein: 1, carbs: 21, fat: 0 }
-      ]
-    }
-  ]
-};
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+  meals: Meal[];
+}
+
+interface DailyTotals {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}
 
 // Calculate daily totals
-const calculateDailyTotals = (meals) => {
+const calculateDailyTotals = (meals: Meal[]): DailyTotals => {
   return meals.reduce((totals, meal) => {
     const mealTotals = meal.foods.reduce((mealAcc, food) => {
       return {
@@ -67,7 +48,7 @@ const calculateDailyTotals = (meals) => {
         fat: mealAcc.fat + food.fat
       };
     }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
-    
+
     return {
       calories: totals.calories + mealTotals.calories,
       protein: totals.protein + mealTotals.protein,
@@ -78,23 +59,69 @@ const calculateDailyTotals = (meals) => {
 };
 
 export default function NutritionLog() {
-  const [data, setData] = useState(mockNutritionData);
-  const [newFood, setNewFood] = useState({ name: '', calories: '', protein: '', carbs: '', fat: '' });
-  const [selectedMealId, setSelectedMealId] = useState('');
-  
+  const [data, setData] = useState<NutritionData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchNutritionData = async () => {
+      try {
+        // TODO: Implement API endpoint for fetching nutrition data
+        // const response = await fetch('/api/wellness/nutrition');
+        // const nutritionData = await response.json();
+        // setData(nutritionData);
+
+        // For now, set null - will be populated when users connect nutrition tracking apps
+        setData(null);
+        setLoading(false);
+      } catch (error) {
+        console.error('Error fetching nutrition data:', error);
+        setData(null);
+        setLoading(false);
+      }
+    };
+
+    fetchNutritionData();
+  }, []);
+
+  if (loading) {
+    return (
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Nutrition Log</h2>
+        <p className="text-gray-500 dark:text-gray-400">Loading nutrition data...</p>
+      </Card>
+    );
+  }
+
+  if (!data) {
+    return (
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Nutrition Log</h2>
+        <div className="text-center py-8">
+          <div className="text-4xl mb-4">🍎</div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+            No Nutrition Data Connected
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Connect your nutrition tracking app to automatically monitor your meals, calories, and macronutrients.
+          </p>
+          <div className="flex gap-2 justify-center">
+            <Link href="/dashboard/integrations">
+              <Button variant="default">Connect Device</Button>
+            </Link>
+            <Button variant="outline">Log Meal Manually</Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   const dailyTotals = calculateDailyTotals(data.meals);
-  
+
   // Calculate percentages for nutrient progress bars
   const caloriesPercentage = Math.min(100, (dailyTotals.calories / data.dailyGoals.calories) * 100);
   const proteinPercentage = Math.min(100, (dailyTotals.protein / data.dailyGoals.protein) * 100);
   const carbsPercentage = Math.min(100, (dailyTotals.carbs / data.dailyGoals.carbs) * 100);
   const fatPercentage = Math.min(100, (dailyTotals.fat / data.dailyGoals.fat) * 100);
-  
-  // Handler for adding a new food item (not fully implemented)
-  const handleAddFood = () => {
-    // This would add a new food to the selected meal
-    console.log('Adding food to meal:', selectedMealId);
-  };
 
   return (
     <div>
@@ -211,22 +238,22 @@ export default function NutritionLog() {
           <div className="mt-6 grid grid-cols-4 gap-4">
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-center">
               <p className="text-blue-800 dark:text-blue-200 text-xs">Daily Calorie Goal</p>
-              <p className="text-lg font-medium">{mockNutritionData.dailyGoals.calories} kcal</p>
+              <p className="text-lg font-medium">{data.dailyGoals.calories} kcal</p>
             </div>
-            
+
             <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3 text-center">
               <p className="text-green-800 dark:text-green-200 text-xs">Protein Goal</p>
-              <p className="text-lg font-medium">{mockNutritionData.dailyGoals.protein}g</p>
+              <p className="text-lg font-medium">{data.dailyGoals.protein}g</p>
             </div>
-            
+
             <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3 text-center">
               <p className="text-yellow-800 dark:text-yellow-200 text-xs">Carbs Goal</p>
-              <p className="text-lg font-medium">{mockNutritionData.dailyGoals.carbs}g</p>
+              <p className="text-lg font-medium">{data.dailyGoals.carbs}g</p>
             </div>
-            
+
             <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3 text-center">
               <p className="text-orange-800 dark:text-orange-200 text-xs">Fat Goal</p>
-              <p className="text-lg font-medium">{mockNutritionData.dailyGoals.fat}g</p>
+              <p className="text-lg font-medium">{data.dailyGoals.fat}g</p>
             </div>
           </div>
         

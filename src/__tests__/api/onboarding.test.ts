@@ -4,7 +4,7 @@
 
 import { POST as riskProfileHandler } from '@/app/api/onboarding/risk-profile/route';
 import { POST as completeHandler } from '@/app/api/onboarding/complete/route';
-import { prisma } from '@/lib/db';
+import { db as prisma } from '@/lib/db';
 
 // Mock the prisma client
 jest.mock('@/lib/db', () => ({

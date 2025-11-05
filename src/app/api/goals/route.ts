@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
+import { db as prisma } from '@/lib/db';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { z } from 'zod';
 
@@ -45,8 +45,7 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
 
     const where: any = {
-      userId: session.user.id,
-      deletedAt: null
+      userId: session.user.id
     };
 
     if (category) where.category = category;
@@ -57,13 +56,8 @@ export async function GET(request: NextRequest) {
       prisma.goal.findMany({
         where,
         include: {
-          benefits: {
-            include: {
-              lifeArea: true
-            }
-          },
+          benefits: true,
           milestones: {
-            where: { deletedAt: null },
             orderBy: { targetDate: 'asc' }
           },
           updates: {
@@ -71,7 +65,7 @@ export async function GET(request: NextRequest) {
             orderBy: { createdAt: 'desc' }
           },
           reminders: {
-            where: { 
+            where: {
               isActive: true,
               nextReminderDate: { gte: new Date() }
             }
@@ -220,9 +214,7 @@ export async function POST(request: NextRequest) {
       return await tx.goal.findUnique({
         where: { id: newGoal.id },
         include: {
-          benefits: {
-            include: { lifeArea: true }
-          },
+          benefits: true,
           milestones: true,
           updates: true
         }

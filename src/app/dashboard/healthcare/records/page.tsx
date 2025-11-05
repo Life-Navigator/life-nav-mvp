@@ -33,114 +33,14 @@ export default function HealthRecordsPage() {
     const fetchHealthRecords = async () => {
       try {
         setLoading(true);
-        
-        // Mock API call - would be replaced with actual API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        const mockRecords: HealthRecord[] = [
-          {
-            id: 'rec1',
-            title: 'Annual Physical',
-            provider: 'Dr. Smith - Primary Care',
-            date: '2025-05-12',
-            type: 'visit',
-            status: 'completed',
-            summary: 'General health examination. Blood pressure: 125/82, Heart rate: 68 bpm.',
-            files: [
-              { id: 'file1', name: 'Physical_Summary.pdf', type: 'PDF', size: '256KB' }
-            ]
-          },
-          {
-            id: 'rec2',
-            title: 'Blood Test Results',
-            provider: 'LabCorp',
-            date: '2025-05-10',
-            type: 'lab',
-            status: 'completed',
-            summary: 'Complete blood count, lipid panel, and metabolic panel. All values within normal range.',
-            files: [
-              { id: 'file2', name: 'Blood_Test_Results.pdf', type: 'PDF', size: '412KB' },
-              { id: 'file3', name: 'Lab_Notes.txt', type: 'TXT', size: '45KB' }
-            ]
-          },
-          {
-            id: 'rec3',
-            title: 'Chest X-Ray',
-            provider: 'City Imaging Center',
-            date: '2025-04-18',
-            type: 'imaging',
-            status: 'completed',
-            summary: 'Routine chest X-ray, no abnormalities detected.',
-            files: [
-              { id: 'file4', name: 'Chest_Xray.jpg', type: 'Image', size: '3.2MB' },
-              { id: 'file5', name: 'Radiologist_Report.pdf', type: 'PDF', size: '320KB' }
-            ]
-          },
-          {
-            id: 'rec4',
-            title: 'Dermatology Consultation',
-            provider: 'Dr. Johnson - Dermatology',
-            date: '2025-03-22',
-            type: 'visit',
-            status: 'completed',
-            summary: 'Evaluation of skin condition. Prescribed topical medication.',
-            files: [
-              { id: 'file6', name: 'Dermatology_Notes.pdf', type: 'PDF', size: '189KB' }
-            ]
-          },
-          {
-            id: 'rec5',
-            title: 'Dental Cleaning',
-            provider: 'Dr. Williams - Dentistry',
-            date: '2025-03-10',
-            type: 'visit',
-            status: 'completed',
-            summary: 'Regular dental cleaning and examination. No cavities.',
-            files: [
-              { id: 'file7', name: 'Dental_Xrays.jpg', type: 'Image', size: '2.8MB' },
-              { id: 'file8', name: 'Dental_Care_Plan.pdf', type: 'PDF', size: '165KB' }
-            ]
-          },
-          {
-            id: 'rec6',
-            title: 'Vaccination - Flu Shot',
-            provider: 'City Pharmacy',
-            date: '2025-02-05',
-            type: 'visit',
-            status: 'completed',
-            summary: 'Annual influenza vaccination.',
-            files: [
-              { id: 'file9', name: 'Vaccination_Record.pdf', type: 'PDF', size: '120KB' }
-            ]
-          },
-          {
-            id: 'rec7',
-            title: 'MRI - Lower Back',
-            provider: 'Advanced Imaging',
-            date: '2025-01-28',
-            type: 'imaging',
-            status: 'completed',
-            summary: 'MRI of the lumbar spine. Minimal disc bulging at L4-L5.',
-            files: [
-              { id: 'file10', name: 'MRI_Images.zip', type: 'ZIP', size: '24MB' },
-              { id: 'file11', name: 'MRI_Report.pdf', type: 'PDF', size: '385KB' }
-            ]
-          },
-          {
-            id: 'rec8',
-            title: 'Cholesterol Screening',
-            provider: 'LabCorp',
-            date: '2025-01-15',
-            type: 'lab',
-            status: 'completed',
-            summary: 'Lipid panel to assess cholesterol levels. LDL slightly elevated.',
-            files: [
-              { id: 'file12', name: 'Cholesterol_Results.pdf', type: 'PDF', size: '245KB' }
-            ]
-          }
-        ];
-        
-        setRecords(mockRecords);
+
+        // TODO: Implement API endpoint for fetching health records
+        // const response = await fetch('/api/healthcare/records');
+        // const data = await response.json();
+        // setRecords(data);
+
+        // For now, set empty array - will be populated when users upload/integrate records
+        setRecords([]);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching health records:', err);
@@ -148,7 +48,7 @@ export default function HealthRecordsPage() {
         setLoading(false);
       }
     };
-    
+
     fetchHealthRecords();
   }, []);
 

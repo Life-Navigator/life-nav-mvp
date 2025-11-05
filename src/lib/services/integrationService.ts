@@ -1,6 +1,6 @@
 // src/lib/services/integrationService.ts
 import { getOAuthProviderConfig, buildAuthorizationUrl, generateOAuthState, generateCodeVerifier, ProviderConfig } from '@/lib/integrations/oauth-config';
-import { prisma } from '@/lib/db';
+import { db as prisma } from '@/lib/db';
 
 /**
  * Interface for token exchange response

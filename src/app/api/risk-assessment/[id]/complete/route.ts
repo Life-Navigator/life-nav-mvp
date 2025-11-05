@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
+import { db as prisma } from '@/lib/db';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 // AI-powered recommendation generation (mock for now, integrate with OpenAI later)

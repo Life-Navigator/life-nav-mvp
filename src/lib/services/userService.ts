@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { db as prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/utils/password";
 
 export interface CreateUserInput {

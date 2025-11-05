@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
+import { db as prisma } from '@/lib/db';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { z } from 'zod';
 
@@ -103,8 +103,7 @@ export async function GET(request: NextRequest) {
       const assessment = await prisma.riskAssessment.findFirst({
         where: {
           id: assessmentId,
-          userId: session.user.id,
-          deletedAt: null
+          userId: session.user.id
         },
         include: {
           answers: {
@@ -129,8 +128,7 @@ export async function GET(request: NextRequest) {
 
     // Get assessment history
     const where: any = {
-      userId: session.user.id,
-      deletedAt: null
+      userId: session.user.id
     };
 
     if (status) where.status = status;

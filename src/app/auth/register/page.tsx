@@ -2,7 +2,7 @@ import React from 'react';
 import RegisterForm from '@/components/auth/RegisterForm';
 import { Metadata } from 'next';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/NextAuth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { redirect } from 'next/navigation';
 
 // Metadata for the page

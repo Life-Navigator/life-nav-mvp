@@ -93,13 +93,14 @@ async function checkRateLimit(
  * Set rate limit headers on the response
  */
 function setRateLimitHeaders(
-  res: NextResponse, 
-  rateLimit: { current: number; remaining: number; resetMs: number }
+  res: NextResponse,
+  rateLimit: { current: number; remaining: number; resetMs: number },
+  config: RateLimitConfig
 ): NextResponse {
   res.headers.set('X-RateLimit-Limit', config.maxRequests.toString());
   res.headers.set('X-RateLimit-Remaining', rateLimit.remaining.toString());
   res.headers.set('X-RateLimit-Reset', (Math.ceil(Date.now() + rateLimit.resetMs) / 1000).toString());
-  
+
   return res;
 }
 
@@ -122,16 +123,16 @@ function createRateLimitedHandler(
         },
         { status: 429 }
       );
-      
+
       res.headers.set('Retry-After', Math.ceil(rateLimit.resetMs / 1000).toString());
-      return setRateLimitHeaders(res, rateLimit);
+      return setRateLimitHeaders(res, rateLimit, config);
     }
-    
+
     // Otherwise, process the request
     const response = await handler(req);
-    
+
     // Add rate limit headers to the response
-    return setRateLimitHeaders(response, rateLimit);
+    return setRateLimitHeaders(response, rateLimit, config);
   };
 }
 

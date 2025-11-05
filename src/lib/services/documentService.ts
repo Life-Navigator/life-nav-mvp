@@ -1,7 +1,7 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
-import { prisma } from '@/lib/db';
+import { db as prisma } from '@/lib/db';
 import { UserType } from '@/types/auth';
 
 // Types

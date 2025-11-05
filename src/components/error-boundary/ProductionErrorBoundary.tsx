@@ -121,8 +121,8 @@ export class ProductionErrorBoundary extends Component<Props, State> {
       if (this.shouldAttemptAutoRecovery(error)) {
         this.scheduleAutoRecovery();
       }
-    } catch (captureError) {
-      console.error('[ErrorBoundary] Failed to capture error:', captureError);
+    } catch (captureErr) {
+      console.error('[ErrorBoundary] Failed to capture error:', captureErr);
     }
   }
 

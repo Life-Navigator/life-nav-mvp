@@ -1,14 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { DataExportButton } from '@/components/settings/DataExportButton';
 import { DeleteAccountModal } from '@/components/settings/DeleteAccountModal';
 
 export default function SettingsPage() {
-  const { data: session } = useSession();
   const router = useRouter();
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
@@ -17,7 +14,7 @@ export default function SettingsPage() {
       id: 'profile',
       name: 'Profile',
       description: 'Manage your personal information',
-      url: '/dashboard/settings/profile',
+      url: '/dashboard/profile',
       icon: '👤',
     },
     {
