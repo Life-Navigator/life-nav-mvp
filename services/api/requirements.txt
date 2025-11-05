@@ -1,0 +1,35 @@
+# Core FastAPI
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# Database
+sqlalchemy==2.0.25
+alembic==1.13.1
+asyncpg==0.29.0
+
+# Validation and Settings
+pydantic==2.5.0
+pydantic-settings==2.1.0
+email-validator==2.1.0
+
+# Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Neo4j and RDF
+neo4j==5.16.0
+rdflib==7.0.0
+
+# AI SDKs
+anthropic==0.18.0
+openai==1.10.0
+
+# Redis
+redis==5.0.1
+
+# HTTP client
+httpx==0.26.0
+
+# Utilities
+python-dotenv==1.0.0
