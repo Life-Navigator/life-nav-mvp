@@ -1,0 +1,53 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalDependencies": [
+    "**/.env.*local",
+    "ontology/**/*.ttl",
+    "tsconfig.json"
+  ],
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [
+        "dist/**",
+        ".next/**",
+        "!.next/cache/**",
+        "build/**",
+        "*.whl",
+        "*.egg-info/**",
+        "target/**"
+      ],
+      "cache": true
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": [
+        "coverage/**",
+        ".coverage",
+        "htmlcov/**"
+      ],
+      "cache": true
+    },
+    "lint": {
+      "cache": true,
+      "outputs": []
+    },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "cache": true,
+      "outputs": []
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "deploy": {
+      "dependsOn": ["build", "test"],
+      "cache": false,
+      "outputs": []
+    },
+    "clean": {
+      "cache": false
+    }
+  }
+}
