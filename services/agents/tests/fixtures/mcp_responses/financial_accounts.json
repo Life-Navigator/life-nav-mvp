@@ -1,0 +1,94 @@
+{
+  "tool": "get_user_accounts",
+  "description": "Example response with diverse account types from multiple institutions",
+  "response": {
+    "request_id": "mcp_test_accounts_001",
+    "success": true,
+    "data": [
+      {
+        "account_id": "acc_chase_checking_001",
+        "plaid_account_id": "plaid_acc_1a2b3c4d",
+        "institution_name": "Chase",
+        "account_type": "checking",
+        "account_subtype": null,
+        "mask": "1234",
+        "current_balance": 5420.50,
+        "available_balance": 5420.50,
+        "currency_code": "USD",
+        "is_closed": false,
+        "last_synced_at": "2025-10-27T10:30:00Z"
+      },
+      {
+        "account_id": "acc_chase_savings_001",
+        "plaid_account_id": "plaid_acc_2b3c4d5e",
+        "institution_name": "Chase",
+        "account_type": "savings",
+        "account_subtype": "savings",
+        "mask": "5678",
+        "current_balance": 12450.80,
+        "available_balance": 12450.80,
+        "currency_code": "USD",
+        "is_closed": false,
+        "last_synced_at": "2025-10-27T10:30:00Z"
+      },
+      {
+        "account_id": "acc_amex_credit_001",
+        "plaid_account_id": "plaid_acc_3c4d5e6f",
+        "institution_name": "American Express",
+        "account_type": "credit_card",
+        "account_subtype": "credit_card",
+        "mask": "4321",
+        "current_balance": -2150.25,
+        "available_balance": null,
+        "currency_code": "USD",
+        "is_closed": false,
+        "last_synced_at": "2025-10-27T10:32:00Z"
+      },
+      {
+        "account_id": "acc_fidelity_401k_001",
+        "plaid_account_id": "plaid_acc_4d5e6f7g",
+        "institution_name": "Fidelity",
+        "account_type": "investment",
+        "account_subtype": "401k",
+        "mask": "9876",
+        "current_balance": 125000.00,
+        "available_balance": null,
+        "currency_code": "USD",
+        "is_closed": false,
+        "last_synced_at": "2025-10-26T18:00:00Z"
+      },
+      {
+        "account_id": "acc_fidelity_roth_001",
+        "plaid_account_id": "plaid_acc_5e6f7g8h",
+        "institution_name": "Fidelity",
+        "account_type": "investment",
+        "account_subtype": "roth_ira",
+        "mask": "5432",
+        "current_balance": 45000.00,
+        "available_balance": null,
+        "currency_code": "USD",
+        "is_closed": false,
+        "last_synced_at": "2025-10-26T18:00:00Z"
+      },
+      {
+        "account_id": "acc_sofi_student_001",
+        "plaid_account_id": "plaid_acc_6f7g8h9i",
+        "institution_name": "SoFi",
+        "account_type": "loan",
+        "account_subtype": "student_loan",
+        "mask": "1111",
+        "current_balance": -28500.00,
+        "available_balance": null,
+        "currency_code": "USD",
+        "is_closed": false,
+        "last_synced_at": "2025-10-25T12:00:00Z"
+      }
+    ],
+    "metadata": {
+      "tool": "get_user_accounts",
+      "execution_time_ms": 42,
+      "cached": false,
+      "total_accounts": 6
+    }
+  }
+}

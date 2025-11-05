@@ -1,0 +1,123 @@
+version: '3.8'
+
+# Minimal Docker Compose for CI/CD testing
+# This version excludes GPU-dependent services and uses lightweight configurations
+
+services:
+  # PostgreSQL with pgvector for testing
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: lna-postgres-test
+    environment:
+      POSTGRES_DB: life_navigator_agents_test
+      POSTGRES_USER: lna_test_user
+      POSTGRES_PASSWORD: lna_test_password
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lna_test_user -d life_navigator_agents_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - lna-test-network
+
+  # Redis for testing
+  redis:
+    image: redis:7-alpine
+    container_name: lna-redis-test
+    command: redis-server --appendonly no
+    ports:
+      - "6380:6379"
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - lna-test-network
+
+  # RabbitMQ for testing
+  rabbitmq:
+    image: rabbitmq:3-alpine
+    container_name: lna-rabbitmq-test
+    environment:
+      RABBITMQ_DEFAULT_USER: lna_test_user
+      RABBITMQ_DEFAULT_PASS: lna_test_password
+    ports:
+      - "5673:5672"
+    tmpfs:
+      - /var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - lna-test-network
+
+  # Qdrant for testing
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: lna-qdrant-test
+    ports:
+      - "6335:6333"
+    tmpfs:
+      - /qdrant/storage
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6333/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - lna-test-network
+
+  # Test runner container
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: lna-test-runner
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DATABASE: life_navigator_agents_test
+      POSTGRES_USER: lna_test_user
+      POSTGRES_PASSWORD: lna_test_password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: lna_test_user
+      RABBITMQ_PASSWORD: lna_test_password
+      QDRANT_URL: http://qdrant:6333
+      APP_ENVIRONMENT: test
+      APP_DEBUG: false
+      APP_LOG_LEVEL: WARNING
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - test_results:/app/test-results
+    command: pytest tests/ -v --cov=. --cov-report=term-missing --cov-report=html:test-results/coverage
+    networks:
+      - lna-test-network
+
+networks:
+  lna-test-network:
+    driver: bridge
+
+volumes:
+  test_results:
+    driver: local

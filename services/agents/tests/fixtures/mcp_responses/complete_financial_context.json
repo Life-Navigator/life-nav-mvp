@@ -1,0 +1,49 @@
+{
+  "transactions": [
+    {
+      "transaction_id": "txn_001",
+      "date": "2025-10-20",
+      "description": "Whole Foods Market",
+      "amount": -127.43,
+      "category": "groceries",
+      "merchant": "Whole Foods"
+    },
+    {
+      "transaction_id": "txn_002",
+      "date": "2025-10-19",
+      "description": "Netflix Subscription",
+      "amount": -15.99,
+      "category": "entertainment",
+      "merchant": "Netflix"
+    },
+    {
+      "transaction_id": "txn_003",
+      "date": "2025-10-18",
+      "description": "Salary Deposit",
+      "amount": 5000.00,
+      "category": "income",
+      "merchant": "Acme Corp"
+    }
+  ],
+  "accounts": [
+    {
+      "account_id": "acc_checking_001",
+      "name": "Chase Checking",
+      "type": "checking",
+      "balance": 3250.00,
+      "currency": "USD"
+    },
+    {
+      "account_id": "acc_savings_001",
+      "name": "Chase Savings",
+      "type": "savings",
+      "balance": 12500.00,
+      "currency": "USD"
+    }
+  ],
+  "summary": {
+    "total_income": 6500.00,
+    "total_expenses": 2515.99,
+    "net_cashflow": 3984.01
+  }
+}

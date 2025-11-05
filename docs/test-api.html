@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backend API Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #555;
+            margin-top: 30px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            margin: 10px 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        textarea {
+            min-height: 100px;
+            font-family: monospace;
+        }
+        pre {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .error {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-left: 4px solid #2196F3;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .status.ok {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .chat-container {
+            margin: 20px 0;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .message.user {
+            background: #e3f2fd;
+            text-align: right;
+        }
+        .message.assistant {
+            background: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Backend API Test Page</h1>
+
+        <div class="info">
+            <strong>Backend URL:</strong> <code>http://localhost:8080</code><br>
+            <strong>Purpose:</strong> Test your AI backend API connection and functionality
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <!-- Health Check -->
+        <h2>1. Health Check</h2>
+        <button onclick="testHealth()">Test /health</button>
+        <pre id="healthOutput">Click button to test...</pre>
+
+        <!-- List Agents -->
+        <h2>2. List Agents</h2>
+        <button onclick="listAgents()">List All Agents</button>
+        <pre id="agentsOutput">Click button to list agents...</pre>
+
+        <!-- Create Agent -->
+        <h2>3. Create Agent</h2>
+        <input type="text" id="agentName" placeholder="Agent Name" value="Test Agent">
+        <textarea id="systemPrompt" placeholder="System Prompt">You are a helpful AI assistant specialized in answering questions.</textarea>
+        <button onclick="createAgent()">Create Agent</button>
+        <pre id="createOutput">Fill in details and click button...</pre>
+
+        <!-- Chat Interface -->
+        <h2>4. Chat with Agent</h2>
+        <select id="agentSelect">
+            <option value="">Select an agent first...</option>
+        </select>
+        <div class="chat-container" id="chatMessages"></div>
+        <input type="text" id="chatInput" placeholder="Type your message..." onkeypress="if(event.key==='Enter') sendChat()">
+        <button onclick="sendChat()">Send Message</button>
+        <button onclick="clearChat()">Clear Chat</button>
+
+        <!-- Direct Inference -->
+        <h2>5. Direct Model Inference</h2>
+        <textarea id="inferencePrompt" placeholder="Enter prompt for direct model inference">Explain quantum computing in simple terms.</textarea>
+        <label>Temperature: <input type="number" id="temperature" min="0" max="2" step="0.1" value="0.7"></label>
+        <label>Max Tokens: <input type="number" id="maxTokens" min="10" max="2000" value="500"></label>
+        <button onclick="testInference()">Run Inference</button>
+        <pre id="inferenceOutput">Fill in prompt and click button...</pre>
+
+        <!-- Execute Task -->
+        <h2>6. Execute Task</h2>
+        <select id="taskAgentSelect">
+            <option value="">Select an agent first...</option>
+        </select>
+        <input type="text" id="taskType" placeholder="Task Type" value="research">
+        <textarea id="taskInput" placeholder="Task Description">Research the latest developments in AI agents.</textarea>
+        <button onclick="executeTask()">Execute Task</button>
+        <pre id="taskOutput">Fill in details and click button...</pre>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080';
+        let conversationId = null;
+
+        // Update status
+        function updateStatus(message, isError = false) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = isError ? 'status error' : 'status ok';
+        }
+
+        // 1. Test Health
+        async function testHealth() {
+            const output = document.getElementById('healthOutput');
+            output.textContent = 'Testing connection...';
+
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                output.textContent = JSON.stringify(data, null, 2);
+                updateStatus('✅ Backend is healthy!');
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                updateStatus('❌ Backend not reachable. Make sure it\'s running: ./START_MAVERICK_QUICKSTART.sh', true);
+            }
+        }
+
+        // 2. List Agents
+        async function listAgents() {
+            const output = document.getElementById('agentsOutput');
+            output.textContent = 'Loading agents...';
+
+            try {
+                const response = await fetch(`${API_BASE}/agents?user_id=default_user`);
+                const data = await response.json();
+                output.textContent = JSON.stringify(data, null, 2);
+
+                // Update agent dropdowns
+                const agentSelect = document.getElementById('agentSelect');
+                const taskAgentSelect = document.getElementById('taskAgentSelect');
+
+                agentSelect.innerHTML = '<option value="">Select an agent...</option>';
+                taskAgentSelect.innerHTML = '<option value="">Select an agent...</option>';
+
+                if (data.agents && data.agents.length > 0) {
+                    data.agents.forEach(agent => {
+                        const option = new Option(`${agent.name} (${agent.agent_type})`, agent.agent_id);
+                        agentSelect.add(option.cloneNode(true));
+                        taskAgentSelect.add(option);
+                    });
+                    updateStatus(`✅ Found ${data.agents.length} agent(s)`);
+                } else {
+                    updateStatus('⚠️ No agents found. Create one first!');
+                }
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                updateStatus('❌ Failed to list agents', true);
+            }
+        }
+
+        // 3. Create Agent
+        async function createAgent() {
+            const output = document.getElementById('createOutput');
+            output.textContent = 'Creating agent...';
+
+            const agentName = document.getElementById('agentName').value;
+            const systemPrompt = document.getElementById('systemPrompt').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/agents`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: agentName,
+                        description: `Test agent: ${agentName}`,
+                        agent_type: 'research',
+                        capabilities: ['research', 'search'],
+                        system_prompt: systemPrompt,
+                        tools: ['query_knowledge_graph'],
+                        max_concurrent_tasks: 5,
+                        task_timeout_seconds: 300,
+                        custom_config: {}
+                    })
+                });
+
+                const data = await response.json();
+                output.textContent = JSON.stringify(data, null, 2);
+                updateStatus('✅ Agent created successfully!');
+
+                // Refresh agent list
+                await listAgents();
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                updateStatus('❌ Failed to create agent', true);
+            }
+        }
+
+        // 4. Chat with Agent
+        async function sendChat() {
+            const agentId = document.getElementById('agentSelect').value;
+            const message = document.getElementById('chatInput').value;
+
+            if (!agentId) {
+                alert('Please select an agent first');
+                return;
+            }
+
+            if (!message.trim()) {
+                return;
+            }
+
+            // Add user message to chat
+            addChatMessage('user', message);
+            document.getElementById('chatInput').value = '';
+
+            try {
+                const response = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agent_id: agentId,
+                        message: message,
+                        conversation_id: conversationId
+                    })
+                });
+
+                const data = await response.json();
+                conversationId = data.conversation_id;
+
+                // Add agent response to chat
+                addChatMessage('assistant', data.message);
+                updateStatus(`✅ Chat response received (${data.metadata?.tokens || 0} tokens)`);
+            } catch (error) {
+                addChatMessage('assistant', `Error: ${error.message}`);
+                updateStatus('❌ Chat failed', true);
+            }
+        }
+
+        function addChatMessage(role, content) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            messageDiv.innerHTML = `<strong>${role === 'user' ? 'You' : 'Agent'}:</strong><br>${content}`;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function clearChat() {
+            document.getElementById('chatMessages').innerHTML = '';
+            conversationId = null;
+            updateStatus('Chat cleared');
+        }
+
+        // 5. Direct Inference
+        async function testInference() {
+            const output = document.getElementById('inferenceOutput');
+            output.textContent = 'Running inference...';
+
+            const prompt = document.getElementById('inferencePrompt').value;
+            const temperature = parseFloat(document.getElementById('temperature').value);
+            const maxTokens = parseInt(document.getElementById('maxTokens').value);
+
+            try {
+                const response = await fetch(`${API_BASE}/inference`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        temperature: temperature,
+                        max_tokens: maxTokens
+                    })
+                });
+
+                const data = await response.json();
+                output.textContent = JSON.stringify(data, null, 2);
+                updateStatus(`✅ Inference complete (${data.tokens_used} tokens)`);
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                updateStatus('❌ Inference failed. Is Maverick running?', true);
+            }
+        }
+
+        // 6. Execute Task
+        async function executeTask() {
+            const output = document.getElementById('taskOutput');
+            output.textContent = 'Executing task...';
+
+            const agentId = document.getElementById('taskAgentSelect').value;
+            const taskType = document.getElementById('taskType').value;
+            const taskInput = document.getElementById('taskInput').value;
+
+            if (!agentId) {
+                alert('Please select an agent first');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/tasks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        agent_id: agentId,
+                        task_type: taskType,
+                        input_text: taskInput,
+                        context: {},
+                        timeout_seconds: 300,
+                        stream: false
+                    })
+                });
+
+                const data = await response.json();
+                output.textContent = JSON.stringify(data, null, 2);
+                updateStatus(`✅ Task ${data.status}: ${data.task_id}`);
+            } catch (error) {
+                output.textContent = `Error: ${error.message}`;
+                updateStatus('❌ Task execution failed', true);
+            }
+        }
+
+        // Auto-test health on page load
+        window.onload = async () => {
+            await testHealth();
+            await listAgents();
+        };
+    </script>
+</body>
+</html>
