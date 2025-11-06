@@ -1,14 +1,15 @@
 """
-GraphRAG endpoints (placeholder).
+GraphRAG endpoints.
 Handles semantic search and RAG queries via gRPC to the GraphRAG service.
-
-TODO: Implement gRPC client integration with the GraphRAG service.
 """
 
-from fastapi import APIRouter, status
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUser, TenantID
+from app.clients.graphrag import get_graphrag_client
 from app.core.logging import logger
 
 router = APIRouter()
@@ -19,28 +20,51 @@ class GraphRAGQueryRequest(BaseModel):
 
     query: str = Field(min_length=1, description="Natural language query")
     max_results: int = Field(default=10, ge=1, le=100, description="Maximum number of results")
-    context_window: int = Field(default=5, ge=1, le=20, description="Context window for results")
-    include_metadata: bool = Field(default=True, description="Include metadata in results")
+    domains: list[str] = Field(default_factory=list, description="Filter by domains (finance, health, etc.)")
+    include_sources: bool = Field(default=True, description="Include source attribution")
+    include_reasoning: bool = Field(default=False, description="Include reasoning steps for explainability")
 
 
-class GraphRAGSearchResult(BaseModel):
-    """Individual search result."""
+class EntityResponse(BaseModel):
+    """Entity from knowledge graph."""
 
-    entity_id: str = Field(description="Entity identifier")
-    entity_type: str = Field(description="Type of entity (e.g., goal, contact, transaction)")
-    relevance_score: float = Field(description="Relevance score (0-1)")
-    content: str = Field(description="Matched content")
-    metadata: dict = Field(default_factory=dict, description="Additional metadata")
+    uri: str = Field(description="Entity URI")
+    type: str = Field(description="Entity type (ln:Goal, ln:Transaction, etc.)")
+    label: str = Field(description="Human-readable label")
+    properties: dict[str, Any] = Field(default_factory=dict, description="Entity properties")
+    tenant_id: str = Field(description="Tenant ID")
+    created_at: str = Field(description="Creation timestamp")
+    updated_at: str = Field(description="Update timestamp")
+
+
+class SourceResponse(BaseModel):
+    """Knowledge source."""
+
+    source_type: str = Field(description="Source type (knowledge_graph, vector_db, llm)")
+    source_uri: str = Field(description="Entity URI or document ID")
+    content: str = Field(description="Source content snippet")
+    relevance: float = Field(description="Relevance score (0.0-1.0)")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+
+class ReasoningStepResponse(BaseModel):
+    """Reasoning step for explainability."""
+
+    step: int = Field(description="Step number")
+    description: str = Field(description="Step description")
+    action: str = Field(description="Action taken")
+    result: str = Field(description="Step result")
 
 
 class GraphRAGQueryResponse(BaseModel):
     """GraphRAG query response schema."""
 
-    query: str = Field(description="Original query")
-    results: list[GraphRAGSearchResult] = Field(description="Search results")
-    total_results: int = Field(description="Total number of results found")
-    processing_time_ms: float = Field(description="Query processing time in milliseconds")
-    message: str = Field(default="", description="Optional message")
+    answer: str = Field(description="Generated answer from RAG")
+    sources: list[SourceResponse] = Field(default_factory=list, description="Knowledge sources used")
+    reasoning: list[ReasoningStepResponse] = Field(default_factory=list, description="Reasoning steps")
+    confidence: float = Field(description="Confidence score (0.0-1.0)")
+    entities: list[EntityResponse] = Field(default_factory=list, description="Related entities")
+    duration_ms: int = Field(description="Query processing time in milliseconds")
 
 
 @router.post("/query", response_model=GraphRAGQueryResponse)
@@ -50,53 +74,67 @@ async def search_knowledge_graph(
     tenant_id: TenantID,
 ):
     """
-    Query the knowledge graph using natural language.
+    Query the knowledge graph using natural language with RAG.
 
-    This is a placeholder endpoint. The actual implementation will use gRPC
-    to communicate with the GraphRAG service.
+    Uses the GraphRAG gRPC service to perform hybrid knowledge graph + vector RAG queries
+    with Row-Level Security filtering for multi-tenant data isolation.
 
     Args:
-        request: Query parameters
-        current_user: Authenticated user
-        tenant_id: Current tenant context
+        request: Query parameters including query text, max results, domains, etc.
+        current_user: Authenticated user (for RLS filtering)
+        tenant_id: Current tenant context (for multi-tenancy)
 
     Returns:
-        Search results from the knowledge graph
+        RAG response with generated answer, sources, entities, and reasoning
 
-    TODO:
-        - Implement gRPC client for GraphRAG service
-        - Add query caching
-        - Implement result ranking and filtering
-        - Add support for entity type filtering
-        - Implement semantic similarity search
+    Raises:
+        HTTPException: If the GraphRAG service is unavailable or returns an error
     """
     logger.info(
-        "GraphRAG query (placeholder)",
+        "GraphRAG personalized query",
         query=request.query,
         user_id=str(current_user.id),
         tenant_id=str(tenant_id),
         max_results=request.max_results,
+        domains=request.domains,
     )
 
-    # TODO: Replace with actual gRPC call to GraphRAG service
-    # Example:
-    # async with grpc.aio.insecure_channel('graphrag:50051') as channel:
-    #     stub = GraphRAGServiceStub(channel)
-    #     response = await stub.Query(QueryRequest(
-    #         query=request.query,
-    #         tenant_id=str(tenant_id),
-    #         user_id=str(current_user.id),
-    #         max_results=request.max_results,
-    #     ))
-    #     return response
+    try:
+        # Get GraphRAG client
+        client = get_graphrag_client()
 
-    return GraphRAGQueryResponse(
-        query=request.query,
-        results=[],
-        total_results=0,
-        processing_time_ms=0.0,
-        message="GraphRAG integration coming soon. This endpoint is a placeholder.",
-    )
+        # Execute personalized query with RLS filtering
+        response = await client.query_personalized(
+            query=request.query,
+            user_id=str(current_user.id),
+            tenant_id=str(tenant_id),
+            max_results=request.max_results,
+            domains=request.domains,
+            include_sources=request.include_sources,
+            include_reasoning=request.include_reasoning,
+        )
+
+        logger.info(
+            "GraphRAG query completed",
+            user_id=str(current_user.id),
+            confidence=response["confidence"],
+            entity_count=len(response["entities"]),
+            duration_ms=response["duration_ms"],
+        )
+
+        return GraphRAGQueryResponse(**response)
+
+    except Exception as e:
+        logger.error(
+            "GraphRAG query failed",
+            error=str(e),
+            user_id=str(current_user.id),
+            tenant_id=str(tenant_id),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"GraphRAG service error: {str(e)}",
+        )
 
 
 @router.get("/status")
@@ -105,31 +143,53 @@ async def get_graphrag_status(
     tenant_id: TenantID,
 ):
     """
-    Get the status of the GraphRAG service.
+    Get the health status of the GraphRAG service.
 
-    Returns connection status and service health.
+    Returns connection status, service health, and version information.
 
-    TODO:
-        - Implement actual health check via gRPC
-        - Add service version information
-        - Include index statistics
+    Args:
+        current_user: Authenticated user
+        tenant_id: Current tenant context
+
+    Returns:
+        Health status including service availability, version, and component health
     """
     logger.info(
-        "GraphRAG status check (placeholder)",
+        "GraphRAG health check",
         user_id=str(current_user.id),
         tenant_id=str(tenant_id),
     )
 
-    # TODO: Replace with actual gRPC health check
-    return {
-        "status": "not_implemented",
-        "message": "GraphRAG service integration coming soon",
-        "connected": False,
-        "version": "N/A",
-    }
+    try:
+        # Get GraphRAG client
+        client = get_graphrag_client()
+
+        # Execute health check
+        health = await client.health_check()
+
+        logger.info(
+            "GraphRAG health check completed",
+            status=health.get("status"),
+            connected=health.get("connected"),
+        )
+
+        return health
+
+    except Exception as e:
+        logger.error(
+            "GraphRAG health check failed",
+            error=str(e),
+        )
+        return {
+            "status": "unhealthy",
+            "connected": False,
+            "error": str(e),
+            "services": {},
+            "version": "unknown",
+        }
 
 
-@router.post("/index/rebuild", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/index/rebuild", status_code=status.HTTP_501_NOT_IMPLEMENTED)
 async def rebuild_knowledge_graph_index(
     current_user: CurrentUser,
     tenant_id: TenantID,
@@ -137,28 +197,36 @@ async def rebuild_knowledge_graph_index(
     """
     Trigger a rebuild of the knowledge graph index for the current tenant.
 
-    This is an async operation that runs in the background.
+    Note: This endpoint is not yet implemented in the GraphRAG service.
+    Index rebuilding will be added in a future version of the GraphRAG service.
+
+    Args:
+        current_user: Authenticated user
+        tenant_id: Current tenant context
+
+    Returns:
+        Not implemented response
 
     TODO:
-        - Implement gRPC call to trigger index rebuild
+        - Add RebuildIndex RPC to GraphRAG protobuf
+        - Implement index rebuild in GraphRAG service
         - Add progress tracking
         - Implement webhook/callback for completion notification
     """
-    logger.info(
-        "GraphRAG index rebuild requested (placeholder)",
+    logger.warning(
+        "GraphRAG index rebuild requested but not implemented",
         user_id=str(current_user.id),
         tenant_id=str(tenant_id),
     )
 
-    # TODO: Replace with actual gRPC call
-    return {
-        "status": "accepted",
-        "message": "GraphRAG index rebuild will be implemented soon",
-        "job_id": None,
-    }
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Index rebuild is not yet available in the GraphRAG service. "
+        "Index rebuilding will be added in a future version.",
+    )
 
 
-@router.get("/index/status")
+@router.get("/index/status", status_code=status.HTTP_501_NOT_IMPLEMENTED)
 async def get_index_status(
     current_user: CurrentUser,
     tenant_id: TenantID,
@@ -166,24 +234,31 @@ async def get_index_status(
     """
     Get the status of the knowledge graph index for the current tenant.
 
-    Returns indexing progress and statistics.
+    Note: This endpoint is not yet implemented in the GraphRAG service.
+    Index status tracking will be added in a future version of the GraphRAG service.
+
+    Args:
+        current_user: Authenticated user
+        tenant_id: Current tenant context
+
+    Returns:
+        Not implemented response
 
     TODO:
-        - Implement actual index status via gRPC
+        - Add GetIndexStatus RPC to GraphRAG protobuf
+        - Implement index status in GraphRAG service
         - Add entity counts by type
         - Include last update timestamp
+        - Add indexing progress tracking
     """
-    logger.info(
-        "GraphRAG index status check (placeholder)",
+    logger.warning(
+        "GraphRAG index status check requested but not implemented",
         user_id=str(current_user.id),
         tenant_id=str(tenant_id),
     )
 
-    # TODO: Replace with actual gRPC call
-    return {
-        "status": "not_implemented",
-        "message": "GraphRAG index status will be implemented soon",
-        "entity_count": 0,
-        "relationship_count": 0,
-        "last_updated": None,
-    }
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Index status tracking is not yet available in the GraphRAG service. "
+        "This will be added in a future version.",
+    )
