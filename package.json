@@ -29,5 +29,12 @@
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
-  "packageManager": "pnpm@8.12.0"
+  "packageManager": "pnpm@8.12.0",
+  "pnpm": {
+    "overrides": {
+      "xml2js": ">=0.6.2",
+      "xmldom": "npm:@xmldom/xmldom@^0.8.10",
+      "@xmldom/xmldom": ">=0.8.10"
+    }
+  }
 }
