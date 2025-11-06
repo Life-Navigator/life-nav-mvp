@@ -5,9 +5,9 @@ pydantic-settings==2.7.1  # Updated
 python-dotenv==1.0.1  # Updated
 sqlalchemy==2.0.37  # Updated to fix GHSA-hx59-hg34-59qc (SQL injection)
 asyncpg==0.30.0  # Updated
-redis==5.2.2  # Updated
+redis==5.2.1  # Updated (5.2.2 doesn't exist)
 httpx==0.28.1  # Updated
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.5.0  # Updated to fix GHSA-6c5p-j8vq-pqhj (CRITICAL), GHSA-cjwg-qfpm-7377
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.18  # Updated to fix GHSA-59g5-xgcq-4qw3
 yfinance==0.2.33
@@ -20,16 +20,16 @@ plaid-python==17.0.0
 alpaca-py==0.13.3
 fredapi==0.5.1
 azure-cosmos==4.5.1
-azure-identity==1.15.0
+azure-identity==1.25.1  # Updated to fix GHSA-m5vv-6r4h-3vj9 (Elevation of Privilege)
 prometheus-client==0.19.0
 structlog==24.1.0
 pytest==7.4.4
 pytest-asyncio==0.23.3
-black==23.12.1
+black==25.9.0  # Updated to fix GHSA-fj7x-q9j7-g6q6 (ReDoS vulnerability)
 ruff==0.1.11
 
 # Document parsing
-PyPDF2==3.0.1
+pypdf==6.1.3  # Migrated from PyPDF2 (deprecated) to fix GHSA-4vvm-4w3v-6mr8
 pdfplumber==0.10.3
 python-docx==1.1.0
 pytesseract==0.3.10
