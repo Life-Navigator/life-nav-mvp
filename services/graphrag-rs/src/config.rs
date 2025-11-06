@@ -131,6 +131,9 @@ impl Config {
         dotenv::dotenv().ok();
 
         let config = config::Config::builder()
+            // Load from config.toml if it exists
+            .add_source(config::File::with_name("config").required(false))
+            // Override with environment variables (GRAPHRAG_ prefix)
             .add_source(config::Environment::with_prefix("GRAPHRAG"))
             .build()
             .map_err(|e| GraphRAGError::Config(e.to_string()))?;

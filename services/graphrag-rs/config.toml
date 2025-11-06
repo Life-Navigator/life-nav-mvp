@@ -1,0 +1,30 @@
+[server]
+host = "0.0.0.0"
+port = 50051
+
+[neo4j]
+uri = "bolt://localhost:7687"
+user = "neo4j"
+password = "devpassword"
+database = "neo4j"
+max_connections = 10
+
+[qdrant]
+url = "http://localhost:6334"
+collection_name = "life_navigator_dev"
+vector_size = 384
+
+[graphdb]
+url = "http://localhost:7200"
+repository = "life-navigator"
+
+[embeddings]
+service_url = "http://localhost:8090"
+model = "all-MiniLM-L6-v2"
+dimension = 384
+
+[rag]
+max_results = 10
+min_similarity_score = 0.5
+semantic_weight = 0.6
+vector_weight = 0.4

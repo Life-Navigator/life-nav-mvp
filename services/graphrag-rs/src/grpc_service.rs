@@ -192,7 +192,7 @@ impl GraphRag for GraphRAGService {
             .search(
                 query_vector,
                 req.limit as usize,
-                req.min_score,
+                req.min_score as f32,
                 Some(filters),
             )
             .await

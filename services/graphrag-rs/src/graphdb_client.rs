@@ -1,7 +1,7 @@
 //! GraphDB SPARQL client for semantic ontology queries
 
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::collections::HashMap;
 use crate::config::GraphDBConfig;
 use crate::error::{GraphRAGError, Result};

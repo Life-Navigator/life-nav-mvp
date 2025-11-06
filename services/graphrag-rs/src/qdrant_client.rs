@@ -1,8 +1,8 @@
 //! Qdrant client for vector search operations
 
-use qdrant_client::prelude::*;
+use qdrant_client::Qdrant;
 use qdrant_client::qdrant::{
-    CreateCollection, Distance, VectorParams, VectorsConfig, SearchPoints, PointStruct,
+    Distance, VectorParams, PointStruct,
     Filter, Condition, FieldCondition, Match,
 };
 use std::collections::HashMap;
@@ -11,7 +11,7 @@ use crate::error::{GraphRAGError, Result};
 
 #[derive(Clone)]
 pub struct QdrantVectorClient {
-    client: QdrantClient,
+    client: Qdrant,
     collection_name: String,
     vector_size: usize,
 }
@@ -19,13 +19,13 @@ pub struct QdrantVectorClient {
 impl QdrantVectorClient {
     /// Create new Qdrant client
     pub async fn new(config: &QdrantConfig) -> Result<Self> {
-        let mut client_config = QdrantClientConfig::from_url(&config.url);
+        let mut builder = Qdrant::from_url(&config.url);
 
         if let Some(api_key) = &config.api_key {
-            client_config = client_config.with_api_key(api_key);
+            builder = builder.api_key(api_key.clone());
         }
 
-        let client = QdrantClient::new(Some(client_config))
+        let client = builder.build()
             .map_err(|e| GraphRAGError::Qdrant(e.to_string()))?;
 
         Ok(Self {
@@ -45,21 +45,16 @@ impl QdrantVectorClient {
             .any(|c| c.name == self.collection_name);
 
         if !exists {
-            // Create collection with cosine distance
+            // Create collection with cosine distance using builder API
             self.client
-                .create_collection(&CreateCollection {
-                    collection_name: self.collection_name.clone(),
-                    vectors_config: Some(VectorsConfig {
-                        config: Some(qdrant_client::qdrant::vectors_config::Config::Params(
-                            VectorParams {
-                                size: self.vector_size as u64,
-                                distance: Distance::Cosine.into(),
-                                ..Default::default()
-                            },
-                        )),
-                    }),
-                    ..Default::default()
-                })
+                .create_collection(
+                    qdrant_client::qdrant::CreateCollectionBuilder::new(&self.collection_name)
+                        .vectors_config(VectorParams {
+                            size: self.vector_size as u64,
+                            distance: Distance::Cosine.into(),
+                            ..Default::default()
+                        })
+                )
                 .await
                 .map_err(|e| GraphRAGError::Qdrant(e.to_string()))?;
         }
@@ -74,15 +69,42 @@ impl QdrantVectorClient {
     ) -> Result<()> {
         let qdrant_points: Vec<PointStruct> = points
             .into_iter()
-            .map(|p| PointStruct {
-                id: Some(p.id.into()),
-                vectors: Some(p.vector.into()),
-                payload: p.payload.into_iter().collect(),
+            .map(|p| {
+                // Convert serde_json::Value to qdrant::Value
+                let mut payload = HashMap::new();
+                for (key, value) in p.payload {
+                    let qdrant_value = match value {
+                        serde_json::Value::String(s) => qdrant_client::qdrant::Value {
+                            kind: Some(qdrant_client::qdrant::value::Kind::StringValue(s)),
+                        },
+                        serde_json::Value::Number(n) if n.is_i64() => qdrant_client::qdrant::Value {
+                            kind: Some(qdrant_client::qdrant::value::Kind::IntegerValue(n.as_i64().unwrap())),
+                        },
+                        serde_json::Value::Number(n) if n.is_f64() => qdrant_client::qdrant::Value {
+                            kind: Some(qdrant_client::qdrant::value::Kind::DoubleValue(n.as_f64().unwrap())),
+                        },
+                        serde_json::Value::Bool(b) => qdrant_client::qdrant::Value {
+                            kind: Some(qdrant_client::qdrant::value::Kind::BoolValue(b)),
+                        },
+                        _ => qdrant_client::qdrant::Value {
+                            kind: Some(qdrant_client::qdrant::value::Kind::StringValue(value.to_string())),
+                        },
+                    };
+                    payload.insert(key, qdrant_value);
+                }
+
+                PointStruct {
+                    id: Some(p.id.into()),
+                    vectors: Some(p.vector.into()),
+                    payload,
+                }
             })
             .collect();
 
         self.client
-            .upsert_points_blocking(self.collection_name.clone(), None, qdrant_points, None)
+            .upsert_points(
+                qdrant_client::qdrant::UpsertPointsBuilder::new(&self.collection_name, qdrant_points)
+            )
             .await
             .map_err(|e| GraphRAGError::Qdrant(e.to_string()))?;
 
@@ -97,27 +119,34 @@ impl QdrantVectorClient {
         min_score: f32,
         filters: Option<HashMap<String, String>>,
     ) -> Result<Vec<VectorSearchResult>> {
-        let mut search_request = SearchPoints {
-            collection_name: self.collection_name.clone(),
-            vector: query_vector,
-            limit: limit as u64,
-            score_threshold: Some(min_score),
-            with_payload: Some(true.into()),
-            ..Default::default()
-        };
+        let mut search_builder = qdrant_client::qdrant::SearchPointsBuilder::new(
+            &self.collection_name,
+            query_vector,
+            limit as u64,
+        )
+        .score_threshold(min_score)
+        .with_payload(true);
 
         // Add filters if provided
         if let Some(filter_map) = filters {
             let mut conditions = Vec::new();
 
             for (key, value) in filter_map {
-                conditions.push(Condition::field(
-                    FieldCondition::new_match(key, Match::new_keyword(value)),
-                ));
+                conditions.push(Condition {
+                    condition_one_of: Some(qdrant_client::qdrant::condition::ConditionOneOf::Field(
+                        FieldCondition {
+                            key,
+                            r#match: Some(Match {
+                                match_value: Some(qdrant_client::qdrant::r#match::MatchValue::Keyword(value)),
+                            }),
+                            ..Default::default()
+                        },
+                    )),
+                });
             }
 
             if !conditions.is_empty() {
-                search_request.filter = Some(Filter {
+                search_builder = search_builder.filter(Filter {
                     must: conditions,
                     ..Default::default()
                 });
@@ -125,7 +154,7 @@ impl QdrantVectorClient {
         }
 
         let search_result = self.client
-            .search_points(&search_request)
+            .search_points(search_builder)
             .await
             .map_err(|e| GraphRAGError::Qdrant(e.to_string()))?;
 
@@ -166,7 +195,10 @@ impl QdrantVectorClient {
             .collect();
 
         self.client
-            .delete_points(self.collection_name.clone(), None, &point_ids.into(), None)
+            .delete_points(
+                qdrant_client::qdrant::DeletePointsBuilder::new(&self.collection_name)
+                    .points(point_ids)
+            )
             .await
             .map_err(|e| GraphRAGError::Qdrant(e.to_string()))?;
 
@@ -180,9 +212,17 @@ impl QdrantVectorClient {
             .await
             .map_err(|e| GraphRAGError::Qdrant(e.to_string()))?;
 
+        let (points_count, segments_count) = match info.result {
+            Some(result) => (
+                result.points_count.unwrap_or(0),
+                result.segments_count as usize,
+            ),
+            None => (0, 0),
+        };
+
         Ok(CollectionInfo {
-            points_count: info.result.map(|r| r.points_count).unwrap_or(0),
-            segments_count: info.result.map(|r| r.segments_count).unwrap_or(0),
+            points_count,
+            segments_count,
         })
     }
 }

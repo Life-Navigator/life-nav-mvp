@@ -5,18 +5,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use crate::config::{Config, RAGConfig};
 use crate::error::{GraphRAGError, Result};
-use crate::neo4j_client::{Neo4jClient, Entity, Relationship};
+use crate::neo4j_client::{Neo4jClient, Entity};
 use crate::qdrant_client::{QdrantVectorClient, VectorPoint, VectorSearchResult};
 use crate::graphdb_client::GraphDBClient;
 use crate::embeddings::EmbeddingsService;
 
 #[derive(Clone)]
 pub struct RAGService {
-    neo4j: Arc<Neo4jClient>,
-    qdrant: Arc<QdrantVectorClient>,
-    graphdb: Arc<GraphDBClient>,
-    embeddings: Arc<EmbeddingsService>,
-    config: RAGConfig,
+    pub neo4j: Arc<Neo4jClient>,
+    pub qdrant: Arc<QdrantVectorClient>,
+    pub graphdb: Arc<GraphDBClient>,
+    pub embeddings: Arc<EmbeddingsService>,
+    pub config: RAGConfig,
 }
 
 impl RAGService {
@@ -78,7 +78,7 @@ impl RAGService {
         }
 
         // Step 4: Ontology validation (GraphDB)
-        let ontology_classes = self.graphdb.get_ontology_classes().await?;
+        let _ontology_classes = self.graphdb.get_ontology_classes().await?;
 
         // Step 5: Combine and rank results
         let combined_results = self.combine_results(
