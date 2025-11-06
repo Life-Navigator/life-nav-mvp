@@ -12,30 +12,49 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Set up Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-    
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v3
+      with:
+        version: '8'
+        run_install: false
+
+    - name: Get pnpm store directory
+      id: pnpm-cache
+      shell: bash
+      run: |
+        echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+    - name: Setup pnpm cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+        restore-keys: |
+          ${{ runner.os }}-pnpm-store-
+
     - name: Install dependencies
-      run: npm ci
-    
+      run: pnpm install --frozen-lockfile
+
     - name: Generate Prisma Client
-      run: npx prisma generate
-    
+      run: pnpm --filter @life-navigator/web exec prisma generate
+
     - name: Build Next.js application
-      run: npm run build
+      run: pnpm run build
       env:
         DATABASE_URL: ${{ secrets.DATABASE_URL }}
         NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-    
+
     - name: Run tests
-      run: npm test -- --passWithNoTests
+      run: pnpm test -- --passWithNoTests
     
     # Option 1: Deploy directly to App Service (FASTEST)
     - name: Deploy to Azure Web App

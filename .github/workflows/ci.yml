@@ -42,6 +42,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install Python dependencies for agents service
+        run: |
+          cd services/agents
+          poetry install
+
       - name: Run linting
         run: pnpm run lint
         
@@ -80,7 +95,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm exec prisma generate
+        run: pnpm --filter @life-navigator/web exec prisma generate
 
       - name: Run type checking
         run: pnpm exec tsc --noEmit
@@ -136,12 +151,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm exec prisma generate
+        run: pnpm --filter @life-navigator/web exec prisma generate
 
       - name: Set up test database
         run: |
           echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/lifenavigator_test?schema=public" > .env.test
-          pnpm exec prisma migrate deploy
+          pnpm --filter @life-navigator/web exec prisma migrate deploy
 
       - name: Run tests
         run: pnpm test
@@ -249,7 +264,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate Prisma client
-        run: pnpm exec prisma generate
+        run: pnpm --filter @life-navigator/web exec prisma generate
 
       - name: Build project
         run: pnpm run build

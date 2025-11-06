@@ -17,7 +17,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
   build-and-deploy:
@@ -26,17 +26,17 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v3
         with:
-          version: 8
+          version: '8'
           run_install: false
 
       - name: Get pnpm store directory
@@ -46,7 +46,7 @@ jobs:
           echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
       - name: Setup pnpm cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -55,6 +55,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @life-navigator/web exec prisma generate
 
       - name: Set environment variables
         id: set-env
@@ -89,7 +92,7 @@ jobs:
 
       - name: Build Next.js app
         run: |
-          SKIP_ENV_VALIDATION=true NODE_ENV=production npx next build
+          SKIP_ENV_VALIDATION=true NODE_ENV=production pnpm --filter @life-navigator/web build
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
