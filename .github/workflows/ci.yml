@@ -13,39 +13,77 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: '8'
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
-        run: npm ci
-        
+        run: pnpm install --frozen-lockfile
+
       - name: Run linting
-        run: npm run lint
+        run: pnpm run lint
         
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: '8'
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
-        run: npm ci
-        
+        run: pnpm install --frozen-lockfile
+
       - name: Generate Prisma client
-        run: npx prisma generate
-        
+        run: pnpm exec prisma generate
+
       - name: Run type checking
-        run: npx tsc --noEmit
+        run: pnpm exec tsc --noEmit
         
   test:
     name: Test
@@ -65,29 +103,48 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: '8'
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
-        run: npm ci
-        
+        run: pnpm install --frozen-lockfile
+
       - name: Generate Prisma client
-        run: npx prisma generate
-        
+        run: pnpm exec prisma generate
+
       - name: Set up test database
         run: |
           echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/lifenavigator_test?schema=public" > .env.test
-          npx prisma migrate deploy
+          pnpm exec prisma migrate deploy
 
       - name: Run tests
-        run: npm test
+        run: pnpm test
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lifenavigator_test?schema=public
           NEXTAUTH_SECRET: test_secret
@@ -97,18 +154,37 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: '8'
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
-        run: npm ci
-        
-      - name: Run npm audit
-        run: npm audit --production
+        run: pnpm install --frozen-lockfile
+
+      - name: Run pnpm audit
+        run: pnpm audit --prod
         continue-on-error: true
         
       - name: Run OWASP Dependency Check
@@ -140,24 +216,43 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint, typecheck, test]
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: '8'
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
-        run: npm ci
-        
+        run: pnpm install --frozen-lockfile
+
       - name: Generate Prisma client
-        run: npx prisma generate
-        
+        run: pnpm exec prisma generate
+
       - name: Build project
-        run: npm run build
+        run: pnpm run build
         
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
