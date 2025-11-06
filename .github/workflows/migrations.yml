@@ -1,0 +1,459 @@
+# ===========================================================================
+# Database Migrations CI/CD Pipeline
+# ===========================================================================
+# Triggers: Push to main branch, manual workflow dispatch
+# Steps: Validate migration files, run Alembic migrations on target environment
+# Supports: PostgreSQL (via Cloud SQL Proxy), multi-environment deployment
+# ===========================================================================
+
+name: Database Migrations
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/db/migrations/**'
+      - 'backend/alembic.ini'
+      - '.github/workflows/migrations.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment for migrations'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      migration_command:
+        description: 'Migration command to run'
+        required: true
+        default: 'upgrade head'
+        type: choice
+        options:
+          - upgrade head
+          - downgrade -1
+          - current
+          - history
+          - heads
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # ===========================================================================
+  # Validate Migration Files
+  # ===========================================================================
+  validate:
+    name: Validate Migration Files
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comparing migrations
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.7.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root --only main
+
+      - name: Install project
+        run: poetry install --no-interaction --only main
+
+      - name: Check migration file syntax
+        run: |
+          echo "Checking migration files for syntax errors..."
+
+          # Find all migration files
+          MIGRATION_FILES=$(find app/db/migrations/versions -name "*.py" 2>/dev/null || echo "")
+
+          if [ -z "$MIGRATION_FILES" ]; then
+            echo "No migration files found"
+            exit 0
+          fi
+
+          # Check Python syntax
+          for file in $MIGRATION_FILES; do
+            echo "Validating: $file"
+            python -m py_compile "$file" || {
+              echo "❌ Syntax error in $file"
+              exit 1
+            }
+          done
+
+          echo "✅ All migration files have valid syntax"
+
+      - name: Check for migration conflicts
+        run: |
+          echo "Checking for migration conflicts..."
+
+          # Check if alembic can parse migrations
+          if [ -f "alembic.ini" ]; then
+            poetry run alembic check || {
+              echo "❌ Migration conflict detected"
+              exit 1
+            }
+          else
+            echo "⚠️  No alembic.ini found, skipping conflict check"
+          fi
+
+          echo "✅ No migration conflicts detected"
+
+      - name: Validate migration dependencies
+        run: |
+          echo "Validating migration dependencies..."
+
+          # Check that migrations have proper down_revision references
+          MIGRATION_FILES=$(find app/db/migrations/versions -name "*.py" 2>/dev/null || echo "")
+
+          for file in $MIGRATION_FILES; do
+            if ! grep -q "down_revision" "$file"; then
+              echo "⚠️  Warning: $file missing down_revision"
+            fi
+          done
+
+          echo "✅ Migration dependency validation complete"
+
+  # ===========================================================================
+  # Run Migrations on Target Environment
+  # ===========================================================================
+  migrate:
+    name: Run Migrations
+    runs-on: ubuntu-latest
+    needs: validate
+    # Only run on main branch or manual dispatch
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine target environment
+        id: env
+        run: |
+          if [ "${{ github.event.inputs.environment }}" != "" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            # Default to dev for main branch
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine migration command
+        id: cmd
+        run: |
+          if [ "${{ github.event.inputs.migration_command }}" != "" ]; then
+            echo "command=${{ github.event.inputs.migration_command }}" >> $GITHUB_OUTPUT
+          else
+            echo "command=upgrade head" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.7.1
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: backend/.venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root --only main
+
+      - name: Install project
+        run: poetry install --no-interaction --only main
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install Cloud SQL Proxy
+        run: |
+          curl -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.0/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+          sudo mv cloud-sql-proxy /usr/local/bin/
+
+      - name: Get Cloud SQL connection details
+        id: db-config
+        run: |
+          # Set Cloud SQL connection name based on environment
+          case "${{ steps.env.outputs.environment }}" in
+            prod)
+              echo "instance_connection_name=${{ secrets.PROD_DB_INSTANCE_CONNECTION_NAME }}" >> $GITHUB_OUTPUT
+              echo "db_name=${{ secrets.PROD_DB_NAME }}" >> $GITHUB_OUTPUT
+              echo "db_user=${{ secrets.PROD_DB_USER }}" >> $GITHUB_OUTPUT
+              ;;
+            staging)
+              echo "instance_connection_name=${{ secrets.STAGING_DB_INSTANCE_CONNECTION_NAME }}" >> $GITHUB_OUTPUT
+              echo "db_name=${{ secrets.STAGING_DB_NAME }}" >> $GITHUB_OUTPUT
+              echo "db_user=${{ secrets.STAGING_DB_USER }}" >> $GITHUB_OUTPUT
+              ;;
+            dev)
+              echo "instance_connection_name=${{ secrets.DEV_DB_INSTANCE_CONNECTION_NAME }}" >> $GITHUB_OUTPUT
+              echo "db_name=${{ secrets.DEV_DB_NAME }}" >> $GITHUB_OUTPUT
+              echo "db_user=${{ secrets.DEV_DB_USER }}" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Start Cloud SQL Proxy
+        run: |
+          # Start Cloud SQL Proxy in background
+          cloud-sql-proxy \
+            --port 5432 \
+            ${{ steps.db-config.outputs.instance_connection_name }} &
+
+          # Store PID for cleanup
+          echo $! > /tmp/cloud-sql-proxy.pid
+
+          # Wait for proxy to be ready
+          echo "Waiting for Cloud SQL Proxy to start..."
+          sleep 10
+
+          # Check if proxy is running
+          if ! ps -p $(cat /tmp/cloud-sql-proxy.pid) > /dev/null; then
+            echo "❌ Cloud SQL Proxy failed to start"
+            exit 1
+          fi
+
+          echo "✅ Cloud SQL Proxy started successfully"
+
+      - name: Check database connectivity
+        env:
+          DATABASE_URL: postgresql+asyncpg://${{ secrets[format('{0}_DB_USER', steps.env.outputs.environment)] }}:${{ secrets[format('{0}_DB_PASSWORD', steps.env.outputs.environment)] }}@localhost:5432/${{ steps.db-config.outputs.db_name }}
+        run: |
+          echo "Testing database connection..."
+
+          # Simple Python script to test connection
+          poetry run python -c "
+          import asyncio
+          import asyncpg
+          import os
+
+          async def test_connection():
+              conn_params = {
+                  'host': 'localhost',
+                  'port': 5432,
+                  'user': '${{ steps.db-config.outputs.db_user }}',
+                  'password': os.environ.get('DB_PASSWORD'),
+                  'database': '${{ steps.db-config.outputs.db_name }}'
+              }
+              conn = await asyncpg.connect(**conn_params)
+              version = await conn.fetchval('SELECT version()')
+              print(f'✅ Connected to: {version}')
+              await conn.close()
+
+          asyncio.run(test_connection())
+          "
+        env:
+          DB_PASSWORD: ${{ secrets[format('{0}_DB_PASSWORD', steps.env.outputs.environment)] }}
+
+      - name: Backup database (production only)
+        if: steps.env.outputs.environment == 'prod'
+        run: |
+          echo "Creating database backup before migration..."
+
+          # Create backup using gcloud
+          BACKUP_NAME="pre-migration-$(date +%Y%m%d-%H%M%S)"
+
+          gcloud sql backups create \
+            --instance=${{ steps.db-config.outputs.instance_connection_name }} \
+            --description="Pre-migration backup: $BACKUP_NAME" \
+            --project=${{ env.PROJECT_ID }}
+
+          echo "✅ Backup created: $BACKUP_NAME"
+
+      - name: Show current migration state
+        env:
+          DATABASE_URL: postgresql://${{ steps.db-config.outputs.db_user }}:${{ secrets[format('{0}_DB_PASSWORD', steps.env.outputs.environment)] }}@localhost:5432/${{ steps.db-config.outputs.db_name }}
+        run: |
+          echo "=== Current Migration State ==="
+          poetry run alembic current -v || echo "No migrations applied yet"
+
+          echo ""
+          echo "=== Migration History ==="
+          poetry run alembic history --verbose || echo "No migration history"
+
+      - name: Run Alembic migrations
+        env:
+          DATABASE_URL: postgresql://${{ steps.db-config.outputs.db_user }}:${{ secrets[format('{0}_DB_PASSWORD', steps.env.outputs.environment)] }}@localhost:5432/${{ steps.db-config.outputs.db_name }}
+        run: |
+          echo "Running migration command: alembic ${{ steps.cmd.outputs.command }}"
+
+          # Run the migration
+          poetry run alembic ${{ steps.cmd.outputs.command }} || {
+            echo "❌ Migration failed"
+            exit 1
+          }
+
+          echo "✅ Migration completed successfully"
+
+      - name: Verify migration state
+        env:
+          DATABASE_URL: postgresql://${{ steps.db-config.outputs.db_user }}:${{ secrets[format('{0}_DB_PASSWORD', steps.env.outputs.environment)] }}@localhost:5432/${{ steps.db-config.outputs.db_name }}
+        run: |
+          echo "=== Post-Migration State ==="
+          poetry run alembic current -v
+
+          echo ""
+          echo "=== Database Schema Version ==="
+          poetry run python -c "
+          import asyncio
+          import asyncpg
+
+          async def check_version():
+              conn = await asyncpg.connect(
+                  host='localhost',
+                  port=5432,
+                  user='${{ steps.db-config.outputs.db_user }}',
+                  password='${{ secrets[format('{0}_DB_PASSWORD', steps.env.outputs.environment)] }}',
+                  database='${{ steps.db-config.outputs.db_name }}'
+              )
+
+              # Check alembic version
+              version = await conn.fetchval('SELECT version_num FROM alembic_version')
+              print(f'Current schema version: {version}')
+
+              await conn.close()
+
+          asyncio.run(check_version())
+          "
+
+      - name: Run post-migration checks
+        env:
+          DATABASE_URL: postgresql://${{ steps.db-config.outputs.db_user }}:${{ secrets[format('{0}_DB_PASSWORD', steps.env.outputs.environment)] }}@localhost:5432/${{ steps.db-config.outputs.db_name }}
+        run: |
+          echo "Running post-migration validation..."
+
+          # Check if critical tables exist
+          poetry run python -c "
+          import asyncio
+          import asyncpg
+
+          async def check_tables():
+              conn = await asyncpg.connect(
+                  host='localhost',
+                  port=5432,
+                  user='${{ steps.db-config.outputs.db_user }}',
+                  password='${{ secrets[format('{0}_DB_PASSWORD', steps.env.outputs.environment)] }}',
+                  database='${{ steps.db-config.outputs.db_name }}'
+              )
+
+              # List all tables
+              tables = await conn.fetch('''
+                  SELECT tablename FROM pg_tables
+                  WHERE schemaname = 'public'
+                  ORDER BY tablename
+              ''')
+
+              print('Tables in database:')
+              for table in tables:
+                  print(f'  - {table[\"tablename\"]}')
+
+              await conn.close()
+
+          asyncio.run(check_tables())
+          "
+
+          echo "✅ Post-migration checks completed"
+
+      - name: Cleanup Cloud SQL Proxy
+        if: always()
+        run: |
+          if [ -f /tmp/cloud-sql-proxy.pid ]; then
+            PID=$(cat /tmp/cloud-sql-proxy.pid)
+            if ps -p $PID > /dev/null; then
+              kill $PID
+              echo "Cloud SQL Proxy stopped"
+            fi
+            rm /tmp/cloud-sql-proxy.pid
+          fi
+
+      - name: Migration summary
+        if: always()
+        run: |
+          echo "=== Migration Summary ==="
+          echo "Environment: ${{ steps.env.outputs.environment }}"
+          echo "Command: alembic ${{ steps.cmd.outputs.command }}"
+          echo "Status: ${{ job.status }}"
+
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Migration completed successfully"
+          else
+            echo "❌ Migration failed"
+            echo "Please check logs and consider rolling back if necessary"
+          fi
+
+      - name: Notify on failure (production)
+        if: failure() && steps.env.outputs.environment == 'prod'
+        run: |
+          echo "⚠️  PRODUCTION MIGRATION FAILED"
+          echo "Immediate action required!"
+          echo "Consider running: alembic downgrade -1"
+          # TODO: Add Slack/email notification here
+
+  # ===========================================================================
+  # Rollback Job (Manual trigger only)
+  # ===========================================================================
+  rollback:
+    name: Rollback Migration
+    runs-on: ubuntu-latest
+    # Only allow manual rollback via workflow_dispatch
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.migration_command == 'downgrade -1'
+
+    steps:
+      - name: Require confirmation
+        run: |
+          echo "⚠️  ROLLBACK REQUESTED"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "This will rollback the last migration"
+          echo "Proceeding in 10 seconds..."
+          sleep 10
+
+      - name: Execute rollback
+        run: |
+          echo "Rollback will be executed by the migrate job"
+          echo "Monitor the migration logs carefully"

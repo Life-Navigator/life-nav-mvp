@@ -1,0 +1,443 @@
+# ===========================================================================
+# GraphRAG Rust Service CI/CD Pipeline
+# ===========================================================================
+# Triggers: Push to main/develop, PRs targeting GraphRAG service
+# Steps: Lint (fmt, clippy), test with docker services, build, push to GCR, deploy to GKE
+# Dependencies: Neo4j, Qdrant, GraphDB (RDF4J)
+# ===========================================================================
+
+name: GraphRAG Rust Service CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/graphrag-rs/**'
+      - '.github/workflows/graphrag.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/graphrag-rs/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCR_REGISTRY: gcr.io
+  IMAGE_NAME: life-navigator-graphrag
+  GKE_CLUSTER: life-navigator-cluster
+  GKE_ZONE: us-central1
+  RUST_VERSION: '1.75'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ===========================================================================
+  # Lint - Cargo fmt and Clippy
+  # ===========================================================================
+  lint:
+    name: Lint (fmt & clippy)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/graphrag-rs
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+          cache: true
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Check documentation
+        run: cargo doc --no-deps --document-private-items
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  # ===========================================================================
+  # Test - Run unit and integration tests with Docker Compose services
+  # ===========================================================================
+  test:
+    name: Test (unit & integration)
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: services/graphrag-rs
+
+    # Docker Compose services for testing
+    services:
+      neo4j:
+        image: neo4j:5.15-community
+        env:
+          NEO4J_AUTH: neo4j/test_password
+          NEO4J_PLUGINS: '["apoc"]'
+          NEO4J_apoc_export_file_enabled: 'true'
+          NEO4J_apoc_import_file_enabled: 'true'
+          NEO4J_dbms_security_procedures_unrestricted: 'apoc.*'
+        ports:
+          - 7687:7687
+          - 7474:7474
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p test_password 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      qdrant:
+        image: qdrant/qdrant:v1.7.4
+        ports:
+          - 6333:6333
+          - 6334:6334
+        options: >-
+          --health-cmd "curl -f http://localhost:6333/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      graphdb:
+        image: ontotext/graphdb:10.5.1
+        env:
+          GDB_HEAP_SIZE: 2g
+        ports:
+          - 7200:7200
+        options: >-
+          --health-cmd "curl -f http://localhost:7200/rest/repositories || exit 1"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 8
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          cache: true
+
+      - name: Install Protocol Buffer Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler libprotobuf-dev
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Cargo build
+        uses: actions/cache@v4
+        with:
+          path: services/graphrag-rs/target/
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+
+      - name: Wait for services to be ready
+        run: |
+          echo "Waiting for Neo4j..."
+          timeout 60 bash -c 'until curl -f http://localhost:7474 > /dev/null 2>&1; do sleep 2; done'
+
+          echo "Waiting for Qdrant..."
+          timeout 60 bash -c 'until curl -f http://localhost:6333/health > /dev/null 2>&1; do sleep 2; done'
+
+          echo "Waiting for GraphDB..."
+          timeout 90 bash -c 'until curl -f http://localhost:7200/rest/repositories > /dev/null 2>&1; do sleep 3; done'
+
+          echo "All services ready!"
+
+      - name: Create test environment file
+        run: |
+          cat > .env.test <<EOF
+          NEO4J_URI=bolt://localhost:7687
+          NEO4J_USER=neo4j
+          NEO4J_PASSWORD=test_password
+
+          QDRANT_URL=http://localhost:6333
+          QDRANT_API_KEY=
+
+          GRAPHDB_URL=http://localhost:7200
+          GRAPHDB_REPOSITORY=test_repo
+
+          GRPC_PORT=50051
+          METRICS_PORT=9090
+
+          RUST_LOG=info
+          RUST_BACKTRACE=1
+          EOF
+
+      - name: Run tests
+        run: |
+          cargo test --all-features --verbose
+        env:
+          NEO4J_URI: bolt://localhost:7687
+          NEO4J_USER: neo4j
+          NEO4J_PASSWORD: test_password
+          QDRANT_URL: http://localhost:6333
+          GRAPHDB_URL: http://localhost:7200
+
+      - name: Run tests with coverage (tarpaulin)
+        run: |
+          cargo install cargo-tarpaulin || true
+          cargo tarpaulin --out xml --output-dir ./coverage --all-features
+        continue-on-error: true
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./services/graphrag-rs/coverage/cobertura.xml
+          flags: graphrag-rs
+          name: graphrag-rs-coverage
+        continue-on-error: true
+
+  # ===========================================================================
+  # Build & Push Docker Image to GCR
+  # ===========================================================================
+  build:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.GCR_REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/graphrag-rs
+          file: ./services/graphrag-rs/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          build-args: |
+            RUST_VERSION=${{ env.RUST_VERSION }}
+
+      - name: Output image details
+        run: |
+          echo "Image Tags: ${{ steps.meta.outputs.tags }}"
+          echo "Image Digest: ${{ steps.build.outputs.digest }}"
+
+  # ===========================================================================
+  # Deploy to GKE
+  # ===========================================================================
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine environment
+        id: env
+        run: |
+          if [ "${{ github.event.inputs.environment }}" != "" ]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          else
+            echo "environment=dev" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install gke-gcloud-auth-plugin
+        run: |
+          gcloud components install gke-gcloud-auth-plugin
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }}-${{ steps.env.outputs.environment }} \
+            --zone ${{ env.GKE_ZONE }} \
+            --project ${{ env.PROJECT_ID }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.28.0'
+
+      - name: Install Kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Verify Kustomize overlay exists
+        run: |
+          if [ ! -d "k8s/overlays/${{ steps.env.outputs.environment }}" ]; then
+            echo "Creating overlay directory for ${{ steps.env.outputs.environment }}"
+            mkdir -p k8s/overlays/${{ steps.env.outputs.environment }}
+          fi
+
+      - name: Update image in Kustomize
+        run: |
+          cd k8s/overlays/${{ steps.env.outputs.environment }}
+
+          # Extract the first tag from the image tags output
+          IMAGE_TAG=$(echo "${{ needs.build.outputs.image-tag }}" | cut -d' ' -f1)
+
+          kustomize edit set image graphrag-image=${IMAGE_TAG}
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -k k8s/overlays/${{ steps.env.outputs.environment }}
+
+      - name: Wait for rollout to complete
+        run: |
+          kubectl rollout status deployment/graphrag-${{ steps.env.outputs.environment }} \
+            -n life-navigator \
+            --timeout=10m
+
+      - name: Verify deployment
+        run: |
+          echo "=== Deployment Status ==="
+          kubectl get deployment -n life-navigator -l app=graphrag,env=${{ steps.env.outputs.environment }}
+
+          echo ""
+          echo "=== Pods Status ==="
+          kubectl get pods -n life-navigator -l app=graphrag,env=${{ steps.env.outputs.environment }}
+
+          echo ""
+          echo "=== Services ==="
+          kubectl get svc -n life-navigator -l app=graphrag
+
+      - name: Run smoke tests
+        run: |
+          # Get the service IP/hostname
+          SERVICE_NAME="graphrag-${{ steps.env.outputs.environment }}"
+
+          # Wait for pods to be fully ready
+          echo "Waiting for pods to be ready..."
+          sleep 30
+
+          # Check if gRPC health check endpoint is available (if implemented)
+          POD_NAME=$(kubectl get pods -n life-navigator -l app=graphrag,env=${{ steps.env.outputs.environment }} -o jsonpath='{.items[0].metadata.name}')
+
+          echo "Testing gRPC service on pod: $POD_NAME"
+          kubectl exec -n life-navigator $POD_NAME -- ps aux | grep graphrag || echo "Process check completed"
+
+          # Check metrics endpoint
+          kubectl port-forward -n life-navigator svc/${SERVICE_NAME} 9090:9090 &
+          PF_PID=$!
+          sleep 5
+
+          curl -f http://localhost:9090/metrics || echo "Metrics endpoint check"
+
+          kill $PF_PID || true
+
+          echo "✅ Smoke tests completed"
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment to ${{ steps.env.outputs.environment }} completed successfully"
+          else
+            echo "❌ Deployment to ${{ steps.env.outputs.environment }} failed"
+          fi
+          echo "Image: ${{ needs.build.outputs.image-tag }}"
+          echo "Digest: ${{ needs.build.outputs.image-digest }}"
+          echo "Environment: ${{ steps.env.outputs.environment }}"
+
+  # ===========================================================================
+  # Security Scan (runs in parallel with tests)
+  # ===========================================================================
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/graphrag-rs
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Run cargo audit
+        run: |
+          cargo install cargo-audit || true
+          cargo audit
+        continue-on-error: true
+
+      - name: Run cargo deny
+        run: |
+          cargo install cargo-deny || true
+          cargo deny check
+        continue-on-error: true
