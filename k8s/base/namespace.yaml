@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: life-navigator
+  labels:
+    app.kubernetes.io/name: life-navigator
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/managed-by: kustomize
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: life-navigator-dev
+  labels:
+    app.kubernetes.io/name: life-navigator
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/managed-by: kustomize
+    environment: dev
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: life-navigator-staging
+  labels:
+    app.kubernetes.io/name: life-navigator
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/managed-by: kustomize
+    environment: staging
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: life-navigator-prod
+  labels:
+    app.kubernetes.io/name: life-navigator
+    app.kubernetes.io/component: namespace
+    app.kubernetes.io/managed-by: kustomize
+    environment: prod

@@ -1,0 +1,25 @@
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: backend-backendconfig
+  labels:
+    app: backend
+    component: api-server
+spec:
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /health
+    port: 8000
+  connectionDraining:
+    drainingTimeoutSec: 30
+  timeoutSec: 30
+  sessionAffinity:
+    affinityType: "NONE"
+  iap:
+    enabled: false
+  cdn:
+    enabled: false

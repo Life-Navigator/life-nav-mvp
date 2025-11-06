@@ -1,0 +1,107 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: life-navigator-dev
+
+resources:
+- ../../base
+- ../../shared/ingress.yaml
+- ../../shared/external-secrets.yaml
+
+commonLabels:
+  environment: dev
+  app.kubernetes.io/version: dev
+
+images:
+- name: gcr.io/PROJECT_ID/life-navigator-backend
+  newTag: dev-latest
+
+replicas:
+- name: backend
+  count: 2
+
+patches:
+# Patch deployment for dev environment
+- target:
+    kind: Deployment
+    name: backend
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: 250m
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: 512Mi
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: 1000m
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 2Gi
+
+# Patch HPA for dev environment
+- target:
+    kind: HorizontalPodAutoscaler
+    name: backend
+  patch: |-
+    - op: replace
+      path: /spec/minReplicas
+      value: 1
+    - op: replace
+      path: /spec/maxReplicas
+      value: 5
+
+# Patch ConfigMap for dev environment
+- target:
+    kind: ConfigMap
+    name: backend-config
+  patch: |-
+    - op: replace
+      path: /data/ENVIRONMENT
+      value: "development"
+    - op: replace
+      path: /data/LOG_LEVEL
+      value: "DEBUG"
+    - op: replace
+      path: /data/ENABLE_SWAGGER_UI
+      value: "true"
+    - op: replace
+      path: /data/GRAPHRAG_ENDPOINT
+      value: "graphrag-dev.services.svc.cluster.local:50051"
+
+# Patch ServiceAccount with dev GCP SA
+- target:
+    kind: ServiceAccount
+    name: backend
+  patch: |-
+    - op: replace
+      path: /metadata/annotations/iam.gke.io~1gcp-service-account
+      value: "api-server-dev@PROJECT_ID.iam.gserviceaccount.com"
+
+# Patch Ingress for dev domain
+- target:
+    kind: Ingress
+    name: life-navigator
+  patch: |-
+    - op: replace
+      path: /spec/rules/0/host
+      value: "api-dev.life-navigator.app"
+    - op: replace
+      path: /spec/tls/0/hosts/0
+      value: "api-dev.life-navigator.app"
+
+# Patch ManagedCertificate for dev domain
+- target:
+    kind: ManagedCertificate
+    name: life-navigator-cert
+  patch: |-
+    - op: replace
+      path: /spec/domains/0
+      value: "api-dev.life-navigator.app"
+
+configMapGenerator:
+- name: backend-config-dev
+  behavior: merge
+  literals:
+  - DEBUG_MODE=true
+  - ENABLE_HOT_RELOAD=true

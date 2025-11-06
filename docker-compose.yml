@@ -3,60 +3,30 @@ version: '3.9'
 services:
   # PostgreSQL with pgvector
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg15
+    container_name: ln-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: localdev
-      POSTGRES_DB: lifenavigator
+      POSTGRES_USER: lifenavigator
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: lifenavigator_dev
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/init-scripts/postgres:/docker-entrypoint-initdb.d
+      - ./backend/app/db/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U lifenavigator"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ln-network
 
-  # Neo4j Enterprise
-  neo4j:
-    image: neo4j:5.15-enterprise
-    environment:
-      NEO4J_AUTH: neo4j/localdev
-      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
-      NEO4J_PLUGINS: '["apoc", "graph-data-science", "n10s"]'
-      NEO4J_dbms_security_procedures_unrestricted: "apoc.*,gds.*,n10s.*"
-    ports:
-      - "7474:7474"  # HTTP
-      - "7687:7687"  # Bolt
-    volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
-    healthcheck:
-      test: ["CMD-SHELL", "cypher-shell -u neo4j -p localdev 'RETURN 1'"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # GraphDB Free
-  graphdb:
-    image: ontotext/graphdb:10.5.0-free
-    ports:
-      - "7200:7200"
-    volumes:
-      - graphdb_data:/opt/graphdb/home
-    environment:
-      GDB_HEAP_SIZE: 2g
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:7200/protocol"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Redis
+  # Redis Cache
   redis:
     image: redis:7-alpine
+    container_name: ln-redis
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
@@ -66,35 +36,150 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - ln-network
 
-  # FastAPI Main Backend
-  api:
+  # Neo4j Knowledge Graph
+  neo4j:
+    image: neo4j:5.15.0-enterprise
+    container_name: ln-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/devpassword
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
+      NEO4J_PLUGINS: '["apoc", "graph-data-science", "n10s"]'
+      NEO4J_dbms_memory_heap_max__size: 2G
+      NEO4J_dbms_memory_pagecache_size: 1G
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*,gds.*,n10s.*"
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O /dev/null -q http://localhost:7474 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - ln-network
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: ln-qdrant
+    ports:
+      - "6333:6333"  # HTTP
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O /dev/null -q http://localhost:6333/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - ln-network
+
+  # GraphDB Semantic Triple Store
+  graphdb:
+    image: ontotext/graphdb:10.5.1
+    container_name: ln-graphdb
+    environment:
+      GDB_HEAP_SIZE: 2g
+      GDB_MIN_MEM: 2g
+      GDB_MAX_MEM: 2g
+    ports:
+      - "7200:7200"
+    volumes:
+      - graphdb_data:/opt/graphdb/home
+      - ./ontology:/ontology:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -O /dev/null -q http://localhost:7200/protocol || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - ln-network
+
+  # GraphRAG Rust Service
+  graphrag:
     build:
-      context: ./services/api
+      context: ./services/graphrag-rs
       dockerfile: Dockerfile
+    container_name: ln-graphrag
+    environment:
+      GRAPHRAG_SERVER__HOST: 0.0.0.0
+      GRAPHRAG_SERVER__PORT: 50051
+      GRAPHRAG_NEO4J__URI: bolt://neo4j:7687
+      GRAPHRAG_NEO4J__USER: neo4j
+      GRAPHRAG_NEO4J__PASSWORD: devpassword
+      GRAPHRAG_QDRANT__URL: http://qdrant:6333
+      GRAPHRAG_GRAPHDB__URL: http://graphdb:7200
+      GRAPHRAG_GRAPHDB__REPOSITORY: life-navigator
+      RUST_LOG: debug
+    ports:
+      - "50051:50051"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      graphdb:
+        condition: service_healthy
+    networks:
+      - ln-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ln-backend
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      DATABASE_URL: postgresql+asyncpg://lifenavigator:devpassword@postgres:5432/lifenavigator_dev
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: dev-secret-key-change-in-production-minimum-32-chars
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+      GRAPHRAG_URL: graphrag:50051
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_PASSWORD: devpassword
+      QDRANT_URL: http://qdrant:6333
+      GRAPHDB_URL: http://graphdb:7200
+      ENABLE_PLAID_SYNC: "false"
+      ENABLE_EMAIL_NOTIFICATIONS: "false"
+      ENABLE_SMS_NOTIFICATIONS: "false"
     ports:
       - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql://postgres:localdev@postgres:5432/lifenavigator
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: neo4j
-      NEO4J_PASSWORD: localdev
-      GRAPHDB_URL: http://graphdb:7200
-      REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
         condition: service_healthy
-      neo4j:
-        condition: service_healthy
       redis:
         condition: service_healthy
+      graphrag:
+        condition: service_started
     volumes:
-      - ./services/api:/app
-    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+      - ./backend/app:/app/app:ro
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - ln-network
+
+networks:
+  ln-network:
+    driver: bridge
 
 volumes:
   postgres_data:
+  redis_data:
   neo4j_data:
   neo4j_logs:
+  qdrant_data:
   graphdb_data:
-  redis_data:

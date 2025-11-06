@@ -9,6 +9,18 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
+    google-beta = {
+      source  = "hashicorp/google-beta"
+      version = "~> 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.23"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.11"
+    }
   }
 
   backend "gcs" {
@@ -18,6 +30,11 @@ terraform {
 }
 
 provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+provider "google-beta" {
   project = var.project_id
   region  = var.region
 }
@@ -39,6 +56,16 @@ module "vpc" {
       name          = "private-subnet"
       ip_cidr_range = "10.0.0.0/24"
       region        = var.region
+      secondary_ip_ranges = [
+        {
+          range_name    = "pods"
+          ip_cidr_range = "10.1.0.0/16"
+        },
+        {
+          range_name    = "services"
+          ip_cidr_range = "10.2.0.0/16"
+        }
+      ]
     }
   ]
 }
@@ -336,6 +363,187 @@ module "monitoring" {
 }
 
 # ===========================================================================
+# GKE Cluster
+# ===========================================================================
+
+module "gke_cluster" {
+  source = "../../modules/gke-cluster"
+
+  project_id = var.project_id
+  region     = var.region
+  env        = "dev"
+
+  cluster_name = "life-navigator-gke"
+  network      = module.vpc.network_name
+  subnetwork   = module.vpc.subnet_names["private-subnet"]
+
+  enable_private_cluster = false  # Public for dev/CI access
+  enable_private_nodes   = true
+
+  # Allow access from anywhere for dev
+  master_authorized_networks = [
+    {
+      cidr_block   = "0.0.0.0/0"
+      display_name = "All"
+    }
+  ]
+
+  release_channel = "REGULAR"
+  enable_autopilot = true
+
+  labels = {
+    environment = "dev"
+    managed_by  = "terraform"
+    cost_center = "development"
+  }
+}
+
+# ===========================================================================
+# Kubernetes Provider Configuration
+# ===========================================================================
+
+# Get GKE cluster credentials
+data "google_client_config" "default" {}
+
+data "google_container_cluster" "primary" {
+  name     = module.gke_cluster.cluster_name
+  location = module.gke_cluster.cluster_location
+  project  = var.project_id
+
+  depends_on = [module.gke_cluster]
+}
+
+provider "kubernetes" {
+  host  = "https://${data.google_container_cluster.primary.endpoint}"
+  token = data.google_client_config.default.access_token
+  cluster_ca_certificate = base64decode(
+    data.google_container_cluster.primary.master_auth[0].cluster_ca_certificate
+  )
+}
+
+provider "helm" {
+  kubernetes {
+    host  = "https://${data.google_container_cluster.primary.endpoint}"
+    token = data.google_client_config.default.access_token
+    cluster_ca_certificate = base64decode(
+      data.google_container_cluster.primary.master_auth[0].cluster_ca_certificate
+    )
+  }
+}
+
+# ===========================================================================
+# External Secrets Operator
+# ===========================================================================
+
+module "external_secrets_operator" {
+  source = "../../modules/external-secrets-operator"
+
+  project_id             = var.project_id
+  cluster_name           = module.gke_cluster.cluster_name
+  cluster_location       = module.gke_cluster.cluster_location
+  workload_identity_pool = module.gke_cluster.workload_identity_pool
+  env                    = "dev"
+
+  labels = {
+    environment = "dev"
+    managed_by  = "terraform"
+  }
+
+  depends_on = [module.gke_cluster]
+}
+
+# ===========================================================================
+# Neo4j Module (if using self-hosted)
+# ===========================================================================
+
+# Uncomment if deploying Neo4j to GKE instead of using Aura
+# module "neo4j" {
+#   source = "../../modules/neo4j"
+#
+#   project_id   = var.project_id
+#   cluster_name = module.gke_cluster.cluster_name
+#   env          = "dev"
+#
+#   depends_on = [module.gke_cluster]
+# }
+
+# ===========================================================================
+# Qdrant Module (if using self-hosted)
+# ===========================================================================
+
+# Uncomment if deploying Qdrant to GKE instead of using Qdrant Cloud
+# module "qdrant" {
+#   source = "../../modules/qdrant"
+#
+#   project_id   = var.project_id
+#   cluster_name = module.gke_cluster.cluster_name
+#   env          = "dev"
+#
+#   depends_on = [module.gke_cluster]
+# }
+
+# ===========================================================================
+# GraphDB Module (if using self-hosted)
+# ===========================================================================
+
+# Uncomment if deploying GraphDB to GKE
+# module "graphdb" {
+#   source = "../../modules/graphdb"
+#
+#   project_id   = var.project_id
+#   cluster_name = module.gke_cluster.cluster_name
+#   env          = "dev"
+#
+#   depends_on = [module.gke_cluster]
+# }
+
+# ===========================================================================
+# GraphRAG Service
+# ===========================================================================
+
+# Note: GraphRAG is deployed via its own Terraform module
+# See terraform/gcp/modules/graphrag-service/main.tf
+# Uncomment and configure when ready to deploy
+
+# module "graphrag_service" {
+#   source = "../../modules/graphrag-service"
+#
+#   project_id   = var.project_id
+#   region       = var.region
+#   env          = "dev"
+#   cluster_name = module.gke_cluster.cluster_name
+#
+#   # Neo4j configuration (using Aura)
+#   neo4j_service            = "neo4j-dev"
+#   neo4j_namespace          = "databases"
+#   neo4j_password_secret    = "neo4j-aura-password"
+#
+#   # Qdrant configuration (using Cloud)
+#   qdrant_url              = "https://your-qdrant-cloud-url"
+#   qdrant_api_key_secret   = "qdrant-cloud-api-key"
+#
+#   # GraphDB configuration
+#   graphdb_service         = "graphdb-dev"
+#   graphdb_namespace       = "databases"
+#   graphdb_repository      = "life-navigator-dev"
+#
+#   # Embeddings service (Maverick)
+#   embeddings_service_url  = "http://maverick:8090"
+#
+#   image_tag = "dev-latest"
+#
+#   labels = {
+#     environment = "dev"
+#     managed_by  = "terraform"
+#   }
+#
+#   depends_on = [
+#     module.gke_cluster,
+#     module.external_secrets_operator
+#   ]
+# }
+
+# ===========================================================================
 # Outputs
 # ===========================================================================
 
@@ -379,4 +587,43 @@ output "api_server_sa_email" {
 output "vpc_name" {
   description = "VPC network name"
   value       = module.vpc.network_name
+}
+
+# GKE outputs
+output "gke_cluster_name" {
+  description = "GKE cluster name"
+  value       = module.gke_cluster.cluster_name
+}
+
+output "gke_cluster_endpoint" {
+  description = "GKE cluster endpoint"
+  value       = module.gke_cluster.cluster_endpoint
+  sensitive   = true
+}
+
+output "gke_cluster_ca_certificate" {
+  description = "GKE cluster CA certificate"
+  value       = module.gke_cluster.cluster_ca_certificate
+  sensitive   = true
+}
+
+output "gke_workload_identity_pool" {
+  description = "GKE Workload Identity pool"
+  value       = module.gke_cluster.workload_identity_pool
+}
+
+# External Secrets Operator outputs
+output "eso_namespace" {
+  description = "External Secrets Operator namespace"
+  value       = module.external_secrets_operator.namespace
+}
+
+output "eso_cluster_secret_store" {
+  description = "ClusterSecretStore name"
+  value       = module.external_secrets_operator.cluster_secret_store_name
+}
+
+output "eso_gcp_sa_email" {
+  description = "External Secrets Operator GCP service account"
+  value       = module.external_secrets_operator.gcp_service_account_email
 }

@@ -28,6 +28,10 @@ variable "subnets" {
     name          = string
     ip_cidr_range = string
     region        = string
+    secondary_ip_ranges = optional(list(object({
+      range_name    = string
+      ip_cidr_range = string
+    })), [])
   }))
 }
 
@@ -50,6 +54,15 @@ resource "google_compute_subnetwork" "subnets" {
 
   # Enable private Google access for managed services
   private_ip_google_access = true
+
+  # Secondary IP ranges for GKE pods and services
+  dynamic "secondary_ip_range" {
+    for_each = var.subnets[count.index].secondary_ip_ranges
+    content {
+      range_name    = secondary_ip_range.value.range_name
+      ip_cidr_range = secondary_ip_range.value.ip_cidr_range
+    }
+  }
 
   # Enable flow logs for dev/staging/prod
   log_config {
@@ -157,6 +170,11 @@ output "subnet_ids" {
 }
 
 output "subnet_names" {
-  description = "Subnet names"
-  value       = [for subnet in google_compute_subnetwork.subnets : subnet.name]
+  description = "Subnet names as map"
+  value       = { for subnet in google_compute_subnetwork.subnets : split("-", subnet.name)[length(split("-", subnet.name))-1] => subnet.name }
+}
+
+output "subnet_self_links" {
+  description = "Subnet self links"
+  value       = [for subnet in google_compute_subnetwork.subnets : subnet.self_link]
 }

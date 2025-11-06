@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  labels:
+    app: backend
+    component: api-server
+data:
+  ENVIRONMENT: "development"
+  LOG_LEVEL: "INFO"
+
+  # API Configuration
+  API_V1_PREFIX: "/api/v1"
+  CORS_ORIGINS: '["*"]'
+
+  # GraphRAG Service
+  GRAPHRAG_ENDPOINT: "graphrag-dev.services.svc.cluster.local:50051"
+
+  # Qdrant Configuration
+  QDRANT_URL: "https://qdrant-cloud-endpoint"
+  QDRANT_COLLECTION: "life_navigator"
+
+  # Neo4j Configuration (non-sensitive)
+  NEO4J_DATABASE: "neo4j"
+  NEO4J_MAX_CONNECTIONS: "10"
+
+  # Application Settings
+  MAX_UPLOAD_SIZE: "104857600"  # 100MB
+  SESSION_TIMEOUT: "3600"
+
+  # Feature Flags
+  ENABLE_SWAGGER_UI: "true"
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "false"
+
+  # Rate Limiting
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_PER_MINUTE: "60"
+
+  # Cache Settings
+  CACHE_TTL: "300"
+  CACHE_MAX_SIZE: "1000"

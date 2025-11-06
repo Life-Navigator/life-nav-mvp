@@ -1,0 +1,84 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: life-navigator
+  labels:
+    app.kubernetes.io/name: life-navigator
+    app.kubernetes.io/component: ingress
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "life-navigator-ip"
+    networking.gke.io/managed-certificates: "life-navigator-cert"
+    kubernetes.io/ingress.allow-http: "false"
+    # GCP-specific annotations
+    cloud.google.com/neg: '{"ingress": true}'
+    cloud.google.com/backend-config: '{"default": "backend-backendconfig"}'
+    # Security headers
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+spec:
+  rules:
+  - host: api.life-navigator.app
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 8000
+      - path: /docs
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 8000
+      - path: /redoc
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 8000
+      - path: /openapi.json
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 8000
+      - path: /health
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 8000
+  tls:
+  - hosts:
+    - api.life-navigator.app
+    secretName: life-navigator-tls
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: life-navigator-cert
+  labels:
+    app.kubernetes.io/name: life-navigator
+    app.kubernetes.io/component: certificate
+spec:
+  domains:
+  - api.life-navigator.app
+---
+apiVersion: compute.cnrm.cloud.google.com/v1beta1
+kind: ComputeAddress
+metadata:
+  name: life-navigator-ip
+  labels:
+    app.kubernetes.io/name: life-navigator
+    app.kubernetes.io/component: static-ip
+spec:
+  location: global
+  addressType: EXTERNAL
