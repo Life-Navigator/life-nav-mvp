@@ -119,7 +119,8 @@ resource "aws_db_instance" "main" {
   tags = merge(
     var.tags,
     {
-      Name = "${var.environment}-graphrag-db"
+      Name   = "${var.environment}-graphrag-db"
+      Backup = var.environment == "production" ? "HIPAA" : "Standard" # Tag for AWS Backup selection
     }
   )
 }
@@ -369,6 +370,133 @@ resource "aws_cloudwatch_metric_alarm" "redis_memory" {
   dimensions = {
     ReplicationGroupId = aws_elasticache_replication_group.main.id
   }
+
+  tags = var.tags
+}
+
+# ===========================================================================
+# AWS Backup for HIPAA 7-Year Retention (2,555 days)
+# ===========================================================================
+
+# AWS Backup Vault with KMS encryption
+resource "aws_backup_vault" "hipaa_compliant" {
+  count = var.environment == "production" ? 1 : 0
+
+  name        = "${var.environment}-hipaa-backup-vault"
+  kms_key_arn = var.backup_kms_key_arn
+
+  tags = merge(
+    var.tags,
+    {
+      Name       = "${var.environment}-hipaa-backup-vault"
+      Compliance = "HIPAA"
+      Retention  = "7-years"
+    }
+  )
+}
+
+# AWS Backup Plan for HIPAA Compliance
+resource "aws_backup_plan" "hipaa_compliant" {
+  count = var.environment == "production" ? 1 : 0
+
+  name = "${var.environment}-hipaa-backup-plan"
+
+  # Daily backups with 7-year retention
+  rule {
+    rule_name         = "daily-7year-retention"
+    target_vault_name = aws_backup_vault.hipaa_compliant[0].name
+    schedule          = "cron(0 5 * * ? *)" # Daily at 5 AM UTC
+    start_window      = 60                  # Start within 1 hour
+    completion_window = 180                 # Complete within 3 hours
+
+    lifecycle {
+      delete_after       = 2555 # 7 years for HIPAA compliance
+      cold_storage_after = 90   # Move to cold storage after 90 days
+    }
+
+    recovery_point_tags = merge(
+      var.tags,
+      {
+        Compliance    = "HIPAA"
+        RetentionDays = "2555"
+      }
+    )
+  }
+
+  # Weekly backups for additional redundancy
+  rule {
+    rule_name         = "weekly-7year-retention"
+    target_vault_name = aws_backup_vault.hipaa_compliant[0].name
+    schedule          = "cron(0 6 ? * SUN *)" # Weekly on Sunday at 6 AM UTC
+    start_window      = 60
+    completion_window = 180
+
+    lifecycle {
+      delete_after       = 2555 # 7 years
+      cold_storage_after = 30   # Move to cold storage after 30 days
+    }
+
+    recovery_point_tags = merge(
+      var.tags,
+      {
+        Compliance    = "HIPAA"
+        RetentionDays = "2555"
+        BackupType    = "Weekly"
+      }
+    )
+  }
+
+  tags = merge(
+    var.tags,
+    {
+      Name       = "${var.environment}-hipaa-backup-plan"
+      Compliance = "HIPAA"
+    }
+  )
+}
+
+# Backup Selection - RDS PostgreSQL
+resource "aws_backup_selection" "rds_hipaa" {
+  count = var.environment == "production" ? 1 : 0
+
+  name         = "${var.environment}-rds-hipaa-backup"
+  plan_id      = aws_backup_plan.hipaa_compliant[0].id
+  iam_role_arn = aws_iam_role.aws_backup[0].arn
+
+  resources = [
+    aws_db_instance.main.arn
+  ]
+
+  selection_tag {
+    type  = "STRINGEQUALS"
+    key   = "Backup"
+    value = "HIPAA"
+  }
+}
+
+# IAM Role for AWS Backup
+resource "aws_iam_role" "aws_backup" {
+  count = var.environment == "production" ? 1 : 0
+
+  name_prefix = "${var.environment}-aws-backup-"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "backup.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  managed_policy_arns = [
+    "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup",
+    "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores"
+  ]
 
   tags = var.tags
 }

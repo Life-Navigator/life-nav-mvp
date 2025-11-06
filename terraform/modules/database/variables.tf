@@ -69,12 +69,12 @@ variable "enable_multi_az" {
 }
 
 variable "backup_retention_period" {
-  description = "Number of days to retain automated backups"
+  description = "Number of days to retain automated backups (RDS automated backups max: 35 days. For HIPAA 7-year retention, use AWS Backup service configured separately)"
   type        = number
-  default     = 7
+  default     = 35 # Maximum for RDS automated backups
   validation {
     condition     = var.backup_retention_period >= 0 && var.backup_retention_period <= 35
-    error_message = "Backup retention period must be between 0 and 35 days."
+    error_message = "RDS automated backup retention period must be between 0 and 35 days. For longer retention (e.g., HIPAA 7 years), use AWS Backup service."
   }
 }
 
@@ -136,6 +136,16 @@ variable "redis_snapshot_retention_limit" {
 
 variable "sns_topic_arn" {
   description = "SNS topic ARN for CloudWatch alarms (optional)"
+  type        = string
+  default     = null
+}
+
+# ===========================================================================
+# HIPAA Backup Configuration
+# ===========================================================================
+
+variable "backup_kms_key_arn" {
+  description = "KMS key ARN for encrypting AWS Backup vault (required for HIPAA compliance in production)"
   type        = string
   default     = null
 }
