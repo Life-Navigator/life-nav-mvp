@@ -1,6 +1,10 @@
 """SQLAlchemy models for all domains."""
 
+from app.models.career import CareerProfile, Interview, JobApplication
+from app.models.education import Course, EducationCredential
 from app.models.finance import Budget, FinancialAccount, Transaction
+from app.models.goals import Goal, Milestone
+from app.models.health import HealthCondition, Medication
 from app.models.mixins import (
     BaseModel,
     BaseSoftDeleteModel,
@@ -12,6 +16,7 @@ from app.models.mixins import (
     UUIDMixin,
     UserOwnedMixin,
 )
+from app.models.relationships import Contact, ContactInteraction
 from app.models.user import (
     AuditLog,
     Organization,
@@ -41,9 +46,20 @@ __all__ = [
     "FinancialAccount",
     "Transaction",
     "Budget",
-    # Career (to be added)
-    # Education (to be added)
-    # Goals (to be added)
-    # Health (to be added)
-    # Relationships (to be added)
+    # Career
+    "CareerProfile",
+    "JobApplication",
+    "Interview",
+    # Education
+    "EducationCredential",
+    "Course",
+    # Goals
+    "Goal",
+    "Milestone",
+    # Health
+    "HealthCondition",
+    "Medication",
+    # Relationships
+    "Contact",
+    "ContactInteraction",
 ]
