@@ -1,12 +1,12 @@
 # Core dependencies
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
-python-multipart==0.0.6
+fastapi==0.115.6  # Updated to fix DoS vulnerabilities
+uvicorn[standard]==0.34.0  # Updated for compatibility
+pydantic==2.10.5  # Updated for compatibility
+pydantic-settings==2.7.1  # Updated
+python-multipart==0.0.18  # Updated to fix GHSA-59g5-xgcq-4qw3
 
 # Async and utilities
-httpx==0.25.1
+httpx==0.28.1  # Updated
 aiofiles==23.2.1
 python-dotenv==1.0.0
 
@@ -33,8 +33,8 @@ pytest-cov==4.1.0
 httpx==0.25.1
 
 # Type checking
-mypy==1.7.1
-types-redis==4.6.0.20231113
+mypy==1.14.1  # Updated
+types-redis==4.6.0.20241004  # Updated to latest available version
 
 # Code quality
 ruff==0.1.6

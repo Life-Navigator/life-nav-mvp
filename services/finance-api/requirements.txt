@@ -1,15 +1,15 @@
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
-python-dotenv==1.0.0
-sqlalchemy==2.0.25
-asyncpg==0.29.0
-redis==5.0.1
-httpx==0.26.0
+fastapi==0.115.6  # Updated to fix GHSA-qf9m-vfgh-m389, GHSA-4gqc-68p4-vx9x
+uvicorn[standard]==0.34.0  # Updated for compatibility
+pydantic==2.10.5  # Updated for compatibility
+pydantic-settings==2.7.1  # Updated
+python-dotenv==1.0.1  # Updated
+sqlalchemy==2.0.37  # Updated to fix GHSA-hx59-hg34-59qc (SQL injection)
+asyncpg==0.30.0  # Updated
+redis==5.2.2  # Updated
+httpx==0.28.1  # Updated
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
+python-multipart==0.0.18  # Updated to fix GHSA-59g5-xgcq-4qw3
 yfinance==0.2.33
 pandas==2.1.4
 numpy==1.26.3
@@ -33,12 +33,12 @@ PyPDF2==3.0.1
 pdfplumber==0.10.3
 python-docx==1.1.0
 pytesseract==0.3.10
-Pillow==10.2.0
+Pillow==11.1.0  # Updated for security
 openpyxl==3.1.2
 
 # Market data and caching
-cachetools==5.3.2
-aiohttp==3.9.1
+cachetools==5.5.0  # Updated
+aiohttp==3.12.14  # Updated to fix 8 critical vulnerabilities (request smuggling, DoS)
 
 # Database migrations
 alembic==1.13.1

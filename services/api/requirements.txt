@@ -1,21 +1,21 @@
 # Core FastAPI
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
+fastapi==0.115.6  # Updated to fix GHSA-qf9m-vfgh-m389, GHSA-4gqc-68p4-vx9x (DoS vulnerabilities)
+uvicorn[standard]==0.34.0  # Updated for compatibility
 
 # Database
-sqlalchemy==2.0.25
-alembic==1.13.1
-asyncpg==0.29.0
+sqlalchemy==2.0.37  # Updated to fix GHSA-hx59-hg34-59qc (SQL injection)
+alembic==1.14.0  # Updated for compatibility
+asyncpg==0.30.0  # Updated
 
 # Validation and Settings
-pydantic==2.5.0
-pydantic-settings==2.1.0
-email-validator==2.1.0
+pydantic==2.10.5  # Updated for compatibility with fastapi 0.115
+pydantic-settings==2.7.1  # Updated
+email-validator==2.2.0  # Updated
 
 # Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
+python-multipart==0.0.18  # Updated to fix GHSA-59g5-xgcq-4qw3 (DoS vulnerability)
 
 # Neo4j and RDF
 neo4j==5.16.0
