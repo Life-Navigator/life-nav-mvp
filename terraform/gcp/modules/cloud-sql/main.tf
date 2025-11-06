@@ -93,6 +93,12 @@ variable "labels" {
   default     = {}
 }
 
+variable "enable_pgvector" {
+  description = "Enable pgvector extension for vector similarity search"
+  type        = bool
+  default     = true
+}
+
 # Cloud SQL Instance
 resource "google_sql_database_instance" "postgres" {
   name             = var.instance_name
@@ -159,6 +165,31 @@ resource "google_sql_database_instance" "postgres" {
     database_flags {
       name  = "log_min_duration_statement"
       value = "1000"  # Log queries > 1s
+    }
+
+    # pgvector optimization flags
+    dynamic "database_flags" {
+      for_each = var.enable_pgvector ? [1] : []
+      content {
+        name  = "maintenance_work_mem"
+        value = "2097152"  # 8GB for vector index building
+      }
+    }
+
+    dynamic "database_flags" {
+      for_each = var.enable_pgvector ? [1] : []
+      content {
+        name  = "max_parallel_workers"
+        value = "8"
+      }
+    }
+
+    dynamic "database_flags" {
+      for_each = var.enable_pgvector ? [1] : []
+      content {
+        name  = "max_parallel_workers_per_gather"
+        value = "4"
+      }
     }
 
     user_labels = var.labels
@@ -290,4 +321,14 @@ output "database_password" {
 output "database_user" {
   description = "Database user"
   value       = google_sql_user.default.name
+}
+
+output "pgvector_enabled" {
+  description = "Whether pgvector optimization is enabled"
+  value       = var.enable_pgvector
+}
+
+output "pgvector_init_sql" {
+  description = "SQL commands to initialize pgvector extension (run after first connection)"
+  value       = var.enable_pgvector ? "CREATE EXTENSION IF NOT EXISTS vector;\nCREATE EXTENSION IF NOT EXISTS pg_trgm;\nCREATE EXTENSION IF NOT EXISTS btree_gin;" : "pgvector not enabled"
 }
