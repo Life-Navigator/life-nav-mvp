@@ -7,7 +7,7 @@
     "dev": "tsc --watch",
     "build": "tsc",
     "generate": "openapi-typescript ../../../services/api/openapi.json -o ./src/generated.ts",
-    "lint": "eslint src/",
+    "lint": "eslint 'src/**/*.{ts,tsx}'",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist"
   },
