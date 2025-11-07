@@ -15,7 +15,7 @@ asyncpg = "^0.29.0"
 psycopg2-binary = "^2.9.9"
 pydantic = {extras = ["email"], version = "^2.9.0"}
 pydantic-settings = "^2.6.0"
-python-jose = {extras = ["cryptography"], version = "^3.3.0"}
+python-jose = {extras = ["cryptography"], version = "^3.5.0"}  # Updated to fix CRITICAL vulnerabilities
 passlib = {extras = ["bcrypt"], version = "^1.7.4"}
 python-multipart = "^0.0.18"  # Updated to fix DoS vulnerability
 redis = "^5.0.1"
