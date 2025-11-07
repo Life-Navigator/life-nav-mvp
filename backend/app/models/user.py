@@ -217,9 +217,7 @@ class User(BaseSoftDeleteModel, Base):
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, server_default="{}")
 
     # Relationships
-    user_tenants: Mapped[list["UserTenant"]] = relationship(
-        back_populates="user", lazy="selectin"
-    )
+    user_tenants: Mapped[list["UserTenant"]] = relationship(back_populates="user", lazy="selectin")
 
 
 class UserTenant(UUIDMixin, TimestampMixin, Base):

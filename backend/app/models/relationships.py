@@ -73,7 +73,9 @@ class Contact(BaseTenantModel, Base):
     job_title: Mapped[str | None] = mapped_column(String(255))
 
     # Relationship
-    relationship_type: Mapped[RelationshipType | None] = mapped_column(Enum(RelationshipType), index=True)
+    relationship_type: Mapped[RelationshipType | None] = mapped_column(
+        Enum(RelationshipType), index=True
+    )
     relationship_strength: Mapped[int | None] = mapped_column()
     importance: Mapped[Importance] = mapped_column(
         Enum(Importance),
@@ -120,7 +122,9 @@ class ContactInteraction(BaseTenantModel, Base):
 
     # Interaction details
     interaction_type: Mapped[InteractionType | None] = mapped_column(Enum(InteractionType))
-    interaction_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    interaction_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
     duration_minutes: Mapped[int | None] = mapped_column()
     location: Mapped[str | None] = mapped_column(String(255))
 

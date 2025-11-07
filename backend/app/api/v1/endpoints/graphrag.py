@@ -20,9 +20,13 @@ class GraphRAGQueryRequest(BaseModel):
 
     query: str = Field(min_length=1, description="Natural language query")
     max_results: int = Field(default=10, ge=1, le=100, description="Maximum number of results")
-    domains: list[str] = Field(default_factory=list, description="Filter by domains (finance, health, etc.)")
+    domains: list[str] = Field(
+        default_factory=list, description="Filter by domains (finance, health, etc.)"
+    )
     include_sources: bool = Field(default=True, description="Include source attribution")
-    include_reasoning: bool = Field(default=False, description="Include reasoning steps for explainability")
+    include_reasoning: bool = Field(
+        default=False, description="Include reasoning steps for explainability"
+    )
 
 
 class EntityResponse(BaseModel):
@@ -60,8 +64,12 @@ class GraphRAGQueryResponse(BaseModel):
     """GraphRAG query response schema."""
 
     answer: str = Field(description="Generated answer from RAG")
-    sources: list[SourceResponse] = Field(default_factory=list, description="Knowledge sources used")
-    reasoning: list[ReasoningStepResponse] = Field(default_factory=list, description="Reasoning steps")
+    sources: list[SourceResponse] = Field(
+        default_factory=list, description="Knowledge sources used"
+    )
+    reasoning: list[ReasoningStepResponse] = Field(
+        default_factory=list, description="Reasoning steps"
+    )
     confidence: float = Field(description="Confidence score (0.0-1.0)")
     entities: list[EntityResponse] = Field(default_factory=list, description="Related entities")
     duration_ms: int = Field(description="Query processing time in milliseconds")

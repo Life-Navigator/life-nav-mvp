@@ -72,9 +72,7 @@ async def get_financial_account(
 
     Returns 404 if account not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(FinancialAccount).where(FinancialAccount.id == account_id)
-    )
+    result = await db.execute(select(FinancialAccount).where(FinancialAccount.id == account_id))
     account = result.scalar_one_or_none()
 
     if not account:
@@ -87,7 +85,9 @@ async def get_financial_account(
     return FinancialAccountResponse.model_validate(account)
 
 
-@router.post("/accounts", response_model=FinancialAccountResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/accounts", response_model=FinancialAccountResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_financial_account(
     data: FinancialAccountCreate,
     db: DBSession,
@@ -124,9 +124,7 @@ async def update_financial_account(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(FinancialAccount).where(FinancialAccount.id == account_id)
-    )
+    result = await db.execute(select(FinancialAccount).where(FinancialAccount.id == account_id))
     account = result.scalar_one_or_none()
 
     if not account:
@@ -156,9 +154,7 @@ async def delete_financial_account(
 
     Soft deletes the account by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(FinancialAccount).where(FinancialAccount.id == account_id)
-    )
+    result = await db.execute(select(FinancialAccount).where(FinancialAccount.id == account_id))
     account = result.scalar_one_or_none()
 
     if not account:
@@ -224,9 +220,7 @@ async def get_transaction(
 
     Returns 404 if transaction not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(Transaction).where(Transaction.id == transaction_id)
-    )
+    result = await db.execute(select(Transaction).where(Transaction.id == transaction_id))
     transaction = result.scalar_one_or_none()
 
     if not transaction:
@@ -239,7 +233,9 @@ async def get_transaction(
     return TransactionResponse.model_validate(transaction)
 
 
-@router.post("/transactions", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/transactions", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_transaction(
     data: TransactionCreate,
     db: DBSession,
@@ -276,9 +272,7 @@ async def update_transaction(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(Transaction).where(Transaction.id == transaction_id)
-    )
+    result = await db.execute(select(Transaction).where(Transaction.id == transaction_id))
     transaction = result.scalar_one_or_none()
 
     if not transaction:
@@ -308,9 +302,7 @@ async def delete_transaction(
 
     Soft deletes the transaction by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(Transaction).where(Transaction.id == transaction_id)
-    )
+    result = await db.execute(select(Transaction).where(Transaction.id == transaction_id))
     transaction = result.scalar_one_or_none()
 
     if not transaction:
@@ -372,9 +364,7 @@ async def get_budget(
 
     Returns 404 if budget not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(Budget).where(Budget.id == budget_id)
-    )
+    result = await db.execute(select(Budget).where(Budget.id == budget_id))
     budget = result.scalar_one_or_none()
 
     if not budget:
@@ -424,9 +414,7 @@ async def update_budget(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(Budget).where(Budget.id == budget_id)
-    )
+    result = await db.execute(select(Budget).where(Budget.id == budget_id))
     budget = result.scalar_one_or_none()
 
     if not budget:
@@ -456,9 +444,7 @@ async def delete_budget(
 
     Soft deletes the budget by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(Budget).where(Budget.id == budget_id)
-    )
+    result = await db.execute(select(Budget).where(Budget.id == budget_id))
     budget = result.scalar_one_or_none()
 
     if not budget:

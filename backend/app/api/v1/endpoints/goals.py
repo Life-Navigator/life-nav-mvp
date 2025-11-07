@@ -73,9 +73,7 @@ async def get_goal(
 
     Returns 404 if goal not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(Goal).where(Goal.id == goal_id)
-    )
+    result = await db.execute(select(Goal).where(Goal.id == goal_id))
     goal = result.scalar_one_or_none()
 
     if not goal:
@@ -126,9 +124,7 @@ async def update_goal(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(Goal).where(Goal.id == goal_id)
-    )
+    result = await db.execute(select(Goal).where(Goal.id == goal_id))
     goal = result.scalar_one_or_none()
 
     if not goal:
@@ -158,9 +154,7 @@ async def delete_goal(
 
     Soft deletes the goal by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(Goal).where(Goal.id == goal_id)
-    )
+    result = await db.execute(select(Goal).where(Goal.id == goal_id))
     goal = result.scalar_one_or_none()
 
     if not goal:
@@ -226,9 +220,7 @@ async def get_milestone(
 
     Returns 404 if milestone not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(Milestone).where(Milestone.id == milestone_id)
-    )
+    result = await db.execute(select(Milestone).where(Milestone.id == milestone_id))
     milestone = result.scalar_one_or_none()
 
     if not milestone:
@@ -279,9 +271,7 @@ async def update_milestone(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(Milestone).where(Milestone.id == milestone_id)
-    )
+    result = await db.execute(select(Milestone).where(Milestone.id == milestone_id))
     milestone = result.scalar_one_or_none()
 
     if not milestone:
@@ -311,9 +301,7 @@ async def delete_milestone(
 
     Soft deletes the milestone by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(Milestone).where(Milestone.id == milestone_id)
-    )
+    result = await db.execute(select(Milestone).where(Milestone.id == milestone_id))
     milestone = result.scalar_one_or_none()
 
     if not milestone:

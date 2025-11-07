@@ -69,9 +69,7 @@ async def get_health_condition(
 
     Returns 404 if condition not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(HealthCondition).where(HealthCondition.id == condition_id)
-    )
+    result = await db.execute(select(HealthCondition).where(HealthCondition.id == condition_id))
     condition = result.scalar_one_or_none()
 
     if not condition:
@@ -84,7 +82,9 @@ async def get_health_condition(
     return HealthConditionResponse.model_validate(condition)
 
 
-@router.post("/conditions", response_model=HealthConditionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/conditions", response_model=HealthConditionResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_health_condition(
     data: HealthConditionCreate,
     db: DBSession,
@@ -121,9 +121,7 @@ async def update_health_condition(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(HealthCondition).where(HealthCondition.id == condition_id)
-    )
+    result = await db.execute(select(HealthCondition).where(HealthCondition.id == condition_id))
     condition = result.scalar_one_or_none()
 
     if not condition:
@@ -153,9 +151,7 @@ async def delete_health_condition(
 
     Soft deletes the condition by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(HealthCondition).where(HealthCondition.id == condition_id)
-    )
+    result = await db.execute(select(HealthCondition).where(HealthCondition.id == condition_id))
     condition = result.scalar_one_or_none()
 
     if not condition:
@@ -221,9 +217,7 @@ async def get_medication(
 
     Returns 404 if medication not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(Medication).where(Medication.id == medication_id)
-    )
+    result = await db.execute(select(Medication).where(Medication.id == medication_id))
     medication = result.scalar_one_or_none()
 
     if not medication:
@@ -273,9 +267,7 @@ async def update_medication(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(Medication).where(Medication.id == medication_id)
-    )
+    result = await db.execute(select(Medication).where(Medication.id == medication_id))
     medication = result.scalar_one_or_none()
 
     if not medication:
@@ -305,9 +297,7 @@ async def delete_medication(
 
     Soft deletes the medication by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(Medication).where(Medication.id == medication_id)
-    )
+    result = await db.execute(select(Medication).where(Medication.id == medication_id))
     medication = result.scalar_one_or_none()
 
     if not medication:

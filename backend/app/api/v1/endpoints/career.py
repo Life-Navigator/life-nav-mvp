@@ -72,9 +72,7 @@ async def get_career_profile(
 
     Returns 404 if profile not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(CareerProfile).where(CareerProfile.id == profile_id)
-    )
+    result = await db.execute(select(CareerProfile).where(CareerProfile.id == profile_id))
     profile = result.scalar_one_or_none()
 
     if not profile:
@@ -124,9 +122,7 @@ async def update_career_profile(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(CareerProfile).where(CareerProfile.id == profile_id)
-    )
+    result = await db.execute(select(CareerProfile).where(CareerProfile.id == profile_id))
     profile = result.scalar_one_or_none()
 
     if not profile:
@@ -156,9 +152,7 @@ async def delete_career_profile(
 
     Soft deletes the profile by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(CareerProfile).where(CareerProfile.id == profile_id)
-    )
+    result = await db.execute(select(CareerProfile).where(CareerProfile.id == profile_id))
     profile = result.scalar_one_or_none()
 
     if not profile:
@@ -220,9 +214,7 @@ async def get_job_application(
 
     Returns 404 if application not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(JobApplication).where(JobApplication.id == application_id)
-    )
+    result = await db.execute(select(JobApplication).where(JobApplication.id == application_id))
     application = result.scalar_one_or_none()
 
     if not application:
@@ -235,7 +227,9 @@ async def get_job_application(
     return JobApplicationResponse.model_validate(application)
 
 
-@router.post("/applications", response_model=JobApplicationResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/applications", response_model=JobApplicationResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_job_application(
     data: JobApplicationCreate,
     db: DBSession,
@@ -272,9 +266,7 @@ async def update_job_application(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(JobApplication).where(JobApplication.id == application_id)
-    )
+    result = await db.execute(select(JobApplication).where(JobApplication.id == application_id))
     application = result.scalar_one_or_none()
 
     if not application:
@@ -304,9 +296,7 @@ async def delete_job_application(
 
     Soft deletes the application by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(JobApplication).where(JobApplication.id == application_id)
-    )
+    result = await db.execute(select(JobApplication).where(JobApplication.id == application_id))
     application = result.scalar_one_or_none()
 
     if not application:
@@ -372,9 +362,7 @@ async def get_interview(
 
     Returns 404 if interview not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(Interview).where(Interview.id == interview_id)
-    )
+    result = await db.execute(select(Interview).where(Interview.id == interview_id))
     interview = result.scalar_one_or_none()
 
     if not interview:
@@ -424,9 +412,7 @@ async def update_interview(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(Interview).where(Interview.id == interview_id)
-    )
+    result = await db.execute(select(Interview).where(Interview.id == interview_id))
     interview = result.scalar_one_or_none()
 
     if not interview:
@@ -456,9 +442,7 @@ async def delete_interview(
 
     Soft deletes the interview by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(Interview).where(Interview.id == interview_id)
-    )
+    result = await db.execute(select(Interview).where(Interview.id == interview_id))
     interview = result.scalar_one_or_none()
 
     if not interview:

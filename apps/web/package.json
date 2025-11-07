@@ -15,6 +15,7 @@
     "@life-navigator/api-client": "workspace:*",
     "@life-navigator/ui-components": "workspace:*",
     "@life-navigator/provenance": "workspace:*",
+    "@prisma/client": "^5.22.0",
     "next": "^15.4.7",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -25,6 +26,7 @@
     "@types/react-dom": "^19",
     "typescript": "^5",
     "eslint": "^8.57.0",
-    "eslint-config-next": "^15.4.7"
+    "eslint-config-next": "^15.4.7",
+    "prisma": "^5.22.0"
   }
 }

@@ -65,7 +65,9 @@ class EducationCredential(BaseTenantModel, Base):
     __tablename__ = "education_credentials"
 
     # Credential details
-    credential_type: Mapped[CredentialType] = mapped_column(Enum(CredentialType), nullable=False, index=True)
+    credential_type: Mapped[CredentialType] = mapped_column(
+        Enum(CredentialType), nullable=False, index=True
+    )
     credential_name: Mapped[str] = mapped_column(String(255), nullable=False)
     institution_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     field_of_study: Mapped[str | None] = mapped_column(String(255))
@@ -87,7 +89,9 @@ class EducationCredential(BaseTenantModel, Base):
 
     # Details
     gpa: Mapped[Decimal | None] = mapped_column(Numeric(3, 2))
-    gpa_scale: Mapped[Decimal] = mapped_column(Numeric(3, 1), default=Decimal("4.0"), nullable=False)
+    gpa_scale: Mapped[Decimal] = mapped_column(
+        Numeric(3, 1), default=Decimal("4.0"), nullable=False
+    )
     honors: Mapped[list[str] | None] = mapped_column(ARRAY(String))
     thesis_title: Mapped[str | None] = mapped_column(Text)
 

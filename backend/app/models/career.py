@@ -194,7 +194,9 @@ class Interview(BaseTenantModel, Base):
 
     # Interview details
     interview_type: Mapped[InterviewType | None] = mapped_column(Enum(InterviewType))
-    interview_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    interview_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
     duration_minutes: Mapped[int | None] = mapped_column()
     location: Mapped[str | None] = mapped_column(String(255))
     meeting_link: Mapped[str | None] = mapped_column(String(500))

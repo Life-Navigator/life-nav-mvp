@@ -84,7 +84,9 @@ async def get_education_credential(
     return EducationCredentialResponse.model_validate(credential)
 
 
-@router.post("/credentials", response_model=EducationCredentialResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/credentials", response_model=EducationCredentialResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_education_credential(
     data: EducationCredentialCreate,
     db: DBSession,
@@ -221,9 +223,7 @@ async def get_course(
 
     Returns 404 if course not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(Course).where(Course.id == course_id)
-    )
+    result = await db.execute(select(Course).where(Course.id == course_id))
     course = result.scalar_one_or_none()
 
     if not course:
@@ -273,9 +273,7 @@ async def update_course(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(Course).where(Course.id == course_id)
-    )
+    result = await db.execute(select(Course).where(Course.id == course_id))
     course = result.scalar_one_or_none()
 
     if not course:
@@ -305,9 +303,7 @@ async def delete_course(
 
     Soft deletes the course by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(Course).where(Course.id == course_id)
-    )
+    result = await db.execute(select(Course).where(Course.id == course_id))
     course = result.scalar_one_or_none()
 
     if not course:

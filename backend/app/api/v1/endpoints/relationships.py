@@ -69,9 +69,7 @@ async def get_contact(
 
     Returns 404 if contact not found or user doesn't have access.
     """
-    result = await db.execute(
-        select(Contact).where(Contact.id == contact_id)
-    )
+    result = await db.execute(select(Contact).where(Contact.id == contact_id))
     contact = result.scalar_one_or_none()
 
     if not contact:
@@ -121,9 +119,7 @@ async def update_contact(
 
     Only updates fields provided in the request body.
     """
-    result = await db.execute(
-        select(Contact).where(Contact.id == contact_id)
-    )
+    result = await db.execute(select(Contact).where(Contact.id == contact_id))
     contact = result.scalar_one_or_none()
 
     if not contact:
@@ -153,9 +149,7 @@ async def delete_contact(
 
     Soft deletes the contact by setting deleted_at timestamp.
     """
-    result = await db.execute(
-        select(Contact).where(Contact.id == contact_id)
-    )
+    result = await db.execute(select(Contact).where(Contact.id == contact_id))
     contact = result.scalar_one_or_none()
 
     if not contact:
@@ -236,7 +230,9 @@ async def get_contact_interaction(
     return ContactInteractionResponse.model_validate(interaction)
 
 
-@router.post("/interactions", response_model=ContactInteractionResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/interactions", response_model=ContactInteractionResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_contact_interaction(
     data: ContactInteractionCreate,
     db: DBSession,

@@ -23,9 +23,7 @@ try:
     from app.proto import graphrag_pb2, graphrag_pb2_grpc
 except ImportError:
     # Fallback for when proto hasn't been generated yet
-    logger.warning(
-        "GraphRAG proto files not generated. Run: backend/scripts/generate_proto.sh"
-    )
+    logger.warning("GraphRAG proto files not generated. Run: backend/scripts/generate_proto.sh")
     graphrag_pb2 = None  # type: ignore
     graphrag_pb2_grpc = None  # type: ignore
 
