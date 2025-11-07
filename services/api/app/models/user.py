@@ -1,6 +1,7 @@
 """
 User model
 """
+
 from datetime import datetime
 from sqlalchemy import Column, String, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID

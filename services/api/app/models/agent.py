@@ -1,11 +1,22 @@
 """
 Agent models for AI agent system
 """
+
 from datetime import datetime
 from typing import Optional
 import uuid
 import enum
-from sqlalchemy import Column, String, Integer, Float, Boolean, DateTime, ForeignKey, Enum as SQLEnum, Text
+from sqlalchemy import (
+    Column,
+    String,
+    Integer,
+    Float,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Enum as SQLEnum,
+    Text,
+)
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 
@@ -14,14 +25,16 @@ from app.core.database import Base
 
 class AgentType(str, enum.Enum):
     """Agent hierarchy levels"""
-    ORCHESTRATOR = "orchestrator"      # L0 - Strategic planning
+
+    ORCHESTRATOR = "orchestrator"  # L0 - Strategic planning
     DOMAIN_MANAGER = "domain_manager"  # L1 - Domain coordination
-    SPECIALIST = "specialist"          # L2 - Task execution
-    TOOL_USER = "tool_user"           # L3 - External APIs
+    SPECIALIST = "specialist"  # L2 - Task execution
+    TOOL_USER = "tool_user"  # L3 - External APIs
 
 
 class AgentState(str, enum.Enum):
     """Agent execution states"""
+
     IDLE = "idle"
     PROCESSING = "processing"
     COMPLETED = "completed"
@@ -31,6 +44,7 @@ class AgentState(str, enum.Enum):
 
 class TaskStatus(str, enum.Enum):
     """Task execution status"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -47,7 +61,12 @@ class Agent(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Multi-tenancy
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Agent identity
@@ -80,8 +99,12 @@ class Agent(Base):
     last_active_at = Column(DateTime)
 
     # Relationships
-    tasks = relationship("AgentTask", back_populates="agent", cascade="all, delete-orphan")
-    conversations = relationship("Conversation", back_populates="agent", cascade="all, delete-orphan")
+    tasks = relationship(
+        "AgentTask", back_populates="agent", cascade="all, delete-orphan"
+    )
+    conversations = relationship(
+        "Conversation", back_populates="agent", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Agent {self.name} ({self.agent_type})>"
@@ -96,19 +119,33 @@ class AgentTask(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Multi-tenancy
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Agent reference
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True)
+    agent_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     # Task details
-    task_type = Column(String(100), nullable=False)  # "query", "research", "analysis", etc.
+    task_type = Column(
+        String(100), nullable=False
+    )  # "query", "research", "analysis", etc.
     input_text = Column(Text, nullable=False)
     context = Column(JSONB)  # Additional context data
 
     # Execution
-    status = Column(SQLEnum(TaskStatus), default=TaskStatus.PENDING, nullable=False, index=True)
+    status = Column(
+        SQLEnum(TaskStatus), default=TaskStatus.PENDING, nullable=False, index=True
+    )
     result = Column(Text)
     error_message = Column(Text)
 
@@ -147,11 +184,21 @@ class Conversation(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Multi-tenancy
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Agent reference
-    agent_id = Column(UUID(as_uuid=True), ForeignKey("agents.id", ondelete="CASCADE"), nullable=False, index=True)
+    agent_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     # Conversation details
     title = Column(String(500))
@@ -170,7 +217,12 @@ class Conversation(Base):
 
     # Relationships
     agent = relationship("Agent", back_populates="conversations")
-    messages = relationship("ConversationMessage", back_populates="conversation", cascade="all, delete-orphan", order_by="ConversationMessage.created_at")
+    messages = relationship(
+        "ConversationMessage",
+        back_populates="conversation",
+        cascade="all, delete-orphan",
+        order_by="ConversationMessage.created_at",
+    )
 
     def __repr__(self):
         return f"<Conversation {self.id} - {self.title}>"
@@ -185,10 +237,20 @@ class ConversationMessage(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Conversation reference
-    conversation_id = Column(UUID(as_uuid=True), ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    conversation_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     # Multi-tenancy (denormalized for query performance)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Message content

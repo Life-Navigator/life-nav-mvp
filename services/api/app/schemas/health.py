@@ -1,6 +1,7 @@
 """
 Health schemas
 """
+
 from datetime import date, datetime
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, UUID4

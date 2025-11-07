@@ -1,6 +1,7 @@
 """
 Alembic environment configuration for async SQLAlchemy
 """
+
 from logging.config import fileConfig
 import asyncio
 from sqlalchemy import pool

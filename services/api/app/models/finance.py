@@ -1,8 +1,20 @@
 """
 Finance models
 """
+
 from datetime import datetime, date
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer, Date, Numeric, Boolean, Enum
+from sqlalchemy import (
+    Column,
+    String,
+    DateTime,
+    Text,
+    ForeignKey,
+    Integer,
+    Date,
+    Numeric,
+    Boolean,
+    Enum,
+)
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 import uuid
@@ -13,6 +25,7 @@ from app.core.database import Base
 
 class AccountType(str, enum.Enum):
     """Financial account types"""
+
     CHECKING = "checking"
     SAVINGS = "savings"
     CREDIT_CARD = "credit_card"
@@ -25,6 +38,7 @@ class AccountType(str, enum.Enum):
 
 class TransactionType(str, enum.Enum):
     """Transaction types"""
+
     INCOME = "income"
     EXPENSE = "expense"
     TRANSFER = "transfer"
@@ -34,6 +48,7 @@ class TransactionType(str, enum.Enum):
 
 class InvestmentType(str, enum.Enum):
     """Investment types"""
+
     STOCK = "stock"
     BOND = "bond"
     MUTUAL_FUND = "mutual_fund"
@@ -49,7 +64,9 @@ class FinancialAccount(Base):
     __tablename__ = "financial_accounts"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Account Info
@@ -80,15 +97,21 @@ class FinancialAccount(Base):
     is_closed = Column(Boolean, default=False)
 
     # Metadata
-    extra_data = Column("metadata", JSONB)  # Column name "metadata" but attribute name "extra_data"
+    extra_data = Column(
+        "metadata", JSONB
+    )  # Column name "metadata" but attribute name "extra_data"
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    transactions = relationship("Transaction", back_populates="account", cascade="all, delete-orphan")
-    investments = relationship("Investment", back_populates="account", cascade="all, delete-orphan")
+    transactions = relationship(
+        "Transaction", back_populates="account", cascade="all, delete-orphan"
+    )
+    investments = relationship(
+        "Investment", back_populates="account", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<FinancialAccount {self.name}>"
@@ -100,8 +123,15 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    account_id = Column(UUID(as_uuid=True), ForeignKey("financial_accounts.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    account_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("financial_accounts.id"),
+        nullable=False,
+        index=True,
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Transaction Info
@@ -131,7 +161,9 @@ class Transaction(Base):
 
     # Metadata
     tags = Column(JSONB)
-    extra_data = Column("metadata", JSONB)  # Column name "metadata" but attribute name "extra_data"
+    extra_data = Column(
+        "metadata", JSONB
+    )  # Column name "metadata" but attribute name "extra_data"
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -150,8 +182,15 @@ class Investment(Base):
     __tablename__ = "investments"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    account_id = Column(UUID(as_uuid=True), ForeignKey("financial_accounts.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    account_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("financial_accounts.id"),
+        nullable=False,
+        index=True,
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Investment Info
@@ -181,7 +220,9 @@ class Investment(Base):
     isin = Column(String(12))
 
     # Metadata
-    extra_data = Column("metadata", JSONB)  # Column name "metadata" but attribute name "extra_data"
+    extra_data = Column(
+        "metadata", JSONB
+    )  # Column name "metadata" but attribute name "extra_data"
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

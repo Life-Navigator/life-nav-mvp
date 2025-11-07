@@ -1,6 +1,7 @@
 """
 Goals endpoints
 """
+
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +12,13 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.goal import Goal, GoalMilestone
-from app.schemas.goal import GoalCreate, GoalUpdate, GoalResponse, GoalMilestoneCreate, GoalMilestoneResponse
+from app.schemas.goal import (
+    GoalCreate,
+    GoalUpdate,
+    GoalResponse,
+    GoalMilestoneCreate,
+    GoalMilestoneResponse,
+)
 
 router = APIRouter()
 
@@ -21,7 +28,7 @@ async def list_goals(
     skip: int = 0,
     limit: int = 20,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """List all goals for current user"""
     result = await db.execute(
@@ -39,13 +46,11 @@ async def list_goals(
 async def create_goal(
     goal_data: GoalCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Create a new goal"""
     goal = Goal(
-        **goal_data.dict(),
-        user_id=current_user.id,
-        tenant_id=current_user.tenant_id
+        **goal_data.dict(), user_id=current_user.id, tenant_id=current_user.tenant_id
     )
 
     db.add(goal)
@@ -58,7 +63,7 @@ async def create_goal(
 async def get_goal(
     goal_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Get goal by ID"""
     result = await db.execute(
@@ -79,7 +84,7 @@ async def update_goal(
     goal_id: str,
     goal_update: GoalUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Update a goal"""
     result = await db.execute(
@@ -102,7 +107,7 @@ async def update_goal(
 async def delete_goal(
     goal_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete a goal"""
     result = await db.execute(

@@ -1,6 +1,7 @@
 """
 Application configuration using Pydantic Settings
 """
+
 from typing import List, Optional
 from pydantic_settings import BaseSettings
 from pydantic import validator
@@ -47,8 +48,9 @@ class Settings(BaseSettings):
     def parse_cors_origins(cls, v):
         if isinstance(v, str):
             # Handle both comma-separated and JSON list formats
-            if v.startswith('['):
+            if v.startswith("["):
                 import json
+
                 return json.loads(v)
             return [origin.strip() for origin in v.split(",") if origin.strip()]
         return v

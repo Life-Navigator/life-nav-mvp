@@ -1,6 +1,7 @@
 """
 User endpoints
 """
+
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,9 +16,7 @@ router = APIRouter()
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_profile(
-    current_user: User = Depends(get_current_user)
-):
+async def get_current_user_profile(current_user: User = Depends(get_current_user)):
     """Get current user profile"""
     return current_user
 
@@ -26,7 +25,7 @@ async def get_current_user_profile(
 async def update_current_user(
     user_update: UserUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Update current user profile"""
     for field, value in user_update.dict(exclude_unset=True).items():
@@ -41,14 +40,11 @@ async def update_current_user(
 async def get_user(
     user_id: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """Get user by ID"""
     result = await db.execute(
-        select(User).where(
-            User.id == user_id,
-            User.tenant_id == current_user.tenant_id
-        )
+        select(User).where(User.id == user_id, User.tenant_id == current_user.tenant_id)
     )
     user = result.scalar_one_or_none()
 

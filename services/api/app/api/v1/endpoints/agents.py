@@ -1,6 +1,7 @@
 """
 Agent endpoints - AI agent management, task execution, and chat
 """
+
 from typing import List, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,7 +12,14 @@ from sqlalchemy.orm import selectinload
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.user import User
-from app.models.agent import Agent, AgentTask, Conversation, ConversationMessage, AgentState, TaskStatus
+from app.models.agent import (
+    Agent,
+    AgentTask,
+    Conversation,
+    ConversationMessage,
+    AgentState,
+    TaskStatus,
+)
 from app.schemas.agent import *
 from app.services.maverick_client import get_maverick_client, MaverickClient
 
@@ -26,7 +34,7 @@ async def list_agents(
     agent_type: Optional[AgentType] = None,
     is_active: Optional[bool] = None,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """List all agents for the current user"""
     query = select(Agent).where(Agent.user_id == current_user.id)
@@ -45,13 +53,11 @@ async def list_agents(
 async def create_agent(
     agent_data: AgentCreate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Create a new agent"""
     agent = Agent(
-        **agent_data.dict(),
-        user_id=current_user.id,
-        tenant_id=current_user.tenant_id
+        **agent_data.dict(), user_id=current_user.id, tenant_id=current_user.tenant_id
     )
     db.add(agent)
     await db.commit()
@@ -63,7 +69,7 @@ async def create_agent(
 async def get_agent(
     agent_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Get agent by ID"""
     result = await db.execute(
@@ -80,7 +86,7 @@ async def update_agent(
     agent_id: str,
     agent_data: AgentUpdate,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Update agent configuration"""
     result = await db.execute(
@@ -104,7 +110,7 @@ async def update_agent(
 async def delete_agent(
     agent_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete agent"""
     result = await db.execute(
@@ -119,13 +125,17 @@ async def delete_agent(
 
 
 # Task Execution
-@router.post("/{agent_id}/tasks", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{agent_id}/tasks",
+    response_model=TaskResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def execute_task(
     agent_id: str,
     task_data: TaskExecute,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    maverick: MaverickClient = Depends(get_maverick_client)
+    maverick: MaverickClient = Depends(get_maverick_client),
 ):
     """Execute a task with the specified agent"""
     # Get agent
@@ -148,7 +158,7 @@ async def execute_task(
         input_text=task_data.input_text,
         context=task_data.context,
         status=TaskStatus.RUNNING,
-        started_at=datetime.utcnow()
+        started_at=datetime.utcnow(),
     )
     db.add(task)
     await db.commit()
@@ -163,9 +173,7 @@ async def execute_task(
 
         # Call Maverick
         response = await maverick.completion(
-            prompt=prompt,
-            n_predict=agent.max_tokens,
-            temperature=agent.temperature
+            prompt=prompt, n_predict=agent.max_tokens, temperature=agent.temperature
         )
 
         # Calculate duration
@@ -204,12 +212,11 @@ async def list_tasks(
     limit: int = 20,
     status_filter: Optional[TaskStatus] = None,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """List tasks for an agent"""
     query = select(AgentTask).where(
-        AgentTask.agent_id == agent_id,
-        AgentTask.user_id == current_user.id
+        AgentTask.agent_id == agent_id, AgentTask.user_id == current_user.id
     )
 
     if status_filter:
@@ -225,14 +232,14 @@ async def get_task(
     agent_id: str,
     task_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Get task by ID"""
     result = await db.execute(
         select(AgentTask).where(
             AgentTask.id == task_id,
             AgentTask.agent_id == agent_id,
-            AgentTask.user_id == current_user.id
+            AgentTask.user_id == current_user.id,
         )
     )
     task = result.scalar_one_or_none()
@@ -248,7 +255,7 @@ async def chat_with_agent(
     chat_request: ChatRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    maverick: MaverickClient = Depends(get_maverick_client)
+    maverick: MaverickClient = Depends(get_maverick_client),
 ):
     """Chat with an agent using Maverick LLM"""
     # Get agent
@@ -270,7 +277,7 @@ async def chat_with_agent(
             .where(
                 Conversation.id == chat_request.conversation_id,
                 Conversation.user_id == current_user.id,
-                Conversation.agent_id == agent.id
+                Conversation.agent_id == agent.id,
             )
             .options(selectinload(Conversation.messages))
         )
@@ -283,7 +290,11 @@ async def chat_with_agent(
             user_id=current_user.id,
             tenant_id=current_user.tenant_id,
             agent_id=agent.id,
-            title=chat_request.message[:100] if len(chat_request.message) > 100 else chat_request.message
+            title=(
+                chat_request.message[:100]
+                if len(chat_request.message) > 100
+                else chat_request.message
+            ),
         )
         db.add(conversation)
         await db.flush()
@@ -294,7 +305,7 @@ async def chat_with_agent(
         user_id=current_user.id,
         tenant_id=current_user.tenant_id,
         role="user",
-        content=chat_request.message
+        content=chat_request.message,
     )
     db.add(user_message)
     await db.flush()
@@ -302,28 +313,34 @@ async def chat_with_agent(
     # Build message history for context
     messages = []
     for msg in conversation.messages[-10:]:  # Last 10 messages for context
-        messages.append({
-            "role": msg.role,
-            "content": msg.content
-        })
+        messages.append({"role": msg.role, "content": msg.content})
 
     # Add current message
-    messages.append({
-        "role": "user",
-        "content": chat_request.message
-    })
+    messages.append({"role": "user", "content": chat_request.message})
 
     # Call Maverick with chat
     try:
-        system_prompt = chat_request.system_prompt_override or agent.system_prompt or "You are a helpful AI assistant."
-        temperature = chat_request.temperature if chat_request.temperature is not None else agent.temperature
-        max_tokens = chat_request.max_tokens if chat_request.max_tokens is not None else agent.max_tokens
+        system_prompt = (
+            chat_request.system_prompt_override
+            or agent.system_prompt
+            or "You are a helpful AI assistant."
+        )
+        temperature = (
+            chat_request.temperature
+            if chat_request.temperature is not None
+            else agent.temperature
+        )
+        max_tokens = (
+            chat_request.max_tokens
+            if chat_request.max_tokens is not None
+            else agent.max_tokens
+        )
 
         response = await maverick.chat(
             messages=messages,
             system_prompt=system_prompt,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
         )
 
         # Save assistant response
@@ -334,7 +351,7 @@ async def chat_with_agent(
             role="assistant",
             content=response.get("content", ""),
             tokens_used=response.get("tokens_predicted", 0),
-            model_name=agent.model_name
+            model_name=agent.model_name,
         )
         db.add(assistant_message)
 
@@ -360,7 +377,7 @@ async def chat_with_agent(
             model_name=agent.model_name,
             confidence_score=None,
             reasoning_steps=None,
-            timestamp=assistant_message.created_at
+            timestamp=assistant_message.created_at,
         )
 
     except Exception as e:
@@ -375,14 +392,13 @@ async def list_conversations(
     skip: int = 0,
     limit: int = 20,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """List conversations for an agent"""
     result = await db.execute(
         select(Conversation)
         .where(
-            Conversation.agent_id == agent_id,
-            Conversation.user_id == current_user.id
+            Conversation.agent_id == agent_id, Conversation.user_id == current_user.id
         )
         .options(selectinload(Conversation.messages))
         .offset(skip)
@@ -392,12 +408,14 @@ async def list_conversations(
     return result.scalars().all()
 
 
-@router.get("/{agent_id}/conversations/{conversation_id}", response_model=ConversationResponse)
+@router.get(
+    "/{agent_id}/conversations/{conversation_id}", response_model=ConversationResponse
+)
 async def get_conversation(
     agent_id: str,
     conversation_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Get conversation with full message history"""
     result = await db.execute(
@@ -405,7 +423,7 @@ async def get_conversation(
         .where(
             Conversation.id == conversation_id,
             Conversation.agent_id == agent_id,
-            Conversation.user_id == current_user.id
+            Conversation.user_id == current_user.id,
         )
         .options(selectinload(Conversation.messages))
     )
@@ -420,7 +438,7 @@ async def get_conversation(
 async def get_agent_metrics(
     agent_id: str,
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """Get performance metrics for an agent"""
     # Get agent
@@ -439,32 +457,28 @@ async def get_agent_metrics(
 
     successful_tasks_result = await db.execute(
         select(func.count(AgentTask.id)).where(
-            AgentTask.agent_id == agent.id,
-            AgentTask.status == TaskStatus.COMPLETED
+            AgentTask.agent_id == agent.id, AgentTask.status == TaskStatus.COMPLETED
         )
     )
     successful_tasks = successful_tasks_result.scalar() or 0
 
     failed_tasks_result = await db.execute(
         select(func.count(AgentTask.id)).where(
-            AgentTask.agent_id == agent.id,
-            AgentTask.status == TaskStatus.FAILED
+            AgentTask.agent_id == agent.id, AgentTask.status == TaskStatus.FAILED
         )
     )
     failed_tasks = failed_tasks_result.scalar() or 0
 
     avg_duration_result = await db.execute(
         select(func.avg(AgentTask.duration_ms)).where(
-            AgentTask.agent_id == agent.id,
-            AgentTask.status == TaskStatus.COMPLETED
+            AgentTask.agent_id == agent.id, AgentTask.status == TaskStatus.COMPLETED
         )
     )
     avg_duration = avg_duration_result.scalar() or 0.0
 
     avg_tokens_result = await db.execute(
         select(func.avg(AgentTask.tokens_used)).where(
-            AgentTask.agent_id == agent.id,
-            AgentTask.status == TaskStatus.COMPLETED
+            AgentTask.agent_id == agent.id, AgentTask.status == TaskStatus.COMPLETED
         )
     )
     avg_tokens = avg_tokens_result.scalar() or 0.0
@@ -476,8 +490,7 @@ async def get_agent_metrics(
 
     active_conversations_result = await db.execute(
         select(func.count(Conversation.id)).where(
-            Conversation.agent_id == agent.id,
-            Conversation.is_active == True
+            Conversation.agent_id == agent.id, Conversation.is_active == True
         )
     )
     active_conversations = active_conversations_result.scalar() or 0
@@ -500,14 +513,13 @@ async def get_agent_metrics(
         total_tokens=total_tokens,
         active_conversations=active_conversations,
         uptime_seconds=uptime_seconds,
-        last_active_at=agent.last_active_at
+        last_active_at=agent.last_active_at,
     )
 
 
 @router.get("/stats/aggregate", response_model=AgentStats)
 async def get_aggregate_stats(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """Get aggregate statistics across all user's agents"""
     # Total agents
@@ -519,8 +531,7 @@ async def get_aggregate_stats(
     # Active agents
     active_agents_result = await db.execute(
         select(func.count(Agent.id)).where(
-            Agent.user_id == current_user.id,
-            Agent.is_active == True
+            Agent.user_id == current_user.id, Agent.is_active == True
         )
     )
     active_agents = active_agents_result.scalar() or 0
@@ -529,15 +540,16 @@ async def get_aggregate_stats(
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     tasks_today_result = await db.execute(
         select(func.count(AgentTask.id)).where(
-            AgentTask.user_id == current_user.id,
-            AgentTask.created_at >= today_start
+            AgentTask.user_id == current_user.id, AgentTask.created_at >= today_start
         )
     )
     tasks_today = tasks_today_result.scalar() or 0
 
     # Total conversations
     total_conversations_result = await db.execute(
-        select(func.count(Conversation.id)).where(Conversation.user_id == current_user.id)
+        select(func.count(Conversation.id)).where(
+            Conversation.user_id == current_user.id
+        )
     )
     total_conversations = total_conversations_result.scalar() or 0
 
@@ -545,7 +557,7 @@ async def get_aggregate_stats(
     messages_today_result = await db.execute(
         select(func.count(ConversationMessage.id)).where(
             ConversationMessage.user_id == current_user.id,
-            ConversationMessage.created_at >= today_start
+            ConversationMessage.created_at >= today_start,
         )
     )
     messages_today = messages_today_result.scalar() or 0
@@ -554,7 +566,7 @@ async def get_aggregate_stats(
     avg_response_result = await db.execute(
         select(func.avg(AgentTask.duration_ms)).where(
             AgentTask.user_id == current_user.id,
-            AgentTask.status == TaskStatus.COMPLETED
+            AgentTask.status == TaskStatus.COMPLETED,
         )
     )
     avg_response = avg_response_result.scalar() or 0.0
@@ -562,8 +574,7 @@ async def get_aggregate_stats(
     # Tokens today
     tokens_today_result = await db.execute(
         select(func.sum(AgentTask.tokens_used)).where(
-            AgentTask.user_id == current_user.id,
-            AgentTask.created_at >= today_start
+            AgentTask.user_id == current_user.id, AgentTask.created_at >= today_start
         )
     )
     tokens_today = tokens_today_result.scalar() or 0
@@ -575,5 +586,5 @@ async def get_aggregate_stats(
         total_conversations=total_conversations,
         total_messages_today=messages_today,
         average_response_time_ms=float(avg_response),
-        total_tokens_today=tokens_today
+        total_tokens_today=tokens_today,
     )

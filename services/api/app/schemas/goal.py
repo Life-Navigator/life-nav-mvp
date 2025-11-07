@@ -1,6 +1,7 @@
 """
 Goal schemas
 """
+
 from datetime import date, datetime
 from typing import Optional, List, Dict, Any
 from decimal import Decimal
@@ -11,6 +12,7 @@ from app.models.goal import GoalCategory, GoalStatus, GoalPriority
 
 class GoalMilestoneBase(BaseModel):
     """Base milestone schema"""
+
     title: str
     description: Optional[str] = None
     target_value: Optional[Decimal] = None
@@ -19,11 +21,13 @@ class GoalMilestoneBase(BaseModel):
 
 class GoalMilestoneCreate(GoalMilestoneBase):
     """Milestone creation schema"""
+
     order: int = 0
 
 
 class GoalMilestoneUpdate(BaseModel):
     """Milestone update schema"""
+
     title: Optional[str] = None
     description: Optional[str] = None
     target_value: Optional[Decimal] = None
@@ -34,6 +38,7 @@ class GoalMilestoneUpdate(BaseModel):
 
 class GoalMilestoneResponse(BaseResponseSchema):
     """Milestone response schema"""
+
     goal_id: UUID4
     title: str
     description: Optional[str]
@@ -46,6 +51,7 @@ class GoalMilestoneResponse(BaseResponseSchema):
 
 class GoalBase(BaseModel):
     """Base goal schema"""
+
     title: str
     description: Optional[str] = None
     category: GoalCategory
@@ -54,6 +60,7 @@ class GoalBase(BaseModel):
 
 class GoalCreate(GoalBase):
     """Goal creation schema"""
+
     target_value: Optional[Decimal] = None
     unit: Optional[str] = None
     start_date: Optional[date] = None
@@ -63,6 +70,7 @@ class GoalCreate(GoalBase):
 
 class GoalUpdate(BaseModel):
     """Goal update schema"""
+
     title: Optional[str] = None
     description: Optional[str] = None
     category: Optional[GoalCategory] = None
@@ -78,6 +86,7 @@ class GoalUpdate(BaseModel):
 
 class GoalResponse(BaseResponseSchema):
     """Goal response schema"""
+
     title: str
     description: Optional[str]
     category: GoalCategory

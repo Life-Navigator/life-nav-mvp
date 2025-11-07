@@ -2,6 +2,7 @@
 Life Navigator - Main FastAPI Backend
 Complete backend API for all 6 domains
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -34,7 +35,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # CORS middleware
@@ -58,7 +59,7 @@ async def root():
         "message": "Life Navigator API",
         "version": settings.APP_VERSION,
         "docs": "/docs",
-        "status": "operational"
+        "status": "operational",
     }
 
 
@@ -68,5 +69,5 @@ async def health_check():
     return {
         "status": "healthy",
         "version": settings.APP_VERSION,
-        "api_prefix": settings.API_V1_PREFIX
+        "api_prefix": settings.API_V1_PREFIX,
     }

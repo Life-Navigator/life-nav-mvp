@@ -1,13 +1,22 @@
 """
 SQLAlchemy models for all domains
 """
+
 from app.models.user import User
 from app.models.goal import Goal, GoalMilestone
 from app.models.health import HealthRecord, Medication, HealthProvider
 from app.models.finance import FinancialAccount, Transaction, Investment
 from app.models.career import CareerProfile, JobExperience, Skill
 from app.models.education import EducationRecord, Course, Certification
-from app.models.agent import Agent, AgentTask, Conversation, ConversationMessage, AgentType, AgentState, TaskStatus
+from app.models.agent import (
+    Agent,
+    AgentTask,
+    Conversation,
+    ConversationMessage,
+    AgentType,
+    AgentState,
+    TaskStatus,
+)
 
 __all__ = [
     "User",

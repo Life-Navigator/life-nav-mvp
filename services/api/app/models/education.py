@@ -1,8 +1,20 @@
 """
 Education models
 """
+
 from datetime import datetime, date
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer, Date, Numeric, Boolean, Enum
+from sqlalchemy import (
+    Column,
+    String,
+    DateTime,
+    Text,
+    ForeignKey,
+    Integer,
+    Date,
+    Numeric,
+    Boolean,
+    Enum,
+)
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.orm import relationship
 import uuid
@@ -13,6 +25,7 @@ from app.core.database import Base
 
 class DegreeType(str, enum.Enum):
     """Degree types"""
+
     HIGH_SCHOOL = "high_school"
     ASSOCIATE = "associate"
     BACHELOR = "bachelor"
@@ -26,6 +39,7 @@ class DegreeType(str, enum.Enum):
 
 class CourseStatus(str, enum.Enum):
     """Course status"""
+
     NOT_STARTED = "not_started"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -38,7 +52,9 @@ class EducationRecord(Base):
     __tablename__ = "education_records"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Institution
@@ -75,14 +91,18 @@ class EducationRecord(Base):
     transcript_url = Column(String(500))
 
     # Metadata
-    extra_data = Column("metadata", JSONB)  # Column name "metadata" but attribute name "extra_data"
+    extra_data = Column(
+        "metadata", JSONB
+    )  # Column name "metadata" but attribute name "extra_data"
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    courses = relationship("Course", back_populates="education_record", cascade="all, delete-orphan")
+    courses = relationship(
+        "Course", back_populates="education_record", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<EducationRecord {self.degree_name} from {self.institution_name}>"
@@ -94,8 +114,12 @@ class Course(Base):
     __tablename__ = "courses"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    education_record_id = Column(UUID(as_uuid=True), ForeignKey("education_records.id"), index=True)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    education_record_id = Column(
+        UUID(as_uuid=True), ForeignKey("education_records.id"), index=True
+    )
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Course Info
@@ -123,7 +147,9 @@ class Course(Base):
     skills_learned = Column(ARRAY(String))
 
     # Metadata
-    extra_data = Column("metadata", JSONB)  # Column name "metadata" but attribute name "extra_data"
+    extra_data = Column(
+        "metadata", JSONB
+    )  # Column name "metadata" but attribute name "extra_data"
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -142,7 +168,9 @@ class Certification(Base):
     __tablename__ = "certifications"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Certification Info
@@ -169,7 +197,9 @@ class Certification(Base):
     is_verified = Column(Boolean, default=False)
 
     # Metadata
-    extra_data = Column("metadata", JSONB)  # Column name "metadata" but attribute name "extra_data"
+    extra_data = Column(
+        "metadata", JSONB
+    )  # Column name "metadata" but attribute name "extra_data"
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

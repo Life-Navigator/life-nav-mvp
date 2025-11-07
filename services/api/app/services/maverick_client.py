@@ -1,6 +1,7 @@
 """
 Maverick LLM Client - Interface to locally-hosted Llama-4 model
 """
+
 import httpx
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -12,11 +13,7 @@ logger = logging.getLogger(__name__)
 class MaverickClient:
     """Client for Maverick locally-hosted LLM (llama.cpp server on port 8090)"""
 
-    def __init__(
-        self,
-        base_url: str = "http://localhost:8090",
-        timeout: float = 60.0
-    ):
+    def __init__(self, base_url: str = "http://localhost:8090", timeout: float = 60.0):
         self.base_url = base_url
         self.timeout = timeout
         self.client = httpx.AsyncClient(timeout=timeout)
@@ -82,16 +79,19 @@ class MaverickClient:
         try:
             logger.debug(f"Sending completion request to {self.base_url}/completion")
             response = await self.client.post(
-                f"{self.base_url}/completion",
-                json=payload
+                f"{self.base_url}/completion", json=payload
             )
             response.raise_for_status()
             result = response.json()
-            logger.debug(f"Received completion: {result.get('tokens_predicted', 0)} tokens")
+            logger.debug(
+                f"Received completion: {result.get('tokens_predicted', 0)} tokens"
+            )
             return result
 
         except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error from Maverick: {e.response.status_code} - {e.response.text}")
+            logger.error(
+                f"HTTP error from Maverick: {e.response.status_code} - {e.response.text}"
+            )
             raise Exception(f"Maverick LLM error: {e.response.status_code}")
         except httpx.RequestError as e:
             logger.error(f"Request error to Maverick: {str(e)}")
@@ -143,7 +143,7 @@ class MaverickClient:
             prompt=full_prompt,
             n_predict=max_tokens,
             temperature=temperature,
-            stop=["\nUser:", "\nSystem:", "\n\n"]
+            stop=["\nUser:", "\nSystem:", "\n\n"],
         )
 
         # Format as chat response
@@ -151,7 +151,11 @@ class MaverickClient:
             "content": result.get("content", "").strip(),
             "tokens_predicted": result.get("tokens_predicted", 0),
             "role": "assistant",
-            "finish_reason": "stop" if result.get("stopped_word") or result.get("stopped_eos") else "length"
+            "finish_reason": (
+                "stop"
+                if result.get("stopped_word") or result.get("stopped_eos")
+                else "length"
+            ),
         }
 
     async def health_check(self) -> bool:
@@ -181,11 +185,7 @@ class MaverickClient:
             return response.json()
         except Exception as e:
             logger.warning(f"Could not fetch model info: {str(e)}")
-            return {
-                "model": "maverick",
-                "context_length": 4096,
-                "status": "unknown"
-            }
+            return {"model": "maverick", "context_length": 4096, "status": "unknown"}
 
 
 # Global client instance (will be initialized on app startup)

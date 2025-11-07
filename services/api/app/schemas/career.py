@@ -1,6 +1,7 @@
 """
 Career schemas
 """
+
 from datetime import date
 from typing import Optional, List
 from decimal import Decimal

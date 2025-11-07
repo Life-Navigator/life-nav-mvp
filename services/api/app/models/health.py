@@ -1,8 +1,20 @@
 """
 Health models
 """
+
 from datetime import datetime, date
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer, Date, Numeric, Boolean, Enum
+from sqlalchemy import (
+    Column,
+    String,
+    DateTime,
+    Text,
+    ForeignKey,
+    Integer,
+    Date,
+    Numeric,
+    Boolean,
+    Enum,
+)
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 import uuid
@@ -13,6 +25,7 @@ from app.core.database import Base
 
 class RecordType(str, enum.Enum):
     """Health record types"""
+
     VISIT = "visit"
     LAB_RESULT = "lab_result"
     DIAGNOSIS = "diagnosis"
@@ -28,7 +41,9 @@ class HealthRecord(Base):
     __tablename__ = "health_records"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Record Info
@@ -40,7 +55,7 @@ class HealthRecord(Base):
     # Clinical Data
     diagnosis_code = Column(String(50))  # ICD-10 code
     procedure_code = Column(String(50))  # CPT code
-    snomed_code = Column(String(50))     # SNOMED CT code
+    snomed_code = Column(String(50))  # SNOMED CT code
 
     # Provider
     provider_id = Column(UUID(as_uuid=True), ForeignKey("health_providers.id"))
@@ -53,9 +68,11 @@ class HealthRecord(Base):
 
     # Attachments & Data
     attachments = Column(JSONB)  # Document URLs
-    vitals = Column(JSONB)       # Blood pressure, temperature, etc.
+    vitals = Column(JSONB)  # Blood pressure, temperature, etc.
     lab_results = Column(JSONB)  # Lab test results
-    extra_data = Column("metadata", JSONB)  # Column name "metadata" but attribute name "extra_data"
+    extra_data = Column(
+        "metadata", JSONB
+    )  # Column name "metadata" but attribute name "extra_data"
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -75,7 +92,9 @@ class Medication(Base):
     __tablename__ = "medications"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
     health_record_id = Column(UUID(as_uuid=True), ForeignKey("health_records.id"))
     tenant_id = Column(String(255), nullable=False, index=True)
 
@@ -105,7 +124,9 @@ class Medication(Base):
     notes = Column(Text)
 
     # Metadata
-    extra_data = Column("metadata", JSONB)  # Column name "metadata" but attribute name "extra_data"
+    extra_data = Column(
+        "metadata", JSONB
+    )  # Column name "metadata" but attribute name "extra_data"
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -124,7 +145,9 @@ class HealthProvider(Base):
     __tablename__ = "health_providers"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Provider Info

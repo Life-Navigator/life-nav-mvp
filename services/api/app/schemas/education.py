@@ -1,6 +1,7 @@
 """
 Education schemas
 """
+
 from datetime import date
 from typing import Optional
 from decimal import Decimal

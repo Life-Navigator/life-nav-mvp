@@ -1,6 +1,7 @@
 """
 User schemas
 """
+
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, EmailStr, UUID4, Field
@@ -9,6 +10,7 @@ from app.schemas.base import BaseResponseSchema
 
 class UserBase(BaseModel):
     """Base user schema"""
+
     email: EmailStr
     username: Optional[str] = None
     first_name: Optional[str] = None
@@ -18,11 +20,13 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     """User creation schema"""
+
     password: str = Field(..., min_length=8)
 
 
 class UserUpdate(BaseModel):
     """User update schema"""
+
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone: Optional[str] = None
@@ -32,6 +36,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(BaseResponseSchema):
     """User response schema"""
+
     email: EmailStr
     username: Optional[str]
     first_name: Optional[str]
@@ -48,12 +53,14 @@ class UserResponse(BaseResponseSchema):
 
 class UserLogin(BaseModel):
     """User login schema"""
+
     email: EmailStr
     password: str
 
 
 class Token(BaseModel):
     """Token response schema"""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -62,4 +69,5 @@ class Token(BaseModel):
 
 class TokenRefresh(BaseModel):
     """Token refresh schema"""
+
     refresh_token: str

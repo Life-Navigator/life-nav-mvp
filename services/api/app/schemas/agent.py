@@ -1,6 +1,7 @@
 """
 Agent schemas for request/response validation
 """
+
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, UUID4, Field
@@ -12,6 +13,7 @@ from app.models.agent import AgentType, AgentState, TaskStatus
 # Agent Schemas
 class AgentBase(BaseModel):
     """Base agent schema"""
+
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
     agent_type: AgentType
@@ -20,6 +22,7 @@ class AgentBase(BaseModel):
 
 class AgentCreate(AgentBase):
     """Agent creation schema"""
+
     capabilities: Optional[List[Dict[str, Any]]] = []
     max_concurrent_tasks: int = Field(default=5, ge=1, le=100)
     timeout_seconds: float = Field(default=30.0, ge=1.0, le=300.0)
@@ -31,6 +34,7 @@ class AgentCreate(AgentBase):
 
 class AgentUpdate(BaseModel):
     """Agent update schema"""
+
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     system_prompt: Optional[str] = None
@@ -46,6 +50,7 @@ class AgentUpdate(BaseModel):
 
 class AgentResponse(BaseResponseSchema):
     """Agent response schema"""
+
     name: str
     description: Optional[str]
     agent_type: AgentType
@@ -65,23 +70,27 @@ class AgentResponse(BaseResponseSchema):
 # Task Schemas
 class TaskBase(BaseModel):
     """Base task schema"""
+
     task_type: str = Field(..., min_length=1, max_length=100)
     input_text: str = Field(..., min_length=1)
 
 
 class TaskCreate(TaskBase):
     """Task creation schema"""
+
     agent_id: UUID4
     context: Optional[Dict[str, Any]] = None
 
 
 class TaskExecute(TaskBase):
     """Task execution schema (without agent_id)"""
+
     context: Optional[Dict[str, Any]] = None
 
 
 class TaskResponse(BaseResponseSchema):
     """Task response schema"""
+
     agent_id: UUID4
     task_type: str
     input_text: str
@@ -102,16 +111,19 @@ class TaskResponse(BaseResponseSchema):
 # Conversation Schemas
 class ConversationBase(BaseModel):
     """Base conversation schema"""
+
     title: Optional[str] = Field(None, max_length=500)
 
 
 class ConversationCreate(ConversationBase):
     """Conversation creation schema"""
+
     agent_id: UUID4
 
 
 class ConversationUpdate(BaseModel):
     """Conversation update schema"""
+
     title: Optional[str] = Field(None, max_length=500)
     summary: Optional[str] = None
     is_active: Optional[bool] = None
@@ -119,16 +131,19 @@ class ConversationUpdate(BaseModel):
 
 class MessageBase(BaseModel):
     """Base message schema"""
+
     content: str = Field(..., min_length=1)
 
 
 class MessageCreate(MessageBase):
     """Message creation schema"""
+
     role: str = Field(default="user", pattern="^(user|assistant|system)$")
 
 
 class MessageResponse(BaseModel):
     """Message response schema"""
+
     id: UUID4
     conversation_id: UUID4
     role: str
@@ -145,6 +160,7 @@ class MessageResponse(BaseModel):
 
 class ConversationResponse(BaseResponseSchema):
     """Conversation response schema"""
+
     agent_id: UUID4
     title: Optional[str]
     summary: Optional[str]
@@ -158,6 +174,7 @@ class ConversationResponse(BaseResponseSchema):
 # Chat Schemas
 class ChatRequest(BaseModel):
     """Chat request schema"""
+
     message: str = Field(..., min_length=1)
     conversation_id: Optional[UUID4] = None
     system_prompt_override: Optional[str] = None
@@ -167,6 +184,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     """Chat response schema"""
+
     conversation_id: UUID4
     message_id: UUID4
     agent_id: UUID4
@@ -181,6 +199,7 @@ class ChatResponse(BaseModel):
 # Metrics Schemas
 class AgentMetrics(BaseModel):
     """Agent performance metrics"""
+
     agent_id: UUID4
     agent_name: str
     current_state: AgentState
@@ -198,6 +217,7 @@ class AgentMetrics(BaseModel):
 
 class AgentStats(BaseModel):
     """Aggregate agent statistics"""
+
     total_agents: int
     active_agents: int
     total_tasks_today: int

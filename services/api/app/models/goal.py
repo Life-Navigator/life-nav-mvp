@@ -1,8 +1,20 @@
 """
 Goal models
 """
+
 from datetime import datetime, date
-from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Integer, Date, Numeric, Boolean, Enum
+from sqlalchemy import (
+    Column,
+    String,
+    DateTime,
+    Text,
+    ForeignKey,
+    Integer,
+    Date,
+    Numeric,
+    Boolean,
+    Enum,
+)
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
 import uuid
@@ -13,6 +25,7 @@ from app.core.database import Base
 
 class GoalCategory(str, enum.Enum):
     """Goal categories"""
+
     FINANCIAL = "financial"
     HEALTH = "health"
     CAREER = "career"
@@ -24,6 +37,7 @@ class GoalCategory(str, enum.Enum):
 
 class GoalStatus(str, enum.Enum):
     """Goal status"""
+
     DRAFT = "draft"
     ACTIVE = "active"
     COMPLETED = "completed"
@@ -33,6 +47,7 @@ class GoalStatus(str, enum.Enum):
 
 class GoalPriority(str, enum.Enum):
     """Goal priority"""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -45,7 +60,9 @@ class Goal(Base):
     __tablename__ = "goals"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Goal Info
@@ -68,14 +85,18 @@ class Goal(Base):
 
     # Additional data
     tags = Column(JSONB)
-    extra_data = Column("metadata", JSONB)  # Column name "metadata" but attribute name "extra_data"
+    extra_data = Column(
+        "metadata", JSONB
+    )  # Column name "metadata" but attribute name "extra_data"
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    milestones = relationship("GoalMilestone", back_populates="goal", cascade="all, delete-orphan")
+    milestones = relationship(
+        "GoalMilestone", back_populates="goal", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Goal {self.title}>"
@@ -87,7 +108,9 @@ class GoalMilestone(Base):
     __tablename__ = "goal_milestones"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    goal_id = Column(UUID(as_uuid=True), ForeignKey("goals.id"), nullable=False, index=True)
+    goal_id = Column(
+        UUID(as_uuid=True), ForeignKey("goals.id"), nullable=False, index=True
+    )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Milestone Info

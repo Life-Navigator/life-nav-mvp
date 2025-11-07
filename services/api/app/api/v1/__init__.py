@@ -1,8 +1,18 @@
 """
 API v1 routing
 """
+
 from fastapi import APIRouter
-from app.api.v1.endpoints import users, goals, health, finance, career, education, auth, agents
+from app.api.v1.endpoints import (
+    users,
+    goals,
+    health,
+    finance,
+    career,
+    education,
+    auth,
+    agents,
+)
 
 api_router = APIRouter()
 

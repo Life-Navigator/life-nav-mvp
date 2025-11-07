@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from app.main import app
 
+
 def generate_openapi():
     """Generate and save OpenAPI specification"""
     openapi_schema = app.openapi()
@@ -28,10 +29,17 @@ def generate_openapi():
 
     # Count total operations
     total_ops = sum(
-        len([op for op in path_item.values() if isinstance(op, dict) and 'operationId' in op])
-        for path_item in openapi_schema.get('paths', {}).values()
+        len(
+            [
+                op
+                for op in path_item.values()
+                if isinstance(op, dict) and "operationId" in op
+            ]
+        )
+        for path_item in openapi_schema.get("paths", {}).values()
     )
     print(f"   - Operations: {total_ops} total")
+
 
 if __name__ == "__main__":
     generate_openapi()
