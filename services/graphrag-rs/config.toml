@@ -3,19 +3,19 @@ host = "0.0.0.0"
 port = 50051
 
 [neo4j]
-uri = "bolt://localhost:7687"
+uri = "bolt://neo4j:7687"
 user = "neo4j"
 password = "devpassword"
 database = "neo4j"
 max_connections = 10
 
 [qdrant]
-url = "http://localhost:6334"
+url = "http://qdrant:6334"
 collection_name = "life_navigator_dev"
 vector_size = 384
 
 [graphdb]
-url = "http://localhost:7200"
+url = "http://graphdb:7200"
 repository = "life-navigator"
 
 [embeddings]

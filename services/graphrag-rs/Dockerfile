@@ -8,7 +8,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Builder - Compile Rust binary
 # -----------------------------------------------------------------------------
-FROM rust:1.75-slim as builder
+FROM rust:latest as builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y \
@@ -30,6 +30,9 @@ COPY build.rs ./
 # Copy source code
 COPY src/ ./src/
 
+# Copy configuration
+COPY config.toml ./
+
 # Build for release
 RUN cargo build --release
 
@@ -47,11 +50,17 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
+# Create app directory
+WORKDIR /app
+
 # Copy binary from builder
 COPY --from=builder /app/target/release/graphrag-rs /usr/local/bin/graphrag-rs
 
+# Copy config from builder
+COPY --from=builder /app/config.toml ./config.toml
+
 # Change ownership
-RUN chown appuser:appuser /usr/local/bin/graphrag-rs
+RUN chown -R appuser:appuser /app /usr/local/bin/graphrag-rs
 
 # Switch to non-root user
 USER appuser

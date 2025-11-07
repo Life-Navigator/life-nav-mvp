@@ -128,7 +128,7 @@ impl Config {
     /// Load configuration from environment and config file
     pub fn load() -> Result<Self> {
         // Load from environment variables first
-        dotenv::dotenv().ok();
+        dotenvy::dotenv().ok();
 
         let config = config::Config::builder()
             // Load from config.toml if it exists

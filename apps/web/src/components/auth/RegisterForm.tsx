@@ -82,13 +82,28 @@ export default function RegisterForm() {
         }),
       });
 
-      const data = await response.json();
+      // Parse response
+      let data;
+      const contentType = response.headers.get('content-type');
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Registration failed');
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        // Non-JSON response
+        const text = await response.text();
+        console.error('Non-JSON response from server:', text);
+        throw new Error('Server returned an invalid response. Please try again.');
       }
 
-      // After successful registration, redirect to login page with a success message
+      // Handle error responses
+      if (!response.ok) {
+        const errorMessage = data?.message || data?.detail || 'Registration failed';
+        throw new Error(errorMessage);
+      }
+
+      // Successful registration
+      console.log('Registration successful:', data);
+
       addToast({
         title: "Registration successful",
         description: "Your account has been created. Please log in with your credentials.",
@@ -98,12 +113,24 @@ export default function RegisterForm() {
       // Redirect to login page with a query parameter to show a success message
       router.push('/auth/login?registered=true');
     } catch (err) {
+      // Handle different types of errors
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+
       if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An unexpected error occurred. Please try again.');
+        errorMessage = err.message;
+      } else if (typeof err === 'string') {
+        errorMessage = err;
       }
+
+      setError(errorMessage);
       console.error('Registration error:', err);
+
+      // Show error toast as well
+      addToast({
+        title: "Registration failed",
+        description: errorMessage,
+        type: "error",
+      });
     } finally {
       setIsLoading(false);
     }
