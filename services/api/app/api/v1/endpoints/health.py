@@ -78,7 +78,7 @@ async def list_medications(
     """List medications"""
     result = await db.execute(
         select(Medication).where(
-            Medication.user_id == current_user.id, Medication.is_active == True
+            Medication.user_id == current_user.id, Medication.is_active is True
         )
     )
     return result.scalars().all()

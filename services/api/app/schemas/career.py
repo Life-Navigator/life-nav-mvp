@@ -3,11 +3,11 @@ Career schemas
 """
 
 from datetime import date
-from typing import Optional, List
+from typing import Optional
 from decimal import Decimal
-from pydantic import BaseModel, UUID4
+from pydantic import BaseModel
 from app.schemas.base import BaseResponseSchema
-from app.models.career import EmploymentType, SkillLevel
+from app.models.career import SkillLevel
 
 
 # Career Profile Schemas

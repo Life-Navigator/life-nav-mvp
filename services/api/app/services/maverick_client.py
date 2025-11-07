@@ -4,7 +4,6 @@ Maverick LLM Client - Interface to locally-hosted Llama-4 model
 
 import httpx
 from typing import Optional, Dict, Any, List
-from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)

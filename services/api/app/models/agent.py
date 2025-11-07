@@ -3,7 +3,6 @@ Agent models for AI agent system
 """
 
 from datetime import datetime
-from typing import Optional
 import uuid
 import enum
 from sqlalchemy import (

@@ -11,7 +11,6 @@ from app.core.security import (
     verify_password,
     create_access_token,
     create_refresh_token,
-    decode_token,
     get_password_hash,
 )
 from app.models.user import User

@@ -14,12 +14,6 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Import all models so Alembic can detect them
-from app.models.user import User
-from app.models.goal import Goal, GoalMilestone
-from app.models.health import HealthRecord, Medication, HealthProvider
-from app.models.finance import FinancialAccount, Transaction, Investment
-from app.models.career import CareerProfile, JobExperience, Skill
-from app.models.education import EducationRecord, Course, Certification
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

@@ -3,7 +3,7 @@ Finance endpoints
 """
 
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -25,7 +25,7 @@ async def list_accounts(
     result = await db.execute(
         select(FinancialAccount).where(
             FinancialAccount.user_id == current_user.id,
-            FinancialAccount.is_active == True,
+            FinancialAccount.is_active is True,
         )
     )
     return result.scalars().all()

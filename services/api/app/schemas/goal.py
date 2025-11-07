@@ -3,9 +3,9 @@ Goal schemas
 """
 
 from datetime import date, datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 from decimal import Decimal
-from pydantic import BaseModel, UUID4, Field
+from pydantic import BaseModel, UUID4
 from app.schemas.base import BaseResponseSchema
 from app.models.goal import GoalCategory, GoalStatus, GoalPriority
 

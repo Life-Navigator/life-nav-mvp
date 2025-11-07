@@ -3,7 +3,7 @@ Agent endpoints - AI agent management, task execution, and chat
 """
 
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -490,7 +490,7 @@ async def get_agent_metrics(
 
     active_conversations_result = await db.execute(
         select(func.count(Conversation.id)).where(
-            Conversation.agent_id == agent.id, Conversation.is_active == True
+            Conversation.agent_id == agent.id, Conversation.is_active is True
         )
     )
     active_conversations = active_conversations_result.scalar() or 0
@@ -531,7 +531,7 @@ async def get_aggregate_stats(
     # Active agents
     active_agents_result = await db.execute(
         select(func.count(Agent.id)).where(
-            Agent.user_id == current_user.id, Agent.is_active == True
+            Agent.user_id == current_user.id, Agent.is_active is True
         )
     )
     active_agents = active_agents_result.scalar() or 0

@@ -34,6 +34,15 @@ black = "^25.9.0"
 ruff = "^0.1.0"
 mypy = "^1.8.0"
 
+[tool.ruff]
+line-length = 100
+ignore = [
+    "F403",  # star imports (from module import *) - to be fixed later
+    "F405",  # names from star imports may be undefined - to be fixed later
+    "E402",  # module level import not at top of file
+    "E712",  # comparison to True should use 'is'
+]
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

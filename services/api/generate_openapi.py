@@ -22,7 +22,7 @@ def generate_openapi():
         json.dump(openapi_schema, f, indent=2)
 
     print(f"✅ OpenAPI specification generated: {output_path}")
-    print(f"📊 API Info:")
+    print("📊 API Info:")
     print(f"   - Title: {openapi_schema['info']['title']}")
     print(f"   - Version: {openapi_schema['info']['version']}")
     print(f"   - Endpoints: {len(openapi_schema.get('paths', {}))} paths")
