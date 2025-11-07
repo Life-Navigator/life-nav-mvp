@@ -13,7 +13,7 @@ pydantic-settings==2.7.1  # Updated
 email-validator==2.2.0  # Updated
 
 # Security
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.5.0  # Updated to fix GHSA-6c5p-j8vq-pqhj (CRITICAL), GHSA-cjwg-qfpm-7377
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.18  # Updated to fix GHSA-59g5-xgcq-4qw3 (DoS vulnerability)
 

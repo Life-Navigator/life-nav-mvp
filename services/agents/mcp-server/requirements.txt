@@ -3,7 +3,7 @@ fastapi==0.115.6  # Updated to fix DoS vulnerabilities
 uvicorn[standard]==0.34.0  # Updated for compatibility
 pydantic==2.10.5  # Updated for compatibility
 pydantic-settings==2.7.1  # Updated
-python-multipart==0.0.18  # Updated to fix GHSA-59g5-xgcq-4qw3
+python-multipart==0.0.20  # Updated to fix GHSA-2jv5-9r88-3w3p, GHSA-59g5-xgcq-4qw3 (HIGH DoS)
 
 # Async and utilities
 httpx==0.28.1  # Updated
@@ -14,17 +14,16 @@ python-dotenv==1.0.0
 asyncpg==0.29.0
 redis[hiredis]==5.0.1
 neo4j==5.14.1
-qdrant-client==1.7.0
+qdrant-client==1.15.1  # Updated to fix GHSA-7m75-x27w-r52r (CRITICAL input validation)
 
 # Authentication
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.5.0  # Updated to fix GHSA-6c5p-j8vq-pqhj (CRITICAL), GHSA-cjwg-qfpm-7377
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
 
 # Monitoring and logging
 prometheus-client==0.19.0
 structlog==23.2.0
-sentry-sdk[fastapi]==1.38.0
+sentry-sdk[fastapi]==2.43.0  # Updated to fix GHSA-g92j-qhmh-64v2 (LOW env var exposure)
 
 # Testing
 pytest==7.4.3
@@ -38,4 +37,4 @@ types-redis==4.6.0.20241004  # Updated to latest available version
 
 # Code quality
 ruff==0.1.6
-black==23.11.0
+black==25.9.0  # Updated to fix GHSA-fj7x-q9j7-g6q6 (MODERATE ReDoS)
