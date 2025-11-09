@@ -2,9 +2,10 @@
 User model
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, String, Boolean, DateTime, Text
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 import uuid
 
 from app.core.database import Base
@@ -37,10 +38,26 @@ class User(Base):
     is_superuser = Column(Boolean, default=False)
 
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), nullable=False)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None), onupdate=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     last_login_at = Column(DateTime)
     email_verified_at = Column(DateTime)
+
+    # Education module relationships
+    education_credentials = relationship("EducationCredential", back_populates="user")
+    courses = relationship("Course", back_populates="user")
+    learning_paths = relationship("LearningPath", back_populates="user")
+    education_programs = relationship("EducationProgram", back_populates="user")
+    learning_goals = relationship("LearningGoal", back_populates="user")
+
+    # Health module relationships
+    health_insurance = relationship("HealthInsurance", back_populates="user")
+
+    # Integration relationships
+    integrations = relationship("UserIntegration", back_populates="user")
+
+    # Resume relationships
+    resumes = relationship("Resume", back_populates="user")
 
     def __repr__(self):
         return f"<User {self.email}>"

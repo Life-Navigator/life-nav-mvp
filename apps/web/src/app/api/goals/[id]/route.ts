@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { db as prisma } from '@/lib/db';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { z } from 'zod';
 
 // Update goal schema
@@ -26,15 +25,15 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const goal = await prisma.goal.findFirst({
       where: {
         id: params.id,
-        userId: session.user.id,
+        userId,
         deletedAt: null
       },
       include: {
@@ -112,8 +111,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -124,7 +123,7 @@ export async function PUT(
     const existingGoal = await prisma.goal.findFirst({
       where: {
         id: params.id,
-        userId: session.user.id,
+        userId,
         deletedAt: null
       }
     });
@@ -193,7 +192,7 @@ export async function PUT(
       // Log audit event
       await tx.auditLog.create({
         data: {
-          userId: session.user.id,
+          userId,
           action: 'UPDATE',
           entity: 'Goal',
           entityId: params.id,
@@ -246,8 +245,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -255,7 +254,7 @@ export async function DELETE(
     const goal = await prisma.goal.findFirst({
       where: {
         id: params.id,
-        userId: session.user.id,
+        userId,
         deletedAt: null
       }
     });
@@ -271,7 +270,7 @@ export async function DELETE(
         where: { id: params.id },
         data: {
           deletedAt: new Date(),
-          deletedBy: session.user.id
+          deletedBy: userId
         }
       });
 
@@ -297,7 +296,7 @@ export async function DELETE(
       // Log audit event
       await tx.auditLog.create({
         data: {
-          userId: session.user.id,
+          userId,
           action: 'DELETE',
           entity: 'Goal',
           entityId: params.id,

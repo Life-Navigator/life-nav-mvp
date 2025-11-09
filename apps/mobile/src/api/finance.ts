@@ -177,7 +177,274 @@ export const exchangePlaidToken = async (
   });
 };
 
+// ============================================================================
+// ADVANCED FINANCIAL PLANNING APIs
+// ============================================================================
+
+/**
+ * Legacy Planning / Estate Planning
+ */
+
+export const getLegacyPlan = async (): Promise<any> => {
+  return api.get('/finance/legacy');
+};
+
+export const updateLegacyPlan = async (data: any): Promise<any> => {
+  return api.put('/finance/legacy', data);
+};
+
+export const addBeneficiary = async (data: any): Promise<any> => {
+  return api.post('/finance/legacy/beneficiaries', data);
+};
+
+export const updateBeneficiary = async (id: string, data: any): Promise<any> => {
+  return api.put(`/finance/legacy/beneficiaries/${id}`, data);
+};
+
+export const deleteBeneficiary = async (id: string): Promise<any> => {
+  return api.delete(`/finance/legacy/beneficiaries/${id}`);
+};
+
+export const uploadEstateDocument = async (data: FormData): Promise<any> => {
+  return api.post('/finance/legacy/documents', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
+export const getEstateDocuments = async (): Promise<any[]> => {
+  return api.get('/finance/legacy/documents');
+};
+
+/**
+ * Risk Management & Insurance
+ */
+
+export const getInsurancePolicies = async (): Promise<any[]> => {
+  return api.get('/finance/insurance/policies');
+};
+
+export const addInsurancePolicy = async (data: any): Promise<any> => {
+  return api.post('/finance/insurance/policies', data);
+};
+
+export const updateInsurancePolicy = async (id: string, data: any): Promise<any> => {
+  return api.put(`/finance/insurance/policies/${id}`, data);
+};
+
+export const deleteInsurancePolicy = async (id: string): Promise<any> => {
+  return api.delete(`/finance/insurance/policies/${id}`);
+};
+
+export const getRiskAssessment = async (): Promise<any> => {
+  return api.get('/finance/insurance/risk-assessment');
+};
+
+export const getCoverageAnalysis = async (): Promise<any> => {
+  return api.get('/finance/insurance/coverage-analysis');
+};
+
+export const getInsuranceClaims = async (): Promise<any[]> => {
+  return api.get('/finance/insurance/claims');
+};
+
+export const addInsuranceClaim = async (data: any): Promise<any> => {
+  return api.post('/finance/insurance/claims', data);
+};
+
+/**
+ * Tax Planning
+ */
+
+export const getTaxPlan = async (): Promise<any> => {
+  return api.get('/finance/tax');
+};
+
+export const getTaxProjections = async (year: number): Promise<any> => {
+  return api.get(`/finance/tax/projections/${year}`);
+};
+
+export const addTaxDocument = async (data: FormData): Promise<any> => {
+  return api.post('/finance/tax/documents', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
+export const getTaxDocuments = async (): Promise<any[]> => {
+  return api.get('/finance/tax/documents');
+};
+
+export const addDeduction = async (data: any): Promise<any> => {
+  return api.post('/finance/tax/deductions', data);
+};
+
+export const getDeductions = async (): Promise<any[]> => {
+  return api.get('/finance/tax/deductions');
+};
+
+export const getQuarterlyEstimates = async (year: number): Promise<any> => {
+  return api.get(`/finance/tax/quarterly-estimates/${year}`);
+};
+
+/**
+ * Retirement Planning
+ */
+
+export const getRetirementPlan = async (): Promise<any> => {
+  return api.get('/finance/retirement');
+};
+
+export const getRetirementAccounts = async (): Promise<any[]> => {
+  return api.get('/finance/retirement/accounts');
+};
+
+export const addRetirementAccount = async (data: any): Promise<any> => {
+  return api.post('/finance/retirement/accounts', data);
+};
+
+export const updateRetirementAccount = async (id: string, data: any): Promise<any> => {
+  return api.put(`/finance/retirement/accounts/${id}`, data);
+};
+
+export const deleteRetirementAccount = async (id: string): Promise<any> => {
+  return api.delete(`/finance/retirement/accounts/${id}`);
+};
+
+export const runMonteCarloSimulation = async (params: any): Promise<any> => {
+  return api.post('/finance/retirement/monte-carlo', params);
+};
+
+export const getRetirementGoals = async (): Promise<any[]> => {
+  return api.get('/finance/retirement/goals');
+};
+
+export const addRetirementGoal = async (data: any): Promise<any> => {
+  return api.post('/finance/retirement/goals', data);
+};
+
+export const updateRetirementGoal = async (id: string, data: any): Promise<any> => {
+  return api.put(`/finance/retirement/goals/${id}`, data);
+};
+
+/**
+ * Benefits Planning
+ */
+
+export const getBenefitsPlan = async (): Promise<any> => {
+  return api.get('/finance/benefits');
+};
+
+export const getHealthBenefits = async (): Promise<any[]> => {
+  return api.get('/finance/benefits/health');
+};
+
+export const addHealthBenefit = async (data: any): Promise<any> => {
+  return api.post('/finance/benefits/health', data);
+};
+
+export const getRetirementBenefits = async (): Promise<any[]> => {
+  return api.get('/finance/benefits/retirement');
+};
+
+export const addRetirementBenefit = async (data: any): Promise<any> => {
+  return api.post('/finance/benefits/retirement', data);
+};
+
+export const getInsuranceBenefits = async (): Promise<any[]> => {
+  return api.get('/finance/benefits/insurance');
+};
+
+export const getPTOBenefits = async (): Promise<any> => {
+  return api.get('/finance/benefits/pto');
+};
+
+export const updatePTOBenefits = async (data: any): Promise<any> => {
+  return api.put('/finance/benefits/pto', data);
+};
+
+export const getBenefitsOptimization = async (): Promise<any> => {
+  return api.get('/finance/benefits/optimization');
+};
+
+/**
+ * Investment Management
+ */
+
+export const getPortfolio = async (): Promise<any> => {
+  return api.get('/finance/portfolio');
+};
+
+export const getPortfolioPerformance = async (params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<any> => {
+  return api.get('/finance/portfolio/performance', { params });
+};
+
+export const getAssetAllocation = async (): Promise<any> => {
+  return api.get('/finance/portfolio/asset-allocation');
+};
+
+export const getHoldings = async (): Promise<any[]> => {
+  return api.get('/finance/portfolio/holdings');
+};
+
+export const addHolding = async (data: any): Promise<any> => {
+  return api.post('/finance/portfolio/holdings', data);
+};
+
+export const updateHolding = async (id: string, data: any): Promise<any> => {
+  return api.put(`/finance/portfolio/holdings/${id}`, data);
+};
+
+export const deleteHolding = async (id: string): Promise<any> => {
+  return api.delete(`/finance/portfolio/holdings/${id}`);
+};
+
+export const getPortfolioMetrics = async (): Promise<any> => {
+  return api.get('/finance/portfolio/metrics');
+};
+
+export const getDividends = async (params?: {
+  startDate?: string;
+  endDate?: string;
+}): Promise<any[]> => {
+  return api.get('/finance/portfolio/dividends', { params });
+};
+
+export const getInvestmentStrategy = async (): Promise<any> => {
+  return api.get('/finance/portfolio/strategy');
+};
+
+export const updateInvestmentStrategy = async (data: any): Promise<any> => {
+  return api.put('/finance/portfolio/strategy', data);
+};
+
+/**
+ * Financial Planning Dashboard
+ */
+
+export const getFinancialHealthScore = async (): Promise<any> => {
+  return api.get('/finance/planning/health-score');
+};
+
+export const getPlanningProgress = async (): Promise<any> => {
+  return api.get('/finance/planning/progress');
+};
+
+export const getPlanningMilestones = async (): Promise<any[]> => {
+  return api.get('/finance/planning/milestones');
+};
+
+export const getActionItems = async (): Promise<any[]> => {
+  return api.get('/finance/planning/action-items');
+};
+
+export const completeActionItem = async (id: string): Promise<any> => {
+  return api.post(`/finance/planning/action-items/${id}/complete`);
+};
+
 export default {
+  // Basic Finance
   getAccounts,
   getAccount,
   syncAccount,
@@ -194,4 +461,74 @@ export default {
   getCashFlow,
   createPlaidLinkToken,
   exchangePlaidToken,
+
+  // Legacy Planning
+  getLegacyPlan,
+  updateLegacyPlan,
+  addBeneficiary,
+  updateBeneficiary,
+  deleteBeneficiary,
+  uploadEstateDocument,
+  getEstateDocuments,
+
+  // Risk Management & Insurance
+  getInsurancePolicies,
+  addInsurancePolicy,
+  updateInsurancePolicy,
+  deleteInsurancePolicy,
+  getRiskAssessment,
+  getCoverageAnalysis,
+  getInsuranceClaims,
+  addInsuranceClaim,
+
+  // Tax Planning
+  getTaxPlan,
+  getTaxProjections,
+  addTaxDocument,
+  getTaxDocuments,
+  addDeduction,
+  getDeductions,
+  getQuarterlyEstimates,
+
+  // Retirement Planning
+  getRetirementPlan,
+  getRetirementAccounts,
+  addRetirementAccount,
+  updateRetirementAccount,
+  deleteRetirementAccount,
+  runMonteCarloSimulation,
+  getRetirementGoals,
+  addRetirementGoal,
+  updateRetirementGoal,
+
+  // Benefits Planning
+  getBenefitsPlan,
+  getHealthBenefits,
+  addHealthBenefit,
+  getRetirementBenefits,
+  addRetirementBenefit,
+  getInsuranceBenefits,
+  getPTOBenefits,
+  updatePTOBenefits,
+  getBenefitsOptimization,
+
+  // Investment Management
+  getPortfolio,
+  getPortfolioPerformance,
+  getAssetAllocation,
+  getHoldings,
+  addHolding,
+  updateHolding,
+  deleteHolding,
+  getPortfolioMetrics,
+  getDividends,
+  getInvestmentStrategy,
+  updateInvestmentStrategy,
+
+  // Financial Planning Dashboard
+  getFinancialHealthScore,
+  getPlanningProgress,
+  getPlanningMilestones,
+  getActionItems,
+  completeActionItem,
 };

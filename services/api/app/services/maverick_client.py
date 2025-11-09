@@ -1,5 +1,6 @@
 """
-Maverick LLM Client - Interface to locally-hosted Llama-4 model
+Maverick LLM Client - Interface to locally-hosted LLM via vLLM
+Optimized for DGX/GCP enterprise deployment with vLLM OpenAI-compatible API
 """
 
 import httpx
@@ -10,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class MaverickClient:
-    """Client for Maverick locally-hosted LLM (llama.cpp server on port 8090)"""
+    """Client for Maverick locally-hosted LLM (vLLM server on port 8090)"""
 
     def __init__(self, base_url: str = "http://localhost:8090", timeout: float = 60.0):
         self.base_url = base_url
@@ -38,7 +39,7 @@ class MaverickClient:
         stream: bool = False,
     ) -> Dict[str, Any]:
         """
-        Request completion from Maverick LLM
+        Request completion from Maverick LLM (vLLM OpenAI-compatible API)
 
         Args:
             prompt: The input prompt
@@ -53,39 +54,38 @@ class MaverickClient:
             {
                 "content": "Generated text...",
                 "tokens_predicted": 123,
-                "tokens_evaluated": 45,
-                "truncated": false,
-                "stopped_eos": false,
-                "stopped_word": true,
-                "stopped_limit": false,
-                "stopping_word": "\n\n",
-                "timings": {...}
+                "finish_reason": "stop"
             }
         """
         if stop is None:
             stop = ["\nUser:", "\n\n"]
 
+        # vLLM uses OpenAI-compatible /v1/completions endpoint
         payload = {
+            "model": "default",  # vLLM uses the loaded model
             "prompt": prompt,
-            "n_predict": n_predict,
+            "max_tokens": n_predict,
             "temperature": temperature,
             "top_p": top_p,
-            "top_k": top_k,
             "stop": stop,
             "stream": stream,
         }
 
         try:
-            logger.debug(f"Sending completion request to {self.base_url}/completion")
+            logger.debug(f"Sending completion request to {self.base_url}/v1/completions")
             response = await self.client.post(
-                f"{self.base_url}/completion", json=payload
+                f"{self.base_url}/v1/completions", json=payload
             )
             response.raise_for_status()
             result = response.json()
-            logger.debug(
-                f"Received completion: {result.get('tokens_predicted', 0)} tokens"
-            )
-            return result
+
+            # Extract from OpenAI format
+            choice = result.get("choices", [{}])[0]
+            return {
+                "content": choice.get("text", ""),
+                "tokens_predicted": result.get("usage", {}).get("completion_tokens", 0),
+                "finish_reason": choice.get("finish_reason", "unknown")
+            }
 
         except httpx.HTTPStatusError as e:
             logger.error(
@@ -107,11 +107,11 @@ class MaverickClient:
         max_tokens: int = 500,
     ) -> Dict[str, Any]:
         """
-        Chat-style completion with message history
+        Chat-style completion with message history (vLLM OpenAI-compatible API)
 
         Args:
-            messages: List of {role: "user"|"assistant", content: "..."}
-            system_prompt: Optional system prompt
+            messages: List of {role: "user"|"assistant"|"system", content: "..."}
+            system_prompt: Optional system prompt (prepended to messages)
             temperature: Sampling temperature
             max_tokens: Max tokens to generate
 
@@ -123,39 +123,53 @@ class MaverickClient:
                 "finish_reason": "stop"
             }
         """
-        # Build prompt from messages
-        prompt_parts = []
+        # Build messages list for OpenAI format
+        formatted_messages = []
 
         if system_prompt:
-            prompt_parts.append(f"System: {system_prompt}\n")
+            formatted_messages.append({"role": "system", "content": system_prompt})
 
-        for msg in messages:
-            role = msg.get("role", "user").capitalize()
-            content = msg.get("content", "")
-            prompt_parts.append(f"{role}: {content}")
+        formatted_messages.extend(messages)
 
-        prompt_parts.append("Assistant:")
-        full_prompt = "\n\n".join(prompt_parts)
-
-        # Call completion endpoint
-        result = await self.completion(
-            prompt=full_prompt,
-            n_predict=max_tokens,
-            temperature=temperature,
-            stop=["\nUser:", "\nSystem:", "\n\n"],
-        )
-
-        # Format as chat response
-        return {
-            "content": result.get("content", "").strip(),
-            "tokens_predicted": result.get("tokens_predicted", 0),
-            "role": "assistant",
-            "finish_reason": (
-                "stop"
-                if result.get("stopped_word") or result.get("stopped_eos")
-                else "length"
-            ),
+        # vLLM uses OpenAI-compatible /v1/chat/completions endpoint
+        payload = {
+            "model": "default",  # vLLM uses the loaded model
+            "messages": formatted_messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "top_p": 0.9,
         }
+
+        try:
+            logger.debug(f"Sending chat request to {self.base_url}/v1/chat/completions")
+            response = await self.client.post(
+                f"{self.base_url}/v1/chat/completions", json=payload
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            # Extract from OpenAI format
+            choice = result.get("choices", [{}])[0]
+            message = choice.get("message", {})
+
+            return {
+                "content": message.get("content", "").strip(),
+                "tokens_predicted": result.get("usage", {}).get("completion_tokens", 0),
+                "role": "assistant",
+                "finish_reason": choice.get("finish_reason", "stop"),
+            }
+
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                f"HTTP error from Maverick: {e.response.status_code} - {e.response.text}"
+            )
+            raise Exception(f"Maverick LLM error: {e.response.status_code}")
+        except httpx.RequestError as e:
+            logger.error(f"Request error to Maverick: {str(e)}")
+            raise Exception(f"Failed to connect to Maverick LLM: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error calling Maverick: {str(e)}")
+            raise
 
     async def health_check(self) -> bool:
         """

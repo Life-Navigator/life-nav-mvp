@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { AcademicCapIcon, BookOpenIcon, ChartBarIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
+import PlatformIntegrations from '@/components/education/PlatformIntegrations';
 
 export default function EducationLandingPage() {
   const features = [
@@ -86,6 +87,11 @@ export default function EducationLandingPage() {
               Join Desktop Waitlist
             </Link>
           </div>
+        </div>
+
+        {/* Platform Integrations */}
+        <div className="mb-8">
+          <PlatformIntegrations />
         </div>
 
         {/* Educational Resources */}

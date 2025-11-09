@@ -8,12 +8,12 @@ import { ConnectedServices } from './ConnectedServices';
 import { DataSyncStatus } from './DataSyncStatus';
 
 const INTEGRATION_CATEGORIES = [
-  { id: 'finance', name: 'Financial', count: 6 },
-  { id: 'education', name: 'Education', count: 4 },
-  { id: 'career', name: 'Career', count: 3 },
-  { id: 'health', name: 'Healthcare', count: 5 },
-  { id: 'automotive', name: 'Automotive', count: 3 },
-  { id: 'smarthome', name: 'Smart Home', count: 4 },
+  { id: 'finance', name: 'Financial', count: 16 },
+  { id: 'education', name: 'Education', count: 8 },
+  { id: 'career', name: 'Career', count: 15 },
+  { id: 'health', name: 'Healthcare', count: 16 },
+  { id: 'automotive', name: 'Automotive', count: 12 },
+  { id: 'smarthome', name: 'Smart Home', count: 15 },
 ];
 
 export function IntegrationsOverview() {

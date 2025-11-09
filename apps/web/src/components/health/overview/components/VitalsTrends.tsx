@@ -137,7 +137,7 @@ export default function VitalsTrends() {
         <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Temperature</p>
           <p className={`text-2xl font-bold ${getVitalStatus('temperature', data.current.temperature)}`}>
-            {data.current.temperature}°C
+            {data.current.temperature}Â°C
           </p>
         </div>
       </div>
@@ -239,7 +239,7 @@ export default function VitalsTrends() {
                   stroke="#F97316"
                   strokeWidth={2}
                   dot={{ r: 4 }}
-                  name="Temperature (°C)"
+                  name="Temperature (Â°C)"
                 />
               )}
             </LineChart>

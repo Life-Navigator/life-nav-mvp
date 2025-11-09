@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { db as prisma } from '@/lib/db';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
 // AI-powered recommendation generation (mock for now, integrate with OpenAI later)
 function generateRecommendations(
@@ -57,8 +56,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -66,7 +65,7 @@ export async function PUT(
     const assessment = await prisma.riskAssessment.findFirst({
       where: {
         id: params.id,
-        userId: session.user.id,
+        userId: userId,
         status: 'IN_PROGRESS',
         deletedAt: null
       },
@@ -182,7 +181,7 @@ export async function PUT(
       // Log audit event
       await tx.auditLog.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           action: 'COMPLETE',
           entity: 'RiskAssessment',
           entityId: params.id,

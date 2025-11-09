@@ -52,6 +52,8 @@ export async function POST(request: NextRequest) {
         password: body.password,
         username: body.name.toLowerCase().replace(/\s+/g, ''), // Create username from name
         full_name: body.name,
+        first_name: body.name.split(' ')[0] || '',
+        last_name: body.name.split(' ').slice(1).join(' ') || '',
       }),
     });
 

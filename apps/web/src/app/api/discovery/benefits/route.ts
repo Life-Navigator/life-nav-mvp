@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { z } from 'zod';
 
@@ -22,8 +21,8 @@ const benefitsSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -41,14 +40,14 @@ export async function POST(request: NextRequest) {
       // Delete existing rankings for this domain
       await db.benefitRanking.deleteMany({
         where: {
-          userId: session.user.id,
+          userId: userId,
           domain,
         },
       });
 
       // Create new rankings
       const rankings = tagIds.map((tagId, index) => ({
-        userId: session.user.id,
+        userId: userId,
         domain,
         tagId,
         rank: index + 1, // Rank 1 is highest priority
@@ -63,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     // Update user's profile to indicate benefits discovery is complete
     await db.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: {
         setupCompleted: true,
         updatedAt: new Date(),
@@ -98,8 +97,8 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     // Check authentication
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -108,7 +107,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch user's benefit rankings
     const rankings = await db.benefitRanking.findMany({
-      where: { userId: session.user.id },
+      where: { userId: userId },
       orderBy: [
         { domain: 'asc' },
         { rank: 'asc' },

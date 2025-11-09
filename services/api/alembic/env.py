@@ -14,6 +14,14 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Import all models so Alembic can detect them
+from app.models.user import User  # noqa
+from app.models.health import HealthRecord, HealthProvider, Medication  # noqa
+from app.models.finance import FinancialAccount, Transaction, Investment  # noqa
+from app.models.career import CareerProfile, JobExperience, Skill  # noqa
+from app.models.education import EducationRecord, Course, Certification  # noqa
+from app.models.goal import Goal, GoalMilestone  # noqa
+from app.models.agent import Agent, AgentTask, Conversation, ConversationMessage  # noqa
+from app.models.verification_token import EmailVerificationToken  # noqa
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

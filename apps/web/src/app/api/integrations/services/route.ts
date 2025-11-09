@@ -1,18 +1,17 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/auth';
+import { NextResponse, NextRequest } from 'next/server';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { ConnectedService } from '@/types/integration';
 
 /**
  * GET /api/integrations/services
  * Fetches all connected services for the authenticated user
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Check authentication
-    const session = await getServerSession(authOptions);
+    const userId = await getUserIdFromJWT(request);
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -22,7 +21,7 @@ export async function GET() {
     // TODO: Query database for user's connected services
     // const services = await prisma.connectedService.findMany({
     //   where: {
-    //     userId: session.user.id,
+    //     userId: userId,
     //   },
     //   include: {
     //     provider: true,

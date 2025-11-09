@@ -1,5 +1,3 @@
-import { DefaultSession } from 'next-auth';
-
 // User model from Prisma schema
 export interface User {
   id: string;
@@ -41,13 +39,14 @@ export interface Session {
   user: User;
 }
 
-// Augment the built-in types from next-auth
-export interface ExtendedSession extends DefaultSession {
+// User session data
+export interface UserSession {
   user: {
     id: string;
     email: string;
+    name?: string;
     setupCompleted: boolean;
-  } & DefaultSession['user'];
+  };
 }
 
 // Credentials for login

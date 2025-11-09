@@ -3,8 +3,6 @@
  */
 import { JWTPayload, SignJWT, jwtVerify } from 'jose';
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { db } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { parseAuthHeader } from './secure-cookie-config';

@@ -2,33 +2,72 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { WhatWhatWhyChat } from '@/components/conversation/WhatWhatWhyChat';
 import { Goal } from '@/lib/goals/types';
 
+function isAuthenticated(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!localStorage.getItem('access_token');
+}
+
+function getUserId(): string | null {
+  if (typeof window === 'undefined') return null;
+  const token = localStorage.getItem('access_token');
+  if (!token) return null;
+
+  try {
+    // Decode JWT token to get user ID
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.id || payload.sub || null;
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return null;
+  }
+}
+
 export default function ConversationPage() {
   const router = useRouter();
-  const { data: session } = useSession();
   const [userGoals, setUserGoals] = useState<Goal[]>([]);
   const [benefitSelections, setBenefitSelections] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [analysisComplete, setAnalysisComplete] = useState(false);
   const [analysis, setAnalysis] = useState<any>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check authentication
+    if (!isAuthenticated()) {
+      router.push('/auth/login');
+      return;
+    }
+
+    const id = getUserId();
+    setUserId(id);
+
     const fetchUserData = async () => {
-      if (!session?.user?.id) return;
+      if (!id) return;
 
       try {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+
         // Fetch user's goals
-        const goalsRes = await fetch('/api/goals');
+        const goalsRes = await fetch('/api/goals', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
         if (goalsRes.ok) {
           const goalsData = await goalsRes.json();
           setUserGoals(goalsData.goals || []);
         }
 
         // Fetch user's benefit selections
-        const benefitsRes = await fetch('/api/discovery/benefits');
+        const benefitsRes = await fetch('/api/discovery/benefits', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
         if (benefitsRes.ok) {
           const benefitsData = await benefitsRes.json();
           // Transform to expected format
@@ -47,7 +86,7 @@ export default function ConversationPage() {
     };
 
     fetchUserData();
-  }, [session]);
+  }, []);
 
   const handleConversationComplete = async (conversationAnalysis: any) => {
     setAnalysis(conversationAnalysis);
@@ -55,11 +94,17 @@ export default function ConversationPage() {
 
     // Save analysis to database
     try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
       await fetch('/api/conversation/analysis', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
-          userId: session?.user?.id,
+          userId,
           analysis: conversationAnalysis,
         }),
       });
@@ -278,7 +323,7 @@ export default function ConversationPage() {
     <WhatWhatWhyChat
       userGoals={userGoals}
       benefitSelections={benefitSelections}
-      userId={session?.user?.id || ''}
+      userId={userId || ''}
       onComplete={handleConversationComplete}
     />
   );

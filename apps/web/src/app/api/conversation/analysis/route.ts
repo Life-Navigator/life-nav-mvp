@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth/auth-options';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { db as prisma } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const userId = await getUserIdFromJWT(request);
     
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -20,11 +19,11 @@ export async function POST(req: NextRequest) {
     // Store the analysis (you might want to create a ConversationAnalysis model)
     // For now, we'll store it as JSON in the user's metadata
     const user = await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: {
         metadata: {
           ...(await prisma.user.findUnique({
-            where: { id: session.user.id },
+            where: { id: userId },
             select: { metadata: true }
           }))?.metadata as any || {},
           conversationAnalysis: {
@@ -50,9 +49,9 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const userId = await getUserIdFromJWT(request);
     
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -60,7 +59,7 @@ export async function GET(req: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       select: { metadata: true }
     });
 

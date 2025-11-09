@@ -11,11 +11,13 @@ import {
   StatusBar,
   StyleSheet,
   useColorScheme,
+  ActivityIndicator,
+  View,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './src/store/authStore';
-import { LoginScreen } from './src/screens/auth/LoginScreen';
+import { RootNavigator } from './src/navigation/RootNavigator';
 import { colors } from './src/utils/colors';
 
 // Create React Query client
@@ -24,22 +26,22 @@ const queryClient = new QueryClient({
     queries: {
       retry: 3,
       staleTime: 1000 * 60 * 5, // 5 minutes
-      cacheTime: 1000 * 60 * 30, // 30 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes (replaces cacheTime)
     },
   },
 });
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
-  const { initialize, isInitialized, isAuthenticated } = useAuthStore();
+  const { initialize, isInitialized } = useAuthStore();
 
   useEffect(() => {
     // Initialize authentication state on app start
     initialize();
-  }, []);
+  }, [initialize]);
 
   const backgroundStyle = {
-    backgroundColor: isDarkMode ? colors.dark.primary : colors.light.primary,
+    backgroundColor: isDarkMode ? colors.dark?.primary || colors.background : colors.light?.primary || colors.background,
     flex: 1,
   };
 
@@ -51,7 +53,7 @@ function App(): React.JSX.Element {
           barStyle={isDarkMode ? 'light-content' : 'dark-content'}
           backgroundColor={backgroundStyle.backgroundColor}
         />
-        {/* Add a proper loading component here */}
+        <ActivityIndicator size="large" color={colors.primary} />
       </SafeAreaView>
     );
   }
@@ -59,15 +61,11 @@ function App(): React.JSX.Element {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <QueryClientProvider client={queryClient}>
-        <SafeAreaView style={backgroundStyle}>
-          <StatusBar
-            barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-            backgroundColor={backgroundStyle.backgroundColor}
-          />
-          {/* For now, just show login screen */}
-          {/* In production, this will be replaced with navigation */}
-          <LoginScreen />
-        </SafeAreaView>
+        <StatusBar
+          barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+          backgroundColor={backgroundStyle.backgroundColor}
+        />
+        <RootNavigator />
       </QueryClientProvider>
     </GestureHandlerRootView>
   );

@@ -3,8 +3,7 @@
  * Includes middleware for CSRF validation and authentication
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { validateCsrfToken } from '@/lib/auth/csrf';
 
 /**
@@ -34,19 +33,19 @@ export function withCsrfProtection(handler: Function) {
  */
 export function withAuth(handler: Function) {
   return async (request: NextRequest) => {
-    // Get session
-    const session = await getServerSession(authOptions);
-    
+    // Get user ID from JWT
+    const userId = await getUserIdFromJWT(request);
+
     // Check if user is authenticated
-    if (!session || !session.user) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
-    
-    // Call the handler function with session
-    return handler(request, session);
+
+    // Call the handler function with userId
+    return handler(request, userId);
   };
 }
 

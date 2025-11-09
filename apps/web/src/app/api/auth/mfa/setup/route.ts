@@ -5,8 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../[...nextauth]/route';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { db as prisma } from '@/lib/db';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
@@ -16,9 +15,9 @@ import { hash } from 'bcryptjs';
 // Generate TOTP secret and QR code for MFA setup
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const userId = await getUserIdFromJWT(request);
 
-    if (!session?.user?.email) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -26,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { id: userId },
     });
 
     if (!user) {
@@ -81,8 +80,8 @@ export async function POST(request: NextRequest) {
 // Verify and save MFA setup
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -120,7 +119,7 @@ export async function PUT(request: NextRequest) {
 
     // Save to database
     await prisma.user.update({
-      where: { email: session.user.email },
+      where: { id: userId },
       data: {
         mfaSecret: secret,
         mfaEnabled: true,

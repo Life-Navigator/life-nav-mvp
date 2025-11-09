@@ -78,17 +78,24 @@ async function handleNormalRequest(request: NextRequest) {
                        path.includes('/images') ||
                        path.includes('/favicon');
   
-  // Get the user token if not already obtained
-  const token = path === '/' ? null : await getToken({ 
-    req: request, 
-    secret: process.env.NEXTAUTH_SECRET 
+  // Get the user token - check both NextAuth and custom auth_token cookie
+  const nextAuthToken = path === '/' ? null : await getToken({
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET
   });
-  
+
+  // Check for custom auth_token cookie from FastAPI backend
+  const authTokenCookie = request.cookies.get('auth_token')?.value;
+
+  // User is authenticated if either token exists
+  const isAuthenticated = !!nextAuthToken || !!authTokenCookie;
+  const token = nextAuthToken || { authenticated: !!authTokenCookie };
+
   // Attach token to request for API gateway use in rate limiting
   (request as any).token = token;
-  
+
   // If the path is a protected route and no token exists, redirect to login
-  if (isProtectedRoute && !token && !isPublicRoute) {
+  if (isProtectedRoute && !isAuthenticated && !isPublicRoute) {
     return NextResponse.redirect(new URL('/auth/login', request.url));
   }
   

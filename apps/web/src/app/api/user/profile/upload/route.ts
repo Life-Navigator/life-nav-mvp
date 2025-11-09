@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
@@ -15,9 +14,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const userId = await getUserIdFromJWT(request);
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -62,7 +61,7 @@ export async function POST(request: NextRequest) {
     // Generate unique filename
     const timestamp = Date.now();
     const extension = file.name.split('.').pop();
-    const filename = `${session.user.id}-${timestamp}.${extension}`;
+    const filename = `${userId}-${timestamp}.${extension}`;
     const filepath = path.join(uploadsDir, filename);
 
     // Convert file to buffer and save
@@ -75,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     // Update user image in database
     await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: { image: imageUrl },
     });
 
@@ -99,9 +98,9 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const userId = await getUserIdFromJWT(request);
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -110,7 +109,7 @@ export async function DELETE(request: NextRequest) {
 
     // Update user image to null in database
     await prisma.user.update({
-      where: { id: session.user.id },
+      where: { id: userId },
       data: { image: null },
     });
 

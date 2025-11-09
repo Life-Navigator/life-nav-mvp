@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, FC } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { signOut } from 'next-auth/react';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { DirectThemeToggle } from '@/components/theme/DirectThemeToggle';
 
@@ -39,6 +38,7 @@ const classNames = (...classes: (string | boolean | undefined)[]) => {
 
 const Header: FC = () => {
   const pathname = usePathname();
+  const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState<boolean>(false);
   const [showUserMenu, setShowUserMenu] = useState<boolean>(false);
@@ -119,6 +119,16 @@ const Header: FC = () => {
     email: 'thomas.riffe@example.com',
     initials: 'TR',
     image: null,
+  };
+
+  const handleSignOut = () => {
+    // Clear authentication tokens
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+    }
+    // Redirect to login page
+    router.push('/auth/login');
   };
 
   return (
@@ -311,7 +321,7 @@ const Header: FC = () => {
                     </Link>
                     <button
                       type="button"
-                      onClick={() => signOut({ callbackUrl: '/auth/login' })}
+                      onClick={handleSignOut}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       Sign out

@@ -2,8 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { signIn } from 'next-auth/react';
-import { toast } from '@/components/ui/toaster';
 import { useRouter } from 'next/navigation';
 
 export default function LoginForm() {
@@ -80,64 +78,48 @@ export default function LoginForm() {
         return;
       }
 
-      // If MFA is required, verify the token first
-      if (mfaRequired) {
-        if (!formData.mfaToken) {
-          setError('MFA token is required');
-          setIsLoading(false);
-          return;
-        }
+      // Call backend login API
+      console.log('[LoginForm] Calling backend login API');
 
-        // Proceed with login including MFA token
-        const result = await signIn('credentials', {
-          redirect: false,
+      const loginResponse = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          mfaToken: formData.mfaToken,
-        });
+          mfaToken: mfaRequired ? formData.mfaToken : undefined,
+        }),
+      });
 
-        if (result?.error) {
-          setError('Invalid credentials or MFA token. Please try again.');
-          // Check if account is now locked after this failed attempt
-          await checkLockoutStatus(formData.email);
-        } else {
-          // Successful login with MFA
-          router.push('/');
-        }
+      const loginData = await loginResponse.json();
+      console.log('[LoginForm] Backend login response:', loginResponse.status);
+
+      if (!loginResponse.ok) {
+        const errorMessage = loginData?.message || 'Invalid email or password. Please try again.';
+        setError(errorMessage);
+        // Check if account is now locked after this failed attempt
+        await checkLockoutStatus(formData.email);
       } else {
-        // Check if MFA is required for this user
-        const mfaCheckResponse = await fetch('/api/auth/mfa/challenge', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email }),
-        });
+        // Successful login - store tokens
+        if (loginData.access_token) {
+          localStorage.setItem('access_token', loginData.access_token);
+          localStorage.setItem('refresh_token', loginData.refresh_token);
+          localStorage.setItem('token_type', loginData.token_type);
 
-        const mfaData = await mfaCheckResponse.json();
-
-        if (mfaData.requiresMfa) {
-          // MFA is required, store the userId and show MFA input
-          setMfaRequired(true);
-          setUserId(mfaData.userId);
-          setIsLoading(false);
-          return;
+          // Also set httpOnly cookie via API route
+          await fetch('/api/auth/set-cookie', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              token: loginData.access_token,
+              expiresIn: loginData.expires_in,
+            }),
+          });
         }
 
-        // No MFA required, proceed with normal login
-        const result = await signIn('credentials', {
-          redirect: false,
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (result?.error) {
-          setError('Invalid email or password. Please try again.');
-          // Check if account is now locked after this failed attempt
-          await checkLockoutStatus(formData.email);
-        } else {
-          // Successful login, redirect to root which will handle navigation
-          // based on user setup status (dashboard or onboarding questionnaire)
-          router.push('/');
-        }
+        // Redirect to dashboard
+        console.log('[LoginForm] Login successful, redirecting to dashboard');
+        router.push('/dashboard');
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
@@ -152,19 +134,40 @@ export default function LoginForm() {
     setError(null);
 
     try {
-      // Use NextAuth signIn with demo credentials
-      const result = await signIn('credentials', {
-        redirect: false,
-        email: 'demo@example.com',
-        password: 'demo',
+      // Call login API with demo credentials
+      const loginResponse = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'demo@example.com',
+          password: 'demo',
+        }),
       });
 
-      if (result?.error) {
+      const contentType = loginResponse.headers.get('content-type');
+      let loginData;
+
+      if (contentType && contentType.includes('application/json')) {
+        loginData = await loginResponse.json();
+      } else {
+        throw new Error('Server returned an invalid response.');
+      }
+
+      if (!loginResponse.ok) {
         setError('Demo login failed. Please try again or contact support.');
-        console.error('Demo login error:', result.error);
-      } else if (result?.ok) {
-        // Successful demo login - redirect to dashboard
-        router.push('/dashboard');
+        console.error('Demo login error:', loginData?.message);
+      } else {
+        // Successful demo login - store tokens
+        if (loginData.access_token) {
+          localStorage.setItem('access_token', loginData.access_token);
+          localStorage.setItem('refresh_token', loginData.refresh_token);
+          localStorage.setItem('token_type', loginData.token_type);
+
+          // Also set a cookie for server-side middleware access
+          document.cookie = `auth_token=${loginData.access_token}; path=/; max-age=${loginData.expires_in || 1800}; SameSite=Lax`;
+        }
+        // Redirect to dashboard
+        window.location.href = '/dashboard';
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.');
@@ -302,7 +305,7 @@ export default function LoginForm() {
           {/* Google button */}
           <button
             type="button"
-            onClick={() => signIn('google')}
+            onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/oauth/google`}
             disabled={isLoading}
             className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm
             bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700
@@ -329,28 +332,10 @@ export default function LoginForm() {
             <span className="ml-2">Google</span>
           </button>
 
-          {/* Microsoft button */}
-          <button
-            type="button"
-            onClick={() => signIn('azure-ad')}
-            disabled={isLoading}
-            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm
-            bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700
-            disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 23 23" fill="none">
-              <rect x="1" y="1" width="10" height="10" fill="#f25022"/>
-              <rect x="12" y="1" width="10" height="10" fill="#00a4ef"/>
-              <rect x="1" y="12" width="10" height="10" fill="#7fba00"/>
-              <rect x="12" y="12" width="10" height="10" fill="#ffb900"/>
-            </svg>
-            <span className="ml-2">Microsoft</span>
-          </button>
-
           {/* LinkedIn button */}
           <button
             type="button"
-            onClick={() => signIn('linkedin')}
+            onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/oauth/linkedin`}
             disabled={isLoading}
             className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm
             bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700
@@ -365,11 +350,11 @@ export default function LoginForm() {
           {/* Facebook button */}
           <button
             type="button"
-            onClick={() => signIn('facebook')}
+            onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/oauth/facebook`}
             disabled={isLoading}
             className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm
             bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700
-            disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled:opacity-50 disabled:cursor-not-allowed col-span-2"
           >
             <svg className="h-5 w-5" aria-hidden="true" fill="#1877F2" viewBox="0 0 24 24">
               <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />

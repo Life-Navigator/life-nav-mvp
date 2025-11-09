@@ -353,6 +353,74 @@ const HealthcareDashboard = () => {
         </div>
       </div>
       
+      {/* Insurance Management */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Health Insurance</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Manage your insurance policies, coverage, and claims
+            </p>
+          </div>
+          <Link
+            href="/dashboard/healthcare/insurance"
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            View Insurance
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start">
+              <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-3">
+                <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-white text-sm">Digital Insurance Cards</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Access your insurance cards anytime, anywhere
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+            <div className="flex items-start">
+              <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center mr-3">
+                <svg className="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-white text-sm">Track Claims</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  Monitor your insurance claims and reimbursements
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+            <div className="flex items-start">
+              <div className="h-10 w-10 flex-shrink-0 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center mr-3">
+                <svg className="h-5 w-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900 dark:text-white text-sm">Coverage Details</h3>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                  View deductibles, copays, and benefits
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Document Vault Feature */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8">
         <div className="flex justify-between items-start mb-4">

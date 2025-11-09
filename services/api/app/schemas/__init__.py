@@ -44,15 +44,12 @@ from app.schemas.career import (
     SkillResponse,
 )
 from app.schemas.education import (
-    EducationRecordCreate,
-    EducationRecordUpdate,
-    EducationRecordResponse,
+    EducationCredentialCreate,
+    EducationCredentialUpdate,
+    EducationCredentialResponse,
     CourseCreate,
     CourseUpdate,
     CourseResponse,
-    CertificationCreate,
-    CertificationUpdate,
-    CertificationResponse,
 )
 
 __all__ = [
@@ -99,13 +96,10 @@ __all__ = [
     "SkillUpdate",
     "SkillResponse",
     # Education
-    "EducationRecordCreate",
-    "EducationRecordUpdate",
-    "EducationRecordResponse",
+    "EducationCredentialCreate",
+    "EducationCredentialUpdate",
+    "EducationCredentialResponse",
     "CourseCreate",
     "CourseUpdate",
     "CourseResponse",
-    "CertificationCreate",
-    "CertificationUpdate",
-    "CertificationResponse",
 ]

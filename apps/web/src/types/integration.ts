@@ -6,6 +6,7 @@ export interface Provider {
     category: 'finance' | 'education' | 'career' | 'healthcare' | 'automotive' | 'smarthome';
     logo: string;
     connected: boolean;
+    comingSoon?: boolean;
     permissions: string[];
     modalDescription?: string;
   }

@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signOut } from 'next-auth/react';
 import { Button } from '@/components/ui/buttons/Button';
 
 interface DeleteAccountModalProps {
@@ -52,10 +51,13 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
         const data = await response.json();
         throw new Error(data.message || 'Failed to delete account');
       }
-      
-      // Sign out the user
-      await signOut({ redirect: false });
-      
+
+      // Clear authentication tokens
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+      }
+
       // Redirect to login page with a message
       router.push('/auth/login?accountDeleted=true');
     } catch (err) {

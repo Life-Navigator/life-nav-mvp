@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { db as prisma } from '@/lib/db';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { z } from 'zod';
 
 // Validation schemas
@@ -32,8 +31,8 @@ const createGoalSchema = z.object({
 // GET /api/goals - List user goals
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -45,7 +44,7 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0');
 
     const where: any = {
-      userId: session.user.id
+      userId
     };
 
     if (category) where.category = category;
@@ -133,8 +132,8 @@ export async function GET(request: NextRequest) {
 // POST /api/goals - Create new goal
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -146,7 +145,7 @@ export async function POST(request: NextRequest) {
       // Create the goal
       const newGoal = await tx.goal.create({
         data: {
-          userId: session.user.id,
+          userId,
           title: validatedData.title,
           description: validatedData.description,
           category: validatedData.category,
@@ -200,7 +199,7 @@ export async function POST(request: NextRequest) {
       // Log audit event
       await tx.auditLog.create({
         data: {
-          userId: session.user.id,
+          userId,
           action: 'CREATE',
           entity: 'Goal',
           entityId: newGoal.id,

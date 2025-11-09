@@ -1,21 +1,16 @@
 import { redirect } from 'next/navigation';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getUserIdFromJWT } from '@/lib/jwt';
 
 export default async function Home() {
-  // Get the user's session
-  const session = await getServerSession(authOptions);
+  // Get the user's ID from JWT
+  const userId = await getUserIdFromJWT();
 
   // If user is not authenticated, redirect to login
-  if (!session) {
+  if (!userId) {
     redirect('/auth/login');
   }
 
-  // If user is authenticated but hasn't completed setup, redirect to onboarding
-  if (session.user && !session.user.setupCompleted) {
-    redirect(`/onboarding/questionnaire?userId=${session.user.id}`);
-  }
-
-  // If user is authenticated and has completed setup, redirect to dashboard
+  // If user is authenticated, redirect to dashboard
+  // Note: Setup completion check should be done in the dashboard
   redirect('/dashboard');
 }

@@ -1,5 +1,4 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { NextRequest, NextResponse } from 'next/server';
 import { GetServerSidePropsContext } from 'next';
 
@@ -7,16 +6,15 @@ import { GetServerSidePropsContext } from 'next';
  * Check if a user is authenticated for server-side requests
  */
 export async function isAuthenticated(req: NextRequest | Request | null = null): Promise<boolean> {
-  const session = await getServerSession(authOptions);
-  return !!session?.user?.id;
+  const userId = await getUserIdFromJWT(req || undefined);
+  return !!userId;
 }
 
 /**
  * Get the current user's ID if authenticated
  */
 export async function getCurrentUserId(): Promise<string | null> {
-  const session = await getServerSession(authOptions);
-  return session?.user?.id || null;
+  return await getUserIdFromJWT();
 }
 
 /**
@@ -36,13 +34,9 @@ export async function authMiddleware(req: NextRequest | Request): Promise<NextRe
  * Helper for protected pages in getServerSideProps
  */
 export async function requireAuth(context: GetServerSidePropsContext) {
-  const session = await getServerSession(
-    context.req,
-    context.res,
-    authOptions
-  );
+  const userId = await getUserIdFromJWT();
 
-  if (!session) {
+  if (!userId) {
     return {
       redirect: {
         destination: '/auth/login',
@@ -50,23 +44,19 @@ export async function requireAuth(context: GetServerSidePropsContext) {
       },
     };
   }
-  
-  return { props: { user: session.user } };
+
+  return { props: { userId } };
 }
 
 /**
  * Attach user info to context
  */
 export async function withAuthContext(context: GetServerSidePropsContext) {
-  const session = await getServerSession(
-    context.req,
-    context.res,
-    authOptions
-  );
+  const userId = await getUserIdFromJWT();
 
-  if (!session) {
-    return { props: { user: null } };
+  if (!userId) {
+    return { props: { userId: null } };
   }
-  
-  return { props: { user: session.user } };
+
+  return { props: { userId } };
 }

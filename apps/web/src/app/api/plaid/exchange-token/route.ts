@@ -4,8 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { plaidClient, isPlaidConfigured } from '@/lib/integrations/plaid-client';
 import { db } from '@/lib/db';
 import { z } from 'zod';
@@ -20,9 +19,9 @@ const exchangeTokenSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const userId = await getUserIdFromJWT(request);
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -74,7 +73,7 @@ export async function POST(request: NextRequest) {
     const plaidItem = await db.plaidItem.upsert({
       where: {
         userId_itemId: {
-          userId: session.user.id,
+          userId,
           itemId: itemId,
         },
       },
@@ -86,7 +85,7 @@ export async function POST(request: NextRequest) {
         lastSyncedAt: new Date(),
       },
       create: {
-        userId: session.user.id,
+        userId,
         itemId: itemId,
         accessToken: accessToken,
         institutionId: institutionId,

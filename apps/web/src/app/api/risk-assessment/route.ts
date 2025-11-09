@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { db as prisma } from '@/lib/db';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { z } from 'zod';
 
 // Risk calculation using Item Response Theory (IRT)
@@ -89,8 +88,8 @@ const submitAnswerSchema = z.object({
 // GET /api/risk-assessment - Get assessment history or current assessment
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -103,7 +102,7 @@ export async function GET(request: NextRequest) {
       const assessment = await prisma.riskAssessment.findFirst({
         where: {
           id: assessmentId,
-          userId: session.user.id
+          userId: userId
         },
         include: {
           answers: {
@@ -128,7 +127,7 @@ export async function GET(request: NextRequest) {
 
     // Get assessment history
     const where: any = {
-      userId: session.user.id
+      userId: userId
     };
 
     if (status) where.status = status;
@@ -161,8 +160,8 @@ export async function GET(request: NextRequest) {
 // POST /api/risk-assessment - Start new assessment
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    const userId = await getUserIdFromJWT(request);
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -172,7 +171,7 @@ export async function POST(request: NextRequest) {
     // Check for incomplete assessments
     const incompleteAssessment = await prisma.riskAssessment.findFirst({
       where: {
-        userId: session.user.id,
+        userId: userId,
         status: 'IN_PROGRESS',
         deletedAt: null
       }
@@ -192,7 +191,7 @@ export async function POST(request: NextRequest) {
     const assessment = await prisma.$transaction(async (tx) => {
       const newAssessment = await tx.riskAssessment.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           type: validatedData.type,
           status: 'IN_PROGRESS',
           questionnaireName: validatedData.questionnaireName || `${validatedData.type} Risk Assessment`,
@@ -229,7 +228,7 @@ export async function POST(request: NextRequest) {
       // Log audit event
       await tx.auditLog.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           action: 'CREATE',
           entity: 'RiskAssessment',
           entityId: newAssessment.id,

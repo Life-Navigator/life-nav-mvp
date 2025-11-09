@@ -13,10 +13,10 @@ export const APP_CONFIG = {
 
 export const API_CONFIG = {
   baseURL: __DEV__
-    ? 'http://localhost:3000/api'
-    : 'https://api.lifenavigator.com/api',
+    ? 'http://localhost:8000/api/v1'
+    : 'https://api.lifenavigator.com/api/v1',
   websocketURL: __DEV__
-    ? 'ws://localhost:3000'
+    ? 'ws://localhost:8000'
     : 'wss://api.lifenavigator.com',
   timeout: 30000,
   retryAttempts: 3,

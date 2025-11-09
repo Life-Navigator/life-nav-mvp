@@ -2,8 +2,7 @@
  * Session validation utilities
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getUserIdFromJWT, verifyJWT } from '@/lib/jwt';
 import { jwtVerify } from 'jose';
 
 // Types for session and user data
@@ -52,45 +51,21 @@ export function withAuth(
         }
       }
 
-      // Get session
-      const session = await getServerSession(authOptions) as Session | null;
-      
+      // Get user ID from JWT
+      const userId = await getUserIdFromJWT(request);
+
       // Check if user is authenticated
-      if (!session || !session.user) {
+      if (!userId) {
         return NextResponse.json(
           { error: 'Authentication required' },
           { status: 401 }
         );
       }
 
-      const { user } = session;
+      // Create a user object for compatibility
+      const user = { id: userId };
       
-      // Validate token from Authorization header (if present) against session
-      // This helps prevent session hijacking by ensuring the JWT is valid
-      const authHeader = request.headers.get('authorization');
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        try {
-          const token = authHeader.substring(7);
-          const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET);
-          
-          const { payload } = await jwtVerify(token, secret);
-          
-          // Ensure the token belongs to the same user
-          if (payload.sub !== user.id) {
-            console.warn(`Token user mismatch: ${payload.sub} vs ${user.id}`);
-            return NextResponse.json(
-              { error: 'Invalid authentication token' },
-              { status: 401 }
-            );
-          }
-        } catch (error) {
-          console.warn('Invalid JWT token in Authorization header');
-          return NextResponse.json(
-            { error: 'Invalid authentication token' },
-            { status: 401 }
-          );
-        }
-      }
+      // JWT validation is already handled in getUserIdFromJWT
       
       // Check for session hijacking by validating last activity time
       const now = Date.now();
@@ -163,8 +138,8 @@ export function withAuth(
  */
 export async function getAuthenticatedUser() {
   try {
-    const session = await getServerSession(authOptions) as Session | null;
-    return session?.user || null;
+    const userId = await getUserIdFromJWT();
+    return userId ? { id: userId } : null;
   } catch (error) {
     console.error('Error getting authenticated user:', error);
     return null;
@@ -176,8 +151,8 @@ export async function getAuthenticatedUser() {
  * @returns Boolean indicating if user is authenticated
  */
 export async function isAuthenticated(): Promise<boolean> {
-  const user = await getAuthenticatedUser();
-  return user !== null;
+  const userId = await getUserIdFromJWT();
+  return userId !== null;
 }
 
 /**

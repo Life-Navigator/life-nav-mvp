@@ -1,8 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import { agentApi } from '@/lib/api/agent';
+
+// Check if user is authenticated with JWT
+function isAuthenticated(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!localStorage.getItem('access_token');
+}
 
 interface Message {
   id: string;
@@ -16,7 +21,6 @@ interface ChatSidebarProps {
 }
 
 export default function ChatSidebar({ context }: ChatSidebarProps) {
-  const { data: session } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -26,8 +30,13 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load available agent on mount
+  // Load available agent on mount (only if authenticated)
   useEffect(() => {
+    // Don't try to load agents if user is not authenticated
+    if (!isAuthenticated()) {
+      return;
+    }
+
     async function loadAgent() {
       try {
         const agents = await agentApi.listAgents('default_user');

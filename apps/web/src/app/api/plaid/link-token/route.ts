@@ -4,8 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { plaidClient, PLAID_PRODUCTS, PLAID_COUNTRY_CODES, isPlaidConfigured } from '@/lib/integrations/plaid-client';
 import { Products, CountryCode } from 'plaid';
 
@@ -13,9 +12,9 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const userId = await getUserIdFromJWT(request);
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -33,7 +32,7 @@ export async function POST(request: NextRequest) {
     // Create link token
     const response = await plaidClient.linkTokenCreate({
       user: {
-        client_user_id: session.user.id,
+        client_user_id: userId,
       },
       client_name: 'Life Navigator',
       products: PLAID_PRODUCTS as Products[],

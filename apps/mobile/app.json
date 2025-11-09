@@ -1,4 +1,76 @@
 {
-  "name": "LifeNavigator",
-  "displayName": "LifeNavigator"
+  "expo": {
+    "name": "Life Navigator",
+    "slug": "life-navigator",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a1a2e"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lifenavigator.app",
+      "buildNumber": "1.0.0",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to scan documents and upload profile pictures.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photo library to upload images.",
+        "NSFaceIDUsageDescription": "This app uses Face ID for secure authentication.",
+        "NSBluetoothAlwaysUsageDescription": "This app uses Bluetooth to connect to your health wearable devices like Fitbit, Garmin, Apple Watch, Whoop, and Oura Ring to sync your health data.",
+        "NSBluetoothPeripheralUsageDescription": "This app uses Bluetooth to connect to your health wearable devices to sync your health data.",
+        "NSHealthShareUsageDescription": "This app needs access to your health data to provide comprehensive health tracking and insights.",
+        "NSHealthUpdateUsageDescription": "This app needs to save health data to HealthKit to keep your health information synchronized.",
+        "NSMotionUsageDescription": "This app uses motion data to track your activity and workouts.",
+        "NSHealthClinicalHealthRecordsShareUsageDescription": "This app needs access to your clinical health records to provide comprehensive health tracking."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a1a2e"
+      },
+      "package": "com.lifenavigator.app",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACTIVITY_RECOGNITION",
+        "BODY_SENSORS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-secure-store"
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": true,
+          "modes": ["peripheral", "central"],
+          "bluetoothAlwaysPermission": "Allow $(PRODUCT_NAME) to connect to your health wearable devices"
+        }
+      ]
+    ]
+  }
 }

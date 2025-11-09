@@ -183,10 +183,22 @@ export interface NetworkValue {
 export interface Skill {
   id: string;
   name: string;
+  category: string;
+  proficiency: number; // 1-5
   level: 'beginner' | 'intermediate' | 'advanced' | 'expert';
   endorsements: number;
   lastUsed: string;
   verified: boolean;
+  progress?: SkillProgress[];
+  aiRecommendations?: string[];
+}
+
+export interface SkillProgress {
+  id: string;
+  skillId: string;
+  proficiency: number;
+  date: string;
+  notes?: string;
 }
 
 export interface Achievement {
@@ -196,6 +208,143 @@ export interface Achievement {
   date: string;
   verifiedBy?: string;
   category: string;
+}
+
+export interface NetworkContact {
+  id: string;
+  name: string;
+  company?: string;
+  position?: string;
+  email?: string;
+  phone?: string;
+  category: 'mentor' | 'colleague' | 'recruiter' | 'client' | 'other';
+  lastContact?: string;
+  nextFollowUp?: string;
+  notes?: string;
+  linkedInUrl?: string;
+  meetingHistory?: ContactMeeting[];
+  tags?: string[];
+}
+
+export interface ContactMeeting {
+  id: string;
+  contactId: string;
+  date: string;
+  type: 'in_person' | 'video_call' | 'phone_call' | 'email';
+  notes?: string;
+  followUpRequired: boolean;
+}
+
+export interface JobApplication {
+  id: string;
+  company: string;
+  position: string;
+  status: 'applied' | 'screening' | 'interview' | 'offer' | 'rejected' | 'accepted' | 'withdrawn';
+  appliedDate: string;
+  jobUrl?: string;
+  salary?: {
+    min?: number;
+    max?: number;
+    currency: string;
+  };
+  location?: string;
+  remote?: boolean;
+  notes?: string;
+  interviews?: Interview[];
+  timeline?: ApplicationTimeline[];
+}
+
+export interface Interview {
+  id: string;
+  applicationId: string;
+  date: string;
+  type: 'phone_screen' | 'technical' | 'behavioral' | 'final' | 'other';
+  interviewer?: string;
+  duration?: number;
+  notes?: string;
+  feedback?: string;
+}
+
+export interface ApplicationTimeline {
+  id: string;
+  applicationId: string;
+  status: string;
+  date: string;
+  notes?: string;
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  platform: string;
+  instructor?: string;
+  status: 'not_started' | 'in_progress' | 'completed';
+  progress: number; // 0-100
+  startDate?: string;
+  completionDate?: string;
+  deadline?: string;
+  url?: string;
+  materials?: CourseMaterial[];
+  grade?: string;
+  certificateUrl?: string;
+}
+
+export interface CourseMaterial {
+  id: string;
+  courseId: string;
+  title: string;
+  type: 'video' | 'document' | 'quiz' | 'assignment' | 'link';
+  url?: string;
+  completed: boolean;
+}
+
+export interface Certification {
+  id: string;
+  name: string;
+  issuingOrganization: string;
+  issueDate?: string;
+  expirationDate?: string;
+  status: 'in_progress' | 'earned' | 'expired' | 'renewing';
+  credentialId?: string;
+  credentialUrl?: string;
+  verificationUrl?: string;
+  documentUrl?: string;
+  renewalReminder?: boolean;
+  notes?: string;
+}
+
+export interface LearningProgress {
+  totalCourses: number;
+  completedCourses: number;
+  inProgressCourses: number;
+  totalCertifications: number;
+  activeCertifications: number;
+  currentStreak: number;
+  longestStreak: number;
+  totalHoursLearned: number;
+  weeklyHours: number[];
+  monthlyHours: number[];
+  achievements: LearningAchievement[];
+  milestones: LearningMilestone[];
+}
+
+export interface LearningAchievement {
+  id: string;
+  title: string;
+  description: string;
+  earnedDate: string;
+  icon?: string;
+}
+
+export interface LearningMilestone {
+  id: string;
+  title: string;
+  description: string;
+  target: number;
+  current: number;
+  unit: string;
+  achieved: boolean;
+  achievedDate?: string;
 }
 
 /**

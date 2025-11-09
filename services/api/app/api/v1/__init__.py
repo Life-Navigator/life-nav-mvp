@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     education,
     auth,
     agents,
+    integrations,
 )
 
 api_router = APIRouter()
@@ -25,3 +26,4 @@ api_router.include_router(finance.router, prefix="/finance", tags=["finance"])
 api_router.include_router(career.router, prefix="/career", tags=["career"])
 api_router.include_router(education.router, prefix="/education", tags=["education"])
 api_router.include_router(agents.router, prefix="/agents", tags=["agents"])
+api_router.include_router(integrations.router, prefix="/integrations", tags=["integrations"])

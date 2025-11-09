@@ -2,35 +2,71 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { MyBlocksTimeline } from '@/components/goals/MyBlocksTimeline';
 import { Goal } from '@/lib/goals/types';
 import { v4 as uuidv4 } from 'uuid';
 
+function isAuthenticated(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!localStorage.getItem('access_token');
+}
+
+function getUserId(): string | null {
+  if (typeof window === 'undefined') return null;
+  const token = localStorage.getItem('access_token');
+  if (!token) return null;
+
+  try {
+    // Decode JWT token to get user ID
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.id || payload.sub || null;
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return null;
+  }
+}
+
 export default function MyBlocksGoalsPage() {
   const router = useRouter();
-  const { data: session } = useSession();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [userBenefits, setUserBenefits] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    // Check authentication
+    if (!isAuthenticated()) {
+      router.push('/auth/login');
+      return;
+    }
+
+    const id = getUserId();
+    setUserId(id);
     fetchUserData();
-  }, [session]);
+  }, []);
 
   const fetchUserData = async () => {
-    if (!session?.user?.id) return;
-
     try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
       // Fetch user's benefit selections
-      const benefitsRes = await fetch('/api/discovery/benefits');
+      const benefitsRes = await fetch('/api/discovery/benefits', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       if (benefitsRes.ok) {
         const benefitsData = await benefitsRes.json();
         setUserBenefits(benefitsData.benefits || {});
       }
 
       // Fetch existing goals
-      const goalsRes = await fetch('/api/goals');
+      const goalsRes = await fetch('/api/goals', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       if (goalsRes.ok) {
         const goalsData = await goalsRes.json();
         setGoals(goalsData.goals || []);
@@ -44,9 +80,12 @@ export default function MyBlocksGoalsPage() {
 
   const handleGoalCreate = async (goalData: Partial<Goal>) => {
     try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
       const newGoal: Goal = {
         id: uuidv4(),
-        userId: session?.user?.id || '',
+        userId: userId || '',
         title: goalData.title || 'New Goal',
         description: goalData.description || '',
         domain: goalData.domain || 'financial',
@@ -74,7 +113,10 @@ export default function MyBlocksGoalsPage() {
       // Save to database
       const response = await fetch('/api/goals', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify(newGoal),
       });
 
@@ -89,9 +131,15 @@ export default function MyBlocksGoalsPage() {
 
   const handleGoalUpdate = async (updatedGoal: Goal) => {
     try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
       const response = await fetch(`/api/goals/${updatedGoal.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify(updatedGoal),
       });
 
@@ -105,8 +153,14 @@ export default function MyBlocksGoalsPage() {
 
   const handleGoalDelete = async (goalId: string) => {
     try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+
       const response = await fetch(`/api/goals/${goalId}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
 
       if (response.ok) {

@@ -1,8 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import { apiClient } from '@/lib/api/client';
+
+// JWT authentication helper
+function isAuthenticated(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!localStorage.getItem('access_token');
+}
 
 // Types for user data
 interface UserGoals {
@@ -31,14 +36,13 @@ interface UserData {
 }
 
 export function useUserData() {
-  const { data: session, status } = useSession();
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     async function fetchUserData() {
-      if (status !== 'authenticated' || !session?.user) {
+      if (!isAuthenticated()) {
         setLoading(false);
         return;
       }
@@ -57,21 +61,20 @@ export function useUserData() {
     }
 
     fetchUserData();
-  }, [session, status]);
+  }, []);
 
   return { userData, loading, error };
 }
 
 // Function to fetch domain-specific data
 export function useDomainData<T>(domain: 'financial' | 'career' | 'education' | 'health', endpoint: string) {
-  const { data: session, status } = useSession();
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     async function fetchDomainData() {
-      if (status !== 'authenticated' || !session?.user) {
+      if (!isAuthenticated()) {
         setLoading(false);
         return;
       }
@@ -90,7 +93,7 @@ export function useDomainData<T>(domain: 'financial' | 'career' | 'education' | 
     }
 
     fetchDomainData();
-  }, [session, status, domain, endpoint]);
+  }, [domain, endpoint]);
 
   return { data, loading, error };
 }

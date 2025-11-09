@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { getUserIdFromJWT } from '@/lib/jwt';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
@@ -11,9 +10,9 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const userId = await getUserIdFromJWT(request);
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -22,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch user with profile relation
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       select: {
         id: true,
         email: true,
@@ -68,9 +67,9 @@ export async function GET(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const userId = await getUserIdFromJWT(request);
 
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -129,20 +128,20 @@ export async function PUT(request: NextRequest) {
     // Update user name if provided
     if (name !== undefined) {
       await prisma.user.update({
-        where: { id: session.user.id },
+        where: { id: userId },
         data: { name },
       });
     }
 
     // Get or create profile
     let profile = await prisma.userProfile.findUnique({
-      where: { userId: session.user.id },
+      where: { userId: userId },
     });
 
     if (!profile) {
       profile = await prisma.userProfile.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           profileCompletion: 0,
         },
       });
@@ -204,7 +203,7 @@ export async function PUT(request: NextRequest) {
 
     // Fetch updated user with profile
     const updatedUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       select: {
         id: true,
         email: true,

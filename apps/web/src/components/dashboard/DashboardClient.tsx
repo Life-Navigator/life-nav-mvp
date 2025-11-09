@@ -42,11 +42,12 @@ interface DashboardData {
 }
 
 interface DashboardClientProps {
-  initialSession: any;
+  initialSession?: any;
 }
 
 export default function DashboardClient({ initialSession }: DashboardClientProps) {
   const currentSession = initialSession;
+  const [userName, setUserName] = useState<string>('User');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,35 +72,102 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
     { id: 'milestone-celebrations', name: 'Milestone Celebrations', description: 'Celebrate achievements with friends', votes: 78 }
   ];
 
+  // Fetch user profile
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token && !currentSession?.user?.name) return;
+
+      // Use NextAuth session name if available
+      if (currentSession?.user?.name) {
+        setUserName(currentSession.user.name);
+        return;
+      }
+
+      // Otherwise fetch from API
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1'}/users/me`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          const firstName = userData.first_name || userData.name || 'User';
+          setUserName(firstName);
+        }
+      } catch (err) {
+        console.error('Error fetching user profile:', err);
+      }
+    };
+
+    fetchUserProfile();
+  }, [currentSession]);
+
   // Fetch dashboard data
   useEffect(() => {
     const fetchDashboardData = async () => {
-      if (!currentSession?.user?.id) {
+      // Get token from localStorage (used by custom auth)
+      const token = localStorage.getItem('access_token');
+
+      if (!token && !currentSession?.user?.id) {
+        // No authentication at all - show empty dashboard
         setDataLoading(false);
+        setDashboardData({
+          financial: { netWorth: 0, totalAssets: 0, totalLiabilities: 0, checking: 0, savings: 0, investments: 0, hasData: false },
+          health: { nextAppointment: null, wellnessScore: null, medicationsDue: 0, hasData: false },
+          career: { title: null, company: null, networkSize: 0, activeApplications: 0, hasData: false },
+          education: { activeCourses: 0, completionRate: 0, studyStreak: 0, hasData: false },
+          hasAnyData: false
+        });
         return;
       }
 
       try {
         setDataLoading(true);
-        const response = await fetch('/api/dashboard/summary');
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+
+        // Add authorization header if we have a custom token
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch('/api/dashboard/summary', { headers });
 
         if (!response.ok) {
-          throw new Error('Failed to fetch dashboard data');
+          // If API fails, show empty dashboard instead of error
+          console.warn('Dashboard API returned error, showing empty dashboard');
+          setDashboardData({
+            financial: { netWorth: 0, totalAssets: 0, totalLiabilities: 0, checking: 0, savings: 0, investments: 0, hasData: false },
+            health: { nextAppointment: null, wellnessScore: null, medicationsDue: 0, hasData: false },
+            career: { title: null, company: null, networkSize: 0, activeApplications: 0, hasData: false },
+            education: { activeCourses: 0, completionRate: 0, studyStreak: 0, hasData: false },
+            hasAnyData: false
+          });
+          setDataLoading(false);
+          return;
         }
 
         const data = await response.json();
         setDashboardData(data);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
-        setError('Failed to load dashboard data');
+        // Show empty dashboard on error instead of error message
+        setDashboardData({
+          financial: { netWorth: 0, totalAssets: 0, totalLiabilities: 0, checking: 0, savings: 0, investments: 0, hasData: false },
+          health: { nextAppointment: null, wellnessScore: null, medicationsDue: 0, hasData: false },
+          career: { title: null, company: null, networkSize: 0, activeApplications: 0, hasData: false },
+          education: { activeCourses: 0, completionRate: 0, studyStreak: 0, hasData: false },
+          hasAnyData: false
+        });
       } finally {
         setDataLoading(false);
       }
     };
 
-    if (currentSession?.user) {
-      fetchDashboardData();
-    }
+    fetchDashboardData();
   }, [currentSession]);
 
   const handleVote = (moduleId: string) => {
@@ -139,7 +207,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
         {/* Welcome Section */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-1 text-gray-900 dark:text-white">
-            Welcome back, {currentSession?.user?.name || 'User'}!
+            Welcome back, {userName}!
           </h1>
           <p className="text-base text-gray-600 dark:text-gray-400">
             Here's your life overview for today

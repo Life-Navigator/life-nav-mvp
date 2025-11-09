@@ -12,10 +12,11 @@
     "clean": "rm -rf .next"
   },
   "dependencies": {
-    "@life-navigator/api-client": "workspace:*",
-    "@life-navigator/ui-components": "workspace:*",
-    "@life-navigator/provenance": "workspace:*",
+    "@headlessui/react": "^2.2.9",
     "@heroicons/react": "^2.1.1",
+    "@life-navigator/api-client": "workspace:*",
+    "@life-navigator/provenance": "workspace:*",
+    "@life-navigator/ui-components": "workspace:*",
     "@prisma/client": "^5.22.0",
     "@tanstack/react-query": "^5.0.0",
     "bcryptjs": "^2.4.3",
@@ -28,7 +29,6 @@
     "lodash": "^4.17.21",
     "lucide-react": "^0.292.0",
     "next": "^15.4.7",
-    "next-auth": "^4.24.0",
     "next-themes": "^0.2.1",
     "node-cron": "^3.0.3",
     "otplib": "^12.0.1",
@@ -41,6 +41,7 @@
     "zod": "^3.22.0"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/bull": "^4.10.0",
     "@types/cookie": "^0.6.0",
@@ -52,11 +53,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^9.0.7",
-    "typescript": "^5",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.4.7",
     "prisma": "^5.22.0",
-    "@tailwindcss/postcss": "^4.0.0",
-    "tailwindcss": "^4.0.0"
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5"
   }
 }

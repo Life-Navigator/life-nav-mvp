@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { db as prisma } from '@/lib/db';
+import { getUserIdFromJWT } from '@/lib/jwt';
 
 // Force dynamic rendering - this route depends on user session and database
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    // Verify JWT and get user ID
+    const userId = await getUserIdFromJWT(request);
+    console.log('[Dashboard Summary] User ID from JWT:', userId);
+
+    if (!userId) {
+      console.log('[Dashboard Summary] No valid JWT token - returning 401');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    console.log('[Dashboard Summary] Proceeding with userId:', userId);
 
     // Demo mode - return empty data structure without database queries
     if (userId === 'demo-user-id') {

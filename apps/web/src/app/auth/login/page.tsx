@@ -2,9 +2,6 @@ import React from 'react';
 import LoginForm from '@/components/auth/LoginForm';
 import Link from 'next/link';
 import { Metadata } from 'next';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import { redirect } from 'next/navigation';
 
 // Metadata for the page
 export const metadata: Metadata = {
@@ -17,18 +14,6 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ registered?: string }>;
 }) {
-  // Check if user is already authenticated
-  const session = await getServerSession(authOptions);
-
-  // If user is authenticated, redirect them appropriately
-  if (session) {
-    if (!session.user.setupCompleted) {
-      redirect(`/onboarding/questionnaire?userId=${session.user.id}`);
-    } else {
-      redirect('/dashboard');
-    }
-  }
-
   // Await searchParams (Next.js 15 requires async access)
   const params = await searchParams;
   const justRegistered = params?.registered === 'true';

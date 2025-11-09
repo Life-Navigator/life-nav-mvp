@@ -75,6 +75,55 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
+    # OAuth 2.0 Configuration
+    OAUTH_REDIRECT_URI: str = "http://localhost:3002/auth/callback"  # Frontend callback URL
+
+    # Google OAuth
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+
+    # Facebook OAuth
+    FACEBOOK_CLIENT_ID: Optional[str] = None
+    FACEBOOK_CLIENT_SECRET: Optional[str] = None
+
+    # LinkedIn OAuth
+    LINKEDIN_CLIENT_ID: Optional[str] = None
+    LINKEDIN_CLIENT_SECRET: Optional[str] = None
+    LINKEDIN_API_KEY: Optional[str] = None
+
+    # Indeed
+    INDEED_API_KEY: Optional[str] = None
+    INDEED_PUBLISHER_ID: Optional[str] = None
+
+    # Upwork
+    UPWORK_API_KEY: Optional[str] = None
+    UPWORK_API_SECRET: Optional[str] = None
+
+    # Fiverr
+    FIVERR_API_KEY: Optional[str] = None
+
+    # Freelancer
+    FREELANCER_API_KEY: Optional[str] = None
+
+    # Twitter
+    TWITTER_API_KEY: Optional[str] = None
+    TWITTER_API_SECRET: Optional[str] = None
+    TWITTER_BEARER_TOKEN: Optional[str] = None
+
+    # Instagram
+    INSTAGRAM_CLIENT_ID: Optional[str] = None
+    INSTAGRAM_CLIENT_SECRET: Optional[str] = None
+
+    # TikTok
+    TIKTOK_CLIENT_KEY: Optional[str] = None
+    TIKTOK_CLIENT_SECRET: Optional[str] = None
+
+    # Eventbrite
+    EVENTBRITE_API_KEY: Optional[str] = None
+
+    # Meetup
+    MEETUP_API_KEY: Optional[str] = None
+
     class Config:
         env_file = ".env"
         case_sensitive = True
