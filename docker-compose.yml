@@ -127,7 +127,7 @@ services:
       GRAPHRAG_GRAPHDB__URL: http://graphdb:7200
       GRAPHRAG_GRAPHDB__REPOSITORY: life-navigator
       GRAPHRAG_EMBEDDINGS__SERVICE_URL: http://localhost:8090
-      RUST_LOG: debug
+      RUST_LOG: info
     ports:
       - "50051:50051"
     depends_on:
@@ -137,6 +137,12 @@ services:
         condition: service_healthy
       graphdb:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep graphrag-rs || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks:
       - ln-network
 
@@ -170,7 +176,7 @@ services:
       redis:
         condition: service_healthy
       graphrag:
-        condition: service_started
+        condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     networks:
       - ln-network
