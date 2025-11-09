@@ -2,8 +2,7 @@
 Instagram Graph API integration service
 """
 
-import httpx
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 from datetime import datetime
 from app.core.config import settings
 import logging

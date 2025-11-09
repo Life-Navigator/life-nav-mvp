@@ -7,7 +7,7 @@ from typing import Optional, List
 from uuid import UUID
 from pydantic import BaseModel, Field
 from app.schemas.base import BaseResponseSchema
-from app.models.application import ApplicationStatus, InterviewType
+from app.models.application import ApplicationStatus
 
 
 # Job Application Schemas

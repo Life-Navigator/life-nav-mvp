@@ -99,6 +99,7 @@ class EducationRecord(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    user = relationship("User", back_populates="education_credentials")
     courses = relationship(
         "Course", back_populates="education_record", cascade="all, delete-orphan"
     )
@@ -155,6 +156,7 @@ class Course(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
+    user = relationship("User", back_populates="courses")
     education_record = relationship("EducationRecord", back_populates="courses")
 
     def __repr__(self):

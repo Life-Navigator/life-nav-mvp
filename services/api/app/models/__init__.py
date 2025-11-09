@@ -3,6 +3,7 @@ SQLAlchemy models for all domains
 """
 
 from app.models.user import User
+from app.models.user_integration import UserIntegration
 from app.models.goal import Goal, GoalMilestone
 from app.models.health import HealthRecord, Medication, HealthProvider
 from app.models.health_insurance import (
@@ -32,6 +33,7 @@ from app.models.social_account import SocialAccount, SocialPost, NetworkConnecti
 
 __all__ = [
     "User",
+    "UserIntegration",
     "Goal",
     "GoalMilestone",
     "HealthRecord",

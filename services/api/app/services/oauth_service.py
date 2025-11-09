@@ -4,7 +4,7 @@ Supports Google, LinkedIn, Facebook, and other OAuth providers
 """
 
 import httpx
-from typing import Dict, Optional
+from typing import Dict
 from urllib.parse import urlencode
 
 from app.core.config import settings

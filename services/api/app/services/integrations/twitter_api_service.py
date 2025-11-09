@@ -2,7 +2,6 @@
 Twitter API v2 integration service
 """
 
-import httpx
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from app.core.config import settings

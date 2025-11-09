@@ -2,7 +2,6 @@
 Indeed API integration service
 """
 
-import httpx
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from app.core.config import settings

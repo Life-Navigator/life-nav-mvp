@@ -14,7 +14,6 @@ from sqlalchemy import (
     Integer,
 )
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.orm import relationship
 import uuid
 import enum
 

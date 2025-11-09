@@ -5,8 +5,7 @@ from datetime import datetime, timedelta
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
-from sqlalchemy.orm import joinedload
+from sqlalchemy import select, func, and_
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -14,8 +13,8 @@ from app.models.user import User
 from app.models.education_credential import EducationCredential
 from app.models.course import Course, StudySession, CourseStatus
 from app.models.learning_path import LearningPath, PathCourse
-from app.models.education_program import EducationProgram, ProgramCourse
-from app.models.learning_goal import LearningGoal, GoalProgressLog, GoalStatus
+from app.models.education_program import EducationProgram
+from app.models.learning_goal import LearningGoal, GoalStatus
 from app.schemas.education import *
 
 router = APIRouter()

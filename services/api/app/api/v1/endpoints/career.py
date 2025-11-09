@@ -17,7 +17,7 @@ from app.models.career import CareerProfile, JobExperience, Skill
 from app.models.job_listing import JobListing, Platform
 from app.models.gig_listing import GigListing, GigPlatform
 from app.models.application import JobApplication, GigProposal, ApplicationStatus
-from app.models.event import Event, EventAttendee, EventPlatform, RSVPStatus
+from app.models.event import Event, EventPlatform
 from app.models.social_account import SocialAccount, SocialPost, NetworkConnection, SocialPlatform
 from app.schemas.career import *
 from app.schemas.job_listing import *
@@ -33,10 +33,6 @@ from app.services.integrations import (
     FreelancerService,
     EventbriteService,
     MeetupService,
-    LinkedInAPIService,
-    TwitterAPIService,
-    InstagramAPIService,
-    TikTokAPIService,
 )
 import uuid
 import logging

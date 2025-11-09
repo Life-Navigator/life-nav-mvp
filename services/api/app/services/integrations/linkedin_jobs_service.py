@@ -2,8 +2,6 @@
 LinkedIn Jobs API integration service
 """
 
-import asyncio
-import httpx
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from app.core.config import settings
@@ -120,7 +118,7 @@ class LinkedInJobsService:
         mock_jobs = [
             {
                 "id": f"linkedin_job_{i}",
-                "title": f"Software Engineer - {keywords or 'Technology'}" if i % 3 == 0 else f"Senior Developer",
+                "title": f"Software Engineer - {keywords or 'Technology'}" if i % 3 == 0 else "Senior Developer",
                 "company": ["Google", "Microsoft", "Amazon", "Meta", "Apple"][i % 5],
                 "location": location or "San Francisco, CA",
                 "location_type": ["remote", "hybrid", "onsite"][i % 3],

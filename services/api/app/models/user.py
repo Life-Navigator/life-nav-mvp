@@ -44,20 +44,11 @@ class User(Base):
     email_verified_at = Column(DateTime)
 
     # Education module relationships
-    education_credentials = relationship("EducationCredential", back_populates="user")
+    education_credentials = relationship("EducationRecord", back_populates="user")
     courses = relationship("Course", back_populates="user")
-    learning_paths = relationship("LearningPath", back_populates="user")
-    education_programs = relationship("EducationProgram", back_populates="user")
-    learning_goals = relationship("LearningGoal", back_populates="user")
 
     # Health module relationships
     health_insurance = relationship("HealthInsurance", back_populates="user")
-
-    # Integration relationships
-    integrations = relationship("UserIntegration", back_populates="user")
-
-    # Resume relationships
-    resumes = relationship("Resume", back_populates="user")
 
     def __repr__(self):
         return f"<User {self.email}>"

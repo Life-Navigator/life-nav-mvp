@@ -47,3 +47,8 @@ ignore = [
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "ruff (>=0.14.4,<0.15.0)"
+]

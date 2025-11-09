@@ -1,7 +1,6 @@
 """Credly API integration for digital credential verification."""
 
 from typing import List, Dict, Optional
-import httpx
 
 
 class CredlyService:

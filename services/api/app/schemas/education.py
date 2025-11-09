@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict
 
 from app.models.education_credential import CredentialType
 from app.models.course import CoursePlatform, CourseStatus, CourseDifficulty

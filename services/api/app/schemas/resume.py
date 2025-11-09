@@ -4,7 +4,7 @@ Resume schemas for AI-powered resume builder
 
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 # Resume Content Structure Schemas

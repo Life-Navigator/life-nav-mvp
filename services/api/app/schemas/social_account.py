@@ -5,7 +5,7 @@ Social account schemas
 from datetime import datetime
 from typing import Optional, List
 from uuid import UUID
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from app.schemas.base import BaseResponseSchema
 from app.models.social_account import SocialPlatform, ConnectionStatus
 

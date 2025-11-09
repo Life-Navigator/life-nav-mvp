@@ -5,7 +5,6 @@ from datetime import datetime
 from sqlalchemy import (
     Column,
     String,
-    Integer,
     Float,
     Boolean,
     DateTime,
