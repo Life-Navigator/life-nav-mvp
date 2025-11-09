@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     enable_memory_plugin: bool = True
     enable_websearch_plugin: bool = False
     enable_files_plugin: bool = True
+    enable_ocr_plugin: bool = True
 
     # External APIs
     serper_api_key: Optional[str] = None

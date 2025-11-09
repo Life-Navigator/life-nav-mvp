@@ -160,6 +160,18 @@ async def _load_plugins(
         plugin = FilesPlugin()
         await pm.register_plugin(plugin, {})
 
+    # OCR Plugin (Tri-Engine)
+    if settings.enable_ocr_plugin:
+        from ..plugins.ocr.plugin import OCRPlugin
+        plugin = OCRPlugin()
+        await pm.register_plugin(plugin, {
+            "use_paddleocr": True,
+            "use_deepseek": True,
+            "enable_gpu": True,
+            "high_quality_threshold": 0.80,
+            "medium_quality_threshold": 0.60,
+        })
+
 
 def create_app() -> FastAPI:
     """Create and configure FastAPI application"""
