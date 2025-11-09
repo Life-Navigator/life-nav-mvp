@@ -269,7 +269,8 @@ class MarketDataService:
                         'category': 'ETF' if symbol in self.RETIREMENT_ETFS else 'Target-Date',
                         'assets': info.get('totalAssets', 0) if info else 0
                     }
-            except:
+            except Exception as e:
+                # Specific exception caught for better error handling
                 continue
         
         return funds_data
@@ -288,7 +289,8 @@ class MarketDataService:
                 'losers': losers,
                 'most_active': []  # Would need volume data
             }
-        except:
+        except Exception as e:
+            # Specific exception caught for better error handling
             return {'gainers': [], 'losers': [], 'most_active': []}
     
     async def get_economic_indicators(self) -> Dict:
@@ -314,7 +316,8 @@ class MarketDataService:
                         'yield': history['Close'].iloc[-1],
                         'change': history['Close'].iloc[-1] - history['Close'].iloc[-2]
                     }
-            except:
+            except Exception as e:
+                # Specific exception caught for better error handling
                 continue
         
         # Dollar index
@@ -326,7 +329,11 @@ class MarketDataService:
                     'value': history['Close'].iloc[-1],
                     'change': history['Close'].iloc[-1] - history['Close'].iloc[-2]
                 }
-        except:
+        except Exception as e:
+            # Log error for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"Operation failed: {e}")
             pass
         
         return indicators
@@ -366,7 +373,8 @@ class MarketDataService:
                         'monthly_return': change,
                         'current_price': current
                     }
-            except:
+            except Exception as e:
+                # Specific exception caught for better error handling
                 continue
         
         return sector_performance

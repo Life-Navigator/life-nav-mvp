@@ -190,7 +190,7 @@ class BaseAgent(ABC):
                     correlation_id=str(uuid4()),
                     description=f"Agent {self.agent_id} started",
                     details={
-                        "capabilities": [cap.dict() for cap in self.capabilities],
+                        "capabilities": [cap.model_dump() for cap in self.capabilities],
                         "config": self.config
                     }
                 )
@@ -243,7 +243,7 @@ class BaseAgent(ABC):
                     agent_type=self.agent_type,
                     correlation_id=str(uuid4()),
                     description=f"Agent {self.agent_id} stopped",
-                    details={"final_metrics": self.metrics.dict()}
+                    details={"final_metrics": self.metrics.model_dump()}
                 )
             )
 

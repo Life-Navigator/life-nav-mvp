@@ -12,7 +12,7 @@ max_connections = 10
 [qdrant]
 url = "http://qdrant:6334"
 collection_name = "life_navigator_dev"
-vector_size = 384
+vector_size = 1024
 
 [graphdb]
 url = "http://graphdb:7200"
@@ -20,8 +20,8 @@ repository = "life-navigator"
 
 [embeddings]
 service_url = "http://localhost:8090"
-model = "all-MiniLM-L6-v2"
-dimension = 384
+model = "intfloat/e5-large-v2"
+dimension = 1024
 
 [rag]
 max_results = 10

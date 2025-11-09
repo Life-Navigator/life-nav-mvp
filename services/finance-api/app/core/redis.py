@@ -350,7 +350,11 @@ class PubSubService:
                     # Try to parse JSON
                     try:
                         data = json.loads(data)
-                    except:
+                    except Exception as e:
+                        # Log error for debugging
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.debug(f"Operation failed: {e}")
                         pass
                     
                     # Call callback

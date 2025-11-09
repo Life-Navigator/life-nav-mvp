@@ -73,7 +73,7 @@ async def create_career_profile(
 ):
     """Create career profile"""
     profile = CareerProfile(
-        **profile_data.dict(), user_id=current_user.id, tenant_id=current_user.tenant_id
+        **profile_data.model_dump(), user_id=current_user.id, tenant_id=current_user.tenant_id
     )
     db.add(profile)
     await db.commit()
@@ -113,7 +113,7 @@ async def create_experience(
         raise HTTPException(status_code=404, detail="Create career profile first")
 
     experience = JobExperience(
-        **exp_data.dict(),
+        **exp_data.model_dump(),
         profile_id=profile.id,
         user_id=current_user.id,
         tenant_id=current_user.tenant_id
@@ -151,7 +151,7 @@ async def create_skill(
         raise HTTPException(status_code=404, detail="Create career profile first")
 
     skill = Skill(
-        **skill_data.dict(),
+        **skill_data.model_dump(),
         profile_id=profile.id,
         user_id=current_user.id,
         tenant_id=current_user.tenant_id
@@ -903,7 +903,7 @@ async def create_application(
             id=uuid.uuid4(),
             user_id=current_user.id,
             tenant_id=current_user.tenant_id,
-            **app_data.dict(),
+            **app_data.model_dump(),
         )
 
         db.add(application)
@@ -938,7 +938,7 @@ async def update_application(
         if not application:
             raise HTTPException(status_code=404, detail="Application not found")
 
-        for field, value in app_update.dict(exclude_unset=True).items():
+        for field, value in app_update.model_dump(exclude_unset=True).items():
             setattr(application, field, value)
 
         await db.commit()
@@ -1317,7 +1317,7 @@ async def connect_social_account(
 
         if existing:
             # Update existing
-            for field, value in connect_data.dict(exclude_unset=True).items():
+            for field, value in connect_data.model_dump(exclude_unset=True).items():
                 setattr(existing, field, value)
             existing.connected_at = datetime.utcnow()
             await db.commit()
@@ -1328,7 +1328,7 @@ async def connect_social_account(
             id=uuid.uuid4(),
             user_id=current_user.id,
             tenant_id=current_user.tenant_id,
-            **connect_data.dict(),
+            **connect_data.model_dump(),
         )
 
         db.add(account)

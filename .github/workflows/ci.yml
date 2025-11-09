@@ -66,6 +66,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install Python dependencies and run MyPy (agents service)
+        run: |
+          cd services/agents
+          poetry install
+          poetry run mypy agents/ --strict --ignore-missing-imports
+        continue-on-error: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:

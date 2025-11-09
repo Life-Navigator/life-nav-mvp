@@ -48,7 +48,7 @@ async def create_goal(
 ):
     """Create a new goal"""
     goal = Goal(
-        **goal_data.dict(), user_id=current_user.id, tenant_id=current_user.tenant_id
+        **goal_data.model_dump(), user_id=current_user.id, tenant_id=current_user.tenant_id
     )
 
     db.add(goal)
@@ -93,7 +93,7 @@ async def update_goal(
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
 
-    for field, value in goal_update.dict(exclude_unset=True).items():
+    for field, value in goal_update.model_dump(exclude_unset=True).items():
         setattr(goal, field, value)
 
     await db.commit()

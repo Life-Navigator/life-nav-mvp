@@ -43,7 +43,7 @@ async def create_account(
 ):
     """Create financial account"""
     account = FinancialAccount(
-        **account_data.dict(), user_id=current_user.id, tenant_id=current_user.tenant_id
+        **account_data.model_dump(), user_id=current_user.id, tenant_id=current_user.tenant_id
     )
     db.add(account)
     await db.commit()
@@ -82,7 +82,7 @@ async def create_transaction(
 ):
     """Create transaction"""
     transaction = Transaction(
-        **tx_data.dict(), user_id=current_user.id, tenant_id=current_user.tenant_id
+        **tx_data.model_dump(), user_id=current_user.id, tenant_id=current_user.tenant_id
     )
     db.add(transaction)
     await db.commit()
@@ -114,7 +114,7 @@ async def create_investment(
 ):
     """Create investment"""
     investment = Investment(
-        **inv_data.dict(), user_id=current_user.id, tenant_id=current_user.tenant_id
+        **inv_data.model_dump(), user_id=current_user.id, tenant_id=current_user.tenant_id
     )
     db.add(investment)
     await db.commit()

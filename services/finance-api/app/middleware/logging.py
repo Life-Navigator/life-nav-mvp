@@ -85,7 +85,8 @@ class LoggingMiddleware:
                         body = self._mask_sensitive_data(body)
                     except json.JSONDecodeError:
                         body = f"<binary: {len(body_bytes)} bytes>"
-            except:
+            except Exception as e:
+                # Specific exception caught for better error handling
                 body = "<could not read body>"
         
         logger.info(

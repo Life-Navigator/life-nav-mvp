@@ -57,7 +57,7 @@ async def create_agent(
 ):
     """Create a new agent"""
     agent = Agent(
-        **agent_data.dict(), user_id=current_user.id, tenant_id=current_user.tenant_id
+        **agent_data.model_dump(), user_id=current_user.id, tenant_id=current_user.tenant_id
     )
     db.add(agent)
     await db.commit()
@@ -97,7 +97,7 @@ async def update_agent(
         raise HTTPException(status_code=404, detail="Agent not found")
 
     # Update fields
-    for key, value in agent_data.dict(exclude_unset=True).items():
+    for key, value in agent_data.model_dump(exclude_unset=True).items():
         setattr(agent, key, value)
 
     agent.updated_at = datetime.utcnow()

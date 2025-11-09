@@ -41,7 +41,11 @@ def create_test_graph(n_nodes, edge_density=0.1):
             weight = random.uniform(1.0, 5.0)
             try:
                 graph.add_edge(f'node_{from_node}', f'node_{to_node}', weight, {})
-            except:
+            except Exception as e:
+                # Log error for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"Operation failed: {e}")
                 pass
 
     return graph

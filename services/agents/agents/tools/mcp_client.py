@@ -522,7 +522,11 @@ class MCPClient:
         try:
             response = await self.client.get("/health")
             return response.status_code == 200
-        except:
+        except Exception as e:
+            # Log health check failure for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.debug(f"MCP health check failed: {e}")
             return False
 
 

@@ -267,5 +267,6 @@ class AdaptiveRateLimiter:
         try:
             value = await self.redis_client.get(key)
             return float(value) if value else None
-        except:
+        except Exception as e:
+            # Specific exception caught for better error handling
             return None

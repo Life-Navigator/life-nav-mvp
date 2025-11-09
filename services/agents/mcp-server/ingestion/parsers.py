@@ -199,7 +199,11 @@ class DOCXParser(DocumentParser):
                     "author": core_props.author or '',
                     "subject": core_props.subject or '',
                 })
-            except:
+            except Exception as e:
+                # Log error for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"Operation failed: {e}")
                 pass
 
             # Extract text from paragraphs

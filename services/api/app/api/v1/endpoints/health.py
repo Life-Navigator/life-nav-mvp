@@ -53,7 +53,7 @@ async def create_health_record(
 ):
     """Create health record"""
     record = HealthRecord(
-        **record_data.dict(), user_id=current_user.id, tenant_id=current_user.tenant_id
+        **record_data.model_dump(), user_id=current_user.id, tenant_id=current_user.tenant_id
     )
     db.add(record)
     await db.commit()
@@ -105,7 +105,7 @@ async def create_medication(
 ):
     """Create medication"""
     medication = Medication(
-        **med_data.dict(), user_id=current_user.id, tenant_id=current_user.tenant_id
+        **med_data.model_dump(), user_id=current_user.id, tenant_id=current_user.tenant_id
     )
     db.add(medication)
     await db.commit()
@@ -137,7 +137,7 @@ async def create_provider(
 ):
     """Create health provider"""
     provider = HealthProvider(
-        **provider_data.dict(),
+        **provider_data.model_dump(),
         user_id=current_user.id,
         tenant_id=current_user.tenant_id
     )
@@ -177,7 +177,7 @@ async def create_health_insurance(
 ):
     """Create health insurance policy"""
     insurance = HealthInsurance(
-        **insurance_data.dict(),
+        **insurance_data.model_dump(),
         user_id=current_user.id,
         tenant_id=current_user.tenant_id
     )
@@ -224,7 +224,7 @@ async def update_health_insurance(
     if not insurance:
         raise HTTPException(status_code=404, detail="Insurance policy not found")
 
-    for key, value in insurance_data.dict(exclude_unset=True).items():
+    for key, value in insurance_data.model_dump(exclude_unset=True).items():
         setattr(insurance, key, value)
 
     await db.commit()
@@ -310,7 +310,7 @@ async def create_insurance_claim(
         raise HTTPException(status_code=404, detail="Insurance policy not found")
 
     claim = InsuranceClaim(
-        **claim_data.dict(),
+        **claim_data.model_dump(),
         user_id=current_user.id,
         tenant_id=current_user.tenant_id
     )
@@ -355,7 +355,7 @@ async def update_insurance_claim(
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
-    for key, value in claim_data.dict(exclude_unset=True).items():
+    for key, value in claim_data.model_dump(exclude_unset=True).items():
         setattr(claim, key, value)
 
     await db.commit()

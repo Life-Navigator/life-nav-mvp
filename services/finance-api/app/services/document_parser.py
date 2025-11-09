@@ -117,12 +117,25 @@ class DocumentParserService:
         if file_type == 'pdf':
             text = self._extract_pdf_text(file_content)
         else:
-            # OCR for scanned documents
-            text = self._extract_image_text(file_content)
+            # OCR for scanned documents (hybrid Tesseract + Claude Vision)
+            text = await self._extract_image_text(file_content, doc_type='1040')
         
-        # Extract tax year
-        year_match = re.search(r'(2019|2020|2021|2022|2023|2024)', text)
-        tax_year = int(year_match.group(1)) if year_match else datetime.now().year - 1
+        # Extract tax year - dynamic pattern supports any reasonable tax year
+        # Looks for 4-digit years from 2000-2099 (covers all modern tax returns)
+        current_year = datetime.now().year
+        year_match = re.search(r'\b(20[0-9]{2})\b', text)
+
+        if year_match:
+            found_year = int(year_match.group(1))
+            # Validate year is reasonable (not future, not too far past)
+            if 2000 <= found_year <= current_year:
+                tax_year = found_year
+            else:
+                # Default to previous year if extracted year is invalid
+                tax_year = current_year - 1
+        else:
+            # No year found, default to previous year
+            tax_year = current_year - 1
         
         # Extract key values using patterns
         parsed = ParsedTaxReturn(tax_year=tax_year)
@@ -332,8 +345,10 @@ class DocumentParserService:
         for match in re.finditer(amount_pattern, text):
             try:
                 values['amounts'].append(float(match.group(1).replace(',', '')))
-            except:
-                pass
+            except (ValueError, IndexError) as e:
+                # Skip invalid number formats
+                logger.debug(f"Failed to parse amount '{match.group(1)}': {e}")
+                continue
         
         # Find dates
         date_pattern = r'\d{1,2}/\d{1,2}/\d{2,4}'
@@ -373,16 +388,52 @@ class DocumentParserService:
                 
                 if all_tables:
                     return pd.concat(all_tables, ignore_index=True)
-        except:
+        except (Exception) as e:
+            # PDF table extraction failed, return empty DataFrame
+            logger.warning(f"Failed to extract PDF tables: {e}")
             pass
-        
+
         return pd.DataFrame()
     
-    def _extract_image_text(self, file_content: bytes) -> str:
-        """OCR text extraction from image"""
-        image = Image.open(io.BytesIO(file_content))
-        text = pytesseract.image_to_string(image)
-        return text
+    async def _extract_image_text(self, file_content: bytes, doc_type: str = None) -> str:
+        """
+        OCR text extraction from image using hybrid Tesseract + Claude Vision.
+
+        Args:
+            file_content: Image bytes
+            doc_type: Document type hint (W2, 1099, bank_statement, etc.)
+
+        Returns:
+            Extracted text
+        """
+        from app.services.ocr_hybrid import get_hybrid_ocr
+
+        hybrid_ocr = get_hybrid_ocr()
+
+        try:
+            text, engine, quality = await hybrid_ocr.extract_text(
+                image_bytes=file_content,
+                doc_type=doc_type
+            )
+
+            logger.info(
+                f"OCR completed",
+                extra={
+                    "engine": engine,
+                    "quality": quality,
+                    "doc_type": doc_type,
+                    "text_length": len(text)
+                }
+            )
+
+            return text
+
+        except Exception as e:
+            logger.error(f"Hybrid OCR failed, falling back to basic Tesseract: {e}")
+            # Final fallback to basic Tesseract
+            image = Image.open(io.BytesIO(file_content))
+            text = pytesseract.image_to_string(image)
+            return text
     
     def _categorize_transaction(self, description: str) -> str:
         """Auto-categorize transaction based on description"""
@@ -502,7 +553,9 @@ class DocumentParserService:
                 amount=abs(amount_val),
                 transaction_type='credit' if amount_val > 0 else 'debit'
             )
-        except:
+        except (ValueError, KeyError, TypeError) as e:
+            # Failed to parse transaction row - skip invalid data
+            logger.debug(f"Failed to parse transaction row: {e}")
             return None
     
     def _parse_schedule_1(self, text: str, parsed: ParsedTaxReturn):

@@ -50,7 +50,7 @@ def get_integration_platforms(
     platforms = query.offset(skip).limit(limit).all()
 
     return IntegrationPlatformList(
-        platforms=[IntegrationPlatformResponse.from_orm(p) for p in platforms],
+        platforms=[IntegrationPlatformResponse.model_validate(p) for p in platforms],
         total=total
     )
 
@@ -74,7 +74,7 @@ def get_integration_platform(
     if not platform:
         raise HTTPException(status_code=404, detail="Integration platform not found")
 
-    return IntegrationPlatformResponse.from_orm(platform)
+    return IntegrationPlatformResponse.model_validate(platform)
 
 
 @router.get("/user", response_model=List[UserIntegrationResponse])
@@ -101,9 +101,9 @@ def get_user_integrations(
             IntegrationPlatform.id == ui.platform_id
         ).first()
 
-        ui_dict = UserIntegrationResponse.from_orm(ui).dict()
+        ui_dict = UserIntegrationResponse.model_validate(ui).model_dump()
         if platform:
-            ui_dict["platform"] = IntegrationPlatformResponse.from_orm(platform)
+            ui_dict["platform"] = IntegrationPlatformResponse.model_validate(platform)
 
         result.append(UserIntegrationResponse(**ui_dict))
 
@@ -161,8 +161,8 @@ def create_user_integration(
     db.refresh(user_integration)
 
     # Load platform data
-    result = UserIntegrationResponse.from_orm(user_integration)
-    result.platform = IntegrationPlatformResponse.from_orm(platform)
+    result = UserIntegrationResponse.model_validate(user_integration)
+    result.platform = IntegrationPlatformResponse.model_validate(platform)
 
     return result
 
@@ -189,7 +189,7 @@ def update_user_integration(
         raise HTTPException(status_code=404, detail="Integration not found")
 
     # Update fields
-    update_data = integration_update.dict(exclude_unset=True)
+    update_data = integration_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(user_integration, field, value)
 
@@ -201,9 +201,9 @@ def update_user_integration(
         IntegrationPlatform.id == user_integration.platform_id
     ).first()
 
-    result = UserIntegrationResponse.from_orm(user_integration)
+    result = UserIntegrationResponse.model_validate(user_integration)
     if platform:
-        result.platform = IntegrationPlatformResponse.from_orm(platform)
+        result.platform = IntegrationPlatformResponse.model_validate(platform)
 
     return result
 

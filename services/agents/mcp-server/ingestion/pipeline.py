@@ -371,7 +371,8 @@ class IngestionPipeline:
         # Ensure collection exists
         try:
             await self.db.qdrant.get_collection(collection_name)
-        except:
+        except Exception as e:
+            # Specific exception caught for better error handling
             # Create collection if it doesn't exist
             from qdrant_client.models import VectorParams, Distance
 

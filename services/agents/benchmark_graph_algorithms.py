@@ -197,7 +197,11 @@ def create_rust_graph(n_nodes, edge_density=0.1):
             try:
                 graph.add_edge(f'node_{from_node}', f'node_{to_node}', weight, {})
                 edges_added += 1
-            except:
+            except Exception as e:
+                # Log error for debugging
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"Operation failed: {e}")
                 pass
 
     return graph
