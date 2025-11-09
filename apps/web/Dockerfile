@@ -1,58 +1,93 @@
+# ===========================================================================
+# Multi-stage Dockerfile for Next.js Web Application
+# ===========================================================================
+# Build: docker build -t life-navigator-web:latest .
+# Run: docker run -p 3000:3000 life-navigator-web:latest
+# ===========================================================================
+
+# -----------------------------------------------------------------------------
+# Stage 0: Base image with pnpm
+# -----------------------------------------------------------------------------
 FROM node:20-alpine AS base
 
-# Install dependencies only when needed
+# Install pnpm globally
+RUN coreutils enable && coreutils prepare pnpm@8.12.0 --activate || \
+    npm install -g pnpm@8.12.0
+
+# -----------------------------------------------------------------------------
+# Stage 1: Dependencies - Install all workspace dependencies
+# -----------------------------------------------------------------------------
 FROM base AS deps
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
-RUN npm ci
+# Copy workspace configuration
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY turbo.json ./
 
-# Rebuild the source code only when needed
+# Copy package.json files from workspace packages
+COPY packages/ui-components/package.json ./packages/ui-components/
+COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/provenance/package.json ./packages/provenance/
+COPY apps/web/package.json ./apps/web/
+
+# Install dependencies with frozen lockfile
+RUN pnpm install --frozen-lockfile --prefer-offline
+
+# -----------------------------------------------------------------------------
+# Stage 2: Builder - Build application and dependencies
+# -----------------------------------------------------------------------------
 FROM base AS builder
 WORKDIR /app
+
+# Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/pnpm-lock.yaml ./
+
+# Copy all source code
 COPY . .
 
 # Generate Prisma client
-RUN npx prisma generate
+RUN cd apps/web && pnpm exec prisma generate
 
-# Next.js collects anonymous telemetry data about general usage.
-# Learn more here: https://nextjs.org/telemetry
-# Uncomment the following line in case you want to disable telemetry during the build.
-ENV NEXT_TELEMETRY_DISABLED 1
+# Disable Next.js telemetry
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Build Next.js based on the preferred build mode
-RUN npm run build
+# Build with Turbo (builds dependencies first, then web app)
+RUN pnpm turbo run build --filter=@life-navigator/web
 
-# Production image, copy all the files and run next
+# -----------------------------------------------------------------------------
+# Stage 3: Runner - Minimal production image
+# -----------------------------------------------------------------------------
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-COPY --from=builder /app/public ./public
+# Copy Next.js standalone output
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 
-# Set the correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Automatically leverage output traces to reduce image size
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# Copy Prisma schema and generated client
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/prisma ./apps/web/prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 
+# Security: Switch to non-root user
 USER nextjs
 
+# Expose Next.js default port
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME 0.0.0.0
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-# Start the application
-CMD ["node", "server.js"]
+# Start Next.js
+CMD ["node", "apps/web/server.js"]
