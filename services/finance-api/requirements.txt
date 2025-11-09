@@ -36,7 +36,8 @@ pytesseract==0.3.10
 Pillow==11.1.0  # Updated for security
 openpyxl==3.1.2
 opencv-python==4.8.1.78  # For image quality assessment
-anthropic==0.40.0  # Claude Vision API for hybrid OCR
+paddleocr==2.7.3  # Self-hosted OCR for privacy (no external APIs)
+paddlepaddle==2.6.0  # Required by PaddleOCR
 
 # Market data and caching
 cachetools==5.5.0  # Updated

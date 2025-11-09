@@ -1,13 +1,19 @@
 """
-Hybrid OCR Service - Tesseract + Claude Vision Fallback
+Hybrid OCR Service - 100% Self-Hosted Privacy-Preserving OCR
 
 Strategy:
-- 90% of volume → Tesseract OCR (free, fast)
-- 10% of volume → Claude Vision API (high quality, handles complex/poor scans)
+- High quality scans (>0.75 score) → Tesseract OCR (fast, free)
+- Low quality/complex documents → PaddleOCR (self-hosted, superior quality)
 
-Quality assessment determines routing:
-- High quality scans (>0.8 score) → Tesseract
-- Low quality/complex documents → Claude Vision
+NO EXTERNAL APIs - All processing happens locally to protect user privacy.
+
+PaddleOCR advantages:
+- 100% self-hosted (no data leaves your servers)
+- Supports 80+ languages
+- Better accuracy than Tesseract on complex documents
+- Handles handwritten text, tables, rotated text
+- GPU acceleration available
+- Open source (Apache 2.0 license)
 """
 import io
 import os
@@ -26,7 +32,7 @@ logger = logging.getLogger(__name__)
 class OCREngine(str, Enum):
     """OCR engine selection"""
     TESSERACT = "tesseract"
-    CLAUDE_VISION = "claude_vision"
+    PADDLEOCR = "paddleocr"  # Self-hosted alternative to external APIs
 
 
 class ImageQuality(str, Enum):
@@ -38,45 +44,74 @@ class ImageQuality(str, Enum):
 
 class HybridOCRService:
     """
-    Hybrid OCR with automatic quality-based routing.
+    Hybrid OCR with automatic quality-based routing - 100% SELF-HOSTED.
 
     Features:
     - Image quality assessment (contrast, noise, resolution)
-    - Tesseract OCR for high-quality scans (90% of volume)
-    - Claude Vision fallback for poor quality (10% of volume)
+    - Tesseract OCR for high-quality scans (~80% of volume)
+    - PaddleOCR for poor quality/complex documents (~20% of volume)
     - Pre-processing pipeline (denoise, enhance, deskew)
-    - Cost tracking and optimization
+    - NO EXTERNAL APIs - All processing is local for privacy
+    - Usage tracking for optimization
     """
 
     def __init__(
         self,
-        claude_api_key: Optional[str] = None,
-        fallback_enabled: bool = True,
-        quality_threshold: float = 0.75
+        use_paddleocr: bool = True,
+        quality_threshold: float = 0.75,
+        enable_gpu: bool = True
     ):
         """
-        Initialize hybrid OCR service.
+        Initialize hybrid OCR service with privacy-preserving engines.
 
         Args:
-            claude_api_key: Anthropic API key for Claude Vision
-            fallback_enabled: Enable Claude Vision fallback
+            use_paddleocr: Enable PaddleOCR for complex documents
             quality_threshold: Quality score threshold for Tesseract (0-1)
+            enable_gpu: Enable GPU acceleration for PaddleOCR
         """
-        self.claude_api_key = claude_api_key or os.getenv("ANTHROPIC_API_KEY")
-        self.fallback_enabled = fallback_enabled and self.claude_api_key is not None
+        self.use_paddleocr = use_paddleocr
         self.quality_threshold = quality_threshold
+        self.enable_gpu = enable_gpu and self._check_gpu_available()
 
-        # Cost tracking
+        # Initialize PaddleOCR if enabled
+        self.paddleocr_engine = None
+        if self.use_paddleocr:
+            try:
+                from paddleocr import PaddleOCR
+                self.paddleocr_engine = PaddleOCR(
+                    use_angle_cls=True,  # Detect and correct text orientation
+                    lang='en',  # Can support 80+ languages
+                    use_gpu=self.enable_gpu,
+                    show_log=False
+                )
+                logger.info("PaddleOCR initialized successfully")
+            except ImportError:
+                logger.warning("PaddleOCR not available, falling back to Tesseract only")
+                self.use_paddleocr = False
+            except Exception as e:
+                logger.error(f"Failed to initialize PaddleOCR: {e}")
+                self.use_paddleocr = False
+
+        # Usage tracking
         self.tesseract_count = 0
-        self.claude_count = 0
+        self.paddleocr_count = 0
 
         logger.info(
-            f"Hybrid OCR initialized",
+            f"Privacy-preserving OCR initialized",
             extra={
-                "fallback_enabled": self.fallback_enabled,
-                "quality_threshold": quality_threshold
+                "paddleocr_enabled": self.use_paddleocr,
+                "quality_threshold": quality_threshold,
+                "gpu_enabled": self.enable_gpu
             }
         )
+
+    def _check_gpu_available(self) -> bool:
+        """Check if GPU is available for PaddleOCR"""
+        try:
+            import paddle
+            return paddle.is_compiled_with_cuda()
+        except ImportError:
+            return False
 
     async def extract_text(
         self,
@@ -115,24 +150,26 @@ class HybridOCRService:
             }
         )
 
-        # Determine OCR engine
+        # Determine OCR engine based on quality
         if force_engine:
             engine = force_engine
-        elif quality_score >= self.quality_threshold and doc_type in ["W2", "1099", "bank_statement"]:
+        elif quality_score >= self.quality_threshold:
+            # High quality - use fast Tesseract
             engine = OCREngine.TESSERACT
-        elif self.fallback_enabled:
-            engine = OCREngine.CLAUDE_VISION
+        elif self.use_paddleocr and self.paddleocr_engine:
+            # Low quality - use superior PaddleOCR
+            engine = OCREngine.PADDLEOCR
         else:
-            # Fallback to Tesseract if Claude not available
+            # Fallback to Tesseract if PaddleOCR not available
             engine = OCREngine.TESSERACT
 
-        # Route to appropriate OCR engine
+        # Route to appropriate OCR engine (all self-hosted)
         if engine == OCREngine.TESSERACT:
             text = self._tesseract_ocr(image)
             self.tesseract_count += 1
         else:
-            text = await self._claude_vision_ocr(image_bytes, doc_type)
-            self.claude_count += 1
+            text = await self._paddleocr_ocr(image)
+            self.paddleocr_count += 1
 
         logger.info(
             f"OCR completed",
@@ -227,110 +264,96 @@ class HybridOCRService:
 
         return text.strip()
 
-    async def _claude_vision_ocr(
-        self,
-        image_bytes: bytes,
-        doc_type: Optional[str] = None
-    ) -> str:
+    async def _paddleocr_ocr(self, image: Image.Image) -> str:
         """
-        Claude Vision API for complex/poor-quality documents.
+        PaddleOCR for complex/poor-quality documents - 100% SELF-HOSTED.
+
+        Advantages over Tesseract:
+        - Better accuracy on low-quality scans (90%+ vs 70-80%)
+        - Handles handwritten text
+        - Detects and corrects text orientation
+        - Better table structure preservation
+        - Multi-language support (80+ languages)
+        - NO DATA SENT TO EXTERNAL APIS - Privacy preserved
 
         Handles:
         - Handwritten forms
         - Low-quality scans
         - Complex table structures
+        - Rotated/skewed text
         - Multi-column layouts
         """
-        if not self.claude_api_key:
-            raise ValueError("Claude API key not configured")
-
-        import anthropic
-        import base64
-
-        # Encode image to base64
-        image_b64 = base64.standard_b64encode(image_bytes).decode('utf-8')
-
-        # Build prompt based on document type
-        if doc_type == "W2":
-            prompt = """Extract all text from this W-2 tax form.
-            Focus on: employer name, employee info, wages, taxes withheld.
-            Preserve the structure and numeric values exactly."""
-        elif doc_type == "1099":
-            prompt = """Extract all text from this 1099 form.
-            Focus on: payer info, recipient info, income amounts, tax withheld.
-            Preserve numeric values exactly."""
-        elif doc_type == "bank_statement":
-            prompt = """Extract all text from this bank statement.
-            Focus on: account info, transactions (date, description, amount).
-            Preserve transaction table structure."""
-        else:
-            prompt = """Extract all text from this financial document.
-            Preserve structure, formatting, and numeric values exactly."""
-
-        # Call Claude Vision API
-        client = anthropic.Anthropic(api_key=self.claude_api_key)
+        if not self.paddleocr_engine:
+            # Fallback to Tesseract if PaddleOCR not initialized
+            logger.warning("PaddleOCR not available, using Tesseract")
+            return self._tesseract_ocr(image)
 
         try:
-            response = client.messages.create(
-                model="claude-3-5-sonnet-20241022",  # Latest vision model
-                max_tokens=4096,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "image",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "image/png",
-                                    "data": image_b64
-                                }
-                            },
-                            {
-                                "type": "text",
-                                "text": prompt
-                            }
-                        ]
-                    }
-                ]
+            # Convert PIL Image to numpy array for PaddleOCR
+            import numpy as np
+            img_array = np.array(image)
+
+            # Run PaddleOCR (runs async in thread pool to avoid blocking)
+            import asyncio
+            result = await asyncio.to_thread(
+                self.paddleocr_engine.ocr,
+                img_array,
+                cls=True  # Enable text orientation classification
             )
 
-            text = response.content[0].text
-            return text.strip()
+            # Extract text from PaddleOCR result
+            # Result format: [[[bbox], (text, confidence)], ...]
+            text_lines = []
+            if result and result[0]:
+                for line in result[0]:
+                    if line and len(line) >= 2:
+                        text, confidence = line[1]
+                        # Only include high-confidence results (>0.5)
+                        if confidence > 0.5:
+                            text_lines.append(text)
+
+            # Join lines with newlines
+            extracted_text = '\n'.join(text_lines)
+
+            if not extracted_text.strip():
+                # Fallback to Tesseract if PaddleOCR returns nothing
+                logger.warning("PaddleOCR returned no text, falling back to Tesseract")
+                return self._tesseract_ocr(image)
+
+            return extracted_text.strip()
 
         except Exception as e:
-            logger.error(f"Claude Vision OCR failed: {e}", exc_info=True)
-            # Fallback to Tesseract on API error
-            logger.warning("Falling back to Tesseract after Claude API error")
-            return self._tesseract_ocr(Image.open(io.BytesIO(image_bytes)))
+            logger.error(f"PaddleOCR failed: {e}", exc_info=True)
+            # Fallback to Tesseract on error
+            logger.warning("Falling back to Tesseract after PaddleOCR error")
+            return self._tesseract_ocr(image)
 
     def get_stats(self) -> dict:
         """
         Get OCR usage statistics.
 
         Returns:
-            Dict with cost breakdown and volume metrics
+            Dict with usage breakdown and performance metrics
         """
-        total_requests = self.tesseract_count + self.claude_count
+        total_requests = self.tesseract_count + self.paddleocr_count
 
         if total_requests == 0:
             tesseract_pct = 0.0
-            claude_pct = 0.0
+            paddleocr_pct = 0.0
         else:
             tesseract_pct = (self.tesseract_count / total_requests) * 100
-            claude_pct = (self.claude_count / total_requests) * 100
-
-        # Cost estimate (Claude Vision ~$0.025 per image)
-        estimated_cost = self.claude_count * 0.025
+            paddleocr_pct = (self.paddleocr_count / total_requests) * 100
 
         return {
             "total_requests": total_requests,
             "tesseract_count": self.tesseract_count,
             "tesseract_percentage": f"{tesseract_pct:.1f}%",
-            "claude_count": self.claude_count,
-            "claude_percentage": f"{claude_pct:.1f}%",
-            "estimated_monthly_cost_usd": f"${estimated_cost:.2f}",
-            "fallback_enabled": self.fallback_enabled
+            "paddleocr_count": self.paddleocr_count,
+            "paddleocr_percentage": f"{paddleocr_pct:.1f}%",
+            "paddleocr_enabled": self.use_paddleocr,
+            "gpu_enabled": self.enable_gpu,
+            "privacy_preserving": True,  # 100% self-hosted
+            "estimated_monthly_cost_usd": "$0.00"  # No external API costs
         }
 
 
