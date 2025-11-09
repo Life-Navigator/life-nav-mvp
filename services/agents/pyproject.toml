@@ -92,3 +92,9 @@ target-version = "py312"
 testpaths = ["tests"]
 python_files = "test_*.py"
 asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "ruff (>=0.14.4,<0.15.0)",
+    "mypy (>=1.18.2,<2.0.0)"
+]
