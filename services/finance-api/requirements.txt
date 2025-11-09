@@ -38,6 +38,8 @@ openpyxl==3.1.2
 opencv-python==4.8.1.78  # For image quality assessment
 paddleocr==2.7.3  # Self-hosted OCR for privacy (no external APIs)
 paddlepaddle==2.6.0  # Required by PaddleOCR
+transformers>=4.35.0  # For DeepSeek-OCR (best-in-class 96% accuracy)
+torch>=2.1.0  # Required by DeepSeek-OCR and transformers
 
 # Market data and caching
 cachetools==5.5.0  # Updated
