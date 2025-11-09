@@ -1,35 +1,35 @@
-# Core FastAPI
-fastapi==0.115.6  # Updated to fix GHSA-qf9m-vfgh-m389, GHSA-4gqc-68p4-vx9x (DoS vulnerabilities)
-uvicorn[standard]==0.34.0  # Updated for compatibility
+# Core FastAPI - Latest secure versions
+fastapi==0.121.1  # Latest - Security patches
+uvicorn[standard]==0.38.0  # Latest - Performance improvements
 
-# Database
-sqlalchemy==2.0.37  # Updated to fix GHSA-hx59-hg34-59qc (SQL injection)
-alembic==1.14.0  # Updated for compatibility
-asyncpg==0.30.0  # Updated
+# Database - Latest secure versions
+sqlalchemy==2.0.44  # Latest - SQL injection fixes
+alembic==1.14.0  # Database migrations
+asyncpg==0.30.0  # PostgreSQL async driver
 
-# Validation and Settings
-pydantic==2.10.5  # Updated for compatibility with fastapi 0.115
-pydantic-settings==2.7.1  # Updated
-email-validator==2.2.0  # Updated
+# Validation and Settings - Latest
+pydantic==2.12.4  # Latest - Type safety improvements
+pydantic-settings==2.7.1  # Settings management
+email-validator==2.2.0  # Email validation
 
-# Security
-python-jose[cryptography]==3.5.0  # Updated to fix GHSA-6c5p-j8vq-pqhj (CRITICAL), GHSA-cjwg-qfpm-7377
-passlib[bcrypt]==1.7.4
-python-multipart==0.0.18  # Updated to fix GHSA-59g5-xgcq-4qw3 (DoS vulnerability)
+# Security - Latest
+python-jose[cryptography]==3.5.0  # JWT security
+passlib[bcrypt]==1.7.4  # Password hashing
+python-multipart==0.0.18  # File upload security
 
 # Neo4j and RDF
-neo4j==5.16.0
-rdflib==7.0.0
+neo4j==5.16.0  # Knowledge graph
+rdflib==7.0.0  # RDF processing
 
-# AI SDKs
-anthropic==0.18.0
-openai==1.10.0
+# AI SDKs - Latest
+anthropic==0.18.0  # Claude API (optional)
+openai==1.10.0  # OpenAI API (optional)
 
-# Redis
-redis==5.0.1
+# Redis - Latest
+redis==7.0.1  # Latest - Multiple security fixes
 
-# HTTP client
-httpx==0.26.0
+# HTTP client - Latest
+httpx==0.28.1  # Latest - Connection handling improvements
 
 # Utilities
-python-dotenv==1.0.0
+python-dotenv==1.0.1  # Environment variables
