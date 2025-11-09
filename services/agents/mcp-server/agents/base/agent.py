@@ -3,13 +3,13 @@
 import asyncio
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 import uuid
 import structlog
 from pydantic import BaseModel, Field
 
-from .message import Message, MessageType, MessagePriority, TaskRequest, TaskResponse
+from .message import Message, MessageType, TaskRequest, TaskResponse
 from .message_bus import MessageBus
 
 logger = structlog.get_logger(__name__)

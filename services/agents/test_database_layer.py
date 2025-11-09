@@ -30,11 +30,11 @@ def test_neo4j_config():
     print("\n=== Testing Neo4j Config ===")
 
     # Test default config
-    config1 = PyNeo4jConfigFixed()
+    PyNeo4jConfigFixed()
     print("✓ Created default Neo4j config")
 
     # Test custom config
-    config2 = PyNeo4jConfigFixed(
+    PyNeo4jConfigFixed(
         uri="bolt://my-server:7687",
         user="admin",
         password="secret",
@@ -51,18 +51,18 @@ def test_qdrant_config():
     print("\n=== Testing Qdrant Config ===")
 
     # Test default config
-    config1 = PyQdrantConfigFixed()
+    PyQdrantConfigFixed()
     print("✓ Created default Qdrant config")
 
     # Test custom config
-    config2 = PyQdrantConfigFixed(
+    PyQdrantConfigFixed(
         url="http://my-server:6334",
         api_key="my-secret-key"
     )
     print("✓ Created custom Qdrant config with API key")
 
     # Test without API key
-    config3 = PyQdrantConfigFixed(url="http://localhost:6334")
+    PyQdrantConfigFixed(url="http://localhost:6334")
     print("✓ Created custom Qdrant config without API key")
 
     return True

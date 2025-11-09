@@ -8,7 +8,6 @@ import asyncio
 import httpx
 import time
 from pathlib import Path
-import json
 import sys
 
 # Color codes for terminal output

@@ -15,9 +15,6 @@ from models.agent_models import (
     AgentTask,
     AgentType,
     AgentCapability,
-    TaskMetadata,
-    TaskPriority,
-    TaskStatus,
 )
 from utils.logging import get_logger
 from utils.errors import TaskExecutionError

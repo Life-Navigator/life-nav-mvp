@@ -652,7 +652,7 @@ class BaseAgent(ABC):
         )
 
         self.logger.info(
-            f"Subscribed to message topics",
+            "Subscribed to message topics",
             extra={"topics": [task_topic, query_topic]}
         )
 
@@ -671,7 +671,7 @@ class BaseAgent(ABC):
             task = AgentTask(**message["payload"])
 
             self.logger.info(
-                f"Received task from message bus",
+                "Received task from message bus",
                 extra={"task_id": str(task.metadata.task_id), "task_type": task.task_type}
             )
 
@@ -695,7 +695,7 @@ class BaseAgent(ABC):
             query = message["payload"]
 
             self.logger.info(
-                f"Received query from message bus",
+                "Received query from message bus",
                 extra={"query_type": query.get("query_type")}
             )
 

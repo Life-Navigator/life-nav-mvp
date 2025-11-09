@@ -45,10 +45,10 @@ def test_incremental_vs_full():
     print("⚡ Test 1: Adding single edge (incremental update)...")
     start = time.perf_counter()
     inc_graph.add_edge("node_0", "node_50", 2.0)  # Creates shortcut
-    result2 = inc_graph.get_pagerank()
+    inc_graph.get_pagerank()
     incremental_time = (time.perf_counter() - start) * 1000
     print(f"   ✓ Incremental update: {incremental_time:.4f}ms")
-    print(f"   ✓ Cached result (no iterations needed)")
+    print("   ✓ Cached result (no iterations needed)")
     print()
 
     # Test 2: Add multiple edges sequentially
@@ -71,7 +71,7 @@ def test_incremental_vs_full():
     print("⚡ Test 3: Removing edge (incremental update)...")
     start = time.perf_counter()
     inc_graph.remove_edge("node_0", "node_50")
-    result3 = inc_graph.get_pagerank()
+    inc_graph.get_pagerank()
     remove_time = (time.perf_counter() - start) * 1000
     print(f"   ✓ Edge removed: {remove_time:.4f}ms")
     print()
@@ -93,7 +93,7 @@ def test_incremental_vs_full():
         compact_graph.add_edge(f"node_{i}", f"node_{i+60}", 1.5, {})
 
     start = time.perf_counter()
-    result_full = compact_graph.pagerank_sparse()
+    compact_graph.pagerank_sparse()
     full_recompute_time = (time.perf_counter() - start) * 1000
 
     print(f"   Full recomputation: {full_recompute_time:.4f}ms")
@@ -108,7 +108,7 @@ def test_incremental_vs_full():
     top_nodes = sorted(final_pr.ranks.items(), key=lambda x: x[1], reverse=True)[:5]
     print(f"   Nodes: {inc_graph.node_count()}")
     print(f"   Edges: {inc_graph.edge_count()}")
-    print(f"   Top 5 nodes by PageRank:")
+    print("   Top 5 nodes by PageRank:")
     for node, rank in top_nodes:
         print(f"     {node}: {rank:.6f}")
     print()
@@ -191,7 +191,7 @@ def test_large_graph_updates():
     compact_graph.pagerank_sparse()
     full_time = (time.perf_counter() - start) * 1000
 
-    print(f"📊 Comparison:")
+    print("📊 Comparison:")
     print(f"   Full recomputation: {full_time:.4f}ms")
     print(f"   Incremental (50 edges): {incremental_total:.4f}ms")
     print(f"   Speedup: {full_time/incremental_total:.1f}x faster! ⚡")

@@ -2,7 +2,7 @@
 
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Any, Optional
 import structlog
 
@@ -512,7 +512,7 @@ class EpisodicMemory:
         """
 
         async with self.driver.session() as session:
-            result = await session.run(query, {
+            await session.run(query, {
                 "id": episode_id,
                 "user_id": user_id,
                 "content": content,

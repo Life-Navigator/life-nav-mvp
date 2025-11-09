@@ -16,7 +16,7 @@ echo "📊 Detected $GPU_COUNT GPU(s)"
 MODEL_NAME="${MODEL_NAME:-cognitivecomputations/dolphin-2.9-llama3-70b}"
 MODEL_PATH="${MODEL_PATH:-./models/maverick}"
 HOST="${HOST:-0.0.0.0}"
-PORT="${PORT:-8080}"
+PORT="${PORT:-8090}"
 
 # Advanced vLLM Configuration
 # For single GPU: use it fully

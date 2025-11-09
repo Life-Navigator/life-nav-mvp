@@ -113,7 +113,7 @@ class GraphOperations:
             })
 
             record = await result.single()
-            entity = dict(record["e"])
+            dict(record["e"])
 
             logger.info(
                 "entity_created",
@@ -160,7 +160,7 @@ class GraphOperations:
             record = await result.single()
 
             if not record:
-                raise ValueError(f"Could not create relationship (entities not found or access denied)")
+                raise ValueError("Could not create relationship (entities not found or access denied)")
 
             logger.info(
                 "relationship_created",
@@ -339,7 +339,7 @@ class VectorOperations:
                 )
             )
             logger.info("qdrant_collection_created", collection=collection_name)
-        except Exception as e:
+        except Exception:
             # Collection might already exist
             logger.info("qdrant_collection_exists", collection=collection_name)
 

@@ -37,14 +37,13 @@ Example usage:
     85.5
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from agents.core.base_agent import BaseAgent
 from models.agent_models import AgentCapability, AgentTask, AgentType
 from utils.admin_tracker import track_metrics
 from utils.logging import get_logger
-from utils.errors import TaskExecutionError
 
 
 class JobSearchSpecialist(BaseAgent):
@@ -202,7 +201,7 @@ class JobSearchSpecialist(BaseAgent):
         user_skills = set(s.lower() for s in user_profile.get("skills", []))
         user_experience = int(user_profile.get("experience_years", 0))
         user_education = user_profile.get("education", "").lower()
-        user_certs = set(c.lower() for c in user_profile.get("certifications", []))
+        set(c.lower() for c in user_profile.get("certifications", []))
         user_location = user_profile.get("location", "").lower()
         user_salary_expectation = user_profile.get("salary_expectation")
 
@@ -1104,7 +1103,7 @@ What specific actions should they take with future applications?"""
         job_title = payload.get("job_title", "")
         company = payload.get("company", "")
         interview_type = payload.get("interview_type", "behavioral").lower()
-        job_description = payload.get("job_description", "")
+        payload.get("job_description", "")
         required_skills = payload.get("required_skills", [])
 
         if not job_title:

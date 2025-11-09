@@ -6,7 +6,7 @@ Tests the MessageBus with mocked Redis and RabbitMQ connections.
 
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
+from unittest.mock import AsyncMock, patch, Mock
 from uuid import uuid4
 from datetime import datetime, timezone
 

@@ -5,7 +5,7 @@ Uses life_navigator_rs for high-performance text chunking and preprocessing.
 """
 
 import structlog
-from typing import List, Dict, Any, Tuple
+from typing import List, Tuple
 
 try:
     from life_navigator_rs import TextProcessor as RustTextProcessor

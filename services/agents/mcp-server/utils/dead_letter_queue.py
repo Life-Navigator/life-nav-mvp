@@ -11,7 +11,6 @@ Handles permanently failed jobs that have exhausted all retries:
 
 import asyncio
 import json
-import time
 from typing import Optional, Dict, Any, List, Callable
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -19,7 +18,7 @@ from enum import Enum
 import structlog
 import uuid
 
-from .errors import BaseError, ErrorSeverity, ErrorCategory
+from .errors import BaseError
 
 logger = structlog.get_logger(__name__)
 

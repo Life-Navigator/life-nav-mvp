@@ -12,7 +12,6 @@ Handles:
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
-from decimal import Decimal
 import math
 
 from agents.core.base_agent import BaseAgent
@@ -716,7 +715,7 @@ Keep insights brief and specific to the numbers provided.
         """
         debts = payload.get("debts", [])
         credit_score = payload.get("credit_score", 680)
-        extra_payment = payload.get("extra_payment", 0)
+        payload.get("extra_payment", 0)
 
         credit_cards = [d for d in debts if d["type"] == "credit_card"]
 

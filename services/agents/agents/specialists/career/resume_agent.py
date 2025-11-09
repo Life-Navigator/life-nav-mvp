@@ -39,7 +39,6 @@ from agents.core.base_agent import BaseAgent
 from models.agent_models import AgentCapability, AgentTask, AgentType
 from utils.admin_tracker import track_metrics
 from utils.logging import get_logger
-from utils.errors import TaskExecutionError
 
 
 class ResumeSpecialist(BaseAgent):
@@ -199,8 +198,8 @@ class ResumeSpecialist(BaseAgent):
             Dict with comprehensive analysis including strengths and weaknesses.
         """
         resume_text = payload.get("resume_text", "")
-        target_role = payload.get("target_role", "")
-        years_experience = payload.get("years_experience", 0)
+        payload.get("target_role", "")
+        payload.get("years_experience", 0)
 
         if not resume_text:
             return {
@@ -319,7 +318,7 @@ class ResumeSpecialist(BaseAgent):
         resume_lower = resume_text.lower()
 
         # Check for each recommended and optional section
-        all_sections = self.RECOMMENDED_SECTIONS + self.OPTIONAL_SECTIONS
+        self.RECOMMENDED_SECTIONS + self.OPTIONAL_SECTIONS
 
         section_patterns = {
             "contact information": [r"contact", r"email", r"phone"],

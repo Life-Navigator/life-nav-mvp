@@ -1,14 +1,14 @@
 """Workflow Engine - Multi-Step Task Orchestration"""
 
 import asyncio
-from typing import Dict, List, Any, Optional, Callable
+from typing import Dict, List, Any, Optional
 from enum import Enum
 from datetime import datetime
 import uuid
 import structlog
 from pydantic import BaseModel, Field
 
-from ..base.message import TaskRequest, TaskResponse, MessagePriority
+from ..base.message import TaskRequest, MessagePriority
 from .agent_coordinator import AgentCoordinator
 
 logger = structlog.get_logger(__name__)
@@ -233,7 +233,7 @@ class WorkflowEngine:
     async def _execute_workflow(self, workflow: Workflow) -> Dict[str, Any]:
         """Execute all workflow steps"""
         # Build dependency graph
-        dependency_graph = self._build_dependency_graph(workflow.steps)
+        self._build_dependency_graph(workflow.steps)
 
         # Execute steps in order
         completed_steps = set()

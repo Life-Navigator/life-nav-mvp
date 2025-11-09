@@ -12,14 +12,12 @@ Handles:
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
-from uuid import uuid4
 
 from agents.core.base_agent import BaseAgent
 from models.agent_models import (
     AgentTask,
     AgentType,
     AgentCapability,
-    TaskMetadata,
 )
 from utils.logging import get_logger
 from utils.errors import TaskExecutionError

@@ -7,7 +7,7 @@ Demonstrates 10-50x speedup from Week 2 optimization
 import asyncio
 import time
 import uuid
-from typing import List, Dict
+from typing import List
 import sys
 
 # Try to import Rust module
@@ -253,7 +253,7 @@ async def run_benchmark(size: int, name: str):
 
         # Python Entity Creation
         if python_client:
-            print(f"  Python entities (N+1 pattern)...", end=" ", flush=True)
+            print("  Python entities (N+1 pattern)...", end=" ", flush=True)
             result = await python_create_entities_sequential(python_client, size, user_id)
             print(f"{result['time']:.3f}s ({result['ops_per_sec']:.1f} ops/sec)")
             results["python"]["entities"].append(result)
@@ -263,7 +263,7 @@ async def run_benchmark(size: int, name: str):
             await cleanup_test_data(python_client, user_id)
 
         # Rust Entity Creation
-        print(f"  Rust entities (batch UNWIND)...", end=" ", flush=True)
+        print("  Rust entities (batch UNWIND)...", end=" ", flush=True)
         result = await rust_create_entities_batch(rust_client, size, user_id)
         print(f"{result['time']:.3f}s ({result['ops_per_sec']:.1f} ops/sec)")
         results["rust"]["entities"].append(result)
@@ -271,7 +271,7 @@ async def run_benchmark(size: int, name: str):
 
         # Python Relationship Creation
         if python_client and entity_ids_python:
-            print(f"  Python relationships (N+1)...", end=" ", flush=True)
+            print("  Python relationships (N+1)...", end=" ", flush=True)
             result = await python_create_relationships_sequential(python_client, entity_ids_python, user_id)
             print(f"{result['time']:.3f}s ({result['ops_per_sec']:.1f} ops/sec)")
             results["python"]["relationships"].append(result)
@@ -280,7 +280,7 @@ async def run_benchmark(size: int, name: str):
             await cleanup_test_data(python_client, user_id)
 
         # Rust Relationship Creation
-        print(f"  Rust relationships (batch)...", end=" ", flush=True)
+        print("  Rust relationships (batch)...", end=" ", flush=True)
         result = await rust_create_relationships_batch(rust_client, entity_ids_rust, user_id)
         print(f"{result['time']:.3f}s ({result['ops_per_sec']:.1f} ops/sec)")
         results["rust"]["relationships"].append(result)
@@ -325,7 +325,7 @@ async def run_benchmark(size: int, name: str):
         total_rust = rust_entity_avg + rust_rel_avg
         total_speedup = total_python / total_rust
 
-        print(f"\nTotal Time:")
+        print("\nTotal Time:")
         print(f"  Python:            {total_python:.3f}s")
         print(f"  Rust:              {total_rust:.3f}s")
         print(f"  🎯 OVERALL:        {total_speedup:.1f}x faster")
@@ -362,7 +362,7 @@ async def main():
     print("  • Single UNWIND query replaces N+1 anti-pattern")
     print("  • Production-ready async clients with connection pooling")
     print("  • Zero-copy JSON ↔ BoltType conversion")
-    print(f"\n📊 Full results saved above")
+    print("\n📊 Full results saved above")
 
 
 if __name__ == "__main__":

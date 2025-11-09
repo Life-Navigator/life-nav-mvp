@@ -1,6 +1,6 @@
 """MCP Protocol Handler"""
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import structlog
 
 from .plugin_manager import PluginManager

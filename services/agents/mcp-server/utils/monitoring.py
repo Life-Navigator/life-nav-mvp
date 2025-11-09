@@ -13,12 +13,12 @@ Provides comprehensive monitoring and alerting for errors:
 import asyncio
 import time
 from typing import Optional, Dict, Any, List, Callable
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from collections import defaultdict, deque
 import structlog
 
-from .errors import BaseError, ErrorSeverity, ErrorCategory
+from .errors import BaseError, ErrorSeverity
 from .circuit_breaker import circuit_breaker_manager
 from .retry import get_retry_stats
 from .dead_letter_queue import get_dlq_stats
@@ -669,7 +669,7 @@ error_monitor.alert_manager.add_notification_handler(log_notification_handler)
 if __name__ == "__main__":
     # Example usage
     import asyncio
-    from .errors import NetworkError, DatabaseError
+    from .errors import NetworkError
 
     async def main():
         # Create monitor

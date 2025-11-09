@@ -3,7 +3,7 @@
 import asyncio
 from collections import defaultdict
 from typing import Dict, List, Set, Optional, Callable, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 import structlog
 
 from .message import Message, MessageType

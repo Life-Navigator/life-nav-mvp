@@ -13,7 +13,7 @@ if curl -s http://localhost:8090/health > /dev/null 2>&1; then
 else
     echo "🤖 Starting Maverick model server with GPU acceleration..."
     # Use GPU script for hybrid GPU+CPU offload (10 GPU layers + CPU)
-    ./scripts/start_maverick_gpu.sh &
+    bash /home/riffe007/Documents/projects/life-navigator-monorepo/scripts/start_maverick_gpu.sh > /tmp/maverick_server.log 2>&1 &
     echo "⏳ Waiting for Maverick to load (may take 1-2 minutes)..."
     sleep 60
     

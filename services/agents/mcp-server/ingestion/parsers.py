@@ -1,6 +1,5 @@
 """Document Parsers for Multiple Formats"""
 
-import io
 from typing import Dict, List, Any, Optional
 from pathlib import Path
 import structlog

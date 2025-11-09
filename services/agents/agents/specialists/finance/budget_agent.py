@@ -5,9 +5,8 @@ Provides comprehensive budget analysis, spending pattern detection,
 recommendations, and cash flow forecasting using GraphRAG and LLM integration.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
-from uuid import uuid4
 import json
 
 from agents.core.base_agent import BaseAgent

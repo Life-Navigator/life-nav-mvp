@@ -5,7 +5,7 @@ Provides tools for ResumeSpecialist agent to access data across all modules
 
 import asyncio
 import httpx
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from mcp.server import Server
 from mcp.types import Tool, TextContent
 import os

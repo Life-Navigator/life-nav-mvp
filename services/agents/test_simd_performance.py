@@ -51,7 +51,7 @@ def benchmark_pagerank(graph, name, method, n_runs=10):
 
     for _ in range(n_runs):
         start = time.perf_counter()
-        result = method()
+        method()
         elapsed = (time.perf_counter() - start) * 1000  # ms
         times.append(elapsed)
 
@@ -124,7 +124,7 @@ def main():
         results = []
 
         # 1. Baseline: Sparse PageRank
-        print(f"   Testing Sparse PageRank...")
+        print("   Testing Sparse PageRank...")
         result = benchmark_pagerank(
             graph,
             "Sparse PageRank",
@@ -134,7 +134,7 @@ def main():
         results.append(result)
 
         # 2. SIMD PageRank
-        print(f"   Testing SIMD PageRank...")
+        print("   Testing SIMD PageRank...")
         result = benchmark_pagerank(
             graph,
             "SIMD PageRank (4x parallel)",
@@ -144,7 +144,7 @@ def main():
         results.append(result)
 
         # 3. Parallel SIMD PageRank
-        print(f"   Testing Parallel SIMD PageRank...")
+        print("   Testing Parallel SIMD PageRank...")
         result = benchmark_pagerank(
             graph,
             "Parallel SIMD (Multi-core)",
@@ -180,9 +180,9 @@ def main():
 
     print(f"   • Best SIMD speedup: {best_simd_speedup:.2f}x faster ⚡")
     print(f"   • Best Parallel SIMD speedup: {best_parallel_speedup:.2f}x faster 🔥")
-    print(f"   • SIMD processes 4 nodes per instruction (f64x4 vectors)")
-    print(f"   • Parallel SIMD uses all CPU cores simultaneously")
-    print(f"   • Works on any modern CPU (AVX2/SSE/NEON auto-detected)")
+    print("   • SIMD processes 4 nodes per instruction (f64x4 vectors)")
+    print("   • Parallel SIMD uses all CPU cores simultaneously")
+    print("   • Works on any modern CPU (AVX2/SSE/NEON auto-detected)")
     print()
 
     # Hardware info

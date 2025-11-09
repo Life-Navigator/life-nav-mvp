@@ -6,7 +6,6 @@ Tests the core BaseAgent framework without requiring external dependencies.
 
 import pytest
 import asyncio
-from datetime import datetime, timezone
 from uuid import uuid4
 
 from agents.core.base_agent import BaseAgent
@@ -15,8 +14,7 @@ from models.agent_models import (
     AgentType,
     AgentCapability,
     TaskMetadata,
-    TaskPriority,
-    TaskStatus
+    TaskPriority
 )
 
 

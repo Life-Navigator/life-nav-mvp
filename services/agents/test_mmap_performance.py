@@ -58,7 +58,7 @@ def benchmark_neighbor_access(graph, name, n_nodes, n_queries=1000):
     times = []
     for node_idx in node_indices:
         start = time.perf_counter()
-        neighbors = graph.neighbors(node_idx)
+        graph.neighbors(node_idx)
         elapsed = (time.perf_counter() - start) * 1_000_000  # microseconds
         times.append(elapsed)
 
@@ -94,7 +94,7 @@ def main():
         print(f"{'=' * 100}\n")
 
         # 1. Create in-memory graph
-        print(f"⏳ Creating in-memory graph...")
+        print("⏳ Creating in-memory graph...")
         start = time.time()
         graph = create_test_graph(n_nodes, edge_density=0.1)
         creation_time = time.time() - start
@@ -102,7 +102,7 @@ def main():
 
         # 2. Export to memory-mapped file
         mmap_path = f"/tmp/test_graph_{n_nodes}.bin"
-        print(f"\n⏳ Exporting to memory-mapped file...")
+        print("\n⏳ Exporting to memory-mapped file...")
 
         # Build node index and adjacency lists from CompactGraph
         # CompactGraph stores nodes by index (0..n-1), so we use that directly
@@ -121,7 +121,7 @@ def main():
         print(f"   ✓ Exported to {mmap_path} in {export_time:.3f}s ({file_size_mb:.2f} MB)")
 
         # 3. Open memory-mapped graph
-        print(f"\n⏳ Opening memory-mapped graph...")
+        print("\n⏳ Opening memory-mapped graph...")
         start = time.time()
         mmap_graph = MmapGraph.open(mmap_path)
         open_time = time.time() - start
@@ -130,7 +130,7 @@ def main():
         print(f"   ✓ Estimated memory usage: {mmap_graph.memory_usage_estimate() / 1024:.2f} KB")
 
         # 4. Benchmark neighbor access
-        print(f"\n⏳ Benchmarking neighbor access (1000 queries)...")
+        print("\n⏳ Benchmarking neighbor access (1000 queries)...")
 
         # In-memory graph
         in_memory_result = benchmark_neighbor_access(graph, "In-Memory (CompactGraph)", n_nodes, n_queries=1000)
@@ -138,7 +138,7 @@ def main():
         # Memory-mapped graph
         mmap_result = benchmark_neighbor_access(mmap_graph, "Memory-Mapped (MmapGraph)", n_nodes, n_queries=1000)
 
-        print(f"\n📊 Neighbor Access Performance:")
+        print("\n📊 Neighbor Access Performance:")
         print(f"{'─' * 100}")
         print(f"{'Method':<30} │ {'Avg':<12} │ {'Median':<12} │ {'Min':<12} │ {'P99':<12}")
         print(f"{'─' * 100}")
@@ -161,7 +161,7 @@ def main():
                 print(f"✅ Performance is comparable ({speedup:.2f}x)")
 
         # 5. Memory usage comparison
-        print(f"\n💾 Memory & Storage:")
+        print("\n💾 Memory & Storage:")
         print(f"{'─' * 100}")
         print(f"   • File size: {file_size_mb:.2f} MB")
         print(f"   • Mmap memory usage: ~{mmap_graph.memory_usage_estimate() / 1024:.2f} KB (just index)")

@@ -15,7 +15,6 @@ This benchmark shows:
 
 import time
 import os
-import sys
 from life_navigator_rs import MmapGraph
 
 def format_size(bytes_size):
@@ -36,14 +35,14 @@ def create_large_graph(n_nodes, avg_degree=5, path="/tmp/large_graph.bin"):
     print(f"{'=' * 100}")
 
     # Create node index
-    print(f"   Building node index...")
+    print("   Building node index...")
     start = time.time()
     node_index = {f"node_{i}": i for i in range(n_nodes)}
     index_time = time.time() - start
     print(f"   ✓ Node index built in {index_time:.3f}s")
 
     # Create adjacency lists (ring + random edges)
-    print(f"   Building adjacency lists...")
+    print("   Building adjacency lists...")
     start = time.time()
     adjacency = []
     total_edges = 0
@@ -74,7 +73,7 @@ def create_large_graph(n_nodes, avg_degree=5, path="/tmp/large_graph.bin"):
     print(f"\n   ✓ Adjacency lists built in {adj_time:.3f}s ({total_edges:,} edges)")
 
     # Write to file
-    print(f"   Writing to disk...")
+    print("   Writing to disk...")
     start = time.time()
     MmapGraph.create(path, node_index, adjacency)
     write_time = time.time() - start
@@ -98,7 +97,7 @@ def benchmark_graph(path, n_nodes, total_edges, file_size, n_queries=100):
     print(f"{'─' * 100}")
 
     # Open graph
-    print(f"\n1. Opening graph...")
+    print("\n1. Opening graph...")
     start = time.perf_counter()
     graph = MmapGraph.open(path)
     open_time = (time.perf_counter() - start) * 1000  # ms
@@ -141,7 +140,7 @@ def benchmark_graph(path, n_nodes, total_edges, file_size, n_queries=100):
     print(f"   Avg neighbors per query: {total_neighbors / n_queries:.1f}")
 
     # Query by ID
-    print(f"\n3. Query by ID performance...")
+    print("\n3. Query by ID performance...")
     start = time.perf_counter()
     neighbors = graph.neighbors_by_id("node_0")
     query_id_time = (time.perf_counter() - start) * 1_000_000
@@ -227,7 +226,7 @@ def main():
     print(f"{'─' * 100}")
 
     # Key insights
-    print(f"\n💡 KEY INSIGHTS:")
+    print("\n💡 KEY INSIGHTS:")
     print(f"{'─' * 100}")
     print("   ✅ File open time is CONSTANT (~ms) regardless of graph size")
     print("   ✅ Query time is SUB-MICROSECOND (<1μs) for all graph sizes")
@@ -241,7 +240,7 @@ def main():
     if results:
         # Estimate for 1B nodes based on largest test
         largest = results[-1]
-        bytes_per_node = largest['file_size'] / largest['nodes']
+        largest['file_size'] / largest['nodes']
         bytes_per_edge = largest['file_size'] / largest['edges']
 
         billion_nodes = 1_000_000_000
@@ -252,13 +251,13 @@ def main():
         est_open_time = largest['open_ms']  # Should be similar
         est_query_time = largest['query_avg_us']  # Should be similar
 
-        print(f"   • 1 BILLION nodes, 5B edges:")
+        print("   • 1 BILLION nodes, 5B edges:")
         print(f"     - Estimated file size: {format_size(est_file_size)}")
         print(f"     - Estimated memory usage: {format_size(est_memory)}")
         print(f"     - Estimated open time: ~{est_open_time:.1f}ms")
         print(f"     - Estimated query time: ~{est_query_time:.2f}μs")
         print()
-        print(f"   🎯 This is PRODUCTION-READY for web-scale graphs!")
+        print("   🎯 This is PRODUCTION-READY for web-scale graphs!")
 
     print(f"\n{'=' * 100}")
     print("✅ LARGE-SCALE BENCHMARK COMPLETE - Billion-Node Capability Demonstrated!")

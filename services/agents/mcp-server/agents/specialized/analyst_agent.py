@@ -215,7 +215,7 @@ class AnalystAgent(BaseAgent):
         # Store insights in memory for future reference
         if user_id:
             await self.store_memory(
-                content=f"Generated insights from analysis",
+                content="Generated insights from analysis",
                 memory_type="long_term",
                 user_id=user_id,
                 metadata={

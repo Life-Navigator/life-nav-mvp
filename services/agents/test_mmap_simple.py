@@ -44,7 +44,7 @@ def test_basic_functionality():
     print(f"   ✓ Created! File size: {file_size_mb:.4f} MB")
 
     # Open the graph
-    print(f"\n📂 Opening memory-mapped graph...")
+    print("\n📂 Opening memory-mapped graph...")
     start = time.perf_counter()
     graph = MmapGraph.open(path)
     open_time = (time.perf_counter() - start) * 1000
@@ -52,7 +52,7 @@ def test_basic_functionality():
     print(f"   ✓ {graph}")
 
     # Test queries
-    print(f"\n🔍 Testing neighbor queries...")
+    print("\n🔍 Testing neighbor queries...")
     print(f"{'─' * 100}")
 
     test_queries = [
@@ -71,7 +71,7 @@ def test_basic_functionality():
             print(f"   {node_name:<10} → {neighbor_names if neighbors else 'no neighbors'}")
 
     # Test neighbor access by ID
-    print(f"\n🔍 Testing neighbor queries by ID...")
+    print("\n🔍 Testing neighbor queries by ID...")
     print(f"{'─' * 100}")
 
     alice_neighbors = graph.neighbors_by_id("Alice")
@@ -81,7 +81,7 @@ def test_basic_functionality():
     print(f"   Bob's neighbors: {bob_neighbors}")
 
     # Performance test
-    print(f"\n⚡ Performance Test (1000 queries)...")
+    print("\n⚡ Performance Test (1000 queries)...")
     print(f"{'─' * 100}")
 
     times = []
@@ -100,7 +100,7 @@ def test_basic_functionality():
     print(f"   Max: {max_time:.3f}μs")
 
     # Statistics
-    print(f"\n📊 Graph Statistics:")
+    print("\n📊 Graph Statistics:")
     print(f"{'─' * 100}")
     print(f"   Nodes: {graph.node_count()}")
     print(f"   Edges: {graph.edge_count()}")

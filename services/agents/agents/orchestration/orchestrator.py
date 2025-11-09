@@ -5,7 +5,7 @@ Provides LLM-powered intent analysis, task decomposition, domain routing,
 and result synthesis. The root of the agent hierarchy.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 from uuid import uuid4
 import asyncio
@@ -16,8 +16,6 @@ from models.agent_models import (
     AgentTask,
     AgentType,
     AgentCapability,
-    TaskMetadata,
-    TaskPriority,
 )
 from utils.logging import get_logger
 from utils.errors import TaskExecutionError

@@ -13,14 +13,12 @@ import time
 import random
 from typing import Optional, Callable, TypeVar, Any, Dict, List
 from functools import wraps
-from datetime import datetime
 import structlog
 
 from .errors import (
     BaseError,
     ErrorRecoveryStrategy,
-    ErrorCategory,
-    ErrorSeverity
+    ErrorCategory
 )
 
 logger = structlog.get_logger(__name__)

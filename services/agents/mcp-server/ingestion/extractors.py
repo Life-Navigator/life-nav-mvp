@@ -4,7 +4,6 @@ import asyncio
 from typing import Dict, List, Any, Optional, Tuple
 import structlog
 import httpx
-import numpy as np
 
 logger = structlog.get_logger(__name__)
 

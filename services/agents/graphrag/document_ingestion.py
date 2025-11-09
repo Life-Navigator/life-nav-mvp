@@ -7,11 +7,9 @@ Supports FINRA regulations, CFP guidelines, tax laws, and other regulatory conte
 
 from typing import List, Dict, Any, Optional
 from pathlib import Path
-import asyncio
 from datetime import datetime, timezone
 import hashlib
 import re
-from uuid import uuid4
 
 try:
     from sentence_transformers import SentenceTransformer

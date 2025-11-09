@@ -213,7 +213,7 @@ async def create_agent_hierarchy(
 
     logger.info(
         "Agent hierarchy created successfully: "
-        f"1 orchestrator, 2 managers, 7 specialists (9 agents total)"
+        "1 orchestrator, 2 managers, 7 specialists (9 agents total)"
     )
 
     return orchestrator

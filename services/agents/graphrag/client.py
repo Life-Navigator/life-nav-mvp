@@ -5,18 +5,14 @@ Provides semantic search, knowledge graph storage, and context retrieval for age
 Uses pgvector for vector similarity search and PostgreSQL for relational data.
 """
 
-from typing import List, Dict, Any, Optional, Tuple
-import asyncio
+from typing import List, Dict, Any, Optional
 import asyncpg
 from asyncpg.pool import Pool
-import numpy as np
-from datetime import datetime, timezone
 import json
 
 from utils.config import Config
 from utils.logging import get_logger
 from utils.errors import (
-    GraphRAGError,
     PostgresConnectionError,
     QueryExecutionError
 )

@@ -515,7 +515,7 @@ class AuditLogger:
         Returns:
             List of security events
         """
-        since = datetime.utcnow() - timedelta(hours=hours)
+        datetime.utcnow() - timedelta(hours=hours)
 
         return await self.get_recent_events(
             limit=limit,
@@ -737,7 +737,6 @@ async def get_audit_logger() -> AuditLogger:
     Returns:
         Configured AuditLogger
     """
-    import asyncpg
 
     db_config = {
         'host': os.getenv('DB_HOST', 'localhost'),
@@ -832,7 +831,7 @@ if __name__ == "__main__":
         # Test 7: Generate GDPR report
         print("\n7. Generating GDPR report...")
         report = await audit.generate_user_data_report(test_user_id)
-        print(f"   ✅ Report generated")
+        print("   ✅ Report generated")
         print(f"      Total events: {report['total_events']}")
         print(f"      Actions: {list(report['events_by_action'].keys())}")
 

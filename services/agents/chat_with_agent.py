@@ -6,7 +6,6 @@ Simple command-line interface to chat with your configured AI agents.
 """
 
 import requests
-import json
 import sys
 
 # Configuration

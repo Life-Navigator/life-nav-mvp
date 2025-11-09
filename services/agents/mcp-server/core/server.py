@@ -1,15 +1,14 @@
 """MCP Server - FastAPI Application"""
 
 from contextlib import asynccontextmanager
-from typing import Dict, Any, List, Optional
+from typing import List, Optional
 import time
 from pathlib import Path
 import shutil
 
-from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-import structlog
 
 from ..utils.config import get_settings, Settings
 from ..utils.logging import setup_logging, get_logger

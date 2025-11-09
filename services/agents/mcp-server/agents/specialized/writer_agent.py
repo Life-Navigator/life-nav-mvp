@@ -1,6 +1,6 @@
 """Writer Agent - Content Generation Specialist"""
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 import structlog
 
 from ..base.agent import BaseAgent, AgentConfig, AgentCapability

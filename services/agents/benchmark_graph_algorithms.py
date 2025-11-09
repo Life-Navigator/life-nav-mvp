@@ -237,14 +237,14 @@ def benchmark_algorithm(name, rust_fn, python_fn, n_runs=10):
     # Rust benchmark
     for _ in range(n_runs):
         start = time.perf_counter()
-        rust_result = rust_fn()
+        rust_fn()
         elapsed = time.perf_counter() - start
         rust_times.append(elapsed * 1000)  # Convert to ms
 
     # Python benchmark
     for _ in range(n_runs):
         start = time.perf_counter()
-        python_result = python_fn()
+        python_fn()
         elapsed = time.perf_counter() - start
         python_times.append(elapsed * 1000)  # Convert to ms
 
@@ -307,7 +307,7 @@ def main():
         print("-" * 80)
 
         # Create graphs
-        print(f"   Creating graphs...")
+        print("   Creating graphs...")
         rust_graph = create_rust_graph(n_nodes, edge_density=0.1)
         python_graph = create_python_graph(n_nodes, edge_density=0.1)
 
@@ -317,7 +317,7 @@ def main():
         results = []
 
         # Benchmark BFS
-        print(f"\n   Running BFS benchmarks...")
+        print("\n   Running BFS benchmarks...")
         result = benchmark_algorithm(
             f"BFS ({n_nodes} nodes)",
             lambda: rust_graph.bfs('node_0', f'node_{n_nodes-1}'),
@@ -327,7 +327,7 @@ def main():
         results.append(result)
 
         # Benchmark Dijkstra
-        print(f"   Running Dijkstra benchmarks...")
+        print("   Running Dijkstra benchmarks...")
         result = benchmark_algorithm(
             f"Dijkstra ({n_nodes} nodes)",
             lambda: rust_graph.dijkstra('node_0', f'node_{n_nodes-1}'),
@@ -337,7 +337,7 @@ def main():
         results.append(result)
 
         # Benchmark PageRank
-        print(f"   Running PageRank benchmarks...")
+        print("   Running PageRank benchmarks...")
         result = benchmark_algorithm(
             f"PageRank ({n_nodes} nodes)",
             lambda: rust_graph.pagerank(),
@@ -347,7 +347,7 @@ def main():
         results.append(result)
 
         # WEEK 4: Benchmark A* (using zero heuristic = Dijkstra equivalent)
-        print(f"   Running A* benchmarks...")
+        print("   Running A* benchmarks...")
         result = benchmark_algorithm(
             f"A* ({n_nodes} nodes)",
             lambda: rust_graph.a_star_zero_heuristic('node_0', f'node_{n_nodes-1}'),
@@ -357,7 +357,7 @@ def main():
         results.append(result)
 
         # WEEK 4: Benchmark Bellman-Ford
-        print(f"   Running Bellman-Ford benchmarks...")
+        print("   Running Bellman-Ford benchmarks...")
         result = benchmark_algorithm(
             f"Bellman-Ford ({n_nodes} nodes)",
             lambda: rust_graph.bellman_ford('node_0'),
@@ -367,7 +367,7 @@ def main():
         results.append(result)
 
         # WEEK 4: Benchmark Betweenness Centrality
-        print(f"   Running Betweenness Centrality benchmarks...")
+        print("   Running Betweenness Centrality benchmarks...")
         # Note: Python implementation would be complex, skipping for now
         rust_times = []
         for _ in range(10):
@@ -386,7 +386,7 @@ def main():
         })
 
         # WEEK 4: Benchmark Parallel BFS
-        print(f"   Running Parallel BFS benchmarks...")
+        print("   Running Parallel BFS benchmarks...")
         result = benchmark_algorithm(
             f"Parallel BFS ({n_nodes} nodes)",
             lambda: rust_graph.parallel_bfs('node_0', None),

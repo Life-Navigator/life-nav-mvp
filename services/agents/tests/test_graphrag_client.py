@@ -5,14 +5,12 @@ Tests the GraphRAG client with mocked PostgreSQL connections.
 """
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
-from uuid import uuid4, UUID
+from unittest.mock import AsyncMock, patch, Mock
+from uuid import uuid4
 from datetime import datetime, timezone
-import json
 
 from graphrag.client import GraphRAGClient
-from utils.errors import GraphRAGError, PostgresConnectionError, QueryExecutionError
+from utils.errors import PostgresConnectionError
 
 
 @pytest.fixture

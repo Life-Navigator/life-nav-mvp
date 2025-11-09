@@ -115,7 +115,7 @@ class VLLMClient:
         self._session: Optional[aiohttp.ClientSession] = None
 
         logger.info(
-            f"vLLM client initialized",
+            "vLLM client initialized",
             extra={
                 "instances": len(self.instances),
                 "model": self.model,
@@ -414,7 +414,7 @@ class VLLMClient:
                 else:
                     error_text = await response.text()
                     logger.error(
-                        f"vLLM error response",
+                        "vLLM error response",
                         extra={
                             "status": response.status,
                             "instance": instance_url,

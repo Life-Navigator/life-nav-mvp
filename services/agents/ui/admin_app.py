@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import asyncio
 import sys
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -487,7 +487,7 @@ elif page == "📤 Document Ingestion":
                 st.warning(f"⚠️ {warning}")
 
         # File is valid - show info
-        st.success(f"✅ File validated successfully!")
+        st.success("✅ File validated successfully!")
         st.info(f"📊 File size: {validation_result.file_info['size']:,} bytes")
         st.info(f"📄 MIME type: {validation_result.file_info['mime_type']}")
 

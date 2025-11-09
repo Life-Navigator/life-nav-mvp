@@ -16,7 +16,6 @@ import os
 import re
 import magic
 import hashlib
-from pathlib import Path
 from typing import Optional, Dict, Any, List, Tuple
 from dataclasses import dataclass
 
@@ -647,7 +646,7 @@ if __name__ == "__main__":
 
     result = validator.validate_file_upload(test_file_path, "test_document.txt")
     if result.valid:
-        print(f"   ✅ File validation passed")
+        print("   ✅ File validation passed")
         print(f"      Size: {result.file_info['size']} bytes")
         print(f"      Hash: {result.file_info['hash']}")
         print(f"      MIME: {result.file_info['mime_type']}")

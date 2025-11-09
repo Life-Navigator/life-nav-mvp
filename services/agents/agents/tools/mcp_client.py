@@ -24,7 +24,7 @@ import asyncio
 import os
 import uuid
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 from uuid import UUID
 
 import httpx

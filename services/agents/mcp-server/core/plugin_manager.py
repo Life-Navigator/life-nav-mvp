@@ -4,10 +4,10 @@ import asyncio
 import importlib
 import importlib.util
 from pathlib import Path
-from typing import Dict, List, Optional, Type
+from typing import Dict, List, Optional
 import structlog
 
-from ..plugins.base import BasePlugin, PluginStatus, PluginMetadata
+from ..plugins.base import BasePlugin, PluginStatus
 
 logger = structlog.get_logger()
 

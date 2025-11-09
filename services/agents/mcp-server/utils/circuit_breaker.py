@@ -14,14 +14,12 @@ import time
 from typing import Optional, Callable, TypeVar, Any, Dict
 from functools import wraps
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime
 import structlog
 
 from .errors import (
-    BaseError,
     ExternalServiceError,
-    ResourceExhaustedError,
-    ErrorSeverity
+    ResourceExhaustedError
 )
 
 logger = structlog.get_logger(__name__)
@@ -246,7 +244,7 @@ class CircuitBreaker:
                     },
                     retry_after=int(time_until_retry),
                     suggestions=[
-                        f"Service is temporarily unavailable",
+                        "Service is temporarily unavailable",
                         f"Circuit will attempt recovery in {int(time_until_retry)}s"
                     ]
                 )

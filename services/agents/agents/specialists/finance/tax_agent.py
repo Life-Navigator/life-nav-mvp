@@ -13,7 +13,6 @@ Handles:
 
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
-from decimal import Decimal
 
 from agents.core.base_agent import BaseAgent
 from models.agent_models import (
@@ -437,7 +436,7 @@ Keep advice brief and specific.
         transactions = payload.get("transactions", [])
         filing_status = payload.get("filing_status", "single")
         has_mortgage = payload.get("has_mortgage", False)
-        has_children = payload.get("has_children", False)
+        payload.get("has_children", False)
 
         # Categorize potentially deductible expenses
         deductible_categories = {
@@ -521,7 +520,7 @@ Keep advice brief and specific.
         years = payload.get("planning_years", 3)
 
         current_income = current_estimate.get("total_income", 0)
-        current_tax = current_estimate.get("federal_tax_after_credits", 0)
+        current_estimate.get("federal_tax_after_credits", 0)
 
         # Project future years
         projections = []

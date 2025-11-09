@@ -9,7 +9,7 @@ Provides centralized error handling for FastAPI applications:
 - Integration with DLQ and alerting
 """
 
-from typing import Optional, Callable, Any
+from typing import Optional, Callable
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError

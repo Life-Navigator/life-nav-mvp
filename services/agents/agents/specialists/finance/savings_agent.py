@@ -45,7 +45,6 @@ from agents.core.base_agent import BaseAgent
 from models.agent_models import AgentCapability, AgentTask, AgentType
 from utils.admin_tracker import track_metrics
 from utils.logging import get_logger
-from utils.errors import TaskExecutionError
 
 
 class SavingsSpecialist(BaseAgent):
@@ -325,7 +324,7 @@ Provide concise, actionable advice:"""
                 temperature=0.7,
             )
             return insights.strip()
-        except Exception as e:
+        except Exception:
             # Fallback to rule-based insights
             at_risk = [g for g in goals if g["status"] == "at_risk"]
             completed = [g for g in goals if g["status"] == "completed"]
@@ -695,7 +694,7 @@ Provide specific next steps:"""
         amount = float(payload.get("amount", 0))
         time_horizon = payload.get("time_horizon", "medium")
         liquidity_needs = payload.get("liquidity_needs", "medium")
-        risk_tolerance = payload.get("risk_tolerance", "conservative")
+        payload.get("risk_tolerance", "conservative")
 
         if amount <= 0:
             return {
@@ -1118,7 +1117,7 @@ Provide motivating feedback and specific advice:"""
         monthly_income = float(payload.get("monthly_income", 0))
         monthly_expenses = float(payload.get("monthly_expenses", 0))
         goals = payload.get("goals", [])
-        current_savings = float(payload.get("current_savings", 0))
+        float(payload.get("current_savings", 0))
 
         if monthly_income <= 0:
             return {
