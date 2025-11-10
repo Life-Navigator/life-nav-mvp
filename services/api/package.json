@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
-    "build": "poetry build",
+    "build": "echo 'No build step needed for Python service'",
     "test": "poetry run pytest -v --cov=app --cov-report=html",
     "lint": "poetry run ruff check . && poetry run black --check .",
     "format": "poetry run black . && poetry run ruff check --fix .",
