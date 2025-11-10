@@ -22,14 +22,36 @@ logger = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handle application startup and shutdown"""
+    """
+    Handle application startup and shutdown with proper resource cleanup.
+    Ensures graceful shutdown of database and Redis connections.
+    """
     # Startup
     logger.info("Starting Financial Services API", version=settings.VERSION)
     await init_db()
     await init_redis()
+    logger.info("Financial Services API initialization complete")
+
     yield
-    # Shutdown
+
+    # Shutdown - cleanup resources
     logger.info("Shutting down Financial Services API")
+
+    try:
+        # Close Redis connections
+        from app.core.redis import close_redis
+        await close_redis()
+        logger.info("Redis connections closed")
+
+        # Close database connections
+        from app.core.database import close_db
+        await close_db()
+        logger.info("Database connections closed")
+
+    except Exception as e:
+        logger.error("Error during shutdown", error=str(e), exc_info=True)
+
+    logger.info("Financial Services API shutdown complete")
 
 app = FastAPI(
     title="LifeNavigator Financial Services API",

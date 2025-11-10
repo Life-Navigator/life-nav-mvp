@@ -993,11 +993,10 @@ def create_app() -> FastAPI:
                 detail=f"Inference failed: {str(e)}"
             )
 
-    @app.get("/metrics")
-    async def metrics():
-        """Prometheus metrics endpoint (placeholder)"""
-        # TODO: Implement Prometheus metrics
-        return {"message": "Metrics endpoint"}
+    # Prometheus metrics endpoint
+    from prometheus_client import make_asgi_app
+    metrics_app = make_asgi_app()
+    app.mount("/metrics", metrics_app)
 
     return app
 
