@@ -45,7 +45,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install Poetry
         run: |
@@ -177,12 +177,25 @@ jobs:
           curl -sSL https://install.python-poetry.org | python3 -
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Install Python dependencies for Python services
+      - name: Install Python dependencies for agents service
         run: |
-          cd services/agents && poetry install --no-root
-          cd ../api && poetry install --no-root
-          cd ../embeddings && poetry install --no-root
-          cd ../kg-sync && poetry install --no-root
+          cd services/agents
+          poetry install --no-root
+
+      - name: Install Python dependencies for api service
+        run: |
+          cd services/api
+          poetry install --no-root
+
+      - name: Install Python dependencies for embeddings service
+        run: |
+          cd services/embeddings
+          poetry install --no-root
+
+      - name: Install Python dependencies for kg-sync service
+        run: |
+          cd services/kg-sync
+          poetry install --no-root
 
       - name: Generate Prisma client
         run: pnpm --filter @life-navigator/web exec prisma generate
