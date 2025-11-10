@@ -1,0 +1,72 @@
+---
+# Backend ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backend-metrics
+  labels:
+    app: backend
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: backend
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+# Finance API ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: finance-api-metrics
+  labels:
+    app: finance-api
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: finance-api
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+# Agents ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: agents-metrics
+  labels:
+    app: agents
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: agents
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+---
+# MCP Server ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: mcp-server-metrics
+  labels:
+    app: mcp-server
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: mcp-server
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

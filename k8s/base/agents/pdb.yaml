@@ -1,0 +1,11 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: agents-pdb
+  labels:
+    app: agents
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: agents

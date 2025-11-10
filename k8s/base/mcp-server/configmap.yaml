@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mcp-server-config
+  labels:
+    app: mcp-server
+data:
+  neo4j-uri: "bolt://neo4j:7687"
+  qdrant-url: "http://qdrant:6333"
+  graphdb-url: "http://graphdb:7200"
+  graphrag-url: "graphrag:50051"
+  llm-endpoint: "http://localhost:8090/v1/chat/completions"
+  log-level: "INFO"

@@ -12,15 +12,49 @@ metadata:
     kubernetes.io/ingress.allow-http: "false"
     # GCP-specific annotations
     cloud.google.com/neg: '{"ingress": true}'
-    cloud.google.com/backend-config: '{"default": "backend-backendconfig"}'
+    cloud.google.com/backend-config: '{"default": "backend-backendconfig", "paths": {"/api/finance/*":"finance-api-backendconfig", "/api/agents/*":"agents-backendconfig", "/api/mcp/*":"mcp-server-backendconfig"}}'
     # Security headers
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://app.lifenavigator.ai,https://api.lifenavigator.ai"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "Authorization, Content-Type, X-Request-ID"
+    nginx.ingress.kubernetes.io/cors-max-age: "86400"
 spec:
   rules:
   - host: api.life-navigator.app
     http:
       paths:
+      # Finance API routes
+      - path: /api/finance
+        pathType: Prefix
+        backend:
+          service:
+            name: finance-api
+            port:
+              number: 8001
+      # Agents Service routes
+      - path: /api/agents
+        pathType: Prefix
+        backend:
+          service:
+            name: agents
+            port:
+              number: 8080
+      # MCP Server routes
+      - path: /api/mcp
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-server
+            port:
+              number: 8090
+      # Backend API routes (default/catch-all)
       - path: /api
         pathType: Prefix
         backend:

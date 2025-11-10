@@ -1,0 +1,90 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agents-netpol
+  labels:
+    app: agents
+spec:
+  podSelector:
+    matchLabels:
+      app: agents
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: finance-api
+    - podSelector:
+        matchLabels:
+          app: nginx-ingress
+    ports:
+    - port: 8080
+      protocol: TCP
+  egress:
+  # DNS
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - port: 53
+      protocol: UDP
+  # PostgreSQL
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - port: 5432
+      protocol: TCP
+  # Redis
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - port: 6379
+      protocol: TCP
+  # Neo4j
+  - to:
+    - podSelector:
+        matchLabels:
+          app: neo4j
+    ports:
+    - port: 7687
+      protocol: TCP
+  # Qdrant
+  - to:
+    - podSelector:
+        matchLabels:
+          app: qdrant
+    ports:
+    - port: 6333
+      protocol: TCP
+  # GraphDB
+  - to:
+    - podSelector:
+        matchLabels:
+          app: graphdb
+    ports:
+    - port: 7200
+      protocol: TCP
+  # GraphRAG
+  - to:
+    - podSelector:
+        matchLabels:
+          app: graphrag
+    ports:
+    - port: 50051
+      protocol: TCP
+  # External HTTPS
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - port: 443
+      protocol: TCP
