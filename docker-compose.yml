@@ -181,6 +181,180 @@ services:
     networks:
       - ln-network
 
+  # Finance API with Tri-Engine OCR
+  finance-api:
+    build:
+      context: ./services/finance-api
+      dockerfile: Dockerfile
+    container_name: ln-finance-api
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      DATABASE_URL: postgresql+asyncpg://lifenavigator:devpassword@postgres:5432/lifenavigator_dev
+      REDIS_URL: redis://redis:6379/1
+      SECRET_KEY: dev-secret-key-change-in-production-minimum-32-chars
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:8000
+      # OCR Configuration
+      ENABLE_TESSERACT: "true"
+      ENABLE_PADDLEOCR: "true"
+      ENABLE_DEEPSEEK: "false"  # Requires GPU - set to true if GPU available
+      OCR_CONFIDENCE_THRESHOLD: "0.7"
+      # External API Keys (optional for MVP)
+      PLAID_CLIENT_ID: ${PLAID_CLIENT_ID:-}
+      PLAID_SECRET: ${PLAID_SECRET:-}
+      PLAID_ENVIRONMENT: sandbox
+      ALPHA_VANTAGE_API_KEY: ${ALPHA_VANTAGE_API_KEY:-}
+    ports:
+      - "8001:8001"
+    volumes:
+      # Mount OCR models (optional - will download on first use if not present)
+      - ${HOME}/.paddleocr:/root/.paddleocr:cached
+      - ${HOME}/.cache/huggingface:/root/.cache/huggingface:cached
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001
+    networks:
+      - ln-network
+    # Uncomment below to enable GPU support for DeepSeek-OCR
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  # Agents Service (Multi-Agent System)
+  agents:
+    build:
+      context: ./services/agents
+      dockerfile: Dockerfile
+    container_name: ln-agents
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      # Database
+      DATABASE_URL: postgresql+asyncpg://lifenavigator:devpassword@postgres:5432/lifenavigator_dev
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: lifenavigator_dev
+      POSTGRES_USER: lifenavigator
+      POSTGRES_PASSWORD: devpassword
+      # Cache
+      REDIS_URL: redis://redis:6379/2
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      # Knowledge Graphs
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: devpassword
+      QDRANT_URL: http://qdrant:6333
+      GRAPHDB_URL: http://graphdb:7200
+      GRAPHDB_REPOSITORY: life-navigator
+      # GraphRAG
+      GRAPHRAG_URL: graphrag:50051
+      # AI Services
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # RabbitMQ (if needed)
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-localhost}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      # Feature Flags
+      ENABLE_GPU: "false"  # Set to true if GPU available
+      USE_LOCAL_EMBEDDINGS: "true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      graphdb:
+        condition: service_healthy
+      graphrag:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command: uvicorn mcp-server.core.server:app --host 0.0.0.0 --port 8080
+    networks:
+      - ln-network
+
+  # MCP Server (Model Context Protocol)
+  mcp-server:
+    build:
+      context: ./services/agents
+      dockerfile: Dockerfile
+    container_name: ln-mcp-server
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      APP_NAME: "MCP Server"
+      APP_VERSION: "1.0.0"
+      # Database
+      DATABASE_URL: postgresql+asyncpg://lifenavigator:devpassword@postgres:5432/lifenavigator_dev
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: lifenavigator_dev
+      POSTGRES_USER: lifenavigator
+      POSTGRES_PASSWORD: devpassword
+      # Cache
+      REDIS_URL: redis://redis:6379/3
+      # Knowledge Graphs
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: neo4j
+      NEO4J_PASSWORD: devpassword
+      QDRANT_URL: http://qdrant:6333
+      GRAPHDB_URL: http://graphdb:7200
+      # Services
+      GRAPHRAG_URL: graphrag:50051
+      LLM_ENDPOINT: ${LLM_ENDPOINT:-http://localhost:8090/v1/chat/completions}
+      # AI Keys
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "8090:8090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      graphrag:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    command: uvicorn mcp-server.core.server:app --host 0.0.0.0 --port 8090
+    networks:
+      - ln-network
+
 networks:
   ln-network:
     driver: bridge
