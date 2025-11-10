@@ -55,7 +55,7 @@ jobs:
       - name: Install Python dependencies for agents service
         run: |
           cd services/agents
-          poetry install
+          poetry install --no-root
 
       - name: Run linting
         run: pnpm run lint
@@ -79,7 +79,7 @@ jobs:
       - name: Install Python dependencies and run MyPy (agents service)
         run: |
           cd services/agents
-          poetry install
+          poetry install --no-root
           poetry run mypy agents/ --strict --ignore-missing-imports
         continue-on-error: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
 
