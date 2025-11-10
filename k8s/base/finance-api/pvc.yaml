@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ocr-models-pvc
+  labels:
+    app: finance-api
+spec:
+  accessModes:
+  - ReadWriteMany  # Multiple pods need to access models
+  storageClassName: standard-rw
+  resources:
+    requests:
+      storage: 10Gi  # PaddleOCR + DeepSeek ~2.5GB + buffer
