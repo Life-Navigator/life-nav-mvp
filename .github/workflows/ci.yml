@@ -167,6 +167,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Install Python dependencies for Python services
+        run: |
+          cd services/agents && poetry install --no-root
+          cd ../api && poetry install --no-root
+          cd ../embeddings && poetry install --no-root
+          cd ../kg-sync && poetry install --no-root
+
       - name: Generate Prisma client
         run: pnpm --filter @life-navigator/web exec prisma generate
 
