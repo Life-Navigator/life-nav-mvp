@@ -60,12 +60,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest==9.0.0",  # Latest
+    "pytest>=8.3,<9",  # Compatible with pytest-asyncio
     "pytest-asyncio==0.24.0",
     "pytest-cov==5.0.0",
     "black==25.9.0",  # Latest
-    "ruff==0.6.4",
-    "mypy==1.11.2",
 ]
 ui = [
     "streamlit>=1.38.0",
