@@ -74,6 +74,9 @@ patches:
     - op: replace
       path: /data/ENABLE_METRICS
       value: "true"
+    - op: replace
+      path: /data/CORS_ORIGINS
+      value: '["https://app.life-navigator.vercel.app","https://life-navigator.vercel.app"]'
 
 # Patch ServiceAccount with prod GCP SA
 - target:

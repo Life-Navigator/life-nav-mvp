@@ -11,7 +11,9 @@ data:
 
   # API Configuration
   API_V1_PREFIX: "/api/v1"
-  CORS_ORIGINS: '["*"]'
+  # CORS - Development origins (localhost for testing)
+  # Production should override this with Vercel domain via Kustomize
+  CORS_ORIGINS: '["http://localhost:3000","http://localhost:3001","http://localhost:19006"]'
 
   # GraphRAG Service
   GRAPHRAG_ENDPOINT: "graphrag-dev.services.svc.cluster.local:50051"

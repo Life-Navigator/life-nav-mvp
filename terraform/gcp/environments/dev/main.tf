@@ -367,29 +367,15 @@ module "monitoring" {
 # ===========================================================================
 
 module "gke_cluster" {
-  source = "../../modules/gke-cluster"
+  source = "../../modules/gke-gpu-cluster"
 
   project_id = var.project_id
   region     = var.region
   env        = "dev"
 
-  cluster_name = "life-navigator-gke"
+  cluster_name = "life-navigator-gpu"
   network      = module.vpc.network_name
   subnetwork   = module.vpc.subnet_names["private-subnet"]
-
-  enable_private_cluster = false  # Public for dev/CI access
-  enable_private_nodes   = true
-
-  # Allow access from anywhere for dev
-  master_authorized_networks = [
-    {
-      cidr_block   = "0.0.0.0/0"
-      display_name = "All"
-    }
-  ]
-
-  release_channel = "REGULAR"
-  enable_autopilot = true
 
   labels = {
     environment = "dev"

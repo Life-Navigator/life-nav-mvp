@@ -1,0 +1,66 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: maverick-netpol
+  labels:
+    app: maverick
+    component: embeddings
+spec:
+  podSelector:
+    matchLabels:
+      app: maverick
+      component: embeddings
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow from backend service
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    ports:
+    - port: 8090
+      protocol: TCP
+  # Allow from agents service
+  - from:
+    - podSelector:
+        matchLabels:
+          app: agents
+    ports:
+    - port: 8090
+      protocol: TCP
+  # Allow from GraphRAG service
+  - from:
+    - podSelector:
+        matchLabels:
+          app: graphrag
+    ports:
+    - port: 8090
+      protocol: TCP
+  # Allow from MCP server
+  - from:
+    - podSelector:
+        matchLabels:
+          app: mcp-server
+    ports:
+    - port: 8090
+      protocol: TCP
+  egress:
+  # DNS resolution
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - port: 53
+      protocol: UDP
+  # HTTPS for HuggingFace model download
+  # Note: This allows egress to internet during init
+  - ports:
+    - port: 443
+      protocol: TCP
+  # GCS for model storage (if using GCS instead of PVC)
+  - ports:
+    - port: 443
+      protocol: TCP

@@ -80,6 +80,13 @@ async def get_education_credential(
             detail="Education credential not found",
         )
 
+    # Authorization check: ensure user owns this education credential
+    if credential.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this education credential",
+        )
+
     logger.info("Get education credential", credential_id=str(credential_id))
     return EducationCredentialResponse.model_validate(credential)
 
@@ -134,6 +141,13 @@ async def update_education_credential(
             detail="Education credential not found",
         )
 
+    # Authorization check: ensure user owns this education credential
+    if credential.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this education credential",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(credential, key, value)
 
@@ -164,6 +178,13 @@ async def delete_education_credential(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Education credential not found",
+        )
+
+    # Authorization check: ensure user owns this education credential
+    if credential.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this education credential",
         )
 
     await db.delete(credential)
@@ -232,6 +253,13 @@ async def get_course(
             detail="Course not found",
         )
 
+    # Authorization check: ensure user owns this course
+    if course.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this course",
+        )
+
     logger.info("Get course", course_id=str(course_id))
     return CourseResponse.model_validate(course)
 
@@ -282,6 +310,13 @@ async def update_course(
             detail="Course not found",
         )
 
+    # Authorization check: ensure user owns this course
+    if course.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this course",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(course, key, value)
 
@@ -310,6 +345,13 @@ async def delete_course(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Course not found",
+        )
+
+    # Authorization check: ensure user owns this course
+    if course.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this course",
         )
 
     await db.delete(course)

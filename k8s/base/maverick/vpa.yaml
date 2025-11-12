@@ -1,0 +1,29 @@
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: maverick
+  labels:
+    app: maverick
+    component: embeddings
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: maverick
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: vllm
+      minAllowed:
+        cpu: 2000m
+        memory: 8Gi
+      maxAllowed:
+        cpu: 8000m
+        memory: 32Gi
+      # Don't touch GPU allocation - managed manually
+      controlledResources:
+      - cpu
+      - memory
+    - containerName: model-downloader
+      mode: "Off"  # Init container doesn't need VPA

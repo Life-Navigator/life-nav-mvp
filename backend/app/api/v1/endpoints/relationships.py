@@ -78,6 +78,13 @@ async def get_contact(
             detail="Contact not found",
         )
 
+    # Authorization check: ensure user owns this contact
+    if contact.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this contact",
+        )
+
     logger.info("Get contact", contact_id=str(contact_id))
     return ContactResponse.model_validate(contact)
 
@@ -128,6 +135,13 @@ async def update_contact(
             detail="Contact not found",
         )
 
+    # Authorization check: ensure user owns this contact
+    if contact.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this contact",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(contact, key, value)
 
@@ -156,6 +170,13 @@ async def delete_contact(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Contact not found",
+        )
+
+    # Authorization check: ensure user owns this contact
+    if contact.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this contact",
         )
 
     await db.delete(contact)
@@ -226,6 +247,13 @@ async def get_contact_interaction(
             detail="Contact interaction not found",
         )
 
+    # Authorization check: ensure user owns this contact interaction
+    if interaction.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this contact interaction",
+        )
+
     logger.info("Get contact interaction", interaction_id=str(interaction_id))
     return ContactInteractionResponse.model_validate(interaction)
 
@@ -280,6 +308,13 @@ async def update_contact_interaction(
             detail="Contact interaction not found",
         )
 
+    # Authorization check: ensure user owns this contact interaction
+    if interaction.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this contact interaction",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(interaction, key, value)
 
@@ -310,6 +345,13 @@ async def delete_contact_interaction(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Contact interaction not found",
+        )
+
+    # Authorization check: ensure user owns this contact interaction
+    if interaction.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this contact interaction",
         )
 
     await db.delete(interaction)

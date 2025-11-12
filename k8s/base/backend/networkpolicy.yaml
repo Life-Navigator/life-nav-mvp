@@ -40,15 +40,19 @@ spec:
     ports:
     - protocol: UDP
       port: 53
-  # Allow Cloud SQL Proxy
+  # Allow Cloud SQL Proxy (managed service via private IP)
   - to:
-    - namespaceSelector: {}
+    - namespaceSelector:
+        matchLabels:
+          name: databases
     ports:
     - protocol: TCP
       port: 5432
-  # Allow Redis
+  # Allow Redis (Memorystore via private IP)
   - to:
-    - namespaceSelector: {}
+    - namespaceSelector:
+        matchLabels:
+          name: databases
     ports:
     - protocol: TCP
       port: 6379
@@ -71,9 +75,8 @@ spec:
     ports:
     - protocol: TCP
       port: 50051
-  # Allow HTTPS for external APIs (Qdrant, etc)
-  - to:
-    - namespaceSelector: {}
-    ports:
+  # Allow HTTPS for external APIs (Anthropic, OpenAI, etc.)
+  # Note: This allows egress to internet for API calls
+  - ports:
     - protocol: TCP
       port: 443

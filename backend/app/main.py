@@ -14,6 +14,9 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import make_asgi_app
 from sentry_sdk.integrations.fastapi import FastApiIntegration
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import __version__
@@ -21,10 +24,15 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.database import check_db_health, close_db, init_db
 from app.core.logging import configure_logging, logger
+from app.core.redis import close_redis
 
 
 # Configure logging at import time
 configure_logging()
+
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])  # Default limit for all endpoints
 
 
 @asynccontextmanager
@@ -56,6 +64,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Shutting down Life Navigator API")
     await close_db()
     logger.info("Database connections closed")
+    await close_redis()
+    logger.info("Redis connections closed")
 
 
 # Initialize Sentry if configured
@@ -79,6 +89,10 @@ app = FastAPI(
     openapi_url=f"{settings.API_PREFIX}/openapi.json" if not settings.is_production else None,
     lifespan=lifespan,
 )
+
+# Add rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # =============================================================================

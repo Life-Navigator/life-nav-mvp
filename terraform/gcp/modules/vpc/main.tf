@@ -95,27 +95,83 @@ resource "google_compute_router_nat" "nat" {
   }
 }
 
-# Firewall Rules
+# Firewall Rules - Restrict to specific service ports only
 resource "google_compute_firewall" "allow_internal" {
   name    = "${var.vpc_name}-allow-internal"
   network = google_compute_network.vpc.id
   project = var.project_id
 
+  # GKE inter-pod communication (Kubernetes service mesh)
   allow {
     protocol = "tcp"
-    ports    = ["0-65535"]
+    ports    = ["8000", "8001", "8080", "8090"]  # Backend, Finance API, Agents, MCP Server
   }
 
+  # Database services
+  allow {
+    protocol = "tcp"
+    ports    = ["5432"]  # Cloud SQL PostgreSQL
+  }
+
+  # Caching services
+  allow {
+    protocol = "tcp"
+    ports    = ["6379"]  # Redis
+  }
+
+  # Graph databases
+  allow {
+    protocol = "tcp"
+    ports    = ["7687", "7474"]  # Neo4j Bolt + HTTP
+  }
+
+  # Vector/semantic stores
+  allow {
+    protocol = "tcp"
+    ports    = ["6333", "6334"]  # Qdrant HTTP + gRPC
+  }
+
+  # GraphDB
+  allow {
+    protocol = "tcp"
+    ports    = ["7200"]  # GraphDB SPARQL
+  }
+
+  # GraphRAG service
+  allow {
+    protocol = "tcp"
+    ports    = ["50051"]  # gRPC
+  }
+
+  # HTTPS for internal services
+  allow {
+    protocol = "tcp"
+    ports    = ["443"]
+  }
+
+  # DNS
   allow {
     protocol = "udp"
-    ports    = ["0-65535"]
+    ports    = ["53"]
   }
 
+  # Health checks and monitoring
+  allow {
+    protocol = "tcp"
+    ports    = ["15021"]  # Istio/Envoy health checks (if using service mesh)
+  }
+
+  # ICMP for network diagnostics
   allow {
     protocol = "icmp"
   }
 
   source_ranges = [for subnet in var.subnets : subnet.ip_cidr_range]
+
+  # Enable logging for security auditing
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
 }
 
 resource "google_compute_firewall" "allow_ssh" {

@@ -48,10 +48,9 @@ spec:
     ports:
     - port: 6379
       protocol: TCP
-  # Allow external HTTPS (for API calls)
-  - to:
-    - namespaceSelector: {}
-    ports:
+  # Allow external HTTPS (for Plaid, Alpha Vantage, ML APIs)
+  # Note: This allows egress to internet for external API calls
+  - ports:
     - port: 443
       protocol: TCP
     - port: 80

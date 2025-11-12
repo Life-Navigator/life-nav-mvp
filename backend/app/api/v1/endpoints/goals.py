@@ -82,6 +82,13 @@ async def get_goal(
             detail="Goal not found",
         )
 
+    # Authorization check: ensure user owns this goal
+    if goal.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this goal",
+        )
+
     logger.info("Get goal", goal_id=str(goal_id))
     return GoalResponse.model_validate(goal)
 
@@ -133,6 +140,13 @@ async def update_goal(
             detail="Goal not found",
         )
 
+    # Authorization check: ensure user owns this goal
+    if goal.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this goal",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(goal, key, value)
 
@@ -161,6 +175,13 @@ async def delete_goal(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Goal not found",
+        )
+
+    # Authorization check: ensure user owns this goal
+    if goal.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this goal",
         )
 
     await db.delete(goal)
@@ -229,6 +250,13 @@ async def get_milestone(
             detail="Milestone not found",
         )
 
+    # Authorization check: ensure user owns this milestone
+    if milestone.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this milestone",
+        )
+
     logger.info("Get milestone", milestone_id=str(milestone_id))
     return MilestoneResponse.model_validate(milestone)
 
@@ -280,6 +308,13 @@ async def update_milestone(
             detail="Milestone not found",
         )
 
+    # Authorization check: ensure user owns this milestone
+    if milestone.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this milestone",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(milestone, key, value)
 
@@ -308,6 +343,13 @@ async def delete_milestone(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Milestone not found",
+        )
+
+    # Authorization check: ensure user owns this milestone
+    if milestone.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this milestone",
         )
 
     await db.delete(milestone)

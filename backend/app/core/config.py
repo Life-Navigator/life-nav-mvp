@@ -58,7 +58,17 @@ class Settings(BaseSettings):
     CORS_METHODS: List[str] = Field(
         default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     )
-    CORS_HEADERS: List[str] = Field(default_factory=lambda: ["*"])
+    CORS_HEADERS: List[str] = Field(
+        default_factory=lambda: [
+            "Content-Type",
+            "Authorization",
+            "Accept",
+            "Origin",
+            "User-Agent",
+            "X-Requested-With",
+            "X-Tenant-ID",
+        ]
+    )
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

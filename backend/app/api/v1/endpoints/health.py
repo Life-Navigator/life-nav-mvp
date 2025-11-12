@@ -78,6 +78,13 @@ async def get_health_condition(
             detail="Health condition not found",
         )
 
+    # Authorization check: ensure user owns this health condition
+    if condition.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this health condition",
+        )
+
     logger.info("Get health condition", condition_id=str(condition_id))
     return HealthConditionResponse.model_validate(condition)
 
@@ -130,6 +137,13 @@ async def update_health_condition(
             detail="Health condition not found",
         )
 
+    # Authorization check: ensure user owns this health condition
+    if condition.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this health condition",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(condition, key, value)
 
@@ -158,6 +172,13 @@ async def delete_health_condition(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Health condition not found",
+        )
+
+    # Authorization check: ensure user owns this health condition
+    if condition.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this health condition",
         )
 
     await db.delete(condition)
@@ -226,6 +247,13 @@ async def get_medication(
             detail="Medication not found",
         )
 
+    # Authorization check: ensure user owns this medication
+    if medication.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this medication",
+        )
+
     logger.info("Get medication", medication_id=str(medication_id))
     return MedicationResponse.model_validate(medication)
 
@@ -276,6 +304,13 @@ async def update_medication(
             detail="Medication not found",
         )
 
+    # Authorization check: ensure user owns this medication
+    if medication.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this medication",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(medication, key, value)
 
@@ -304,6 +339,13 @@ async def delete_medication(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Medication not found",
+        )
+
+    # Authorization check: ensure user owns this medication
+    if medication.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this medication",
         )
 
     await db.delete(medication)

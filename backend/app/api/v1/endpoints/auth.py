@@ -5,16 +5,21 @@ Handles user registration, login, logout, and token refresh.
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.core.config import settings
 from app.core.database import get_session
 from app.core.logging import logger
+from app.core.redis import blacklist_token
 from app.core.security import (
     create_access_token,
     create_refresh_token,
+    decode_token,
     get_password_hash,
     verify_password,
     verify_token,
@@ -30,10 +35,14 @@ from app.schemas.auth import (
 from app.schemas.user import UserResponse
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
+security = HTTPBearer()
 
 
 @router.post("/register", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")  # Stricter limit for registration to prevent abuse
 async def register(
+    http_request: Request,
     request: RegisterRequest,
     db: AsyncSession = Depends(get_session),
 ):
@@ -132,7 +141,9 @@ async def register(
 
 
 @router.post("/login", response_model=LoginResponse)
+@limiter.limit("10/minute")  # Prevent brute force attacks
 async def login(
+    http_request: Request,
     request: LoginRequest,
     db: AsyncSession = Depends(get_session),
 ):
@@ -226,6 +237,16 @@ async def refresh_token_endpoint(request: RefreshTokenRequest):
 
     Validates refresh token and generates new access token.
     """
+    # Check if refresh token is blacklisted
+    from app.core.redis import is_token_blacklisted, is_user_blacklisted
+
+    if await is_token_blacklisted(request.refresh_token):
+        logger.warning("Blacklisted refresh token used")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked",
+        )
+
     # Verify refresh token
     payload = verify_token(request.refresh_token, token_type="refresh")
 
@@ -245,6 +266,14 @@ async def refresh_token_endpoint(request: RefreshTokenRequest):
             detail="Invalid token payload",
         )
 
+    # Check if all user tokens are blacklisted
+    if await is_user_blacklisted(user_id):
+        logger.warning("Blacklisted user attempted token refresh", user_id=user_id)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="All user sessions have been revoked",
+        )
+
     # Generate new access token
     access_token = create_access_token(
         subject=user_id,
@@ -262,15 +291,40 @@ async def refresh_token_endpoint(request: RefreshTokenRequest):
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout():
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
     """
-    Logout current user.
+    Logout current user by blacklisting their access token.
 
-    Token invalidation is handled client-side.
-    This endpoint exists for consistency and future server-side token blacklisting.
+    Adds the token to Redis blacklist to prevent further use.
+    The token remains blacklisted until its natural expiration.
     """
-    # In a stateless JWT setup, logout is primarily client-side
-    # (client discards the tokens)
-    # Future enhancement: maintain token blacklist in Redis
-    logger.info("User logged out")
+    token = credentials.credentials
+
+    # Decode token to get expiration
+    payload = decode_token(token)
+    if payload is None:
+        # Token is already invalid, but that's ok for logout
+        logger.info("User logged out with invalid token")
+        return None
+
+    # Calculate remaining TTL (time until token naturally expires)
+    exp = payload.get("exp")
+    if exp:
+        remaining_seconds = int(exp - datetime.utcnow().timestamp())
+        if remaining_seconds > 0:
+            # Blacklist the token with its remaining lifetime
+            await blacklist_token(token, remaining_seconds)
+            logger.info(
+                "User logged out - token blacklisted",
+                user_id=payload.get("sub"),
+                tenant_id=payload.get("tenant_id"),
+                expires_in=remaining_seconds,
+            )
+        else:
+            logger.info("User logged out with expired token")
+    else:
+        logger.warning("Token missing expiration claim")
+
     return None

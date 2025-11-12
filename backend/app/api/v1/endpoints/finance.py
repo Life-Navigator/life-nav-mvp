@@ -81,6 +81,13 @@ async def get_financial_account(
             detail="Financial account not found",
         )
 
+    # Authorization check: ensure user owns this account
+    if account.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this account",
+        )
+
     logger.info("Get financial account", account_id=str(account_id))
     return FinancialAccountResponse.model_validate(account)
 
@@ -133,6 +140,13 @@ async def update_financial_account(
             detail="Financial account not found",
         )
 
+    # Authorization check: ensure user owns this account
+    if account.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this account",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(account, key, value)
 
@@ -161,6 +175,13 @@ async def delete_financial_account(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Financial account not found",
+        )
+
+    # Authorization check: ensure user owns this account
+    if account.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this account",
         )
 
     await db.delete(account)
@@ -229,6 +250,13 @@ async def get_transaction(
             detail="Transaction not found",
         )
 
+    # Authorization check: ensure user owns this transaction
+    if transaction.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this transaction",
+        )
+
     logger.info("Get transaction", transaction_id=str(transaction_id))
     return TransactionResponse.model_validate(transaction)
 
@@ -281,6 +309,13 @@ async def update_transaction(
             detail="Transaction not found",
         )
 
+    # Authorization check: ensure user owns this transaction
+    if transaction.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this transaction",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(transaction, key, value)
 
@@ -309,6 +344,13 @@ async def delete_transaction(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Transaction not found",
+        )
+
+    # Authorization check: ensure user owns this transaction
+    if transaction.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this transaction",
         )
 
     await db.delete(transaction)
@@ -373,6 +415,13 @@ async def get_budget(
             detail="Budget not found",
         )
 
+    # Authorization check: ensure user owns this budget
+    if budget.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this budget",
+        )
+
     logger.info("Get budget", budget_id=str(budget_id))
     return BudgetResponse.model_validate(budget)
 
@@ -423,6 +472,13 @@ async def update_budget(
             detail="Budget not found",
         )
 
+    # Authorization check: ensure user owns this budget
+    if budget.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this budget",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(budget, key, value)
 
@@ -451,6 +507,13 @@ async def delete_budget(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Budget not found",
+        )
+
+    # Authorization check: ensure user owns this budget
+    if budget.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this budget",
         )
 
     await db.delete(budget)

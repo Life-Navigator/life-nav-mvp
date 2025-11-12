@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session, set_tenant_context
 from app.core.logging import logger
+from app.core.redis import is_token_blacklisted, is_user_blacklisted
 from app.core.security import verify_token
 from app.models.user import User, UserTenant, UserTenantRole, UserTenantStatus
 
@@ -39,6 +40,15 @@ async def get_current_user(
     """
     token = credentials.credentials
 
+    # Check if token is blacklisted
+    if await is_token_blacklisted(token):
+        logger.warning("Blacklisted token used", token_prefix=token[:20])
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Verify and decode token
     payload = verify_token(token, token_type="access")
     if payload is None:
@@ -62,6 +72,15 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid user ID in token",
+        )
+
+    # Check if all user tokens are blacklisted (e.g., after password change)
+    if await is_user_blacklisted(str(user_id)):
+        logger.warning("Blacklisted user attempted access", user_id=str(user_id))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="All user sessions have been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     # Fetch user from database

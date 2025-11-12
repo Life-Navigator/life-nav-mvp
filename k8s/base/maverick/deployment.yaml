@@ -1,0 +1,315 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: maverick-model-storage
+  labels:
+    app: maverick
+    component: embeddings
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: pd-ssd  # SSD for fast model loading
+  resources:
+    requests:
+      storage: 80Gi  # Llama 4 Maverick requires ~40-60GB
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: maverick-config
+  labels:
+    app: maverick
+    component: embeddings
+data:
+  MODEL_NAME: "meta-llama/Llama-4-Maverick-8B"
+  TENSOR_PARALLEL_SIZE: "1"
+  GPU_MEMORY_UTILIZATION: "0.9"
+  MAX_MODEL_LEN: "8192"
+  DTYPE: "auto"
+  TRUST_REMOTE_CODE: "true"
+  SERVED_MODEL_NAME: "maverick"
+  # vLLM Performance Settings
+  MAX_NUM_SEQS: "256"
+  MAX_NUM_BATCHED_TOKENS: "8192"
+  # API Settings
+  PORT: "8090"
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: maverick
+  labels:
+    app: maverick
+    component: embeddings
+annotations:
+  # Workload Identity - will be patched by Kustomize per environment
+  iam.gke.io/gcp-service-account: "maverick-dev@PROJECT_ID.iam.gserviceaccount.com"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: maverick
+  labels:
+    app: maverick
+    component: embeddings
+spec:
+  replicas: 1  # Start with 1, HPA will scale based on demand
+  strategy:
+    type: Recreate  # GPU nodes require exclusive scheduling
+  selector:
+    matchLabels:
+      app: maverick
+      component: embeddings
+  template:
+    metadata:
+      labels:
+        app: maverick
+        component: embeddings
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: maverick
+
+      # Schedule on GPU node pool
+      nodeSelector:
+        cloud.google.com/gke-nodepool: gpu-t4-pool
+
+      # Tolerate GPU node taints
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Equal
+        value: present
+        effect: NoSchedule
+
+      # Init container to download model from HuggingFace
+      initContainers:
+      - name: model-downloader
+        image: python:3.11-slim
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+          echo "Installing HuggingFace CLI..."
+          pip install --no-cache-dir huggingface-hub[cli]
+
+          echo "Checking if model exists..."
+          if [ -f "/models/config.json" ]; then
+            echo "Model already downloaded, skipping..."
+            exit 0
+          fi
+
+          echo "Downloading Llama 4 Maverick model..."
+          huggingface-cli download \
+            meta-llama/Llama-4-Maverick-8B \
+            --local-dir /models \
+            --local-dir-use-symlinks False \
+            --token ${HUGGINGFACE_TOKEN}
+
+          echo "Model download complete!"
+          ls -lh /models/
+        env:
+        - name: HUGGINGFACE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: huggingface-token
+              key: token
+        volumeMounts:
+        - name: model-storage
+          mountPath: /models
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+
+      containers:
+      - name: vllm
+        image: vllm/vllm-openai:latest
+        imagePullPolicy: Always
+
+        command:
+        - python3
+        - -m
+        - vllm.entrypoints.openai.api_server
+
+        args:
+        - --model=$(MODEL_NAME)
+        - --tensor-parallel-size=$(TENSOR_PARALLEL_SIZE)
+        - --gpu-memory-utilization=$(GPU_MEMORY_UTILIZATION)
+        - --max-model-len=$(MAX_MODEL_LEN)
+        - --dtype=$(DTYPE)
+        - --trust-remote-code
+        - --served-model-name=$(SERVED_MODEL_NAME)
+        - --max-num-seqs=$(MAX_NUM_SEQS)
+        - --max-num-batched-tokens=$(MAX_NUM_BATCHED_TOKENS)
+        - --port=$(PORT)
+        - --host=0.0.0.0
+
+        envFrom:
+        - configMapRef:
+            name: maverick-config
+
+        env:
+        # Override model path to use downloaded model
+        - name: MODEL_NAME
+          value: "/models"
+        - name: CUDA_VISIBLE_DEVICES
+          value: "0"
+        - name: NCCL_DEBUG
+          value: "INFO"
+
+        ports:
+        - name: http
+          containerPort: 8090
+          protocol: TCP
+
+        # Readiness probe - vLLM can take 2-5 minutes to load model
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8090
+          initialDelaySeconds: 120
+          periodSeconds: 10
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+
+        # Liveness probe - more lenient
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8090
+          initialDelaySeconds: 180
+          periodSeconds: 30
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+
+        resources:
+          requests:
+            cpu: 4000m
+            memory: 16Gi
+            nvidia.com/gpu: 1
+          limits:
+            cpu: 8000m
+            memory: 32Gi
+            nvidia.com/gpu: 1
+
+        volumeMounts:
+        - name: model-storage
+          mountPath: /models
+          readOnly: true
+        - name: shm
+          mountPath: /dev/shm
+
+      volumes:
+      - name: model-storage
+        persistentVolumeClaim:
+          claimName: maverick-model-storage
+      # Shared memory for CUDA operations
+      - name: shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: maverick
+  labels:
+    app: maverick
+    component: embeddings
+spec:
+  type: ClusterIP
+  selector:
+    app: maverick
+    component: embeddings
+  ports:
+  - name: http
+    port: 8090
+    targetPort: 8090
+    protocol: TCP
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: maverick
+  labels:
+    app: maverick
+    component: embeddings
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: maverick
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+  # Scale based on GPU utilization
+  - type: Pods
+    pods:
+      metric:
+        name: nvidia_gpu_duty_cycle
+      target:
+        type: AverageValue
+        averageValue: "80"
+  # Also consider CPU utilization
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Memory utilization
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 1
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: maverick
+  labels:
+    app: maverick
+    component: embeddings
+spec:
+  minAvailable: 0  # Allow disruption during single-replica operation
+  selector:
+    matchLabels:
+      app: maverick
+      component: embeddings

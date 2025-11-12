@@ -39,6 +39,7 @@ opentelemetry-sdk = "^1.22.0"
 opentelemetry-instrumentation-fastapi = "^0.43b0"
 opentelemetry-exporter-otlp = "^1.22.0"
 sentry-sdk = {extras = ["fastapi"], version = "^1.40.0"}
+slowapi = "^0.1.9"
 grpcio = "^1.60.0"
 grpcio-tools = "^1.60.0"
 pgvector = "^0.2.4"

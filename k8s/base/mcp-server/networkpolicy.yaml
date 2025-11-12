@@ -79,9 +79,8 @@ spec:
     ports:
     - port: 50051
       protocol: TCP
-  # External HTTPS
-  - to:
-    - namespaceSelector: {}
-    ports:
+  # External HTTPS (for Claude MCP protocol and external APIs)
+  # Note: This allows egress to internet for external API calls
+  - ports:
     - port: 443
       protocol: TCP

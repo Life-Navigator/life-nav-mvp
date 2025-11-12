@@ -81,6 +81,13 @@ async def get_career_profile(
             detail="Career profile not found",
         )
 
+    # Authorization check: ensure user owns this career profile
+    if profile.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this career profile",
+        )
+
     logger.info("Get career profile", profile_id=str(profile_id))
     return CareerProfileResponse.model_validate(profile)
 
@@ -131,6 +138,13 @@ async def update_career_profile(
             detail="Career profile not found",
         )
 
+    # Authorization check: ensure user owns this career profile
+    if profile.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this career profile",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(profile, key, value)
 
@@ -159,6 +173,13 @@ async def delete_career_profile(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Career profile not found",
+        )
+
+    # Authorization check: ensure user owns this career profile
+    if profile.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this career profile",
         )
 
     await db.delete(profile)
@@ -223,6 +244,13 @@ async def get_job_application(
             detail="Job application not found",
         )
 
+    # Authorization check: ensure user owns this job application
+    if application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this job application",
+        )
+
     logger.info("Get job application", application_id=str(application_id))
     return JobApplicationResponse.model_validate(application)
 
@@ -275,6 +303,13 @@ async def update_job_application(
             detail="Job application not found",
         )
 
+    # Authorization check: ensure user owns this job application
+    if application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this job application",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(application, key, value)
 
@@ -303,6 +338,13 @@ async def delete_job_application(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Job application not found",
+        )
+
+    # Authorization check: ensure user owns this job application
+    if application.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this job application",
         )
 
     await db.delete(application)
@@ -371,6 +413,13 @@ async def get_interview(
             detail="Interview not found",
         )
 
+    # Authorization check: ensure user owns this interview
+    if interview.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this interview",
+        )
+
     logger.info("Get interview", interview_id=str(interview_id))
     return InterviewResponse.model_validate(interview)
 
@@ -421,6 +470,13 @@ async def update_interview(
             detail="Interview not found",
         )
 
+    # Authorization check: ensure user owns this interview
+    if interview.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this interview",
+        )
+
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(interview, key, value)
 
@@ -449,6 +505,13 @@ async def delete_interview(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Interview not found",
+        )
+
+    # Authorization check: ensure user owns this interview
+    if interview.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to access this interview",
         )
 
     await db.delete(interview)
