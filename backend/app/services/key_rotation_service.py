@@ -10,14 +10,13 @@ Features:
 """
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 import structlog
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.encryption import get_encryption_service, EncryptionContext
+from app.core.encryption import get_encryption_service
 from app.models.user import User
 
 logger = structlog.get_logger()

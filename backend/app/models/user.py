@@ -5,6 +5,7 @@ Core multi-tenant architecture models.
 
 from datetime import datetime
 from enum import Enum as PyEnum
+from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, Text, UniqueConstraint
@@ -233,7 +234,7 @@ class User(BaseSoftDeleteModel, Base):
         Args:
             secret: TOTP secret (base32 encoded)
         """
-        from app.core.encryption import encrypt_field, EncryptionContext
+        from app.core.encryption import EncryptionContext, encrypt_field
 
         encrypted_data, encrypted_dek = encrypt_field(
             plaintext=secret,
@@ -257,7 +258,7 @@ class User(BaseSoftDeleteModel, Base):
         """
         # Check if using new encrypted fields
         if self.mfa_secret_encrypted and self.mfa_secret_dek:
-            from app.core.encryption import decrypt_field, EncryptionContext
+            from app.core.encryption import EncryptionContext, decrypt_field
 
             return decrypt_field(
                 encrypted_data=self.mfa_secret_encrypted,
@@ -286,7 +287,7 @@ class User(BaseSoftDeleteModel, Base):
         if not self.mfa_secret_encrypted or not self.mfa_secret_dek:
             return False
 
-        from app.core.encryption import get_encryption_service, EncryptionContext
+        from app.core.encryption import EncryptionContext, get_encryption_service
 
         service = get_encryption_service()
 

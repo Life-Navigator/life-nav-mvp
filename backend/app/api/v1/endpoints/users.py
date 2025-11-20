@@ -9,12 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import CurrentUser, DBSession, TenantID
+from app.api.deps import CurrentUser, DBSession
 from app.core.logging import logger
 from app.core.security import create_access_token, create_refresh_token
 from app.models.user import UserTenant, UserTenantStatus
 from app.schemas.auth import TokenResponse
-from app.schemas.user import TenantResponse, UserResponse, UserTenantResponse, UserUpdate
+from app.schemas.user import UserResponse, UserTenantResponse, UserUpdate
 
 router = APIRouter()
 

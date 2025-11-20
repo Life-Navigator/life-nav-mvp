@@ -10,16 +10,17 @@ Background tasks for:
 
 import asyncio
 import traceback
+from datetime import datetime
 from typing import Any
 from uuid import UUID
 
 import structlog
 from celery import Task
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.core.config import settings
 from app.core.celery_app import celery_app
+from app.core.config import settings
 from app.models.graphrag_index import IndexType
 from app.services.graphrag_index_service import GraphRAGIndexService
 from app.services.graphrag_rebuild_service import GraphRAGRebuildService
@@ -274,6 +275,7 @@ def cleanup_old_jobs_task(days: int = 30) -> dict[str, int]:
     async def _cleanup():
         """Async cleanup implementation."""
         from datetime import timedelta
+
         from sqlalchemy import delete
 
         from app.models.graphrag_index import GraphRAGIndexJob, IndexStatus

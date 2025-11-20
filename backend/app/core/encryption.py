@@ -27,12 +27,11 @@ import hashlib
 import secrets
 from datetime import datetime
 from enum import Enum as PyEnum
-from typing import Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
 import structlog
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
 
@@ -214,7 +213,7 @@ class EncryptionService:
         plaintext: str,
         context: EncryptionContext = EncryptionContext.PII_PERSONAL,
         user_id: Optional[UUID] = None,
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """
         Encrypt sensitive data using envelope encryption.
 
@@ -241,7 +240,7 @@ class EncryptionService:
             aesgcm = AESGCM(dek)
 
             # Use context as additional authenticated data
-            aad = f"{context.value}:v{self.CURRENT_KEY_VERSION}".encode("utf-8")
+            aad = f"{context.value}:v{self.CURRENT_KEY_VERSION}".encode()
             ciphertext = aesgcm.encrypt(nonce, plaintext.encode("utf-8"), aad)
 
             # Prepend nonce to ciphertext
@@ -313,7 +312,7 @@ class EncryptionService:
 
             # Decrypt data with DEK
             aesgcm = AESGCM(dek)
-            aad = f"{context.value}:v{self.CURRENT_KEY_VERSION}".encode("utf-8")
+            aad = f"{context.value}:v{self.CURRENT_KEY_VERSION}".encode()
             plaintext_bytes = aesgcm.decrypt(nonce, ciphertext, aad)
 
             plaintext = plaintext_bytes.decode("utf-8")
@@ -431,7 +430,7 @@ class EncryptionService:
         # Create HMAC with KEK as key
         import hmac
 
-        message = f"{context.value}:{plaintext}".encode("utf-8")
+        message = f"{context.value}:{plaintext}".encode()
         hash_bytes = hmac.new(self.kek, message, hashlib.sha256).digest()
 
         return base64.b64encode(hash_bytes).decode("utf-8")
@@ -453,7 +452,7 @@ def encrypt_field(
     plaintext: str,
     context: EncryptionContext,
     user_id: Optional[UUID] = None,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """
     Convenience function to encrypt a field.
 

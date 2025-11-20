@@ -8,8 +8,8 @@ Provides async interface to the Rust GraphRAG service for:
 - Entity and relationship queries
 """
 
-from typing import Any, AsyncIterator, Optional
 from contextlib import asynccontextmanager
+from typing import Any, Optional
 
 import grpc
 from grpc import aio

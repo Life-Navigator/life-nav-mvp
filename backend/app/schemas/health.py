@@ -18,7 +18,6 @@ from app.models.health import (
 )
 from app.schemas.base import BaseSchema, IDTimestampSchema
 
-
 # ============================================================================
 # HealthCondition Schemas
 # ============================================================================

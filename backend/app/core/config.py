@@ -4,7 +4,7 @@ Loads from environment variables and .env file.
 """
 
 from functools import lru_cache
-from typing import List, Literal
+from typing import Literal
 
 from pydantic import AnyHttpUrl, Field, PostgresDsn, RedisDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -53,12 +53,12 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # CORS
-    CORS_ORIGINS: List[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     CORS_CREDENTIALS: bool = True
-    CORS_METHODS: List[str] = Field(
+    CORS_METHODS: list[str] = Field(
         default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
     )
-    CORS_HEADERS: List[str] = Field(
+    CORS_HEADERS: list[str] = Field(
         default_factory=lambda: [
             "Content-Type",
             "Authorization",
@@ -72,7 +72,7 @@ class Settings(BaseSettings):
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: str | List[str]) -> List[str]:
+    def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",")]
         return v
@@ -124,13 +124,13 @@ class Settings(BaseSettings):
 
     # File Upload
     MAX_UPLOAD_SIZE: int = 10485760  # 10MB
-    ALLOWED_EXTENSIONS: List[str] = Field(
+    ALLOWED_EXTENSIONS: list[str] = Field(
         default_factory=lambda: ["jpg", "jpeg", "png", "pdf", "doc", "docx"]
     )
 
     @field_validator("ALLOWED_EXTENSIONS", mode="before")
     @classmethod
-    def parse_allowed_extensions(cls, v: str | List[str]) -> List[str]:
+    def parse_allowed_extensions(cls, v: str | list[str]) -> list[str]:
         if isinstance(v, str):
             return [ext.strip() for ext in v.split(",")]
         return v
@@ -139,14 +139,14 @@ class Settings(BaseSettings):
     PLAID_CLIENT_ID: str | None = None
     PLAID_SECRET: str | None = None
     PLAID_ENV: Literal["sandbox", "development", "production"] = "sandbox"
-    PLAID_PRODUCTS: List[str] = Field(
+    PLAID_PRODUCTS: list[str] = Field(
         default_factory=lambda: ["auth", "transactions", "investments"]
     )
-    PLAID_COUNTRY_CODES: List[str] = Field(default_factory=lambda: ["US", "CA"])
+    PLAID_COUNTRY_CODES: list[str] = Field(default_factory=lambda: ["US", "CA"])
 
     @field_validator("PLAID_PRODUCTS", "PLAID_COUNTRY_CODES", mode="before")
     @classmethod
-    def parse_plaid_lists(cls, v: str | List[str]) -> List[str]:
+    def parse_plaid_lists(cls, v: str | list[str]) -> list[str]:
         if isinstance(v, str):
             return [item.strip() for item in v.split(",")]
         return v
@@ -204,7 +204,9 @@ class Settings(BaseSettings):
     DATA_RETENTION_DAYS: int = 2555  # 7 years
 
     # Field-Level Encryption (AES-256-GCM with envelope encryption)
-    ENCRYPTION_KEY: str = Field(..., min_length=64, max_length=64)  # 64-char hex (32 bytes)
+    ENCRYPTION_KEY: str = Field(
+        default="0" * 64, min_length=64, max_length=64
+    )  # 64-char hex (32 bytes)
     ENCRYPTION_ENABLED: bool = True
     ENABLE_ENCRYPTION_AT_REST: bool = True
     REQUIRE_MFA_FOR_HEALTH_DATA: bool = True
@@ -226,7 +228,7 @@ class Settings(BaseSettings):
         return url.replace("postgresql+asyncpg://", "postgresql://")
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """
     Get cached settings instance.

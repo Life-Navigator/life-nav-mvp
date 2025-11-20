@@ -20,7 +20,6 @@ from app.models.career import (
 )
 from app.schemas.base import BaseSchema, IDTimestampSchema
 
-
 # ============================================================================
 # CareerProfile Schemas
 # ============================================================================

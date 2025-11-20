@@ -247,8 +247,8 @@ async def rebuild_knowledge_graph_index(
     Returns:
         Job information with tracking ID
     """
-    from app.services.graphrag_index_service import GraphRAGIndexService
     from app.models.graphrag_index import IndexType
+    from app.services.graphrag_index_service import GraphRAGIndexService
     from app.tasks.graphrag_tasks import rebuild_index_task
 
     logger.info(
@@ -463,8 +463,9 @@ async def get_rebuild_job_status(
     )
 
     try:
-        from app.api.deps import get_db
         from uuid import UUID
+
+        from app.api.deps import get_db
 
         async with get_db() as db:
             index_service = GraphRAGIndexService(db)

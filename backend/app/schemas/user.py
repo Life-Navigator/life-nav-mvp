@@ -21,7 +21,6 @@ from app.models.user import (
 )
 from app.schemas.base import BaseSchema, IDTimestampSchema
 
-
 # ============================================================================
 # Organization Schemas
 # ============================================================================

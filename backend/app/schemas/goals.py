@@ -19,7 +19,6 @@ from app.models.goals import (
 )
 from app.schemas.base import BaseSchema, IDTimestampSchema
 
-
 # ============================================================================
 # Goal Schemas
 # ============================================================================

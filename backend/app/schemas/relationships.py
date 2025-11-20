@@ -17,7 +17,6 @@ from app.models.relationships import (
 )
 from app.schemas.base import BaseSchema, IDTimestampSchema
 
-
 # ============================================================================
 # Contact Schemas
 # ============================================================================

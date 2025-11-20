@@ -11,18 +11,16 @@ Features:
 - Audit logging for compliance
 """
 
-import asyncio
-from datetime import datetime, timedelta
-from typing import Optional, Dict, Any
-from uuid import UUID
+from datetime import datetime
+from typing import Any, Optional
 
 import httpx
 import structlog
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 from app.core.config import settings
@@ -97,8 +95,8 @@ class EmailService:
         html: str,
         from_email: Optional[str] = None,
         reply_to: Optional[str] = None,
-        tags: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        tags: Optional[dict[str, str]] = None,
+    ) -> dict[str, Any]:
         """
         Send email via Resend API with retry logic.
 

@@ -8,8 +8,6 @@ Handles knowledge graph index rebuilding with:
 - Performance monitoring
 """
 
-import time
-import traceback
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -18,8 +16,6 @@ import structlog
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.clients.graphrag import get_graphrag_client
-from app.core.config import settings
 from app.models.graphrag_index import (
     GraphRAGIndexJob,
     GraphRAGIndexMetrics,

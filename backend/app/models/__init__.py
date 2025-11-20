@@ -13,8 +13,8 @@ from app.models.mixins import (
     SoftDeleteMixin,
     TenantMixin,
     TimestampMixin,
-    UUIDMixin,
     UserOwnedMixin,
+    UUIDMixin,
 )
 from app.models.relationships import Contact, ContactInteraction
 from app.models.user import (

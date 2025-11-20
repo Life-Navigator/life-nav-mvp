@@ -9,11 +9,11 @@ Actual implementation of index rebuilding logic that:
 - Tracks progress and performance
 """
 
-import asyncio
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from datetime import datetime, timedelta
-from typing import Callable, Optional
+from typing import Optional
 from uuid import UUID
 
 import structlog
@@ -25,7 +25,6 @@ from app.clients.neo4j_client import get_neo4j_client
 from app.clients.qdrant_client import get_qdrant_client
 from app.services.embedding_service import get_embedding_service
 from app.services.entity_extraction_service import EntityExtractionService
-from app.core.config import settings
 
 logger = structlog.get_logger()
 

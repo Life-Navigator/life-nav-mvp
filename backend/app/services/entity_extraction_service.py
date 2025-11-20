@@ -209,7 +209,7 @@ class EntityExtractionService:
         """Extract Education/Course entities."""
         try:
             try:
-                from app.models.education import Course, Certification
+                from app.models.education import Certification, Course
             except ImportError:
                 logger.warning("education_models_not_found")
                 return []

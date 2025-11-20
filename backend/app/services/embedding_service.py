@@ -9,11 +9,9 @@ Generates vector embeddings for text using:
 """
 
 from typing import Optional
-from uuid import UUID
 
 import structlog
-from openai import AsyncOpenAI
-from openai import OpenAIError
+from openai import AsyncOpenAI, OpenAIError
 
 from app.core.config import settings
 

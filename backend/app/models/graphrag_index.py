@@ -6,7 +6,7 @@ Tracks the status of knowledge graph index rebuilds for monitoring and observabi
 
 from datetime import datetime
 from enum import Enum as PyEnum
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -166,9 +166,9 @@ class GraphRAGIndexJob(UUIDMixin, TimestampMixin, Base):
         comment="Additional metadata",
     )
 
-    # Relationships
-    tenant: Mapped["Tenant"] = relationship()
-    user: Mapped["User"] = relationship()
+    # Relationships (forward references for models defined in other files)
+    # tenant: Mapped["Tenant"] = relationship()  # Uncomment when Tenant model is available
+    # user: Mapped["User"] = relationship()  # Uncomment when User model is available
 
     @property
     def progress_percentage(self) -> float:
@@ -313,6 +313,6 @@ class GraphRAGIndexMetrics(UUIDMixin, TimestampMixin, Base):
         comment="Additional metrics",
     )
 
-    # Relationships
-    tenant: Mapped["Tenant"] = relationship()
+    # Relationships (forward references for models defined in other files)
+    # tenant: Mapped["Tenant"] = relationship()  # Uncomment when Tenant model is available
     last_rebuild_job: Mapped["GraphRAGIndexJob"] = relationship()

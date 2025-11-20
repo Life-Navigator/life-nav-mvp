@@ -9,10 +9,10 @@ Provides metrics, traces, and monitoring for GraphRAG operations:
 """
 
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
-from typing import Any, Callable, Optional
 from uuid import UUID
 
 import structlog

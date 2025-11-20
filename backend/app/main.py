@@ -3,8 +3,8 @@ Life Navigator FastAPI Application.
 Main application with middleware, routes, and lifecycle management.
 """
 
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 import sentry_sdk
 from fastapi import FastAPI, Request, status
@@ -26,7 +26,6 @@ from app.core.database import check_db_health, close_db, init_db
 from app.core.logging import configure_logging, logger
 from app.core.redis import close_redis
 from app.core.telemetry import init_telemetry, instrument_fastapi, shutdown_telemetry
-
 
 # Configure logging at import time
 configure_logging()

@@ -18,7 +18,6 @@ from app.models.education import (
 )
 from app.schemas.base import BaseSchema, IDTimestampSchema
 
-
 # ============================================================================
 # EducationCredential Schemas
 # ============================================================================

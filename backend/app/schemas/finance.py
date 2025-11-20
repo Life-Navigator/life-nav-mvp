@@ -19,7 +19,6 @@ from app.models.finance import (
 )
 from app.schemas.base import BaseSchema, IDTimestampSchema
 
-
 # ============================================================================
 # FinancialAccount Schemas
 # ============================================================================

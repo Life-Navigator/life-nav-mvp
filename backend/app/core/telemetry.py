@@ -6,7 +6,6 @@ Integrates with Google Cloud Trace and Cloud Monitoring.
 """
 
 import logging
-from typing import Optional
 
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
