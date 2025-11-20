@@ -19,12 +19,13 @@ data:
   GRAPHRAG_ENDPOINT: "graphrag-dev.services.svc.cluster.local:50051"
 
   # Qdrant Configuration
-  QDRANT_URL: "https://qdrant-cloud-endpoint"
+  QDRANT_URL: "http://qdrant.default.svc.cluster.local:6333"
   QDRANT_COLLECTION: "life_navigator"
 
   # Neo4j Configuration (non-sensitive)
   NEO4J_DATABASE: "neo4j"
-  NEO4J_MAX_CONNECTIONS: "10"
+  NEO4J_USER: "neo4j"
+  NEO4J_MAX_CONNECTIONS: "50"
 
   # Application Settings
   MAX_UPLOAD_SIZE: "104857600"  # 100MB

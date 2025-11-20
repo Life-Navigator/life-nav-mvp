@@ -1,0 +1,163 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qdrant
+  labels:
+    app: qdrant
+    component: vector-database
+    app.kubernetes.io/name: qdrant
+    app.kubernetes.io/component: vector-database
+    app.kubernetes.io/part-of: life-navigator
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # Qdrant doesn't support multi-writer to same volume
+  selector:
+    matchLabels:
+      app: qdrant
+      component: vector-database
+  template:
+    metadata:
+      labels:
+        app: qdrant
+        component: vector-database
+        version: v1.7.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "6333"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: qdrant
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: qdrant
+        image: qdrant/qdrant:v1.7.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 6333
+          protocol: TCP
+        - name: grpc
+          containerPort: 6334
+          protocol: TCP
+        env:
+        - name: QDRANT__SERVICE__HTTP_PORT
+          value: "6333"
+        - name: QDRANT__SERVICE__GRPC_PORT
+          value: "6334"
+        # Enable telemetry
+        - name: QDRANT__TELEMETRY_DISABLED
+          value: "false"
+        # Storage configuration
+        - name: QDRANT__STORAGE__STORAGE_PATH
+          value: "/qdrant/storage"
+        # Performance tuning
+        - name: QDRANT__STORAGE__OPTIMIZERS__INDEXING_THRESHOLD
+          value: "50000"
+        - name: QDRANT__STORAGE__OPTIMIZERS__MEMMAP_THRESHOLD
+          value: "50000"
+        # Cluster configuration (for future scaling)
+        - name: QDRANT__CLUSTER__ENABLED
+          value: "false"
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+          successThreshold: 1
+        startupProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 12
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false  # Qdrant needs to write to storage
+        volumeMounts:
+        - name: qdrant-storage
+          mountPath: /qdrant/storage
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: qdrant-storage
+        persistentVolumeClaim:
+          claimName: qdrant-pvc
+      - name: tmp
+        emptyDir: {}
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant
+  labels:
+    app: qdrant
+    component: vector-database
+spec:
+  type: ClusterIP
+  selector:
+    app: qdrant
+    component: vector-database
+  ports:
+  - name: http
+    port: 6333
+    targetPort: http
+    protocol: TCP
+  - name: grpc
+    port: 6334
+    targetPort: grpc
+    protocol: TCP
+  sessionAffinity: ClientIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qdrant-pvc
+  labels:
+    app: qdrant
+    component: vector-database
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: standard-rwo  # GKE default storage class
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: qdrant
+  labels:
+    app: qdrant
+    component: vector-database

@@ -186,39 +186,168 @@ class AuthMiddleware:
 
 class APIKeyMiddleware:
     """
-    Alternative authentication using API keys
+    Enterprise-grade API key authentication middleware.
+
+    Features:
+    - Database-backed key validation
+    - Rate limiting per key
+    - Permission-based access control
+    - IP whitelisting
+    - Usage tracking and analytics
+    - Comprehensive audit logging
     """
-    
+
     def __init__(self, app):
         self.app = app
-    
+
     async def __call__(self, request: Request, call_next: Callable) -> Response:
+        from app.core.database import get_db
+        from app.services.api_key_service import APIKeyService
+        import time
+
         # Check for API key
-        api_key = request.headers.get("X-API-Key")
-        
-        if api_key:
-            # Validate API key (would check against database)
-            if self._validate_api_key(api_key):
+        api_key_header = request.headers.get("X-API-Key")
+
+        if not api_key_header:
+            # No API key provided, skip (JWT auth will handle if needed)
+            return await call_next(request)
+
+        # Get client IP
+        client_ip = None
+        if request.client:
+            client_ip = request.client.host
+
+        # Track request timing
+        start_time = time.time()
+
+        try:
+            # Get database session
+            async for db in get_db():
+                service = APIKeyService(db)
+
+                # Validate API key
+                api_key = await service.validate_api_key(
+                    plaintext_key=api_key_header,
+                    request_ip=client_ip,
+                )
+
+                if not api_key:
+                    logger.warning(
+                        "api_key_invalid",
+                        path=request.url.path,
+                        client_ip=client_ip,
+                    )
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid or expired API key",
+                        headers={"WWW-Authenticate": "ApiKey"},
+                    )
+
+                # Check rate limits
+                is_allowed, limit_info = await service.check_rate_limit(api_key)
+
+                if not is_allowed:
+                    logger.warning(
+                        "api_key_rate_limited",
+                        key_id=str(api_key.id),
+                        path=request.url.path,
+                    )
+
+                    # Log the rate limit hit
+                    await service.log_usage(
+                        api_key=api_key,
+                        endpoint=request.url.path,
+                        method=request.method,
+                        status_code=429,
+                        response_time_ms=int((time.time() - start_time) * 1000),
+                        ip_address=client_ip or "unknown",
+                        user_agent=request.headers.get("User-Agent"),
+                        error_message="Rate limit exceeded",
+                    )
+
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail="Rate limit exceeded",
+                        headers={
+                            "X-RateLimit-Limit-Minute": str(limit_info["minute"]["limit"]),
+                            "X-RateLimit-Remaining-Minute": str(limit_info["minute"]["remaining"]),
+                            "X-RateLimit-Reset-Minute": limit_info["minute"]["reset_at"],
+                            "X-RateLimit-Limit-Hour": str(limit_info["hour"]["limit"]),
+                            "X-RateLimit-Remaining-Hour": str(limit_info["hour"]["remaining"]),
+                            "X-RateLimit-Reset-Hour": limit_info["hour"]["reset_at"],
+                            "Retry-After": "60",  # Retry after 1 minute
+                        },
+                    )
+
+                # Increment rate limit counters
+                await service.increment_rate_limit(api_key)
+
                 # Set user context from API key
-                request.state.api_key = api_key
+                request.state.api_key_id = str(api_key.id)
+                request.state.user_id = str(api_key.user_id)
+                request.state.api_key_scopes = api_key.scopes
                 request.state.authenticated = True
-                
+                request.state.auth_method = "api_key"
+
                 logger.info(
                     "api_key_authenticated",
-                    api_key=api_key[:8] + "...",  # Log partial key
-                    path=request.url.path
+                    key_id=str(api_key.id),
+                    user_id=str(api_key.user_id),
+                    prefix=api_key.key_prefix,
+                    path=request.url.path,
                 )
-        
-        return await call_next(request)
-    
-    def _validate_api_key(self, api_key: str) -> bool:
-        """
-        Validate API key against database
-        This is a placeholder - implement actual validation
-        """
-        # TODO: Check API key in database
-        # TODO: Check rate limits for API key
-        # TODO: Check permissions for API key
-        
-        # For now, just check format
-        return len(api_key) == 32 and api_key.isalnum()
+
+                # Process request
+                try:
+                    response = await call_next(request)
+                    response_time_ms = int((time.time() - start_time) * 1000)
+
+                    # Log successful usage
+                    await service.log_usage(
+                        api_key=api_key,
+                        endpoint=request.url.path,
+                        method=request.method,
+                        status_code=response.status_code,
+                        response_time_ms=response_time_ms,
+                        ip_address=client_ip or "unknown",
+                        user_agent=request.headers.get("User-Agent"),
+                    )
+
+                    # Add rate limit headers to response
+                    response.headers["X-RateLimit-Limit-Minute"] = str(limit_info["minute"]["limit"])
+                    response.headers["X-RateLimit-Remaining-Minute"] = str(limit_info["minute"]["remaining"])
+                    response.headers["X-RateLimit-Reset-Minute"] = limit_info["minute"]["reset_at"]
+                    response.headers["X-RateLimit-Limit-Hour"] = str(limit_info["hour"]["limit"])
+                    response.headers["X-RateLimit-Remaining-Hour"] = str(limit_info["hour"]["remaining"])
+                    response.headers["X-RateLimit-Reset-Hour"] = limit_info["hour"]["reset_at"]
+
+                    return response
+
+                except Exception as e:
+                    response_time_ms = int((time.time() - start_time) * 1000)
+
+                    # Log error
+                    await service.log_usage(
+                        api_key=api_key,
+                        endpoint=request.url.path,
+                        method=request.method,
+                        status_code=500,
+                        response_time_ms=response_time_ms,
+                        ip_address=client_ip or "unknown",
+                        user_agent=request.headers.get("User-Agent"),
+                        error_message=str(e),
+                    )
+                    raise
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(
+                "api_key_middleware_error",
+                error=str(e),
+                path=request.url.path,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Authentication error"
+            )

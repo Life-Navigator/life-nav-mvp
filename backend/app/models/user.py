@@ -201,7 +201,14 @@ class User(BaseSoftDeleteModel, Base):
     auth_provider_id: Mapped[str | None] = mapped_column(String(255))
     password_hash: Mapped[str | None] = mapped_column(String(255))
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    mfa_secret: Mapped[str | None] = mapped_column(String(255))
+
+    # MFA Secret (Encrypted) - NEVER store plaintext!
+    # Uses envelope encryption: encrypted_data + encrypted_DEK
+    mfa_secret_encrypted: Mapped[str | None] = mapped_column("mfa_secret_encrypted", Text)
+    mfa_secret_dek: Mapped[str | None] = mapped_column("mfa_secret_dek", Text)
+
+    # Deprecated: Old plaintext column (will be removed after migration)
+    mfa_secret: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     # Status
     status: Mapped[UserStatus] = mapped_column(
@@ -218,6 +225,106 @@ class User(BaseSoftDeleteModel, Base):
 
     # Relationships
     user_tenants: Mapped[list["UserTenant"]] = relationship(back_populates="user", lazy="selectin")
+
+    def set_mfa_secret(self, secret: str) -> None:
+        """
+        Set MFA secret with encryption.
+
+        Args:
+            secret: TOTP secret (base32 encoded)
+        """
+        from app.core.encryption import encrypt_field, EncryptionContext
+
+        encrypted_data, encrypted_dek = encrypt_field(
+            plaintext=secret,
+            context=EncryptionContext.MFA_SECRET,
+            user_id=self.id,
+        )
+
+        self.mfa_secret_encrypted = encrypted_data
+        self.mfa_secret_dek = encrypted_dek
+        self.mfa_secret = None  # Clear deprecated field
+
+    def get_mfa_secret(self) -> Optional[str]:
+        """
+        Get decrypted MFA secret.
+
+        Returns:
+            Decrypted TOTP secret, or None if not set
+
+        Raises:
+            EncryptionError: If decryption fails
+        """
+        # Check if using new encrypted fields
+        if self.mfa_secret_encrypted and self.mfa_secret_dek:
+            from app.core.encryption import decrypt_field, EncryptionContext
+
+            return decrypt_field(
+                encrypted_data=self.mfa_secret_encrypted,
+                encrypted_dek=self.mfa_secret_dek,
+                context=EncryptionContext.MFA_SECRET,
+                user_id=self.id,
+            )
+
+        # Fallback to deprecated plaintext field (during migration)
+        if self.mfa_secret:
+            # Auto-migrate to encrypted storage
+            self.set_mfa_secret(self.mfa_secret)
+            return self.mfa_secret
+
+        return None
+
+    def rotate_mfa_encryption(self) -> bool:
+        """
+        Rotate encryption keys for MFA secret.
+
+        Used during key rotation to re-encrypt with new KEK.
+
+        Returns:
+            True if successful, False if no MFA secret
+        """
+        if not self.mfa_secret_encrypted or not self.mfa_secret_dek:
+            return False
+
+        from app.core.encryption import get_encryption_service, EncryptionContext
+
+        service = get_encryption_service()
+
+        # Re-encrypt DEK with new KEK
+        new_encrypted_dek = service.rotate_dek(
+            old_encrypted_dek_b64=self.mfa_secret_dek,
+            context=EncryptionContext.MFA_SECRET.value,
+        )
+
+        self.mfa_secret_dek = new_encrypted_dek
+        return True
+
+    def shred_mfa_secret(self) -> bool:
+        """
+        Crypto shred MFA secret (cryptographically unrecoverable).
+
+        More secure than deletion because:
+        - DEK is destroyed, making data unrecoverable even from backups
+        - No need to overwrite disk sectors
+        - Instant and auditable
+
+        Returns:
+            True if successful
+        """
+        if not self.mfa_secret_dek:
+            return False
+
+        from app.core.encryption import get_encryption_service
+
+        service = get_encryption_service()
+        service.crypto_shred(self.mfa_secret_dek, user_id=self.id)
+
+        # Clear encrypted fields
+        self.mfa_secret_encrypted = None
+        self.mfa_secret_dek = None
+        self.mfa_enabled = False
+
+        return True
 
 
 class UserTenant(UUIDMixin, TimestampMixin, Base):

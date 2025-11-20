@@ -103,10 +103,10 @@ class Settings(BaseSettings):
     GRAPHDB_USERNAME: str = "admin"
     GRAPHDB_PASSWORD: str | None = None
 
-    # Email (SendGrid)
-    SENDGRID_API_KEY: str | None = None
-    SENDGRID_FROM_EMAIL: str = "noreply@lifenavigator.ai"
-    SENDGRID_FROM_NAME: str = "Life Navigator"
+    # Email (Resend - Modern transactional email API)
+    RESEND_API_KEY: str | None = None
+    EMAIL_FROM: str = "Life Navigator <noreply@lifenavigator.ai>"
+    FRONTEND_URL: str = "http://localhost:3000"  # For email verification links
 
     # SMS (Twilio)
     TWILIO_ACCOUNT_SID: str | None = None
@@ -166,6 +166,11 @@ class Settings(BaseSettings):
     APPLE_CLIENT_ID: str | None = None
     APPLE_CLIENT_SECRET: str | None = None
 
+    # OpenAI (for embeddings and LLM)
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-4-turbo-preview"
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+
     # Monitoring (Sentry)
     SENTRY_DSN: str | None = None
     SENTRY_ENVIRONMENT: str = "development"
@@ -197,6 +202,10 @@ class Settings(BaseSettings):
     # HIPAA Compliance
     ENABLE_AUDIT_LOGGING: bool = True
     DATA_RETENTION_DAYS: int = 2555  # 7 years
+
+    # Field-Level Encryption (AES-256-GCM with envelope encryption)
+    ENCRYPTION_KEY: str = Field(..., min_length=64, max_length=64)  # 64-char hex (32 bytes)
+    ENCRYPTION_ENABLED: bool = True
     ENABLE_ENCRYPTION_AT_REST: bool = True
     REQUIRE_MFA_FOR_HEALTH_DATA: bool = True
 

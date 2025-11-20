@@ -25,10 +25,14 @@ from app.core.config import settings
 from app.core.database import check_db_health, close_db, init_db
 from app.core.logging import configure_logging, logger
 from app.core.redis import close_redis
+from app.core.telemetry import init_telemetry, instrument_fastapi, shutdown_telemetry
 
 
 # Configure logging at import time
 configure_logging()
+
+# Initialize OpenTelemetry (must happen before app creation for some instrumentations)
+init_telemetry()
 
 
 # Initialize rate limiter
@@ -66,6 +70,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Database connections closed")
     await close_redis()
     logger.info("Redis connections closed")
+    shutdown_telemetry()
+    logger.info("Telemetry shutdown complete")
 
 
 # Initialize Sentry if configured
@@ -93,6 +99,9 @@ app = FastAPI(
 # Add rate limiting
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Instrument FastAPI with OpenTelemetry
+instrument_fastapi(app)
 
 
 # =============================================================================
