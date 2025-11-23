@@ -35,6 +35,16 @@ model User {
   mfaSecret             String?
   recoveryCodes         String?                 // JSON array of hashed recovery codes
 
+  // Pilot Access Control
+  pilotRole             String                  @default("waitlist") // waitlist, investor, pilot, admin
+  pilotEnabled          Boolean                 @default(false)
+  pilotStartAt          DateTime?
+  pilotEndAt            DateTime?
+  userType              String                  @default("civilian") // civilian, military, veteran
+  waitlistPosition      Int?                    // Position in waitlist queue
+  invitedBy             String?                 // User ID who referred them
+  pilotNotes            String?                 // Admin notes about pilot user
+
   // Relations
   accounts              Account[]
   sessions              Session[]
@@ -70,6 +80,9 @@ model User {
 
   @@index([email])
   @@index([createdAt])
+  @@index([pilotRole])
+  @@index([pilotEnabled])
+  @@index([waitlistPosition])
   @@map("users")
 }
 

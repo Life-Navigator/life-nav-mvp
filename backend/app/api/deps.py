@@ -15,7 +15,7 @@ from app.core.database import get_session, set_tenant_context
 from app.core.logging import logger
 from app.core.redis import is_token_blacklisted, is_user_blacklisted
 from app.core.security import verify_token
-from app.models.user import User, UserTenant, UserTenantRole, UserTenantStatus
+from app.models.user import User, UserTenant, UserTenantRole, UserTenantStatus, PilotRole
 
 # Security scheme for Bearer token
 security = HTTPBearer()
@@ -282,6 +282,139 @@ async def require_owner(
     return user_tenant
 
 
+# =============================================================================
+# PILOT ACCESS CONTROL DEPENDENCIES
+# =============================================================================
+
+
+async def require_pilot(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """
+    Require that the user has active pilot access.
+
+    Checks:
+    - User has pilot or admin role
+    - Pilot is enabled (for pilot role)
+    - Within pilot access window
+
+    Args:
+        current_user: Current authenticated user
+
+    Returns:
+        Current user if pilot access is valid
+
+    Raises:
+        HTTPException: If user doesn't have pilot access
+    """
+    if not current_user.can_access_pilot_app():
+        # Provide specific error messages
+        if current_user.pilot_role not in [PilotRole.PILOT, PilotRole.ADMIN]:
+            logger.warning(
+                "Non-pilot user attempted pilot access",
+                user_id=str(current_user.id),
+                pilot_role=current_user.pilot_role.value,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Pilot access required. You are currently on the waitlist.",
+            )
+
+        if not current_user.pilot_enabled:
+            logger.warning(
+                "Disabled pilot user attempted access",
+                user_id=str(current_user.id),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your pilot access has been disabled.",
+            )
+
+        if not current_user.is_pilot_window_active():
+            days_remaining = current_user.get_pilot_days_remaining()
+            if days_remaining is not None and days_remaining <= 0:
+                logger.warning(
+                    "Expired pilot user attempted access",
+                    user_id=str(current_user.id),
+                    pilot_end_at=str(current_user.pilot_end_at),
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your pilot access has expired.",
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Your pilot access has not started yet.",
+                )
+
+    logger.info(
+        "Pilot access granted",
+        user_id=str(current_user.id),
+        pilot_role=current_user.pilot_role.value,
+        days_remaining=current_user.get_pilot_days_remaining(),
+    )
+    return current_user
+
+
+async def require_investor(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """
+    Require that the user has investor or admin access.
+
+    Args:
+        current_user: Current authenticated user
+
+    Returns:
+        Current user if investor access is valid
+
+    Raises:
+        HTTPException: If user doesn't have investor access
+    """
+    if not current_user.can_access_investor_dashboard():
+        logger.warning(
+            "Non-investor user attempted investor dashboard access",
+            user_id=str(current_user.id),
+            pilot_role=current_user.pilot_role.value,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Investor access required.",
+        )
+
+    return current_user
+
+
+async def require_pilot_admin(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """
+    Require that the user has pilot admin access.
+
+    Args:
+        current_user: Current authenticated user
+
+    Returns:
+        Current user if admin access is valid
+
+    Raises:
+        HTTPException: If user is not an admin
+    """
+    if not current_user.is_admin():
+        logger.warning(
+            "Non-admin user attempted admin access",
+            user_id=str(current_user.id),
+            pilot_role=current_user.pilot_role.value,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
+        )
+
+    return current_user
+
+
 # Common dependency annotations for route handlers
 CurrentUser = Annotated[User, Depends(get_current_active_user)]
 TenantID = Annotated[UUID, Depends(get_tenant_id_from_token)]
@@ -289,3 +422,8 @@ UserTenantMembership = Annotated[UserTenant, Depends(verify_tenant_access)]
 DBSession = Annotated[AsyncSession, Depends(set_rls_context)]
 AdminUser = Annotated[UserTenant, Depends(require_admin)]
 OwnerUser = Annotated[UserTenant, Depends(require_owner)]
+
+# Pilot access dependency annotations
+PilotUser = Annotated[User, Depends(require_pilot)]
+InvestorUser = Annotated[User, Depends(require_investor)]
+PilotAdminUser = Annotated[User, Depends(require_pilot_admin)]

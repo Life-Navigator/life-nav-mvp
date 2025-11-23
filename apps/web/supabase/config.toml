@@ -1,0 +1,102 @@
+# ============================================================================
+# Life Navigator - Supabase Configuration
+# ============================================================================
+# See: https://supabase.com/docs/guides/cli/config
+# ============================================================================
+
+[project]
+id = "life-navigator"
+name = "Life Navigator"
+
+# ============================================================================
+# API Settings
+# ============================================================================
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+# ============================================================================
+# Database Settings
+# ============================================================================
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+# ============================================================================
+# Auth Configuration
+# ============================================================================
+[auth]
+enabled = true
+site_url = "http://localhost:3002"
+additional_redirect_urls = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:3002",
+  "https://*.vercel.app"
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+
+# Password requirements
+[auth.password]
+min_length = 8
+required_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+# Email settings
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = true
+
+# Rate limiting
+[auth.rate_limit]
+email_sent = 100
+sms_sent = 100
+token_refresh = 100
+
+# OAuth Providers
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+redirect_uri = ""
+
+[auth.external.apple]
+enabled = false
+
+[auth.external.github]
+enabled = false
+
+# ============================================================================
+# Storage Configuration (Blob Storage)
+# ============================================================================
+[storage]
+enabled = true
+file_size_limit = "52428800"  # 50MB
+
+# ============================================================================
+# Realtime Configuration
+# ============================================================================
+[realtime]
+enabled = true
+ip_version = "IPv4"
+
+# ============================================================================
+# Analytics
+# ============================================================================
+[analytics]
+enabled = true
+
+# ============================================================================
+# Edge Functions
+# ============================================================================
+[functions]
+enabled = true

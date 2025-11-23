@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserIdFromJWT } from '@/lib/jwt';
-import { prisma } from '@/lib/prisma';
+import { db as prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   try {

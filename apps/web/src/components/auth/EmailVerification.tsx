@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
 type VerificationState = 'loading' | 'success' | 'error' | 'missing-token';
 
-export default function EmailVerification() {
+function EmailVerificationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [state, setState] = useState<VerificationState>('loading');
@@ -153,5 +153,26 @@ export default function EmailVerification() {
         </div>
       )}
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-8">
+      <div className="text-center">
+        <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
+        <p className="mt-4 text-gray-600 dark:text-gray-400">
+          Loading...
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function EmailVerification() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <EmailVerificationContent />
+    </Suspense>
   );
 }

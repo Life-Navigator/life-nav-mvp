@@ -20,6 +20,23 @@ export interface JWTCustomPayload extends JWTPayload {
   iat: number;
   exp: number;
   rotationTimestamp?: number;
+  // Pilot access fields
+  pilotRole?: string;
+  pilotEnabled?: boolean;
+  pilotStartAt?: string;
+  pilotEndAt?: string;
+  userType?: string;
+}
+
+/**
+ * Pilot fields for token generation
+ */
+export interface PilotFields {
+  pilotRole?: string;
+  pilotEnabled?: boolean;
+  pilotStartAt?: Date | null;
+  pilotEndAt?: Date | null;
+  userType?: string;
 }
 
 /**
@@ -29,20 +46,30 @@ export async function generateToken(
   userId: string,
   email: string,
   role: string = 'user',
-  deviceId?: string
+  deviceId?: string,
+  pilotFields?: PilotFields
 ): Promise<string> {
   const jti = uuidv4(); // Unique token ID for revocation
-  const iat = Math.floor(Date.now() / 1000);
-  const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 8; // 8 hours
-  
-  const token = await new SignJWT({ email, role, deviceId })
+
+  // Build token payload with pilot fields
+  const payload: Record<string, any> = { email, role, deviceId };
+
+  if (pilotFields) {
+    payload.pilotRole = pilotFields.pilotRole || 'waitlist';
+    payload.pilotEnabled = pilotFields.pilotEnabled || false;
+    payload.pilotStartAt = pilotFields.pilotStartAt?.toISOString() || null;
+    payload.pilotEndAt = pilotFields.pilotEndAt?.toISOString() || null;
+    payload.userType = pilotFields.userType || 'civilian';
+  }
+
+  const token = await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setJti(jti)
     .setIssuedAt()
     .setExpirationTime(JWT_EXPIRY)
     .setSubject(userId)
     .sign(JWT_SECRET);
-  
+
   // Log the token creation
   await db.securityAuditLog.create({
     data: {
@@ -54,7 +81,7 @@ export async function generateToken(
       },
     },
   });
-  
+
   return token;
 }
 
@@ -165,14 +192,14 @@ export async function validateSession(request: NextRequest): Promise<JWTCustomPa
  */
 export async function getAuthenticatedUser(request: NextRequest) {
   const payload = await validateSession(request);
-  
+
   if (!payload) {
     return null;
   }
-  
+
   const userId = payload.sub;
-  
-  // Get user from database
+
+  // Get user from database with pilot fields
   const user = await db.user.findUnique({
     where: { id: userId },
     select: {
@@ -182,9 +209,16 @@ export async function getAuthenticatedUser(request: NextRequest) {
       role: true,
       mfaEnabled: true,
       emailVerified: true,
+      // Pilot access fields
+      pilotRole: true,
+      pilotEnabled: true,
+      pilotStartAt: true,
+      pilotEndAt: true,
+      userType: true,
+      waitlistPosition: true,
     },
   });
-  
+
   return user;
 }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import SliderInput from '@/components/ui/forms/SliderInput';
+import { SliderInput } from '@/components/ui/forms/SliderInput';
 import AssetAllocationSlider from '@/components/ui/forms/AssetAllocationSlider';
 
 interface FinancialGoals {

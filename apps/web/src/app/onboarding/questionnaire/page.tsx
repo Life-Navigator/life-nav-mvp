@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
 
@@ -24,7 +24,7 @@ const STEPS = {
   COMPLETE: 6,
 };
 
-export default function QuestionnairePage() {
+function QuestionnaireContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const userId = searchParams.get('userId');
@@ -58,7 +58,7 @@ export default function QuestionnairePage() {
     }
   }, [userId, router, addToast]);
 
-  const handleStepDataChange = (step, data) => {
+  const handleStepDataChange = (step: string, data: any) => {
     setFormData(prev => ({
       ...prev,
       [step]: data,
@@ -75,7 +75,7 @@ export default function QuestionnairePage() {
 
   const handleSubmit = async () => {
     if (!userId) return;
-    
+
     setIsSubmitting(true);
     try {
       // Submit education goals
@@ -110,14 +110,14 @@ export default function QuestionnairePage() {
       await fetch('/api/onboarding/risk-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId, 
-          riskTheta: formData.risk.riskTheta,
-          financialRiskTolerance: formData.risk.financialRiskTolerance,
-          careerRiskTolerance: formData.risk.careerRiskTolerance,
-          healthRiskTolerance: formData.risk.healthRiskTolerance,
-          educationRiskTolerance: formData.risk.educationRiskTolerance,
-          assessmentResponses: formData.risk.responses 
+        body: JSON.stringify({
+          userId,
+          riskTheta: (formData.risk as any).riskTheta,
+          financialRiskTolerance: (formData.risk as any).financialRiskTolerance,
+          careerRiskTolerance: (formData.risk as any).careerRiskTolerance,
+          healthRiskTolerance: (formData.risk as any).healthRiskTolerance,
+          educationRiskTolerance: (formData.risk as any).educationRiskTolerance,
+          assessmentResponses: (formData.risk as any).responses
         }),
       });
 
@@ -150,65 +150,65 @@ export default function QuestionnairePage() {
           onContinue={nextStep}
           onSwitchToEnhanced={switchToEnhancedOnboarding}
         />;
-      
+
       case STEPS.EDUCATION:
         return (
-          <EducationQuestionnaire 
+          <EducationQuestionnaire
             data={formData.education}
-            onChange={(data) => handleStepDataChange('education', data)}
+            onChange={(data: any) => handleStepDataChange('education', data)}
             onNext={nextStep}
             onBack={prevStep}
           />
         );
-      
+
       case STEPS.CAREER:
         return (
-          <CareerQuestionnaire 
+          <CareerQuestionnaire
             data={formData.career}
-            onChange={(data) => handleStepDataChange('career', data)}
+            onChange={(data: any) => handleStepDataChange('career', data)}
             onNext={nextStep}
             onBack={prevStep}
           />
         );
-      
+
       case STEPS.FINANCIAL:
         return (
-          <FinancialQuestionnaire 
+          <FinancialQuestionnaire
             data={formData.financial}
-            onChange={(data) => handleStepDataChange('financial', data)}
+            onChange={(data: any) => handleStepDataChange('financial', data)}
             onNext={nextStep}
             onBack={prevStep}
           />
         );
-      
+
       case STEPS.HEALTH:
         return (
-          <HealthQuestionnaire 
+          <HealthQuestionnaire
             data={formData.health}
-            onChange={(data) => handleStepDataChange('health', data)}
+            onChange={(data: any) => handleStepDataChange('health', data)}
             onNext={nextStep}
             onBack={prevStep}
           />
         );
-      
+
       case STEPS.RISK:
         return (
-          <RiskAssessment 
+          <RiskAssessment
             data={formData.risk}
-            onChange={(data) => handleStepDataChange('risk', data)}
+            onChange={(data: any) => handleStepDataChange('risk', data)}
             onNext={handleSubmit}
             onBack={prevStep}
             isSubmitting={isSubmitting}
           />
         );
-      
+
       case STEPS.COMPLETE:
         return <QuestionnaireComplete onContinue={() => {
           // Redirect to dashboard after completion
           // Use window.location to force a full refresh and update the session
           window.location.href = '/dashboard';
         }} />;
-      
+
       default:
         return <QuestionnaireIntro onContinue={nextStep} />;
     }
@@ -237,7 +237,7 @@ export default function QuestionnairePage() {
                 </div>
               </div>
               <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-blue-200 dark:bg-blue-900">
-                <div 
+                <div
                   style={{ width: `${progress}%` }}
                   className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-500 dark:bg-blue-600 transition-all duration-500"
                 />
@@ -250,5 +250,26 @@ export default function QuestionnairePage() {
         {renderStep()}
       </div>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-3xl w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-xl shadow">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading questionnaire...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function QuestionnairePage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <QuestionnaireContent />
+    </Suspense>
   );
 }

@@ -24,7 +24,7 @@ from app.core.security import (
     verify_password,
     verify_token,
 )
-from app.models.user import Organization, Tenant, User, UserTenant, UserTenantRole
+from app.models.user import Organization, Tenant, User, UserStatus, UserTenant, UserTenantRole, UserTenantStatus
 from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -40,7 +40,6 @@ security = HTTPBearer()
 
 
 @router.post("/register", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limit("5/minute")  # Stricter limit for registration to prevent abuse
 async def register(
     http_request: Request,
     request: RegisterRequest,
@@ -141,7 +140,6 @@ async def register(
 
 
 @router.post("/login", response_model=LoginResponse)
-@limiter.limit("10/minute")  # Prevent brute force attacks
 async def login(
     http_request: Request,
     request: LoginRequest,
@@ -173,7 +171,7 @@ async def login(
         )
 
     # Check user status
-    if user.status != "active":
+    if user.status != "ACTIVE":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"User account is {user.status}",
@@ -184,7 +182,7 @@ async def login(
         select(UserTenant)
         .where(
             UserTenant.user_id == user.id,
-            UserTenant.status == "active",
+            UserTenant.status == "ACTIVE",
         )
         .order_by(UserTenant.joined_at)
         .limit(1)

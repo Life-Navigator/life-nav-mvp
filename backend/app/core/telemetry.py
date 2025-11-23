@@ -53,17 +53,14 @@ def init_telemetry() -> None:
     if settings.OTEL_TRACES_ENABLED:
         _init_tracing(resource)
         logger.info(
-            "OpenTelemetry tracing initialized",
-            service=settings.OTEL_SERVICE_NAME,
-            endpoint=settings.OTEL_EXPORTER_OTLP_ENDPOINT,
+            f"OpenTelemetry tracing initialized - service={settings.OTEL_SERVICE_NAME}, endpoint={settings.OTEL_EXPORTER_OTLP_ENDPOINT}"
         )
 
     # Initialize Metrics
     if settings.OTEL_METRICS_ENABLED:
         _init_metrics(resource)
         logger.info(
-            "OpenTelemetry metrics initialized",
-            service=settings.OTEL_SERVICE_NAME,
+            f"OpenTelemetry metrics initialized - service={settings.OTEL_SERVICE_NAME}"
         )
 
     # Instrument libraries

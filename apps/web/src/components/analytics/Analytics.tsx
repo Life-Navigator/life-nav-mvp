@@ -2,13 +2,13 @@
 
 import { usePathname, useSearchParams } from 'next/navigation';
 import Script from 'next/script';
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 
 /**
- * Analytics component for tracking page views and custom events
- * Uses a minimal implementation that can be extended with your preferred analytics provider
+ * Internal component that uses useSearchParams
+ * Must be wrapped in Suspense boundary
  */
-export function Analytics() {
+function AnalyticsInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -18,13 +18,24 @@ export function Analytics() {
 
     // Construct URL from pathname and search params
     const url = pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : '');
-    
+
     // Track page view
     trackPageView(url);
   }, [pathname, searchParams]);
 
+  return null;
+}
+
+/**
+ * Analytics component for tracking page views and custom events
+ * Uses a minimal implementation that can be extended with your preferred analytics provider
+ */
+export function Analytics() {
   return (
     <>
+      <Suspense fallback={null}>
+        <AnalyticsInner />
+      </Suspense>
       {/* Replace with your actual analytics script if needed */}
       {process.env.NODE_ENV === 'production' && process.env.NEXT_PUBLIC_ANALYTICS_ID && (
         <Script

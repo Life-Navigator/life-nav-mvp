@@ -175,14 +175,14 @@ class UserResponse(IDTimestampSchema):
     avatar_url: str | None
     timezone: str
     locale: str
-    auth_provider: AuthProvider
+    auth_provider: str
     auth_provider_id: str | None
     mfa_enabled: bool
-    status: UserStatus
+    status: str
     last_login_at: datetime | None
     email_verified_at: datetime | None
     preferences: dict[str, Any]
-    metadata: dict[str, Any]
+    metadata: dict[str, Any] = Field(validation_alias="metadata_")
 
 
 # ============================================================================

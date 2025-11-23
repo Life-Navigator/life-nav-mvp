@@ -19,69 +19,86 @@ from app.models.mixins import BaseSoftDeleteModel, TimestampMixin, UUIDMixin
 class SubscriptionTier(str, PyEnum):
     """Subscription tier enumeration."""
 
-    FREE = "free"
-    BASIC = "basic"
-    PRO = "pro"
-    ENTERPRISE = "enterprise"
+    FREE = "FREE"
+    BASIC = "BASIC"
+    PRO = "PRO"
+    ENTERPRISE = "ENTERPRISE"
 
 
 class OrganizationStatus(str, PyEnum):
     """Organization status enumeration."""
 
-    ACTIVE = "active"
-    SUSPENDED = "suspended"
-    CHURNED = "churned"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    CHURNED = "CHURNED"
 
 
 class TenantType(str, PyEnum):
     """Tenant type enumeration."""
 
-    WORKSPACE = "workspace"
-    TEAM = "team"
-    DEPARTMENT = "department"
+    WORKSPACE = "WORKSPACE"
+    TEAM = "TEAM"
+    DEPARTMENT = "DEPARTMENT"
 
 
 class TenantStatus(str, PyEnum):
     """Tenant status enumeration."""
 
-    ACTIVE = "active"
-    SUSPENDED = "suspended"
-    ARCHIVED = "archived"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    ARCHIVED = "ARCHIVED"
 
 
 class UserStatus(str, PyEnum):
     """User status enumeration."""
 
-    ACTIVE = "active"
-    SUSPENDED = "suspended"
-    DEACTIVATED = "deactivated"
-    DELETED = "deleted"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    DEACTIVATED = "DEACTIVATED"
+    DELETED = "DELETED"
+
+
+class PilotRole(str, PyEnum):
+    """Pilot program role enumeration."""
+
+    WAITLIST = "WAITLIST"
+    INVESTOR = "INVESTOR"
+    PILOT = "PILOT"
+    ADMIN = "ADMIN"
+
+
+class UserType(str, PyEnum):
+    """User type for segmentation."""
+
+    CIVILIAN = "CIVILIAN"
+    MILITARY = "MILITARY"
+    VETERAN = "VETERAN"
 
 
 class AuthProvider(str, PyEnum):
     """Authentication provider enumeration."""
 
-    EMAIL = "email"
-    GOOGLE = "google"
-    MICROSOFT = "microsoft"
-    APPLE = "apple"
+    EMAIL = "EMAIL"
+    GOOGLE = "GOOGLE"
+    MICROSOFT = "MICROSOFT"
+    APPLE = "APPLE"
 
 
 class UserTenantRole(str, PyEnum):
     """User role within a tenant."""
 
-    OWNER = "owner"
-    ADMIN = "admin"
-    MEMBER = "member"
-    GUEST = "guest"
+    OWNER = "OWNER"
+    ADMIN = "ADMIN"
+    MEMBER = "MEMBER"
+    GUEST = "GUEST"
 
 
 class UserTenantStatus(str, PyEnum):
     """User-tenant membership status."""
 
-    ACTIVE = "active"
-    INVITED = "invited"
-    SUSPENDED = "suspended"
+    ACTIVE = "ACTIVE"
+    INVITED = "INVITED"
+    SUSPENDED = "SUSPENDED"
 
 
 class Organization(BaseSoftDeleteModel, Base):
@@ -224,8 +241,100 @@ class User(BaseSoftDeleteModel, Base):
     preferences: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, server_default="{}")
 
+    # Pilot Access Control
+    pilot_role: Mapped[PilotRole] = mapped_column(
+        Enum(PilotRole),
+        default=PilotRole.WAITLIST,
+        nullable=False,
+    )
+    pilot_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    pilot_start_at: Mapped[datetime | None] = mapped_column()
+    pilot_end_at: Mapped[datetime | None] = mapped_column()
+    user_type: Mapped[UserType] = mapped_column(
+        Enum(UserType),
+        default=UserType.CIVILIAN,
+        nullable=False,
+    )
+    waitlist_position: Mapped[int | None] = mapped_column(Integer)
+    invited_by_user_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
+    pilot_notes: Mapped[str | None] = mapped_column(Text)
+
     # Relationships
-    user_tenants: Mapped[list["UserTenant"]] = relationship(back_populates="user", lazy="selectin")
+    user_tenants: Mapped[list["UserTenant"]] = relationship(
+        back_populates="user",
+        lazy="selectin",
+        foreign_keys="[UserTenant.user_id]",
+    )
+
+    def is_pilot_window_active(self) -> bool:
+        """
+        Check if the pilot access window is currently active.
+
+        Returns:
+            True if within pilot window or admin
+        """
+        # Admins always have access
+        if self.pilot_role == PilotRole.ADMIN:
+            return True
+
+        now = datetime.utcnow()
+
+        # Check start date
+        if self.pilot_start_at and now < self.pilot_start_at:
+            return False
+
+        # Check end date
+        if self.pilot_end_at and now > self.pilot_end_at:
+            return False
+
+        return True
+
+    def can_access_pilot_app(self) -> bool:
+        """
+        Check if user can access the pilot app.
+
+        Returns:
+            True if user has pilot or admin role, is enabled, and within window
+        """
+        if self.pilot_role not in [PilotRole.PILOT, PilotRole.ADMIN]:
+            return False
+
+        if self.pilot_role == PilotRole.PILOT and not self.pilot_enabled:
+            return False
+
+        return self.is_pilot_window_active()
+
+    def can_access_investor_dashboard(self) -> bool:
+        """
+        Check if user can access investor dashboard.
+
+        Returns:
+            True if user is investor or admin
+        """
+        return self.pilot_role in [PilotRole.INVESTOR, PilotRole.ADMIN]
+
+    def is_admin(self) -> bool:
+        """
+        Check if user is an admin.
+
+        Returns:
+            True if user has admin pilot role
+        """
+        return self.pilot_role == PilotRole.ADMIN
+
+    def get_pilot_days_remaining(self) -> int | None:
+        """
+        Get days remaining in pilot access window.
+
+        Returns:
+            Days remaining, or None if no end date
+        """
+        if not self.pilot_end_at:
+            return None
+
+        now = datetime.utcnow()
+        diff = self.pilot_end_at - now
+        return max(0, diff.days)
 
     def set_mfa_secret(self, secret: str) -> None:
         """
@@ -350,17 +459,17 @@ class UserTenant(UUIDMixin, TimestampMixin, Base):
     )
 
     # Role & permissions
-    role: Mapped[UserTenantRole] = mapped_column(
-        Enum(UserTenantRole),
-        default=UserTenantRole.MEMBER,
+    role: Mapped[str] = mapped_column(
+        String(50),
+        default="MEMBER",
         nullable=False,
     )
     permissions: Mapped[list] = mapped_column(JSONB, default=list, server_default="[]")
 
     # Status
-    status: Mapped[UserTenantStatus] = mapped_column(
-        Enum(UserTenantStatus),
-        default=UserTenantStatus.ACTIVE,
+    status: Mapped[str] = mapped_column(
+        String(50),
+        default="ACTIVE",
         nullable=False,
     )
     invited_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))

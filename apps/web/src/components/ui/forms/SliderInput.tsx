@@ -14,7 +14,7 @@ interface SliderInputProps {
   className?: string;
 }
 
-export default function SliderInput({
+export function SliderInput({
   name,
   label,
   value,

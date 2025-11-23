@@ -442,5 +442,4 @@ export default redis;
 export const pubClient = redis;
 export const subClient = redis;
 
-// Export the helper
-export { redisHelper };
+// redisHelper already exported above at line 52

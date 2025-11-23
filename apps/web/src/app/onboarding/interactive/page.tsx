@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -33,15 +33,23 @@ const STEPS = {
   COMPLETE: 9,
 };
 
-export default function InteractiveOnboardingPage() {
+function InteractiveOnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const userId = searchParams.get('userId');
   const userName = searchParams.get('name') || undefined;
   const { addToast } = useToast();
-  
+
   const [currentStep, setCurrentStep] = useState(STEPS.WELCOME);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    persona: string;
+    goals: any;
+    education: any;
+    career: any;
+    financial: any;
+    health: any;
+    risk: any;
+  }>({
     persona: '',
     goals: {},
     education: {},
@@ -85,7 +93,7 @@ export default function InteractiveOnboardingPage() {
 
   const handleSubmit = async () => {
     if (!userId) return;
-    
+
     setIsSubmitting(true);
     try {
       // Submit education goals
@@ -120,8 +128,8 @@ export default function InteractiveOnboardingPage() {
       await fetch('/api/onboarding/persona-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId, 
+        body: JSON.stringify({
+          userId,
           persona: formData.persona,
           prioritizedGoals: formData.goals
         }),
@@ -131,14 +139,14 @@ export default function InteractiveOnboardingPage() {
       await fetch('/api/onboarding/risk-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId, 
+        body: JSON.stringify({
+          userId,
           riskTheta: formData.risk.riskTheta,
           financialRiskTolerance: formData.risk.financialRiskTolerance,
           careerRiskTolerance: formData.risk.careerRiskTolerance,
           healthRiskTolerance: formData.risk.healthRiskTolerance,
           educationRiskTolerance: formData.risk.educationRiskTolerance,
-          assessmentResponses: formData.risk.responses 
+          assessmentResponses: formData.risk.responses
         }),
       });
 
@@ -168,7 +176,7 @@ export default function InteractiveOnboardingPage() {
     switch(currentStep) {
       case STEPS.WELCOME:
         return <EnhancedWelcome onContinue={nextStep} userName={userName} />;
-      
+
       case STEPS.PERSONA:
         return (
           <PersonaSelection
@@ -179,7 +187,7 @@ export default function InteractiveOnboardingPage() {
             onBack={prevStep}
           />
         );
-      
+
       case STEPS.GOALS:
         return (
           <GoalVisualization
@@ -191,58 +199,58 @@ export default function InteractiveOnboardingPage() {
             persona={formData.persona}
           />
         );
-      
+
       case STEPS.EDUCATION:
         return (
-          <EducationQuestionnaire 
+          <EducationQuestionnaire
             data={formData.education}
-            onChange={(data) => handleStepDataChange('education', data)}
+            onChange={(data: any) => handleStepDataChange('education', data)}
             onNext={nextStep}
             onBack={prevStep}
           />
         );
-      
+
       case STEPS.CAREER:
         return (
-          <CareerQuestionnaire 
+          <CareerQuestionnaire
             data={formData.career}
-            onChange={(data) => handleStepDataChange('career', data)}
+            onChange={(data: any) => handleStepDataChange('career', data)}
             onNext={nextStep}
             onBack={prevStep}
           />
         );
-      
+
       case STEPS.FINANCIAL:
         return (
-          <FinancialQuestionnaire 
+          <FinancialQuestionnaire
             data={formData.financial}
-            onChange={(data) => handleStepDataChange('financial', data)}
+            onChange={(data: any) => handleStepDataChange('financial', data)}
             onNext={nextStep}
             onBack={prevStep}
           />
         );
-      
+
       case STEPS.HEALTH:
         return (
-          <HealthQuestionnaire 
+          <HealthQuestionnaire
             data={formData.health}
-            onChange={(data) => handleStepDataChange('health', data)}
+            onChange={(data: any) => handleStepDataChange('health', data)}
             onNext={nextStep}
             onBack={prevStep}
           />
         );
-      
+
       case STEPS.RISK:
         return (
-          <RiskAssessment 
+          <RiskAssessment
             data={formData.risk}
-            onChange={(data) => handleStepDataChange('risk', data)}
+            onChange={(data: any) => handleStepDataChange('risk', data)}
             onNext={handleSubmit}
             onBack={prevStep}
             isSubmitting={isSubmitting}
           />
         );
-      
+
       case STEPS.ACHIEVEMENTS:
         return (
           <AchievementUnlock
@@ -250,7 +258,7 @@ export default function InteractiveOnboardingPage() {
             onBack={prevStep}
           />
         );
-      
+
       case STEPS.COMPLETE:
         return (
           <QuestionnaireComplete onContinue={() => {
@@ -259,7 +267,7 @@ export default function InteractiveOnboardingPage() {
             window.location.href = '/dashboard';
           }} />
         );
-      
+
       default:
         return <EnhancedWelcome onContinue={nextStep} userName={userName} />;
     }
@@ -267,7 +275,7 @@ export default function InteractiveOnboardingPage() {
 
   // Calculate progress percentage
   const progress = Math.round((currentStep / (Object.keys(STEPS).length - 1)) * 100);
-  
+
   // Step labels for the progress indicator
   const stepLabels = [
     'Welcome',
@@ -291,28 +299,28 @@ export default function InteractiveOnboardingPage() {
             <div className="relative mb-6">
               {/* Visual progress bar */}
               <div className="overflow-hidden h-2 text-xs flex rounded bg-blue-200 dark:bg-blue-900/30">
-                <motion.div 
+                <motion.div
                   className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-blue-500 to-indigo-600"
                   initial={{ width: `${(currentStep - 1) / (Object.keys(STEPS).length - 1) * 100}%` }}
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.5 }}
                 />
               </div>
-              
+
               {/* Step markers */}
               <div className="flex justify-between text-xs mt-2">
                 {stepLabels.map((label, index) => (
-                  <div 
-                    key={index} 
+                  <div
+                    key={index}
                     className={`relative ${index === stepLabels.length - 1 ? 'right-2' : index === 0 ? 'left-0' : ''}`}
-                    style={{ 
+                    style={{
                       visibility: [0, 2, 4, 6, 8, 9].includes(index) ? 'visible' : 'hidden',
                       flex: index === 0 || index === stepLabels.length - 1 ? '0 0 auto' : '1 1 0'
                     }}
                   >
                     <div className={`
-                      absolute top-[-20px] left-1/2 transform -translate-x-1/2 
-                      w-3 h-3 rounded-full 
+                      absolute top-[-20px] left-1/2 transform -translate-x-1/2
+                      w-3 h-3 rounded-full
                       ${currentStep >= index ? 'bg-blue-600 dark:bg-blue-400' : 'bg-gray-300 dark:bg-gray-600'}
                     `} />
                     {[0, 2, 4, 6, 8, 9].includes(index) && (
@@ -345,5 +353,26 @@ export default function InteractiveOnboardingPage() {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-900/20 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function InteractiveOnboardingPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <InteractiveOnboardingContent />
+    </Suspense>
   );
 }

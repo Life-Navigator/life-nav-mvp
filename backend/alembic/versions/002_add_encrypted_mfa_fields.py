@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '002_encrypted_mfa'
-down_revision = '001'  # Replace with actual previous revision
+down_revision = '004_enable_pgvector'  # Chain from the last of the numbered migrations
 branch_labels = None
 depends_on = None
 

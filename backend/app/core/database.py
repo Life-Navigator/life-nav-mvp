@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import AsyncAdaptedQueuePool, NullPool
 
 from app.core.config import settings
 from app.core.logging import logger
@@ -40,7 +40,7 @@ def get_engine() -> AsyncEngine:
     global _engine
 
     if _engine is None:
-        pool_class = QueuePool if not settings.is_development else QueuePool
+        # Use AsyncAdaptedQueuePool for all environments (compatible with asyncio)
 
         _engine = create_async_engine(
             str(settings.DATABASE_URL),
@@ -50,7 +50,6 @@ def get_engine() -> AsyncEngine:
             pool_timeout=settings.DATABASE_POOL_TIMEOUT,
             pool_recycle=settings.DATABASE_POOL_RECYCLE,
             pool_pre_ping=True,  # Verify connections before using
-            poolclass=pool_class,
         )
 
         # Set up event listeners
