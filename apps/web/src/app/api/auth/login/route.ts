@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
+import { SignJWT } from 'jose';
+
+const prisma = new PrismaClient();
 
 // Interface for login data
 interface LoginRequestBody {
@@ -6,12 +11,10 @@ interface LoginRequestBody {
   password: string;
 }
 
-// Interface for the backend API token response
-interface BackendTokenResponse {
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  expires_in: number;
+// Get JWT secret
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET || 'fallback-secret-change-in-production';
+  return new TextEncoder().encode(secret);
 }
 
 export async function POST(request: NextRequest) {
@@ -30,84 +33,155 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get API base URL from environment
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+    console.log('[Login API Route] Attempting login for:', body.email);
 
-    console.log('[Login API Route] Calling backend:', `${apiBaseUrl}/auth/login`);
-
-    // Call the backend API
-    const response = await fetch(`${apiBaseUrl}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    // Find user in database
+    const user = await prisma.user.findUnique({
+      where: { email: body.email.toLowerCase() },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        password: true,
+        role: true,
+        pilotRole: true,
+        pilotEnabled: true,
+        setupCompleted: true,
+        emailVerified: true,
       },
-      body: JSON.stringify({
-        email: body.email,
-        password: body.password,
-      }),
     });
 
-    // Get the response text first
-    const responseText = await response.text();
-    console.log('[Login API Route] Backend response status:', response.status);
-    console.log('[Login API Route] Backend response text:', responseText);
-
-    // Try to parse as JSON
-    let data: BackendTokenResponse | { detail: string | Array<{ msg: string }> };
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('[Login API Route] Failed to parse backend response as JSON:', parseError);
+    if (!user) {
+      console.log('[Login API Route] User not found:', body.email);
       return NextResponse.json(
         {
           success: false,
-          message: 'Invalid response from server. Please try again.'
+          message: 'Invalid email or password'
         },
-        { status: 500 }
+        { status: 401 }
       );
     }
 
-    // Handle non-OK responses
-    if (!response.ok) {
-      // Extract error message from backend response
-      let errorMessage = 'Login failed';
-
-      if ('detail' in data) {
-        if (typeof data.detail === 'string') {
-          errorMessage = data.detail;
-        } else if (Array.isArray(data.detail) && data.detail.length > 0) {
-          errorMessage = data.detail.map(err => err.msg).join(', ');
-        }
-      }
-
-      console.error('[Login API Route] Backend returned error:', errorMessage);
-
+    // Check if user has a password (may be OAuth only)
+    if (!user.password) {
+      console.log('[Login API Route] User has no password (OAuth only):', body.email);
       return NextResponse.json(
         {
           success: false,
-          message: errorMessage
+          message: 'Please use your social login provider to sign in'
         },
-        { status: response.status }
+        { status: 401 }
       );
     }
 
-    // Success - return the token data
-    console.log('[Login API Route] Login successful');
+    // Verify password
+    const isValidPassword = await bcrypt.compare(body.password, user.password);
 
-    return NextResponse.json(
+    if (!isValidPassword) {
+      console.log('[Login API Route] Invalid password for:', body.email);
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Invalid email or password'
+        },
+        { status: 401 }
+      );
+    }
+
+    // Check pilot access
+    if (!user.pilotEnabled) {
+      console.log('[Login API Route] User not pilot enabled:', body.email);
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Your account is not yet activated for pilot access. Please contact support.'
+        },
+        { status: 403 }
+      );
+    }
+
+    // Update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+    });
+
+    // Generate JWT tokens
+    const now = Math.floor(Date.now() / 1000);
+    const accessTokenExpiry = now + 30 * 60; // 30 minutes
+    const refreshTokenExpiry = now + 7 * 24 * 60 * 60; // 7 days
+
+    const accessToken = await new SignJWT({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      pilotRole: user.pilotRole,
+      pilotEnabled: user.pilotEnabled,
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(accessTokenExpiry)
+      .setSubject(user.id)
+      .sign(getJwtSecret());
+
+    const refreshToken = await new SignJWT({
+      userId: user.id,
+      type: 'refresh',
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt(now)
+      .setExpirationTime(refreshTokenExpiry)
+      .setSubject(user.id)
+      .sign(getJwtSecret());
+
+    console.log('[Login API Route] Login successful for:', body.email);
+
+    // Create response with cookies
+    const response = NextResponse.json(
       {
         success: true,
         message: 'Login successful',
-        access_token: (data as BackendTokenResponse).access_token,
-        refresh_token: (data as BackendTokenResponse).refresh_token,
-        token_type: (data as BackendTokenResponse).token_type,
-        expires_in: (data as BackendTokenResponse).expires_in,
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        token_type: 'Bearer',
+        expires_in: 30 * 60, // 30 minutes in seconds
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          pilotRole: user.pilotRole,
+          pilotEnabled: user.pilotEnabled,
+          setupCompleted: user.setupCompleted,
+        },
       },
       { status: 200 }
     );
 
+    // Set HTTP-only cookies for security
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    response.cookies.set('token', accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 30 * 60, // 30 minutes
+      path: '/',
+    });
+
+    response.cookies.set('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      path: '/',
+    });
+
+    return response;
+
   } catch (error) {
-    // Handle network errors or other unexpected errors
+    // Handle unexpected errors
     console.error('[Login API Route] Unexpected error:', error);
 
     const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
@@ -115,7 +189,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        message: `Server error: ${errorMessage}. Please check if the backend API is running.`
+        message: `Server error: ${errorMessage}`
       },
       { status: 500 }
     );
