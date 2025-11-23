@@ -1,6 +1,9 @@
 import { redirect } from 'next/navigation';
 import { getUserIdFromJWT } from '@/lib/jwt';
 
+// Force dynamic rendering because this page uses cookies
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
   // Get the user's ID from JWT
   const userId = await getUserIdFromJWT();
