@@ -2,11 +2,19 @@
   "name": "@life-navigator/web",
   "version": "0.1.0",
   "private": true,
+  "prisma": {
+    "seed": "npx ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "db:studio": "prisma studio",
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -28,6 +36,8 @@
     "@life-navigator/provenance": "workspace:*",
     "@life-navigator/ui-components": "workspace:*",
     "@prisma/client": "^5.22.0",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.46.2",
     "@tanstack/react-query": "^5.0.0",
     "bcryptjs": "^2.4.3",
     "bull": "^4.12.0",
@@ -47,11 +57,10 @@
     "qrcode": "^1.5.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "react-plaid-link": "^4.1.1",
     "recharts": "^2.10.0",
     "uuid": "^9.0.1",
-    "zod": "^3.22.0",
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.46.2"
+    "zod": "^3.22.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",
@@ -75,6 +84,7 @@
     "jest-environment-jsdom": "^29.0.0",
     "prisma": "^5.22.0",
     "tailwindcss": "^4.0.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5"
   }
 }

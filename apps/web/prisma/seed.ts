@@ -1,24 +1,38 @@
 import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+// Demo user credentials - change in production!
+const DEMO_EMAIL = 'demo@lifenavigator.app';
+const DEMO_PASSWORD = 'DemoUser2024!';
 
 /**
  * Seed database with initial data for development and testing
  */
 async function main() {
   console.log('Starting database seeding...');
+  console.log(`Demo login credentials:`);
+  console.log(`  Email: ${DEMO_EMAIL}`);
+  console.log(`  Password: ${DEMO_PASSWORD}`);
 
   // Create a demo user with password hash
-  const hashedPassword = await bcrypt.hash('password', 10);
+  const hashedPassword = await bcrypt.hash(DEMO_PASSWORD, 10);
   const demoUser = await prisma.user.upsert({
-    where: { email: 'demo@example.com' },
-    update: {},
+    where: { email: DEMO_EMAIL },
+    update: {
+      password: hashedPassword,
+      pilotRole: 'pilot',
+      pilotEnabled: true,
+    },
     create: {
-      email: 'demo@example.com',
+      email: DEMO_EMAIL,
       name: 'Demo User',
       password: hashedPassword,
       setupCompleted: true,
+      pilotRole: 'pilot',
+      pilotEnabled: true,
+      emailVerified: new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
     },
@@ -181,9 +195,10 @@ async function main() {
     data: {
       userId: demoUser.id,
       type: 'medical_visit',
+      title: 'Annual Physical Checkup',
       providerName: 'Dr. Smith',
       date: lastWeek,
-      description: 'Annual physical checkup',
+      description: 'Annual physical checkup - comprehensive wellness exam',
       notes: 'Everything looks good, follow up in 12 months',
     }
   });
@@ -192,12 +207,14 @@ async function main() {
   await prisma.educationRecord.create({
     data: {
       userId: demoUser.id,
+      type: 'degree',
       institution: 'Demo University',
       degree: 'Bachelor of Science',
-      fieldOfStudy: 'Computer Science',
+      major: 'Computer Science',
       startDate: new Date('2016-09-01'),
       endDate: new Date('2020-05-30'),
-      grade: '3.8 GPA',
+      gpa: 3.8,
+      status: 'completed',
     }
   });
 
@@ -237,13 +254,13 @@ async function main() {
       position: 'Senior Developer',
       applicationDate: lastWeek,
       status: 'interviewing',
+      stage: 'technical',
       contactName: 'Jane Recruiter',
       contactEmail: 'jane@example.com',
       salary: 120000,
       location: 'San Francisco, CA',
-      remote: true,
-      nextStep: 'Technical Interview',
-      nextStepDate: today,
+      workType: 'remote',
+      notes: 'Technical interview scheduled',
     }
   });
 
@@ -255,10 +272,11 @@ async function main() {
       userId: demoUser.id,
       name: 'Emergency Fund',
       description: 'Save 6 months of expenses for emergency fund',
+      type: 'savings',
       targetAmount: 25000,
       currentAmount: 15420.65,
       currency: 'USD',
-      deadline: new Date(today.getFullYear(), today.getMonth() + 6, 1),
+      targetDate: new Date(today.getFullYear(), today.getMonth() + 6, 1),
       category: 'emergency',
     }
   });
