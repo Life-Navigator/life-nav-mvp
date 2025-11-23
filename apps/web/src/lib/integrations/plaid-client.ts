@@ -7,14 +7,8 @@
 
 import { Configuration, PlaidApi, PlaidEnvironments } from 'plaid';
 
-// Validate required environment variables
-if (!process.env.PLAID_CLIENT_ID && process.env.NODE_ENV === 'production') {
-  throw new Error('PLAID_CLIENT_ID must be set in production');
-}
-
-if (!process.env.PLAID_SECRET && process.env.NODE_ENV === 'production') {
-  throw new Error('PLAID_SECRET must be set in production');
-}
+// Note: Environment variable validation is done at runtime via isPlaidConfigured
+// This allows the build to complete even without Plaid credentials
 
 // Determine Plaid environment
 const getPlaidEnvironment = (): PlaidEnvironments => {
