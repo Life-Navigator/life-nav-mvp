@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       // Plaid transactions (limit based on timeframe)
       prisma.plaidTransaction.findMany({
         where: {
-          account: {
+          plaidAccount: {
             plaidItem: {
               userId,
               status: 'active',
