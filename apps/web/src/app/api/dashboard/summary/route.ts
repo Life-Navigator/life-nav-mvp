@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch all dashboard data in parallel
     const [
-      financialAccounts,
+      plaidItems,
       assets,
       healthMetrics,
       healthRecords,
@@ -64,18 +64,14 @@ export async function GET(request: NextRequest) {
       careerProfile,
       jobApplications,
     ] = await Promise.all([
-      // Financial data
-      prisma.financialAccount.findMany({
-        where: { userId, isActive: true },
-        select: {
-          id: true,
-          name: true,
-          type: true,
-          balance: true,
-          currency: true,
+      // Financial data from Plaid (source of truth for connected accounts)
+      prisma.plaidItem.findMany({
+        where: { userId, status: 'active' },
+        include: {
+          accounts: true,
         },
       }),
-      // Assets
+      // Assets (manual entries like real estate, vehicles, etc.)
       prisma.asset.findMany({
         where: { userId },
         select: {
@@ -158,33 +154,83 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    // Calculate financial summary
-    const totalAssets = financialAccounts.reduce((sum, acc) => sum + (acc.balance || 0), 0)
-      + assets.reduce((sum, asset) => sum + (asset.currentValue || 0), 0);
+    // Extract all Plaid accounts from items
+    const plaidAccounts = plaidItems.flatMap(item => item.accounts);
 
-    const checking = financialAccounts
-      .filter(acc => acc.type === 'checking')
-      .reduce((sum, acc) => sum + (acc.balance || 0), 0);
+    // Calculate financial summary from Plaid accounts
+    // Plaid account types: depository, investment, credit, loan, brokerage, other
+    // Plaid depository subtypes: checking, savings, cd, money market, etc.
+    const plaidAssets = plaidAccounts
+      .filter(acc => ['depository', 'investment', 'brokerage'].includes(acc.type))
+      .reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
 
-    const savings = financialAccounts
-      .filter(acc => acc.type === 'savings')
-      .reduce((sum, acc) => sum + (acc.balance || 0), 0);
+    const manualAssets = assets.reduce((sum, asset) => sum + (asset.currentValue || 0), 0);
+    const totalAssets = plaidAssets + manualAssets;
 
-    const investments = financialAccounts
-      .filter(acc => acc.type === 'investment')
-      .reduce((sum, acc) => sum + (acc.balance || 0), 0);
+    const checking = plaidAccounts
+      .filter(acc => acc.type === 'depository' && acc.subtype === 'checking')
+      .reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
 
-    // For demo purposes, calculate total liabilities (credit cards, loans)
-    const totalLiabilities = financialAccounts
+    const savings = plaidAccounts
+      .filter(acc => acc.type === 'depository' && ['savings', 'cd', 'money market'].includes(acc.subtype || ''))
+      .reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
+
+    const investments = plaidAccounts
+      .filter(acc => ['investment', 'brokerage'].includes(acc.type))
+      .reduce((sum, acc) => sum + (acc.currentBalance || 0), 0);
+
+    // Calculate total liabilities (credit cards, loans)
+    const totalLiabilities = plaidAccounts
       .filter(acc => ['credit', 'loan'].includes(acc.type))
-      .reduce((sum, acc) => Math.abs(acc.balance || 0), 0);
+      .reduce((sum, acc) => Math.abs(acc.currentBalance || 0), 0);
 
     const netWorth = totalAssets - totalLiabilities;
+    const hasPlaidConnection = plaidItems.length > 0;
 
-    // Calculate health wellness score (simple average of recent metrics normalized)
-    const wellnessScore = healthMetrics.length > 0
-      ? Math.round(75 + Math.random() * 15) // Placeholder calculation
-      : null;
+    // Calculate health wellness score based on actual health metrics
+    // Calculate average of wellness-related metrics if available
+    let wellnessScore: number | null = null;
+    if (healthMetrics.length > 0) {
+      // Get metrics that could contribute to wellness score
+      const wellnessMetrics = healthMetrics.filter(m =>
+        ['sleep_hours', 'exercise_minutes', 'stress_level', 'mood', 'energy_level'].includes(m.metricType)
+      );
+
+      if (wellnessMetrics.length > 0) {
+        // Calculate normalized wellness score based on available metrics
+        let totalScore = 0;
+        let count = 0;
+
+        wellnessMetrics.forEach(metric => {
+          const value = Number(metric.value) || 0;
+          switch(metric.metricType) {
+            case 'sleep_hours':
+              // 7-8 hours is optimal (100), scale around that
+              totalScore += Math.min(100, Math.max(0, 100 - Math.abs(value - 7.5) * 15));
+              count++;
+              break;
+            case 'exercise_minutes':
+              // 30+ minutes is great
+              totalScore += Math.min(100, (value / 30) * 100);
+              count++;
+              break;
+            case 'stress_level':
+              // Lower is better (1-10 scale)
+              totalScore += Math.max(0, 100 - (value * 10));
+              count++;
+              break;
+            case 'mood':
+            case 'energy_level':
+              // Higher is better (1-10 scale)
+              totalScore += Math.min(100, value * 10);
+              count++;
+              break;
+          }
+        });
+
+        wellnessScore = count > 0 ? Math.round(totalScore / count) : null;
+      }
+    }
 
     // Next appointment
     const nextAppointment = healthRecords.length > 0
@@ -219,7 +265,7 @@ export async function GET(request: NextRequest) {
         checking,
         savings,
         investments,
-        hasData: financialAccounts.length > 0 || assets.length > 0,
+        hasData: hasPlaidConnection || assets.length > 0,
       },
       health: {
         nextAppointment,
@@ -241,7 +287,7 @@ export async function GET(request: NextRequest) {
         hasData: educationCourses.length > 0,
       },
       hasAnyData: (
-        financialAccounts.length > 0 ||
+        hasPlaidConnection ||
         assets.length > 0 ||
         healthMetrics.length > 0 ||
         healthRecords.length > 0 ||

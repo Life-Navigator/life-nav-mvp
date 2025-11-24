@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { usePlaidLink, PlaidLinkOnSuccess, PlaidLinkOnExit } from 'react-plaid-link';
 
 interface PlaidLinkButtonProps {
@@ -21,35 +21,43 @@ export function PlaidLinkButton({
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
-  // Fetch link token on mount
+  // Prevent hydration mismatch by waiting for client mount
   useEffect(() => {
-    const fetchLinkToken = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const response = await fetch('/api/plaid/link-token', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to create link token');
-        }
-
-        const data = await response.json();
-        setLinkToken(data.linkToken);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to initialize Plaid');
-        console.error('Error fetching link token:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLinkToken();
+    setIsMounted(true);
   }, []);
+
+  // Fetch link token when user clicks the button (lazy initialization)
+  const fetchLinkToken = useCallback(async () => {
+    if (linkToken || loading) return; // Already have token or loading
+
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch('/api/plaid/link-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Ensure cookies are sent for auth
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to create link token');
+      }
+
+      const data = await response.json();
+      setLinkToken(data.link_token);
+      setIsInitialized(true);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize Plaid';
+      setError(errorMessage);
+      console.error('Error fetching link token:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [linkToken, loading]);
 
   const handleSuccess = useCallback<PlaidLinkOnSuccess>(
     async (publicToken, metadata) => {
@@ -104,19 +112,35 @@ export function PlaidLinkButton({
     onExit: handleExit,
   });
 
-  const isDisabled = disabled || !ready || loading || !linkToken;
+  // Handle button click - fetch token first if needed, then open
+  const handleClick = useCallback(async () => {
+    if (!linkToken && !loading) {
+      await fetchLinkToken();
+      // Note: We can't open Plaid immediately after fetchLinkToken because
+      // the hook won't have re-rendered yet with the new token.
+      // The user needs to click again after the token is fetched.
+      return;
+    }
+    if (ready && linkToken) {
+      open();
+    }
+  }, [linkToken, loading, ready, open, fetchLinkToken]);
+
+  const isDisabled = disabled || loading;
+  // Only check ready state after mount to prevent hydration mismatch
+  const showReadyToConnect = isMounted && linkToken && ready && !loading;
 
   return (
     <div>
       <button
-        onClick={() => open()}
+        onClick={handleClick}
         disabled={isDisabled}
         className={`inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       >
         {loading ? (
           <>
             <svg
-              className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+              className="animate-spin -ml-1 mr-2 h-4 w-4"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -135,7 +159,24 @@ export function PlaidLinkButton({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               />
             </svg>
-            Connecting...
+            {isInitialized ? 'Connecting...' : 'Initializing...'}
+          </>
+        ) : showReadyToConnect ? (
+          <>
+            <svg
+              className="-ml-1 mr-2 h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            Click to Connect
           </>
         ) : (
           <>

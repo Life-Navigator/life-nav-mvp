@@ -3,14 +3,15 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  BarChart, Bar, LineChart, Line, PieChart, Pie, ResponsiveContainer, 
+import {
+  BarChart, Bar, LineChart, Line, PieChart, Pie, ResponsiveContainer,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell
 } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, DollarSign, Briefcase, CreditCard, Bitcoin, AlertTriangle, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, ArrowDownRight, DollarSign, Briefcase, CreditCard, Bitcoin, AlertTriangle, TrendingUp, Upload, Link2, PenLine } from 'lucide-react';
 // Import lodash with type definitions
 import { get, sum, groupBy } from 'lodash';
 import type { get as GetType, sum as SumType, groupBy as GroupByType } from 'lodash';
+import AddDataModal from '@/components/dashboard/AddDataModal';
 // Remove @types/lodash import since types are included in lodash-es
 
 // Main dashboard component
@@ -84,6 +85,7 @@ const FinancialDashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState('month'); // week, month, year
   const [selectedAccount, setSelectedAccount] = useState('all');
+  const [showAddDataModal, setShowAddDataModal] = useState(false);
   
   // Colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
@@ -112,6 +114,24 @@ const FinancialDashboard = () => {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        // 401/403/500 - show empty state instead of error for better UX
+        // Users without data or not authenticated should see empty dashboard
+        if (response.status === 401 || response.status === 403 || response.status === 500) {
+          setAccounts([]);
+          setTransactions({ dailySpending: [], categorySpending: [], recentTransactions: [] });
+          setInvestments({
+            portfolioPerformance: [],
+            assetAllocation: [],
+            holdings: [],
+            totalValue: 0,
+            dayChange: 0,
+            dayChangePercent: 0
+          });
+          setCryptoAssets([]);
+          setError(null);
+          setLoading(false);
+          return;
+        }
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `Server error: ${response.status}`);
       }
@@ -138,22 +158,11 @@ const FinancialDashboard = () => {
       setError(null);
       setLoading(false);
     } catch (err) {
-      // Comprehensive error handling
-      const errorMessage = err instanceof Error
-        ? err.message
-        : 'An unexpected error occurred. Please try again.';
+      // Log error for debugging
+      console.error('[Finance] Error fetching data:', err);
 
-      setError(errorMessage);
-      setLoading(false);
-
-      // Log error but don't throw (prevents error boundary from catching)
-      console.error('[Finance] Error fetching data:', {
-        error: err,
-        message: errorMessage,
-        timeframe,
-      });
-
-      // Set safe defaults
+      // Set safe defaults and show empty state instead of error
+      // This provides better UX - users can still interact with "Connect Account" buttons
       setAccounts([]);
       setTransactions({ dailySpending: [], categorySpending: [], recentTransactions: [] });
       setInvestments({
@@ -165,6 +174,8 @@ const FinancialDashboard = () => {
         dayChangePercent: 0
       });
       setCryptoAssets([]);
+      setError(null); // Don't show error, show empty state instead
+      setLoading(false);
     }
   }, [timeframe]);
 
@@ -371,14 +382,17 @@ const FinancialDashboard = () => {
               </button>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex flex-col items-center justify-center py-8 text-center">
               <div className="text-5xl mb-4">🏦</div>
               <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Accounts Connected</p>
               <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
-                Connect your bank accounts to start tracking your finances
+                Add your financial data to start tracking
               </p>
-              <button className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                Connect Account
+              <button
+                onClick={() => setShowAddDataModal(true)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Add Financial Data
               </button>
             </div>
           )}
@@ -485,10 +499,13 @@ const FinancialDashboard = () => {
               <div className="text-5xl mb-4">💼</div>
               <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Investment Data</p>
               <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
-                Connect your investment accounts to track portfolio performance
+                Add your investment data to track portfolio performance
               </p>
-              <button className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors">
-                Connect Investments
+              <button
+                onClick={() => setShowAddDataModal(true)}
+                className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
+              >
+                Add Investment Data
               </button>
             </div>
           )}
@@ -552,28 +569,33 @@ const FinancialDashboard = () => {
       {/* Financial insights */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Financial Insights</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
-            <div className="flex items-start">
-              <AlertTriangle className="text-yellow-600 mr-3" size={20} />
-              <div>
-                <p className="font-medium text-yellow-800">Credit Card Payment Due</p>
-                <p className="text-sm text-yellow-700">Your Chase credit card payment of $2,314.92 is due in 3 days.</p>
-              </div>
-            </div>
+        {hasData ? (
+          <p className="text-gray-600 text-center py-8">
+            Insights will be generated based on your financial data.
+          </p>
+        ) : (
+          <div className="text-center py-8">
+            <div className="text-5xl mb-4">💡</div>
+            <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Insights Available</p>
+            <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
+              Connect your accounts to receive personalized financial insights
+            </p>
+            <button
+              onClick={() => setShowAddDataModal(true)}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              Get Started
+            </button>
           </div>
-          
-          <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
-            <div className="flex items-start">
-              <TrendingUp className="text-blue-600 mr-3" size={20} />
-              <div>
-                <p className="font-medium text-blue-800">Savings Opportunity</p>
-                <p className="text-sm text-blue-700">You've spent $543 on dining this month, 32% more than last month.</p>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
+
+      {/* Add Data Modal */}
+      <AddDataModal
+        isOpen={showAddDataModal}
+        onClose={() => setShowAddDataModal(false)}
+        domain="financial"
+      />
     </div>
   );
 };

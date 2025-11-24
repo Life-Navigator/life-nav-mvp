@@ -152,18 +152,110 @@ export interface EnhancedTransaction {
   updatedAt: Date;
 }
 
+export type AssetType = 'real_estate' | 'vehicle' | 'collectible' | 'business' | 'other';
+
 export interface Asset {
   id: string;
   userId: string;
   name: string;
-  type: 'real_estate' | 'vehicle' | 'collectible' | 'business' | 'other';
+  type: AssetType;
+  subtype?: string;
   value: number;
+  currentValue: number;
   currency: string;
   purchaseDate?: Date;
   purchasePrice?: number;
   appreciationRate?: number;
+  lastValuationDate?: Date;
   location?: string;
-  details?: Record<string, any>;
+  description?: string;
+  notes?: string;
+  documents?: string[];
+  imageUrl?: string;
+  images?: string[];
+  details?: Record<string, unknown>;
+  loans?: AssetLoan[];
+  upgrades?: AssetUpgrade[];
+  valuations?: AssetValuation[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+export type LoanType = 'mortgage' | 'auto_loan' | 'heloc' | 'personal' | 'other';
+
+export interface AssetLoan {
+  id: string;
+  assetId: string;
+  loanType: LoanType;
+  lender: string;
+  originalAmount: number;
+  currentBalance: number;
+  interestRate: number;
+  monthlyPayment: number;
+  startDate: Date;
+  endDate?: Date;
+  paymentDueDay?: number;
+  accountNumber?: string;
+  isActive: boolean;
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type UpgradeCategory = 'maintenance' | 'improvement' | 'renovation' | 'repair' | 'addition';
+export type UpgradeStatus = 'planned' | 'in_progress' | 'completed' | 'cancelled';
+export type UpgradePriority = 'low' | 'medium' | 'high' | 'critical';
+
+export interface AssetUpgrade {
+  id: string;
+  assetId: string;
+  name: string;
+  description?: string;
+  category: UpgradeCategory;
+  estimatedCost: number;
+  actualCost?: number;
+  valueIncrease?: number;
+  status: UpgradeStatus;
+  priority: UpgradePriority;
+  startDate?: Date;
+  completionDate?: Date;
+  contractor?: string;
+  warranty?: string;
+  documents?: string[];
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type ValuationSource = 'manual' | 'appraisal' | 'market' | 'zillow' | 'kbb' | 'other';
+
+export interface AssetValuation {
+  id: string;
+  assetId: string;
+  value: number;
+  source: ValuationSource;
+  valuationDate: Date;
+  notes?: string;
+  documents?: string[];
+  createdAt: Date;
+}
+
+export interface UpgradeScenario {
+  upgrade: AssetUpgrade;
+  roi: number; // Return on Investment percentage
+  paybackPeriod: number; // In months
+  netValueChange: number; // valueIncrease - estimatedCost
+  isRecommended: boolean;
+}
+
+export interface AssetSummary {
+  totalValue: number;
+  totalEquity: number;
+  totalDebt: number;
+  byType: {
+    type: AssetType;
+    count: number;
+    value: number;
+    equity: number;
+  }[];
 }

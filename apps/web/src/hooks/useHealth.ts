@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { format, subDays } from 'date-fns';
 import { Health, SleepData, VitalData } from '@/types/health';
 import { getVitals, getHealthMetrics, getSleepData } from '@/lib/api/health';
 
@@ -17,6 +16,7 @@ export const useHealth = () => {
         setError(null);
       } catch (err) {
         setError(err as Error);
+        setHealthData(null);
       } finally {
         setIsLoading(false);
       }
@@ -42,6 +42,7 @@ export const useVitals = (timeRange: string = '7d') => {
         setError(null);
       } catch (err) {
         setError(err as Error);
+        setVitalsData([]);
       } finally {
         setIsLoading(false);
       }
@@ -67,9 +68,7 @@ export const useSleep = (timeRange: string = '7d') => {
         setError(null);
       } catch (err) {
         setError(err as Error);
-        // If API fails, use mock data for development
-        const mockData = generateMockSleepData(timeRange);
-        setSleepData(mockData);
+        setSleepData([]);
       } finally {
         setIsLoading(false);
       }
@@ -79,41 +78,4 @@ export const useSleep = (timeRange: string = '7d') => {
   }, [timeRange]);
 
   return { sleepData, isLoading, error };
-};
-
-// Helper function to generate mock sleep data
-const generateMockSleepData = (timeRange: string): SleepData[] => {
-  const days = timeRange === '7d' ? 7 : 
-               timeRange === '14d' ? 14 : 
-               timeRange === '30d' ? 30 : 90;
-  
-  return Array.from({ length: days }).map((_, index) => {
-    const date = subDays(new Date(), days - index - 1);
-    const isWeekend = [0, 6].includes(date.getDay());
-    
-    // Simulate typical sleep patterns (less sleep on weekends, more variability)
-    const baseHours = isWeekend ? 7 : 7.5;
-    const variance = Math.random() * 2 - 1; // -1 to +1
-    const duration = Math.max(4, Math.min(11, baseHours + variance));
-    
-    // Generate random quality but correlate somewhat with duration
-    const qualityBase = 5 + (duration - 6) * 0.8; // More sleep tends to mean better quality
-    const quality = Math.max(1, Math.min(10, qualityBase + (Math.random() * 2 - 1)));
-    
-    // Sleep stages as percentages of total duration
-    const deepPercent = 0.15 + Math.random() * 0.1;
-    const remPercent = 0.2 + Math.random() * 0.1;
-    const lightPercent = 1 - deepPercent - remPercent;
-    
-    return {
-      date: format(date, 'yyyy-MM-dd'),
-      duration,
-      quality,
-      deepSleep: duration * deepPercent,
-      remSleep: duration * remPercent,
-      lightSleep: duration * lightPercent,
-      sleepStart: format(date, 'HH:mm'),
-      sleepEnd: format(date, 'HH:mm')
-    };
-  });
 };

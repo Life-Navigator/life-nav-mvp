@@ -1,12 +1,14 @@
 /**
  * Plaid Sync API
  * Syncs accounts and transactions for a Plaid item
+ * Also indexes data into GraphRAG for semantic search
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient, isPlaidConfigured } from '@/lib/integrations/plaid-client';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
+import { indexPlaidSync } from '@/lib/graphrag/plaid-indexer';
 
 const prisma = new PrismaClient();
 
@@ -154,6 +156,23 @@ export async function POST(request: NextRequest) {
           where: { id: item.id },
           data: { lastSyncedAt: new Date() },
         });
+
+        // Index into GraphRAG for semantic search (async, don't block sync)
+        const plaidAccounts = await prisma.plaidAccount.findMany({
+          where: { plaidItemId: item.id },
+        });
+        const plaidTransactions = await prisma.plaidTransaction.findMany({
+          where: { plaidItemId: item.id },
+        });
+
+        // Fire and forget - index in background
+        indexPlaidSync(item.userId, item, plaidAccounts, plaidTransactions)
+          .then((indexResult) => {
+            console.log(`[GraphRAG] Indexed ${indexResult.transactionsIndexed} transactions for item ${item.itemId}`);
+          })
+          .catch((err) => {
+            console.error(`[GraphRAG] Failed to index item ${item.itemId}:`, err);
+          });
 
         results.push({
           itemId: item.itemId,

@@ -23,13 +23,28 @@ export default function OverviewPage() {
       try {
         setLoading(true);
         const response = await fetch('/api/financial');
+
+        // Handle non-OK responses gracefully - show empty state
         if (!response.ok) {
-          throw new Error('Failed to fetch financial data');
+          // Log but don't throw - just show $0 values
+          console.warn('[Overview] API returned non-OK status:', response.status);
+          setFinancialSummary({
+            totalAssets: 0,
+            totalLiabilities: 0,
+            netWorth: 0,
+            monthlyCashFlow: 0
+          });
+          setLoading(false);
+          return;
         }
+
         const data = await response.json();
 
+        // Safely access accounts array with fallback
+        const accounts = Array.isArray(data?.accounts) ? data.accounts : [];
+
         // Calculate total assets (sum of banking + investment accounts + investment portfolio value)
-        const bankingAssets = data.accounts
+        const bankingAssets = accounts
           .filter((acc: any) => acc.type === 'banking' || acc.type === 'investment')
           .reduce((sum: number, acc: any) => sum + (acc.balance || 0), 0);
 
@@ -37,7 +52,7 @@ export default function OverviewPage() {
         const totalAssets = bankingAssets + investmentValue;
 
         // Calculate total liabilities (sum of credit accounts)
-        const totalLiabilities = data.accounts
+        const totalLiabilities = accounts
           .filter((acc: any) => acc.type === 'credit')
           .reduce((sum: number, acc: any) => sum + Math.abs(acc.balance || 0), 0);
 
@@ -48,19 +63,23 @@ export default function OverviewPage() {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        const income = data.transactions?.recentTransactions
-          ?.filter((tx: any) => {
+        const recentTransactions = Array.isArray(data.transactions?.recentTransactions)
+          ? data.transactions.recentTransactions
+          : [];
+
+        const income = recentTransactions
+          .filter((tx: any) => {
             const txDate = new Date(tx.date);
             return tx.amount > 0 && txDate >= thirtyDaysAgo;
           })
-          .reduce((sum: number, tx: any) => sum + tx.amount, 0) || 0;
+          .reduce((sum: number, tx: any) => sum + tx.amount, 0);
 
-        const expenses = data.transactions?.recentTransactions
-          ?.filter((tx: any) => {
+        const expenses = recentTransactions
+          .filter((tx: any) => {
             const txDate = new Date(tx.date);
             return tx.amount < 0 && txDate >= thirtyDaysAgo;
           })
-          .reduce((sum: number, tx: any) => sum + Math.abs(tx.amount), 0) || 0;
+          .reduce((sum: number, tx: any) => sum + Math.abs(tx.amount), 0);
 
         const monthlyCashFlow = income - expenses;
 
@@ -72,7 +91,14 @@ export default function OverviewPage() {
         });
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching financial data:', error);
+        // Log error but don't crash - show empty state
+        console.error('[Overview] Error fetching financial data:', error);
+        setFinancialSummary({
+          totalAssets: 0,
+          totalLiabilities: 0,
+          netWorth: 0,
+          monthlyCashFlow: 0
+        });
         setLoading(false);
       }
     };

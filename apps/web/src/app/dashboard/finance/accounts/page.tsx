@@ -15,18 +15,26 @@ export default function AccountsPage() {
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Fetch accounts from database
+  // Fetch accounts from Plaid API
   React.useEffect(() => {
     const fetchAccounts = async () => {
       try {
         setLoading(true);
-        // TODO: Implement API endpoint for fetching financial accounts
-        // const response = await fetch('/api/finance/accounts');
-        // const data = await response.json();
-        // setAccounts(data);
-        setAccounts([]); // Empty for now
+        const response = await fetch('/api/plaid/accounts');
+
+        // Handle non-OK responses gracefully - show empty state
+        if (!response.ok) {
+          console.warn('[Accounts] API returned non-OK status:', response.status);
+          setAccounts([]);
+          setLoading(false);
+          return;
+        }
+
+        const data = await response.json();
+        setAccounts(Array.isArray(data?.accounts) ? data.accounts : []);
       } catch (error) {
-        console.error('Error fetching accounts:', error);
+        console.error('[Accounts] Error fetching accounts:', error);
+        setAccounts([]);
       } finally {
         setLoading(false);
       }

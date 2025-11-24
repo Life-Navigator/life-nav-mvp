@@ -40,24 +40,31 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // No token = no session (return null session, not an error)
+    // No token = no session (return empty session object, not null)
+    // NextAuth's SessionProvider expects an object, not null
     if (!token) {
-      return NextResponse.json(null, {
-        headers: {
-          "Cache-Control": "no-store, max-age=0",
-        },
-      });
+      return NextResponse.json(
+        { user: null, expires: null },
+        {
+          headers: {
+            "Cache-Control": "no-store, max-age=0",
+          },
+        }
+      );
     }
 
     // Verify token
     const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
     if (!secret) {
       console.error("JWT_SECRET not configured");
-      return NextResponse.json(null, {
-        headers: {
-          "Cache-Control": "no-store, max-age=0",
-        },
-      });
+      return NextResponse.json(
+        { user: null, expires: null },
+        {
+          headers: {
+            "Cache-Control": "no-store, max-age=0",
+          },
+        }
+      );
     }
 
     try {
@@ -65,11 +72,14 @@ export async function GET(req: NextRequest) {
 
       // Verify it's an access token (not refresh token)
       if (decoded.type && decoded.type !== "access") {
-        return NextResponse.json(null, {
-          headers: {
-            "Cache-Control": "no-store, max-age=0",
-          },
-        });
+        return NextResponse.json(
+          { user: null, expires: null },
+          {
+            headers: {
+              "Cache-Control": "no-store, max-age=0",
+            },
+          }
+        );
       }
 
       // Build NextAuth-compatible session response
@@ -95,19 +105,25 @@ export async function GET(req: NextRequest) {
     } catch (jwtError) {
       // Invalid or expired token
       console.error("JWT verification failed:", jwtError);
-      return NextResponse.json(null, {
-        headers: {
-          "Cache-Control": "no-store, max-age=0",
-        },
-      });
+      return NextResponse.json(
+        { user: null, expires: null },
+        {
+          headers: {
+            "Cache-Control": "no-store, max-age=0",
+          },
+        }
+      );
     }
   } catch (error) {
     console.error("Session endpoint error:", error);
-    return NextResponse.json(null, {
-      status: 500,
-      headers: {
-        "Cache-Control": "no-store, max-age=0",
-      },
-    });
+    return NextResponse.json(
+      { user: null, expires: null },
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store, max-age=0",
+        },
+      }
+    );
   }
 }

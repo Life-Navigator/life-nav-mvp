@@ -16,9 +16,9 @@ export async function verifyJWT(request?: Request): Promise<JWTPayload | null> {
   try {
     let token: string | null = null;
 
-    // Try to get token from cookies first
+    // Try to get token from cookies first (check both cookie names for compatibility)
     const cookieStore = await cookies();
-    token = cookieStore.get('access_token')?.value || null;
+    token = cookieStore.get('access_token')?.value || cookieStore.get('token')?.value || null;
 
     // If not in cookies, try Authorization header
     if (!token && request) {

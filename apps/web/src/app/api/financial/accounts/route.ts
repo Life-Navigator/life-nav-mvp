@@ -13,78 +13,85 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // userId already extracted from JWT
-
-    // Fetch all active financial accounts
-    const accounts = await prisma.financialAccount.findMany({
+    // Fetch all Plaid-connected accounts (source of truth for financial data)
+    const plaidItems = await prisma.plaidItem.findMany({
       where: {
         userId,
-        isActive: true,
+        status: 'active',
       },
-      select: {
-        id: true,
-        name: true,
-        type: true,
-        subtype: true,
-        balance: true,
-        availableBalance: true,
-        creditLimit: true,
-        interestRate: true,
-        institution: true,
-      },
-      orderBy: {
-        institution: 'asc',
+      include: {
+        accounts: true,
       },
     });
 
+    // Extract and transform Plaid accounts to match expected format
+    const accounts = plaidItems.flatMap(item =>
+      item.accounts.map(acc => ({
+        id: acc.id,
+        name: acc.name,
+        type: acc.type,
+        subtype: acc.subtype,
+        balance: acc.currentBalance,
+        availableBalance: acc.availableBalance,
+        creditLimit: acc.creditLimit,
+        interestRate: null, // Plaid doesn't provide this directly
+        institution: item.institutionName,
+      }))
+    );
+
     // Categorize accounts for calculator import
+    // Plaid types: depository, investment, credit, loan, brokerage
+    // Plaid subtypes: checking, savings, cd, money market, 401k, ira, roth, etc.
     const categorizedAccounts = {
       checking: accounts
-        .filter(a => a.type === 'checking' || a.subtype === 'checking')
+        .filter(a => a.type === 'depository' && a.subtype === 'checking')
         .reduce((sum, a) => sum + (a.balance || 0), 0),
 
       savings: accounts
-        .filter(a => a.type === 'savings' || a.subtype === 'savings')
+        .filter(a => a.type === 'depository' && ['savings', 'cd', 'money market'].includes(a.subtype || ''))
         .reduce((sum, a) => sum + (a.balance || 0), 0),
 
       taxable: accounts
         .filter(a =>
-          (a.type === 'investment' || a.subtype === 'brokerage') &&
-          !a.name.toLowerCase().includes('ira') &&
-          !a.name.toLowerCase().includes('401k') &&
-          !a.name.toLowerCase().includes('403b') &&
-          !a.name.toLowerCase().includes('roth')
+          (a.type === 'investment' || a.type === 'brokerage') &&
+          !['401k', '401a', '403b', 'ira', 'roth', 'roth 401k'].includes(a.subtype || '') &&
+          !a.name?.toLowerCase().includes('ira') &&
+          !a.name?.toLowerCase().includes('401k') &&
+          !a.name?.toLowerCase().includes('403b') &&
+          !a.name?.toLowerCase().includes('roth')
         )
         .reduce((sum, a) => sum + (a.balance || 0), 0),
 
       traditionalIRA: accounts
         .filter(a =>
-          a.name.toLowerCase().includes('traditional ira') ||
-          a.name.toLowerCase().includes('traditional_ira') ||
-          (a.name.toLowerCase().includes('ira') && !a.name.toLowerCase().includes('roth'))
+          a.subtype === 'ira' ||
+          a.name?.toLowerCase().includes('traditional ira') ||
+          a.name?.toLowerCase().includes('traditional_ira') ||
+          (a.name?.toLowerCase().includes('ira') && !a.name?.toLowerCase().includes('roth'))
         )
         .reduce((sum, a) => sum + (a.balance || 0), 0),
 
       rothIRA: accounts
         .filter(a =>
-          a.name.toLowerCase().includes('roth') &&
-          a.name.toLowerCase().includes('ira')
+          a.subtype === 'roth' ||
+          (a.name?.toLowerCase().includes('roth') && a.name?.toLowerCase().includes('ira'))
         )
         .reduce((sum, a) => sum + (a.balance || 0), 0),
 
       account401k: accounts
         .filter(a =>
-          a.name.toLowerCase().includes('401k') ||
-          a.name.toLowerCase().includes('401(k)') ||
-          a.name.toLowerCase().includes('403b') ||
-          a.name.toLowerCase().includes('403(b)')
+          ['401k', '401a', '403b', 'roth 401k'].includes(a.subtype || '') ||
+          a.name?.toLowerCase().includes('401k') ||
+          a.name?.toLowerCase().includes('401(k)') ||
+          a.name?.toLowerCase().includes('403b') ||
+          a.name?.toLowerCase().includes('403(b)')
         )
         .reduce((sum, a) => sum + (a.balance || 0), 0),
 
       annuity: accounts
         .filter(a =>
-          a.name.toLowerCase().includes('annuity') ||
-          a.type === 'annuity'
+          a.subtype === 'annuity' ||
+          a.name?.toLowerCase().includes('annuity')
         )
         .reduce((sum, a) => sum + (a.balance || 0), 0),
 

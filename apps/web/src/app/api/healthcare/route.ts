@@ -12,23 +12,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Demo mode - return empty data structure without database queries
-    if (userId === 'demo-user-id') {
-      const healthcareData = {
-        healthScoreHistory: [],
-        vitalSigns: {
-          bloodPressure: { systolic: 0, diastolic: 0, date: new Date().toISOString() },
-          heartRate: { value: 0, date: new Date().toISOString() },
-          weight: { value: 0, date: new Date().toISOString() },
-        },
-        activityData: [],
-        sleepData: [],
-        upcomingAppointments: [],
-        medicationAdherence: { adherence: 0, medications: [] },
-      };
-      return NextResponse.json(healthcareData);
-    }
-
     // Fetch health data in parallel
     const [
       healthMetrics,
@@ -43,19 +26,22 @@ export async function GET(request: NextRequest) {
           },
         },
         orderBy: { date: 'desc' },
-      }),
+      }).catch(() => []),
       // Health records (appointments, prescriptions, etc.)
       prisma.healthRecord.findMany({
         where: { userId },
         orderBy: { date: 'desc' },
         take: 100,
-      }),
+      }).catch(() => []),
     ]);
 
-    // Process health score history
+    // Medications - not currently implemented in schema
+    const medications: any[] = [];
+
+    // Process health score history from actual metrics
     const healthScoreHistory = generateHealthScoreHistory(healthMetrics);
 
-    // Get latest vital signs
+    // Get latest vital signs from actual data
     const latestVitals = healthMetrics.length > 0 ? healthMetrics[0] : null;
     const vitalSigns = {
       bloodPressure: {
@@ -73,11 +59,13 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    // Generate activity and sleep data (would need dedicated tables)
-    const activityData = generateMockActivityData();
-    const sleepData = generateMockSleepData();
+    // Generate activity data from actual health metrics
+    const activityData = generateActivityDataFromMetrics(healthMetrics);
 
-    // Get upcoming appointments
+    // Generate sleep data from actual health metrics
+    const sleepData = generateSleepDataFromMetrics(healthMetrics);
+
+    // Get upcoming appointments from health records
     const upcomingAppointments = healthRecords
       .filter(record =>
         record.type === 'medical_visit' &&
@@ -92,14 +80,8 @@ export async function GET(request: NextRequest) {
         time: record.date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
       }));
 
-    // Medication adherence (would need dedicated Medication table)
-    const medicationAdherence = {
-      adherence: 85,
-      medications: [
-        { name: 'Vitamin D', adherence: 95 },
-        { name: 'Multivitamin', adherence: 75 },
-      ],
-    };
+    // Calculate medication adherence from actual data
+    const medicationAdherence = calculateMedicationAdherence(medications || []);
 
     return NextResponse.json({
       healthScoreHistory: healthScoreHistory || [],
@@ -122,94 +104,131 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Helper functions
+// Helper functions - all based on actual data, no mock generation
+
 function generateHealthScoreHistory(metrics: any[]) {
-  const result = [];
-  const today = new Date();
+  if (!metrics || metrics.length === 0) {
+    return [];
+  }
 
-  for (let i = 30; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
-    const dateKey = date.toISOString().split('T')[0];
+  const result: { date: string; score: number }[] = [];
+  const metricsByDate = new Map<string, any>();
 
-    // Try to find actual metrics for this date
-    const metricForDate = metrics.find(m =>
-      m.date.toISOString().split('T')[0] === dateKey
-    );
-
-    // Calculate score from available metrics or use baseline
-    let score = 75;
-    if (metricForDate) {
-      // Simple scoring based on available metrics
-      let factors = 0;
-      let totalScore = 0;
-
-      if (metricForDate.heartRate && metricForDate.heartRate >= 60 && metricForDate.heartRate <= 100) {
-        totalScore += 80;
-        factors++;
-      }
-      if (metricForDate.systolicBP && metricForDate.systolicBP >= 110 && metricForDate.systolicBP <= 130) {
-        totalScore += 80;
-        factors++;
-      }
-      if (metricForDate.steps && metricForDate.steps >= 8000) {
-        totalScore += 85;
-        factors++;
-      }
-
-      if (factors > 0) {
-        score = Math.round(totalScore / factors);
-      }
+  // Group metrics by date
+  metrics.forEach(m => {
+    const dateKey = m.date.toISOString().split('T')[0];
+    if (!metricsByDate.has(dateKey)) {
+      metricsByDate.set(dateKey, m);
     }
+  });
+
+  // Calculate scores for dates with actual data
+  metricsByDate.forEach((metric, dateKey) => {
+    let factors = 0;
+    let totalScore = 0;
+
+    if (metric.heartRate && metric.heartRate >= 60 && metric.heartRate <= 100) {
+      totalScore += 80;
+      factors++;
+    } else if (metric.heartRate) {
+      totalScore += 60;
+      factors++;
+    }
+
+    if (metric.systolicBP && metric.systolicBP >= 110 && metric.systolicBP <= 130) {
+      totalScore += 80;
+      factors++;
+    } else if (metric.systolicBP) {
+      totalScore += 60;
+      factors++;
+    }
+
+    if (metric.steps && metric.steps >= 8000) {
+      totalScore += 85;
+      factors++;
+    } else if (metric.steps && metric.steps >= 5000) {
+      totalScore += 70;
+      factors++;
+    } else if (metric.steps) {
+      totalScore += 50;
+      factors++;
+    }
+
+    const score = factors > 0 ? Math.round(totalScore / factors) : 0;
 
     result.push({
       date: dateKey,
       score,
     });
-  }
+  });
+
+  // Sort by date
+  result.sort((a, b) => a.date.localeCompare(b.date));
 
   return result;
 }
 
-function generateMockActivityData() {
-  const result = [];
-  const today = new Date();
+function generateActivityDataFromMetrics(metrics: any[]) {
+  if (!metrics || metrics.length === 0) {
+    return [];
+  }
 
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
+  const result: { day: string; steps: number; activeMinutes: number }[] = [];
+  const last7Days = metrics.slice(0, 7).reverse();
+
+  last7Days.forEach(metric => {
+    const date = new Date(metric.date);
     const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-    const isWeekend = [0, 6].includes(date.getDay());
 
     result.push({
       day: dayName,
-      steps: Math.round((isWeekend ? 9000 : 7000) + Math.random() * 2000 - 1000),
-      activeMinutes: Math.round((isWeekend ? 45 : 30) + Math.random() * 20 - 10),
+      steps: metric.steps || 0,
+      activeMinutes: metric.activeMinutes || 0,
     });
-  }
+  });
 
   return result;
 }
 
-function generateMockSleepData() {
-  const result = [];
-  const today = new Date();
+function generateSleepDataFromMetrics(metrics: any[]) {
+  if (!metrics || metrics.length === 0) {
+    return [];
+  }
 
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(today.getDate() - i);
+  const result: { day: string; hours: number; quality: number }[] = [];
+  const last7Days = metrics.slice(0, 7).reverse();
+
+  last7Days.forEach(metric => {
+    const date = new Date(metric.date);
     const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
-    const isWeekend = [0, 6].includes(date.getDay());
-
-    const baseSleep = isWeekend ? 8 : 7;
-    const sleepVariation = Math.random() * 1.5 - 0.75;
 
     result.push({
       day: dayName,
-      hours: Math.round((baseSleep + sleepVariation) * 10) / 10,
-      quality: Math.round(Math.random() * 30 + 60),
+      hours: metric.sleepHours || 0,
+      quality: metric.sleepQuality || 0,
     });
-  }
+  });
 
   return result;
+}
+
+function calculateMedicationAdherence(medications: any[]) {
+  if (!medications || medications.length === 0) {
+    return { adherence: 0, medications: [] };
+  }
+
+  const medicationList = medications.map(med => ({
+    name: med.name || 'Unknown',
+    adherence: med.adherenceRate || 0,
+  }));
+
+  const totalAdherence = medicationList.reduce((sum, med) => sum + med.adherence, 0);
+  const averageAdherence = medicationList.length > 0
+    ? Math.round(totalAdherence / medicationList.length)
+    : 0;
+
+  return {
+    adherence: averageAdherence,
+    medications: medicationList,
+  };
 }

@@ -35,24 +35,41 @@ const HealthcareDashboard = () => {
         setLoading(true);
 
         // Call real API endpoint
-        const response = await fetch('/api/healthcare');
-        if (!response.ok) {
-          throw new Error('Failed to fetch healthcare data');
+        const response = await fetch('/api/healthcare', {
+          credentials: 'include',
+        });
+
+        // Handle auth redirect or unauthorized - just show empty state
+        if (response.status === 401 || response.redirected || !response.ok) {
+          setLoading(false);
+          return;
+        }
+
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          setLoading(false);
+          return;
         }
 
         const data = await response.json();
 
         setHealthData({
-          healthScoreHistory: data.healthScoreHistory,
-          vitalSigns: data.vitalSigns,
-          activityData: data.activityData,
-          sleepData: data.sleepData,
-          upcomingAppointments: data.upcomingAppointments,
-          medicationAdherence: data.medicationAdherence
+          healthScoreHistory: data.healthScoreHistory || [],
+          vitalSigns: data.vitalSigns || {
+            bloodPressure: { systolic: 0, diastolic: 0, date: '' },
+            heartRate: { value: 0, date: '' },
+            weight: { value: 0, date: '' }
+          },
+          activityData: data.activityData || [],
+          sleepData: data.sleepData || [],
+          upcomingAppointments: data.upcomingAppointments || [],
+          medicationAdherence: data.medicationAdherence || { adherence: 0, medications: [] }
         });
         setLoading(false);
       } catch (err) {
-        setError("Failed to load health data");
+        // Network error or JSON parsing error - just show empty state
+        console.error("Error fetching health data:", err);
         setLoading(false);
       }
     };
@@ -153,7 +170,7 @@ const HealthcareDashboard = () => {
             </div>
           </div>
           <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            Last updated: {new Date(healthData.vitalSigns.bloodPressure.date).toLocaleDateString()}
+            Last updated: {healthData.vitalSigns.bloodPressure.date ? new Date(healthData.vitalSigns.bloodPressure.date).toLocaleDateString() : 'No data yet'}
           </div>
         </div>
         

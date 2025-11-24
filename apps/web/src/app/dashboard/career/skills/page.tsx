@@ -28,15 +28,17 @@ export default function SkillsPage() {
 
           // For now, set empty array - will be populated when users add skills
           setSkills([]);
-          setLoading(false);
         } catch (error) {
           console.error('Error fetching skills:', error);
           setSkills([]);
+        } finally {
           setLoading(false);
         }
       };
 
       fetchSkills();
+    } else if (status === 'unauthenticated') {
+      setLoading(false);
     }
   }, [status]);
 
@@ -44,7 +46,22 @@ export default function SkillsPage() {
     return (
       <div className="container mx-auto py-6 px-4 md:px-6">
         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">Skills & Certifications</h1>
-        <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+        <div className="flex items-center">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-2"></div>
+          <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (status === 'unauthenticated') {
+    return (
+      <div className="container mx-auto py-6 px-4 md:px-6">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">Skills & Certifications</h1>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
+          <p className="text-gray-600 dark:text-gray-400 mb-4">Please sign in to access Skills & Certifications</p>
+          <a href="/auth/login" className="text-blue-600 hover:underline">Sign In</a>
+        </div>
       </div>
     );
   }

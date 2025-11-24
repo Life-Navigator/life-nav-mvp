@@ -4,7 +4,31 @@
  */
 
 import { EventEmitter } from 'events';
-import crypto from 'crypto';
+
+// Helper function to generate UUID that works in both browser and Node.js
+function generateUUID(): string {
+  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+  // Fallback for environments without crypto.randomUUID
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
+// Helper function to create hash that works in both browser and Node.js
+function createHash(data: string): string {
+  // Simple hash function for fingerprinting (not cryptographic)
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    const char = data.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(16).padStart(8, '0');
+}
 
 /**
  * Error Severity Levels
@@ -265,7 +289,7 @@ export class ErrorManager extends EventEmitter {
     const fingerprint = this.generateFingerprint(errorObj, options.category);
     
     return {
-      id: crypto.randomUUID(),
+      id: generateUUID(),
       fingerprint,
       message: errorObj.message,
       stack: errorObj.stack,
@@ -301,11 +325,7 @@ export class ErrorManager extends EventEmitter {
       error.stack?.split('\n').slice(0, 3).join('|') || '',
     ];
     
-    return crypto
-      .createHash('sha256')
-      .update(components.join(':'))
-      .digest('hex')
-      .substring(0, 16);
+    return createHash(components.join(':'));
   }
 
   /**

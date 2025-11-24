@@ -53,108 +53,16 @@ async function main() {
     },
   });
 
-  // Create sample financial accounts
-  const checkingAccount = await prisma.financialAccount.upsert({
-    where: {
-      userId_name: {
-        userId: demoUser.id,
-        name: 'Main Checking'
-      }
-    },
-    update: {},
-    create: {
-      userId: demoUser.id,
-      name: 'Main Checking',
-      type: 'checking',
-      institution: 'Demo Bank',
-      accountNumber: '****4567',
-      balance: 5829.42,
-      currency: 'USD',
-    },
-  });
+  // NOTE: Financial accounts and transactions are NOT seeded here.
+  // Financial data should come from Plaid integration.
+  // Users need to connect their bank accounts via Plaid to see financial data.
+  // Only manual assets (like real estate) are seeded below.
 
-  const savingsAccount = await prisma.financialAccount.upsert({
-    where: {
-      userId_name: {
-        userId: demoUser.id,
-        name: 'Emergency Savings'
-      }
-    },
-    update: {},
-    create: {
-      userId: demoUser.id,
-      name: 'Emergency Savings',
-      type: 'savings',
-      institution: 'Demo Bank',
-      accountNumber: '****7890',
-      balance: 15420.65,
-      currency: 'USD',
-    },
-  });
-
-  const investmentAccount = await prisma.financialAccount.upsert({
-    where: {
-      userId_name: {
-        userId: demoUser.id,
-        name: 'Investment Portfolio'
-      }
-    },
-    update: {},
-    create: {
-      userId: demoUser.id,
-      name: 'Investment Portfolio',
-      type: 'investment',
-      institution: 'Demo Investments',
-      balance: 103642.18,
-      currency: 'USD',
-    },
-  });
-
-  console.log(`Created financial accounts for demo user`);
-
-  // Create sample transactions
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
   const lastWeek = new Date(today);
   lastWeek.setDate(lastWeek.getDate() - 7);
-
-  // Checking account transactions
-  await prisma.transaction.createMany({
-    skipDuplicates: true,
-    data: [
-      {
-        userId: demoUser.id,
-        accountId: checkingAccount.id,
-        amount: -125.43,
-        description: 'Grocery Store',
-        category: 'groceries',
-        date: yesterday,
-        type: 'expense',
-        merchantName: 'Whole Foods',
-      },
-      {
-        userId: demoUser.id,
-        accountId: checkingAccount.id,
-        amount: -82.15,
-        description: 'Restaurant',
-        category: 'dining',
-        date: lastWeek,
-        type: 'expense',
-        merchantName: 'Local Bistro',
-      },
-      {
-        userId: demoUser.id,
-        accountId: checkingAccount.id,
-        amount: 2450.00,
-        description: 'Paycheck',
-        category: 'income',
-        date: lastWeek,
-        type: 'income',
-        merchantName: 'Employer',
-      },
-    ],
-  });
 
   // Create sample health metrics
   const oneWeekAgo = new Date(today);
@@ -266,7 +174,7 @@ async function main() {
 
   console.log(`Created career profile and job application for demo user`);
 
-  // Create sample financial goal
+  // Create sample financial goal (currentAmount will be calculated from Plaid accounts)
   await prisma.financialGoal.create({
     data: {
       userId: demoUser.id,
@@ -274,7 +182,7 @@ async function main() {
       description: 'Save 6 months of expenses for emergency fund',
       type: 'savings',
       targetAmount: 25000,
-      currentAmount: 15420.65,
+      currentAmount: 0, // Will be updated from Plaid account balances
       currency: 'USD',
       targetDate: new Date(today.getFullYear(), today.getMonth() + 6, 1),
       category: 'emergency',
@@ -296,7 +204,7 @@ async function main() {
     }
   });
 
-  console.log(`Created financial goal and asset for demo user`);
+  console.log(`Created asset and financial goal for demo user (financial accounts come from Plaid)`);
 
   console.log('Database seeding completed successfully');
 }

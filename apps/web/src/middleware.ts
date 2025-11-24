@@ -132,17 +132,22 @@ async function handleNormalRequest(request: NextRequest) {
                        path.includes('/images') ||
                        path.includes('/favicon');
 
-  // Get the user token - check both NextAuth and custom auth_token cookie
+  // Get the user token - check both NextAuth and custom auth cookies
   const nextAuthToken = path === '/' ? null : await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET
   });
 
-  // Check for custom auth_token cookie from FastAPI backend
+  // Check for custom auth cookies from FastAPI backend and login API
+  // - auth_token: legacy cookie from FastAPI backend
+  // - token: JWT cookie set by /api/auth/login route
+  // - access_token: alternative JWT cookie name
   const authTokenCookie = request.cookies.get('auth_token')?.value;
+  const tokenCookie = request.cookies.get('token')?.value;
+  const accessTokenCookie = request.cookies.get('access_token')?.value;
 
-  // User is authenticated if either token exists
-  const isAuthenticated = !!nextAuthToken || !!authTokenCookie;
+  // User is authenticated if any token exists
+  const isAuthenticated = !!nextAuthToken || !!authTokenCookie || !!tokenCookie || !!accessTokenCookie;
   const token = nextAuthToken || { authenticated: !!authTokenCookie };
 
   // Attach token to request for API gateway use in rate limiting

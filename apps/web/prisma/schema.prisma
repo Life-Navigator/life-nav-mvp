@@ -61,6 +61,7 @@ model User {
   educationCourses      EducationCourse[]
   careerProfiles        CareerProfile[]
   careerApplications    JobApplication[]
+  resumes               Resume[]
   documents             Document[]
   notifications         Notification[]
   preferences           UserPreference?
@@ -78,6 +79,12 @@ model User {
   calendarConnections   CalendarConnection[]
   socialNetworkConnections SocialNetworkConnection[]
   networkValueInsights  NetworkValueInsight[]
+  taxProfiles           TaxProfile[]
+  employerBenefits      EmployerBenefits[]
+  deductionOpportunities DeductionOpportunity[]
+  taxStrategies         TaxStrategy[]
+  retirementPlans       RetirementPlan[]
+  investmentHoldings    InvestmentHolding[]
 
   @@index([email])
   @@index([createdAt])
@@ -743,15 +750,91 @@ model Asset {
   description       String?
   notes             String?
   documents         Json?    // Related document IDs
+  imageUrl          String?  // Primary image for the asset
+  images            String[] // Additional image URLs
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  
+
   // Relations
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loans             AssetLoan[]
+  upgrades          AssetUpgrade[]
+  valuations        AssetValuation[]
+
   @@index([userId])
   @@index([type])
   @@map("assets")
+}
+
+model AssetLoan {
+  id                String   @id @default(cuid())
+  assetId           String
+  loanType          String   // mortgage, auto_loan, heloc, personal, other
+  lender            String
+  originalAmount    Float
+  currentBalance    Float
+  interestRate      Float
+  monthlyPayment    Float
+  startDate         DateTime
+  endDate           DateTime?
+  paymentDueDay     Int?     // Day of month payment is due
+  accountNumber     String?
+  isActive          Boolean  @default(true)
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  asset             Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@map("asset_loans")
+}
+
+model AssetUpgrade {
+  id                String   @id @default(cuid())
+  assetId           String
+  name              String
+  description       String?
+  category          String   // maintenance, improvement, renovation, repair, addition
+  estimatedCost     Float
+  actualCost        Float?
+  valueIncrease     Float?   // Estimated increase in asset value
+  status            String   @default("planned") // planned, in_progress, completed, cancelled
+  priority          String   @default("medium") // low, medium, high, critical
+  startDate         DateTime?
+  completionDate    DateTime?
+  contractor        String?
+  warranty          String?  // Warranty information
+  documents         Json?    // Related document IDs
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  asset             Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([status])
+  @@map("asset_upgrades")
+}
+
+model AssetValuation {
+  id                String   @id @default(cuid())
+  assetId           String
+  value             Float
+  source            String   // manual, appraisal, market, zillow, kbb, other
+  valuationDate     DateTime @default(now())
+  notes             String?
+  documents         Json?    // Related document IDs (appraisal reports, etc.)
+  createdAt         DateTime @default(now())
+
+  // Relations
+  asset             Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([valuationDate])
+  @@map("asset_valuations")
 }
 
 model FinancialGoal {
@@ -984,6 +1067,73 @@ model JobApplication {
   @@index([status])
   @@index([applicationDate])
   @@map("job_applications")
+}
+
+model Resume {
+  id                String    @id @default(cuid())
+  userId            String
+  name              String    // User-friendly name like "Software Engineer Resume"
+  template          String    @default("modern") // modern, classic, minimal, creative, ats-friendly
+  isDefault         Boolean   @default(false)
+
+  // Personal Information
+  fullName          String?
+  email             String?
+  phone             String?
+  location          String?
+  linkedInUrl       String?
+  githubUrl         String?
+  portfolioUrl      String?
+  websiteUrl        String?
+
+  // Professional Summary
+  summary           String?   @db.Text
+
+  // Structured Data (JSON arrays)
+  experience        Json?     // Array of work experiences with company, title, dates, bullets
+  education         Json?     // Array of education entries
+  skills            Json?     // Categorized skills (technical, soft, languages, etc.)
+  certifications    Json?     // Array of certifications
+  projects          Json?     // Array of notable projects
+  awards            Json?     // Array of awards/achievements
+  publications      Json?     // Array of publications
+  languages         Json?     // Language proficiencies
+  customSections    Json?     // User-defined custom sections
+
+  // Job Targeting
+  targetJobTitle    String?   // The job title this resume targets
+  targetJobDescription String? @db.Text // The job description for AI optimization
+  targetCompany     String?   // Target company name
+  keywords          String[]  // ATS-optimized keywords
+
+  // AI Generation Metadata
+  aiGenerated       Boolean   @default(false)
+  aiModel           String?   // Model used for generation
+  aiPrompt          String?   @db.Text // Prompt used for generation
+  atsScore          Int?      // ATS compatibility score 0-100
+  lastAnalyzedAt    DateTime?
+
+  // Versioning
+  version           Int       @default(1)
+  parentResumeId    String?   // Reference to parent resume if this is a version
+
+  // Export Info
+  pdfUrl            String?   // URL to generated PDF
+  docxUrl           String?   // URL to generated DOCX
+  lastExportedAt    DateTime?
+
+  // Metadata
+  status            String    @default("draft") // draft, active, archived
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([isDefault])
+  @@map("resumes")
 }
 
 //=====================
@@ -1399,4 +1549,1604 @@ model NetworkValueInsight {
   @@index([platform])
   @@index([generatedAt])
   @@map("network_value_insights")
+}
+
+//=====================
+// TAX PLANNING MODELS
+//=====================
+
+model TaxProfile {
+  id                    String              @id @default(cuid())
+  userId                String
+  taxYear               Int
+  filingStatus          String              // single, married_jointly, married_separately, head_of_household
+  state                 String?             // State code for state tax calculations
+  dependents            Int                 @default(0)
+  isBlind               Boolean             @default(false)
+  isOver65              Boolean             @default(false)
+  spouseIsBlind         Boolean             @default(false)
+  spouseIsOver65        Boolean             @default(false)
+
+  // W-4 Data
+  multipleJobs          Boolean             @default(false)
+  claimDependents       Float               @default(0)
+  otherIncome           Float               @default(0)
+  deductionsW4          Float               @default(0)
+  extraWithholding      Float               @default(0)
+
+  // Status
+  status                String              @default("draft") // draft, in_progress, completed, filed
+  lastCalculatedAt      DateTime?
+  notes                 String?             @db.Text
+
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  // Relations
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incomes               TaxIncome[]
+  deductions            TaxDeduction[]
+  credits               TaxCredit[]
+  estimates             TaxEstimate[]
+  scenarios             TaxScenario[]
+  documents             TaxDocument[]
+  quarterlyPayments     QuarterlyTaxPayment[]
+  optimizations         TaxOptimization[]
+  deductionOpportunities DeductionOpportunity[]
+  strategies            TaxStrategy[]
+
+  @@unique([userId, taxYear])
+  @@index([userId])
+  @@index([taxYear])
+  @@index([status])
+  @@map("tax_profiles")
+}
+
+model TaxIncome {
+  id                String      @id @default(cuid())
+  taxProfileId      String
+  category          String      // wages, self_employment, business, rental, interest, dividends, capital_gains, retirement, social_security, other
+  subcategory       String?     // qualified_dividends, short_term_gains, long_term_gains, etc.
+  source            String      // Employer name, business name, bank name, etc.
+  amount            Float
+  frequency         String      @default("annual") // annual, monthly, biweekly, weekly, one_time
+  taxWithheld       Float       @default(0)
+  is1099            Boolean     @default(false)
+  isW2              Boolean     @default(false)
+  employerEIN       String?
+
+  // For self-employment/business income
+  expenses          Float       @default(0)
+  netIncome         Float?      // Calculated: amount - expenses
+  qbiEligible       Boolean     @default(false) // Qualified Business Income deduction eligibility
+
+  // For investment income
+  costBasis         Float?
+  acquisitionDate   DateTime?
+  isQualified       Boolean     @default(false) // For qualified dividends
+
+  // For rental income
+  propertyAddress   String?
+  daysRented        Int?
+  daysPersonalUse   Int?
+
+  notes             String?
+  documentIds       String[]    // References to TaxDocument ids
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  taxProfile        TaxProfile  @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
+
+  @@index([taxProfileId])
+  @@index([category])
+  @@map("tax_incomes")
+}
+
+model TaxDeduction {
+  id                String      @id @default(cuid())
+  taxProfileId      String
+  category          String      // standard, itemized, above_the_line, business
+  type              String      // mortgage_interest, property_tax, charitable, medical, state_local_tax, student_loan, educator_expense, hsa, ira, 401k, etc.
+  description       String
+  amount            Float
+  isRecurring       Boolean     @default(false)
+  frequency         String?     // monthly, annual, one_time
+
+  // For itemized deductions
+  limitApplies      Boolean     @default(false)
+  limitAmount       Float?
+  agiPhaseoutStart  Float?
+  agiPhaseoutEnd    Float?
+
+  // For charitable contributions
+  recipientName     String?
+  recipientEIN      String?
+  isCash            Boolean     @default(true)
+  fairMarketValue   Float?
+
+  // For mortgage interest
+  lenderName        String?
+  loanNumber        String?
+  propertyAddress   String?
+  isFirstMortgage   Boolean     @default(true)
+  loanOriginationDate DateTime?
+  originalLoanAmount Float?
+
+  // For medical expenses
+  agiThreshold      Float?      // 7.5% of AGI floor
+
+  documentIds       String[]
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  taxProfile        TaxProfile  @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
+
+  @@index([taxProfileId])
+  @@index([category])
+  @@index([type])
+  @@map("tax_deductions")
+}
+
+model TaxCredit {
+  id                String      @id @default(cuid())
+  taxProfileId      String
+  type              String      // child_tax_credit, dependent_care, education_aotc, education_llc, earned_income, child_dependent_care, adoption, saver, foreign_tax, energy, ev_credit, premium_tax, etc.
+  name              String
+  amount            Float
+  isRefundable      Boolean     @default(false)
+  isPartiallyRefundable Boolean @default(false)
+  refundableAmount  Float?
+
+  // Phase-out information
+  agiPhaseoutStart  Float?
+  agiPhaseoutEnd    Float?
+  phaseoutRate      Float?      // Percentage reduction per $1000 over threshold
+
+  // For child tax credit
+  qualifyingChildren Int?
+  childrenUnder6    Int?
+  childrenUnder17   Int?
+
+  // For education credits
+  studentName       String?
+  institutionName   String?
+  qualifiedExpenses Float?
+  form1098T         Boolean     @default(false)
+
+  // For EV credit
+  vehicleVIN        String?
+  vehicleMake       String?
+  vehicleModel      String?
+  purchaseDate      DateTime?
+  msrp              Float?
+  batteryCapacity   Float?      // kWh
+
+  // For energy credits
+  propertyType      String?     // solar, wind, geothermal, battery, heat_pump, etc.
+  installationCost  Float?
+  installationDate  DateTime?
+
+  documentIds       String[]
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  taxProfile        TaxProfile  @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
+
+  @@index([taxProfileId])
+  @@index([type])
+  @@map("tax_credits")
+}
+
+model TaxEstimate {
+  id                    String      @id @default(cuid())
+  taxProfileId          String
+  calculatedAt          DateTime    @default(now())
+  scenarioId            String?     // Optional link to scenario for what-if analysis
+
+  // Income Summary
+  grossIncome           Float
+  adjustedGrossIncome   Float
+  taxableIncome         Float
+
+  // Above-the-line deductions
+  aboveLineDeductions   Float       @default(0)
+
+  // Deduction Summary
+  standardDeduction     Float
+  itemizedDeductions    Float
+  deductionUsed         String      // standard, itemized
+  totalDeductions       Float
+
+  // QBI Deduction
+  qbiDeduction          Float       @default(0)
+
+  // Tax Calculations
+  ordinaryIncomeTax     Float
+  capitalGainsTax       Float       @default(0)
+  selfEmploymentTax     Float       @default(0)
+  additionalMedicareTax Float       @default(0)
+  netInvestmentIncomeTax Float      @default(0) // 3.8% NIIT
+  alternativeMinimumTax Float       @default(0)
+
+  totalTaxBeforeCredits Float
+
+  // Credits
+  nonrefundableCredits  Float       @default(0)
+  refundableCredits     Float       @default(0)
+  totalCredits          Float
+
+  // Final Tax
+  totalTaxLiability     Float
+  totalWithholding      Float       @default(0)
+  estimatedPayments     Float       @default(0)
+  totalPayments         Float
+
+  // Result
+  refundOrOwed          Float       // Positive = refund, Negative = owed
+
+  // Rates
+  marginalRate          Float
+  effectiveRate         Float
+
+  // State Tax (if applicable)
+  stateTaxableIncome    Float?
+  stateTax              Float?
+  stateCredits          Float?
+  stateRefundOrOwed     Float?
+
+  // Combined
+  totalFederalAndState  Float?
+  combinedEffectiveRate Float?
+
+  // Breakdown JSON for detailed analysis
+  breakdown             Json?       // Detailed bracket-by-bracket breakdown
+
+  createdAt             DateTime    @default(now())
+
+  // Relations
+  taxProfile            TaxProfile  @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
+  scenario              TaxScenario? @relation(fields: [scenarioId], references: [id], onDelete: SetNull)
+
+  @@index([taxProfileId])
+  @@index([calculatedAt])
+  @@map("tax_estimates")
+}
+
+model TaxScenario {
+  id                String        @id @default(cuid())
+  taxProfileId      String
+  name              String
+  description       String?
+
+  // Scenario modifications (stored as JSON diffs from base profile)
+  incomeChanges     Json?         // { "add": [], "modify": [], "remove": [] }
+  deductionChanges  Json?
+  creditChanges     Json?
+  filingStatusChange String?
+
+  // Comparison metrics
+  baselineTax       Float?
+  scenarioTax       Float?
+  taxDifference     Float?
+
+  // Recommendations
+  isRecommended     Boolean       @default(false)
+  priority          Int           @default(0) // Higher = more important
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  // Relations
+  taxProfile        TaxProfile    @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
+  estimates         TaxEstimate[]
+
+  @@index([taxProfileId])
+  @@map("tax_scenarios")
+}
+
+model TaxOptimization {
+  id                String      @id @default(cuid())
+  taxProfileId      String
+  category          String      // income_timing, deduction_bunching, retirement_contribution, charitable_giving, tax_loss_harvesting, roth_conversion, hsa_contribution, business_structure, etc.
+  title             String
+  description       String      @db.Text
+
+  // Impact
+  estimatedSavings  Float
+  confidenceLevel   String      // high, medium, low
+  timeframe         String      // immediate, this_year, multi_year
+  complexity        String      // simple, moderate, complex
+
+  // Implementation
+  actionRequired    String      @db.Text
+  deadline          DateTime?
+  requirements      Json?       // Prerequisites or conditions
+  risks             String?     @db.Text
+
+  // Status
+  status            String      @default("suggested") // suggested, considering, implemented, dismissed
+  implementedAt     DateTime?
+  actualSavings     Float?
+
+  // Source
+  source            String      @default("system") // system, user, advisor
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  taxProfile        TaxProfile  @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
+
+  @@index([taxProfileId])
+  @@index([category])
+  @@index([status])
+  @@map("tax_optimizations")
+}
+
+model QuarterlyTaxPayment {
+  id                String      @id @default(cuid())
+  taxProfileId      String
+  quarter           Int         // 1, 2, 3, 4
+  dueDate           DateTime
+
+  // Amounts
+  requiredPayment   Float       // Based on safe harbor or current year estimate
+  actualPayment     Float       @default(0)
+  paymentDate       DateTime?
+
+  // Safe Harbor Calculations
+  priorYearTax      Float?
+  currentYearEstimate Float?
+  safeHarborAmount  Float?
+
+  // Penalty avoidance
+  isUnderpaid       Boolean     @default(false)
+  penaltyAmount     Float?
+
+  // Status
+  status            String      @default("pending") // pending, paid, partial, overdue
+  confirmationNumber String?
+  paymentMethod     String?     // eftps, direct_pay, check, irs_online
+
+  notes             String?
+  documentIds       String[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  taxProfile        TaxProfile  @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([taxProfileId, quarter])
+  @@index([taxProfileId])
+  @@index([dueDate])
+  @@index([status])
+  @@map("quarterly_tax_payments")
+}
+
+model TaxDocument {
+  id                String      @id @default(cuid())
+  taxProfileId      String
+  type              String      // w2, 1099_misc, 1099_nec, 1099_div, 1099_int, 1099_b, 1099_r, 1098, 1098_t, 1098_e, k1, receipts, other
+  year              Int
+  issuerName        String
+  issuerEIN         String?
+
+  // Status
+  status            String      @default("pending") // pending, received, reviewed, entered, filed
+  receivedDate      DateTime?
+  reviewedDate      DateTime?
+  enteredDate       DateTime?
+
+  // Document Details
+  documentNumber    String?     // Control number for W-2s, etc.
+  grossAmount       Float?      // Total income/amount on document
+  taxWithheld       Float?      // Federal tax withheld
+  stateTaxWithheld  Float?
+
+  // File Storage
+  fileUrl           String?
+  fileName          String?
+  fileType          String?     // pdf, jpg, png
+  fileSize          Int?
+  ocrText           String?     @db.Text // Extracted text for searchability
+  ocrData           Json?       // Structured data extracted via OCR
+
+  // Validation
+  isValidated       Boolean     @default(false)
+  validationErrors  Json?       // Any discrepancies found
+
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  taxProfile        TaxProfile  @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
+
+  @@index([taxProfileId])
+  @@index([type])
+  @@index([year])
+  @@index([status])
+  @@map("tax_documents")
+}
+
+model TaxDeadline {
+  id                String      @id @default(cuid())
+  name              String
+  description       String
+  dueDate           DateTime
+  category          String      // filing, payment, forms, retirement, healthcare, business, estimated_tax
+  applicableTo      String[]    // individual, business, self_employed, etc.
+  filingStatus      String[]    // Which filing statuses this applies to
+  form              String?     // Form number (1040, 1120, etc.)
+  isExtendable      Boolean     @default(false)
+  extensionDeadline DateTime?
+  penaltyInfo       String?     @db.Text
+  resourceUrl       String?     // IRS or official resource link
+  isRecurring       Boolean     @default(true)
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([dueDate])
+  @@index([category])
+  @@map("tax_deadlines")
+}
+
+//=====================
+// EMPLOYER BENEFITS & COMPENSATION
+//=====================
+
+model EmployerBenefits {
+  id                String      @id @default(cuid())
+  userId            String
+  employerName      String
+  isCurrentEmployer Boolean     @default(true)
+  startDate         DateTime?
+  endDate           DateTime?
+
+  // Compensation
+  baseSalary        Float?
+  bonusTarget       Float?      // Target bonus percentage
+  bonusStructure    String?     // annual, quarterly, monthly
+  signOnBonus       Float?
+  relocationBonus   Float?
+  stockGrants       Float?      // Total value of equity grants
+  vestingSchedule   String?     // 4-year cliff, immediate, etc.
+
+  // Offer Letter Document
+  offerLetterUrl    String?
+  offerLetterFileName String?
+  offerLetterUploadedAt DateTime?
+  offerLetterParsedData Json?   // AI-extracted data from offer letter
+
+  // Benefits Summary Document
+  benefitsSummaryUrl String?
+  benefitsSummaryFileName String?
+  benefitsSummaryUploadedAt DateTime?
+  benefitsSummaryParsedData Json?
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  healthBenefits    HealthBenefit[]
+  retirementBenefits RetirementBenefit[]
+  additionalBenefits AdditionalBenefit[]
+  deductionOpportunities DeductionOpportunity[]
+
+  @@index([userId])
+  @@index([isCurrentEmployer])
+  @@map("employer_benefits")
+}
+
+model HealthBenefit {
+  id                String      @id @default(cuid())
+  employerBenefitsId String
+
+  // Plan Details
+  planType          String      // medical, dental, vision, life, disability_short, disability_long, fsa, dcfsa, hsa
+  planName          String?
+  carrier           String?
+  coverageLevel     String?     // employee_only, employee_spouse, employee_children, family
+
+  // Costs
+  employeePremium   Float?      // Per pay period employee cost
+  employerContribution Float?   // Employer contribution
+  premiumFrequency  String?     // weekly, biweekly, monthly
+  annualPremium     Float?      // Calculated annual cost
+
+  // Coverage Details
+  deductible        Float?
+  outOfPocketMax    Float?
+  coinsurance       Float?
+  copay             Float?
+
+  // HSA/FSA specifics
+  hsaEligible       Boolean     @default(false)
+  hsaEmployerContribution Float?
+  fsaLimit          Float?
+  dcfsaLimit        Float?
+
+  // Life/Disability
+  coverageAmount    Float?      // Life insurance coverage
+  coverageMultiple  Float?      // e.g., 2x salary
+  beneficiaryInfo   String?
+
+  isEnrolled        Boolean     @default(false)
+  enrollmentDeadline DateTime?
+  effectiveDate     DateTime?
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  employerBenefits  EmployerBenefits @relation(fields: [employerBenefitsId], references: [id], onDelete: Cascade)
+
+  @@index([employerBenefitsId])
+  @@index([planType])
+  @@map("health_benefits")
+}
+
+model RetirementBenefit {
+  id                String      @id @default(cuid())
+  employerBenefitsId String
+
+  // Plan Details
+  planType          String      // 401k, 403b, 457b, pension, espp, stock_purchase, roth_401k
+  planName          String?
+  administrator     String?     // Fidelity, Vanguard, etc.
+
+  // Contribution Details
+  employeeContributionLimit Float? // Annual limit
+  employeeContributionPct Float?   // Current contribution %
+  employeeContributionAmt Float?   // Current contribution $
+
+  // Employer Match
+  employerMatchPct  Float?      // e.g., 50% or 100%
+  employerMatchLimit Float?     // Up to X% of salary
+  employerMatchCap  Float?      // Maximum $ match
+  vestingSchedule   String?     // immediate, 3-year cliff, 6-year graded
+  vestingPct        Float?      // Current vesting percentage
+
+  // ESPP specifics
+  esppDiscount      Float?      // e.g., 15%
+  esppLookback      Boolean     @default(false)
+  esppContributionLimit Float?
+
+  // Pension specifics
+  pensionFormula    String?     // e.g., 2% x years of service x final average salary
+  pensionEligibility String?   // e.g., age 65 with 5 years of service
+
+  // Mega Backdoor Roth
+  afterTaxContribAllowed Boolean @default(false)
+  inPlanRothConversion Boolean  @default(false)
+
+  isEnrolled        Boolean     @default(false)
+  enrollmentDeadline DateTime?
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  employerBenefits  EmployerBenefits @relation(fields: [employerBenefitsId], references: [id], onDelete: Cascade)
+
+  @@index([employerBenefitsId])
+  @@index([planType])
+  @@map("retirement_benefits")
+}
+
+// Investment Holdings - Individual securities in user's portfolio
+model InvestmentHolding {
+  id                String   @id @default(cuid())
+  userId            String
+
+  // Security identification
+  ticker            String              // Stock symbol (e.g., AAPL, MSFT)
+  name              String              // Company name
+  assetType         String   @default("stock") // stock, etf, mutual_fund, bond, crypto, option
+
+  // Position details
+  shares            Float               // Number of shares
+  costBasis         Float               // Average cost per share
+  purchaseDate      DateTime?           // Date of purchase
+
+  // Current valuation
+  currentPrice      Float    @default(0) // Current price per share
+  marketValue       Float    @default(0) // shares * currentPrice
+  lastPriceUpdate   DateTime @default(now())
+
+  // Gains/Losses
+  unrealizedGain    Float    @default(0) // marketValue - (shares * costBasis)
+  unrealizedGainPct Float    @default(0) // % gain/loss
+
+  // Classification
+  sector            String?             // technology, healthcare, financial, etc.
+  industry          String?             // More specific industry
+  region            String   @default("US") // US, International, Emerging
+  marketCap         String?             // large_cap, mid_cap, small_cap
+
+  // Market data (updated periodically)
+  dividendYield     Float    @default(0)
+  beta              Float    @default(1.0)
+  peRatio           Float?
+  fiftyTwoWeekHigh  Float?
+  fiftyTwoWeekLow   Float?
+
+  // Tax lot tracking
+  taxLotMethod      String   @default("FIFO") // FIFO, LIFO, SpecID, AvgCost
+  isLongTerm        Boolean  @default(false) // > 1 year holding period
+
+  // Account information
+  accountId         String?             // If linked to a specific account
+  accountName       String?             // e.g., "Fidelity Brokerage"
+  accountType       String   @default("taxable") // taxable, traditional_ira, roth_ira, 401k
+
+  // Data source
+  source            String   @default("manual") // manual, plaid, csv_import
+  plaidSecurityId   String?             // Plaid security ID if from Plaid
+
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, ticker, accountId])
+  @@index([userId])
+  @@index([ticker])
+  @@index([sector])
+  @@index([assetType])
+  @@map("investment_holdings")
+}
+
+model AdditionalBenefit {
+  id                String      @id @default(cuid())
+  employerBenefitsId String
+
+  // Benefit Details
+  category          String      // pto, parental_leave, education, wellness, commuter, legal, pet, adoption, fertility, mental_health, gym, phone, internet, equipment
+  name              String
+  description       String?     @db.Text
+
+  // Value
+  annualValue       Float?      // Monetary value if applicable
+  frequency         String?     // annual, monthly, one_time, unlimited
+
+  // Limits
+  maxAmount         Float?
+  usedAmount        Float?
+  remainingAmount   Float?
+
+  // PTO specifics
+  ptoAccrualRate    Float?      // Hours per pay period
+  ptoMaxCarryover   Float?
+  ptoCurrentBalance Float?
+
+  // Education specifics
+  tuitionReimbursement Float?
+  certificationBudget Float?
+  conferenceBudget  Float?
+
+  // Wellness specifics
+  wellnessStipend   Float?
+  gymReimbursement  Float?
+
+  // Commuter specifics
+  commuterBenefit   Float?      // Monthly limit
+  parkingBenefit    Float?
+
+  isEnrolled        Boolean     @default(false)
+  enrollmentDeadline DateTime?
+  expirationDate    DateTime?
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  employerBenefits  EmployerBenefits @relation(fields: [employerBenefitsId], references: [id], onDelete: Cascade)
+
+  @@index([employerBenefitsId])
+  @@index([category])
+  @@map("additional_benefits")
+}
+
+model DeductionOpportunity {
+  id                String      @id @default(cuid())
+  userId            String
+  employerBenefitsId String?
+  taxProfileId      String?
+
+  // Opportunity Details
+  category          String      // retirement, healthcare, education, charitable, business, home_office, vehicle, professional, investment, other
+  type              String      // specific deduction type
+  title             String
+  description       String      @db.Text
+
+  // Financial Impact
+  currentAmount     Float       @default(0)  // What user is currently utilizing
+  maxAmount         Float?      // Maximum available deduction
+  potentialSavings  Float?      // Estimated tax savings
+  marginalRateUsed  Float?      // Tax rate used to calculate savings
+
+  // Source & Eligibility
+  source            String      // employer_benefit, irs_rule, state_rule, identified_expense, goal_aligned
+  eligibilityRules  Json?       // Rules/requirements for eligibility
+  isEligible        Boolean     @default(true)
+  eligibilityNotes  String?
+
+  // Action & Status
+  status            String      @default("identified") // identified, considering, planned, implemented, declined
+  actionRequired    String?     @db.Text
+  implementationSteps Json?     // Step-by-step guide
+  deadline          DateTime?   // Deadline to take action
+
+  // Goal Alignment
+  alignedGoalIds    String[]    // IDs of goals this supports
+  alignmentReason   String?     @db.Text
+
+  // Priority & Confidence
+  priority          Int         @default(5) // 1-10, higher is more important
+  confidenceLevel   String      @default("medium") // low, medium, high
+  complexity        String      @default("moderate") // simple, moderate, complex
+
+  // Tracking
+  implementedAt     DateTime?
+  implementedAmount Float?
+  actualSavings     Float?
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employerBenefits  EmployerBenefits? @relation(fields: [employerBenefitsId], references: [id], onDelete: SetNull)
+  taxProfile        TaxProfile? @relation(fields: [taxProfileId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([category])
+  @@index([status])
+  @@index([priority])
+  @@map("deduction_opportunities")
+}
+
+model TaxStrategy {
+  id                String      @id @default(cuid())
+  userId            String
+  taxProfileId      String?
+
+  // Strategy Details
+  name              String
+  category          String      // income_timing, retirement, investment, business, estate, education, charitable, healthcare, real_estate, tax_loss_harvesting
+  description       String      @db.Text
+
+  // Implementation
+  currentStatus     String      @default("not_started") // not_started, in_progress, implemented, monitoring, completed
+  implementationPlan Json?      // Step-by-step implementation guide
+  startDate         DateTime?
+  targetCompletionDate DateTime?
+  completedDate     DateTime?
+
+  // Financial Impact
+  estimatedAnnualSavings Float?
+  estimatedLifetimeSavings Float?
+  implementationCost Float?     // Cost to implement (professional fees, etc.)
+  roi               Float?      // Return on investment
+
+  // Risk & Complexity
+  riskLevel         String      @default("low") // low, medium, high
+  complexity        String      @default("moderate") // simple, moderate, complex, expert
+  requiresProfessional Boolean  @default(false)
+
+  // Goal Alignment
+  alignedGoalIds    String[]
+  alignmentScore    Float?      // 0-100 how well it aligns with goals
+
+  // Timeline
+  timeHorizon       String      @default("annual") // immediate, this_year, annual, multi_year, lifetime
+  recurringBenefit  Boolean     @default(false)
+
+  // Prerequisites
+  prerequisites     Json?       // What needs to be in place first
+
+  // Documentation
+  relatedDocuments  String[]    // Document IDs
+  referenceLinks    String[]    // IRS links, articles, etc.
+
+  // Review
+  lastReviewDate    DateTime?
+  nextReviewDate    DateTime?
+  reviewNotes       String?     @db.Text
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taxProfile        TaxProfile? @relation(fields: [taxProfileId], references: [id], onDelete: SetNull)
+  milestones        TaxStrategyMilestone[]
+
+  @@index([userId])
+  @@index([category])
+  @@index([currentStatus])
+  @@map("tax_strategies")
+}
+
+model TaxStrategyMilestone {
+  id                String      @id @default(cuid())
+  taxStrategyId     String
+
+  // Milestone Details
+  title             String
+  description       String?
+  order             Int
+
+  // Status
+  status            String      @default("pending") // pending, in_progress, completed, skipped
+  dueDate           DateTime?
+  completedDate     DateTime?
+
+  // Action
+  actionItems       Json?       // List of specific actions
+  assignedTo        String?     // User or professional
+
+  notes             String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  taxStrategy       TaxStrategy @relation(fields: [taxStrategyId], references: [id], onDelete: Cascade)
+
+  @@index([taxStrategyId])
+  @@index([status])
+  @@map("tax_strategy_milestones")
+}
+
+// ============================================================================
+// COMPREHENSIVE RETIREMENT PLANNING SYSTEM
+// Industry-leading retirement planning models that exceed MoneyGuidePro, eMoney,
+// and Fidelity capabilities with advanced projections, scenarios, and optimizations
+// ============================================================================
+
+model RetirementPlan {
+  id                String      @id @default(cuid())
+  userId            String
+
+  // Basic Information
+  name              String      @default("My Retirement Plan")
+  status            String      @default("active") // draft, active, archived
+  primaryPlanHolder String?     // Name
+  spouseName        String?     // For couples planning
+
+  // Demographics
+  currentAge        Int
+  spouseCurrentAge  Int?
+  targetRetirementAge Int       @default(65)
+  spouseRetirementAge Int?
+  lifeExpectancy    Int         @default(95)
+  spouseLifeExpectancy Int?
+
+  // Current Financial Status
+  currentAnnualIncome Float
+  spouseAnnualIncome Float?
+  currentNetWorth   Float       @default(0)
+  annualExpenses    Float?      // Current annual spending
+
+  // Retirement Goals
+  desiredRetirementIncome Float? // Annual income target in retirement
+  incomeReplacementRatio Float   @default(80) // % of pre-retirement income
+  retirementIncomeMethod String  @default("replacement_ratio") // replacement_ratio, fixed_amount, expense_based
+
+  // Legacy & Estate
+  legacyGoal        Float       @default(0) // Amount to leave to heirs
+  charitableGoal    Float       @default(0) // Charitable giving in retirement
+
+  // Inflation Assumptions
+  generalInflation  Float       @default(2.5)
+  healthcareInflation Float     @default(5.5)
+  educationInflation Float      @default(4.0)
+
+  // Risk Profile
+  riskTolerance     String      @default("moderate") // conservative, moderately_conservative, moderate, moderately_aggressive, aggressive
+  equityAllocation  Float       @default(60) // Current equity %
+  targetEquityInRetirement Float @default(40) // Target equity % at retirement
+  glidepathStrategy String      @default("linear") // linear, bucketed, dynamic, static
+
+  // Settings
+  includeSpouse     Boolean     @default(false)
+  useMonteCarlo     Boolean     @default(true)
+  monteCarloRuns    Int         @default(1000)
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts          RetirementAccount[]
+  incomeStreams     RetirementIncomeStream[]
+  expenses          RetirementExpense[]
+  scenarios         RetirementScenario[]
+  projections       RetirementProjection[]
+  socialSecurity    SocialSecurityBenefit[]
+  healthcarePlans   RetirementHealthcarePlan[]
+  withdrawalStrategies WithdrawalStrategy[]
+  rothConversions   RothConversionPlan[]
+  milestones        RetirementMilestone[]
+
+  @@unique([userId, name])
+  @@index([userId])
+  @@index([status])
+  @@map("retirement_plans")
+}
+
+model RetirementAccount {
+  id                String      @id @default(cuid())
+  retirementPlanId  String
+
+  // Account Details
+  accountName       String
+  accountType       String      // 401k, 403b, 457b, traditional_ira, roth_ira, roth_401k, sep_ira, simple_ira, solo_401k, pension, annuity, brokerage, savings, hsa, other
+  institution       String?     // Fidelity, Vanguard, etc.
+  accountNumber     String?     // Last 4 digits for reference
+
+  // Owner
+  owner             String      @default("primary") // primary, spouse, joint
+
+  // Balances
+  currentBalance    Float
+  costBasis         Float?      // For taxable accounts
+  unrealizedGains   Float?
+
+  // Contributions
+  annualContribution Float      @default(0)
+  contributionFrequency String  @default("per_paycheck") // per_paycheck, monthly, annual
+  employerMatch     Float?      // Dollar amount of employer match
+  employerMatchPct  Float?      // Percentage match
+  employerMatchLimit Float?     // Max % of salary matched
+  vestingPct        Float       @default(100)
+
+  // Contribution Limits
+  contributionLimit Float?      // IRS limit for this account type
+  catchUpEligible   Boolean     @default(false)
+  catchUpAmount     Float?      // Additional catch-up contribution
+
+  // Growth Assumptions
+  expectedReturn    Float       @default(7.0) // Annual return %
+  returnVolatility  Float       @default(15.0) // Standard deviation %
+
+  // Asset Allocation
+  equityPct         Float       @default(60)
+  bondsPct          Float       @default(30)
+  cashPct           Float       @default(5)
+  alternativesPct   Float       @default(5)
+
+  // Holdings Detail (optional)
+  holdings          Json?       // Detailed holdings [{symbol, shares, value, allocation}]
+
+  // Tax Treatment
+  taxTreatment      String      @default("tax_deferred") // tax_deferred, tax_free, taxable, partially_taxable
+  rmdRequired       Boolean     @default(false)
+  rmdStartAge       Int?        // Age when RMDs begin (73, 75, etc.)
+
+  // Fees
+  expenseRatio      Float       @default(0.5) // Annual expense ratio %
+  advisorFee        Float       @default(0)   // Annual advisor fee %
+
+  // Linked External Account
+  plaidAccountId    String?
+  lastSyncedAt      DateTime?
+
+  // Beneficiaries
+  beneficiaries     Json?       // [{name, relationship, percentage, type: primary|contingent}]
+
+  isActive          Boolean     @default(true)
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  retirementPlan    RetirementPlan @relation(fields: [retirementPlanId], references: [id], onDelete: Cascade)
+  transactions      RetirementTransaction[]
+
+  @@index([retirementPlanId])
+  @@index([accountType])
+  @@index([owner])
+  @@map("retirement_accounts")
+}
+
+model RetirementTransaction {
+  id                String      @id @default(cuid())
+  retirementAccountId String
+
+  // Transaction Details
+  type              String      // contribution, withdrawal, dividend, interest, transfer_in, transfer_out, roth_conversion, rebalance, fee
+  amount            Float
+  date              DateTime
+  description       String?
+
+  // For Conversions
+  fromAccountType   String?
+  toAccountType     String?
+  taxableAmount     Float?
+
+  // Categorization
+  category          String?     // employer_match, employee_contribution, rollover, rmd, hardship, qualified_distribution
+
+  createdAt         DateTime    @default(now())
+
+  // Relations
+  retirementAccount RetirementAccount @relation(fields: [retirementAccountId], references: [id], onDelete: Cascade)
+
+  @@index([retirementAccountId])
+  @@index([date])
+  @@index([type])
+  @@map("retirement_transactions")
+}
+
+model RetirementIncomeStream {
+  id                String      @id @default(cuid())
+  retirementPlanId  String
+
+  // Income Source Details
+  name              String
+  type              String      // social_security, pension, annuity, rental, part_time_work, royalties, business_income, inheritance, trust_distribution, other
+  owner             String      @default("primary") // primary, spouse, joint
+
+  // Amount
+  annualAmount      Float
+  monthlyAmount     Float?
+
+  // Timing
+  startAge          Int         // Age when income begins
+  endAge            Int?        // Age when income ends (null = lifetime)
+  startDate         DateTime?   // Specific start date
+  endDate           DateTime?   // Specific end date
+
+  // Adjustments
+  inflationAdjusted Boolean     @default(false)
+  colaRate          Float?      // Cost of living adjustment %
+  taxable           Boolean     @default(true)
+  taxRate           Float?      // Specific tax rate if known
+
+  // Pension Specifics
+  pensionType       String?     // single_life, joint_survivor, period_certain, lump_sum
+  survivorBenefit   Float?      // % survivor receives
+  certainPeriod     Int?        // Years for period certain
+  lumpSumOption     Float?      // Lump sum value if available
+
+  // Annuity Specifics
+  annuityType       String?     // immediate, deferred, fixed, variable, indexed
+  guaranteedPeriod  Int?
+  deathBenefit      Float?
+
+  // Probability
+  probability       Float       @default(100) // % probability of receiving this income (for planning uncertainty)
+
+  isActive          Boolean     @default(true)
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  retirementPlan    RetirementPlan @relation(fields: [retirementPlanId], references: [id], onDelete: Cascade)
+
+  @@index([retirementPlanId])
+  @@index([type])
+  @@index([owner])
+  @@map("retirement_income_streams")
+}
+
+model RetirementExpense {
+  id                String      @id @default(cuid())
+  retirementPlanId  String
+
+  // Expense Details
+  name              String
+  category          String      // housing, healthcare, food, transportation, utilities, insurance, entertainment, travel, hobbies, family_support, charitable, taxes, debt_payments, other
+
+  // Amount
+  annualAmount      Float
+  monthlyAmount     Float?
+
+  // Timing
+  startAge          Int?        // When expense begins (null = now)
+  endAge            Int?        // When expense ends (null = lifetime)
+
+  // Adjustments
+  inflationType     String      @default("general") // general, healthcare, custom, none
+  customInflation   Float?      // Custom inflation rate if applicable
+
+  // Flexibility
+  priority          String      @default("essential") // essential, important, discretionary, luxury
+  canReduce         Boolean     @default(true)
+  reductionPct      Float?      // How much can be reduced if needed
+
+  // One-time vs Recurring
+  isRecurring       Boolean     @default(true)
+  oneTimeYear       Int?        // If one-time, which year
+
+  // For Housing
+  isMortgage        Boolean     @default(false)
+  mortgagePayoffYear Int?
+
+  // For Healthcare (handled separately but can track here too)
+  includesMedicare  Boolean     @default(false)
+
+  isActive          Boolean     @default(true)
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  retirementPlan    RetirementPlan @relation(fields: [retirementPlanId], references: [id], onDelete: Cascade)
+
+  @@index([retirementPlanId])
+  @@index([category])
+  @@index([priority])
+  @@map("retirement_expenses")
+}
+
+model SocialSecurityBenefit {
+  id                String      @id @default(cuid())
+  retirementPlanId  String
+
+  // Beneficiary
+  owner             String      @default("primary") // primary, spouse
+
+  // Current Earnings Record
+  currentPIA        Float?      // Primary Insurance Amount at FRA (from SSA)
+  estimatedPIA      Float?      // Estimated PIA if not available
+
+  // Earning History
+  yearsOfEarnings   Int         @default(35)
+  averageIndexedMonthlyEarnings Float? // AIME
+  highestEarningsYears Json?    // Array of highest 35 years
+
+  // Key Ages
+  earliestClaimAge  Int         @default(62)
+  fullRetirementAge Int         @default(67) // 66, 66+2mo, 67, etc.
+  maxClaimAge       Int         @default(70)
+
+  // Claiming Strategy
+  plannedClaimAge   Int?        // When they plan to claim
+  claimingStrategy  String      @default("optimal") // early, fra, delayed, optimal, file_suspend, restricted_application
+
+  // Benefit Amounts
+  benefitAtEarly    Float?      // Estimated benefit at 62
+  benefitAtFRA      Float?      // Estimated benefit at FRA
+  benefitAtMax      Float?      // Estimated benefit at 70
+
+  // Spousal Benefits
+  spousalBenefitEligible Boolean @default(false)
+  spousalBenefitAmount Float?
+
+  // Survivor Benefits
+  survivorBenefitAmount Float?
+
+  // Adjustments
+  expectedCOLA      Float       @default(2.5) // Expected COLA %
+
+  // Earnings Test
+  workingWhileClaiming Boolean  @default(false)
+  expectedEarningsBeforeFRA Float?
+
+  // Optimization Results
+  optimalClaimAge   Int?        // Calculated optimal age
+  breakEvenAge      Int?        // Age where delayed claiming pays off
+  lifetimeValue     Float?      // Total lifetime benefit estimate
+
+  lastUpdated       DateTime?
+  ssaVerified       Boolean     @default(false)
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  retirementPlan    RetirementPlan @relation(fields: [retirementPlanId], references: [id], onDelete: Cascade)
+
+  @@index([retirementPlanId])
+  @@index([owner])
+  @@map("social_security_benefits")
+}
+
+model RetirementHealthcarePlan {
+  id                String      @id @default(cuid())
+  retirementPlanId  String
+
+  // Beneficiary
+  owner             String      @default("primary") // primary, spouse, both
+
+  // Pre-Medicare (before 65)
+  preMedicareStrategy String    @default("employer") // employer, cobra, aca_marketplace, private, spouse_plan, part_time_work, health_sharing
+
+  // ACA Marketplace
+  acaPlanType       String?     // bronze, silver, silver_csr, gold, platinum
+  acaEstimatedPremium Float?
+  acaEstimatedSubsidy Float?    // Based on income
+
+  // COBRA
+  cobraDuration     Int?        // Months of COBRA coverage
+  cobraMonthlyPremium Float?
+
+  // Employer Retiree Benefits
+  hasRetireeHealthcare Boolean  @default(false)
+  retireeBenefitValue Float?
+
+  // Medicare (65+)
+  medicarePartAEligible Boolean @default(true)
+  medicarePartAPremium Float    @default(0) // Usually $0 if 40+ quarters
+
+  medicarePartBPremium Float    @default(174.70) // 2024 standard premium
+  medicarePartBIRMAA Float      @default(0) // Income-related adjustment
+
+  // Medicare Plans
+  medicarePlanType  String      @default("advantage") // original_medigap, advantage, none
+
+  // Medigap
+  medigapPlanLetter String?     // A, B, C, D, F, G, K, L, M, N
+  medigapPremium    Float?
+
+  // Medicare Advantage
+  advantagePlanType String?     // hmo, ppo, pffs, snp
+  advantagePremium  Float?      // Often $0
+  advantageOOPMax   Float?
+
+  // Part D
+  partDPremium      Float       @default(55.50) // 2024 avg
+  partDIRMAA        Float       @default(0)
+
+  // Long-term Care
+  hasLTCI           Boolean     @default(false)
+  ltciDailyBenefit  Float?
+  ltciBenefitPeriod Int?        // Years
+  ltciEliminationPeriod Int?    // Days
+  ltciInflationProtection Boolean @default(false)
+  ltciAnnualPremium Float?
+
+  // HSA Strategy
+  hasHSA            Boolean     @default(false)
+  hsaBalance        Float?
+  hsaAnnualContribution Float?
+  hsaInvestmentStrategy String? // cash, invested, hybrid
+
+  // Cost Estimates by Age
+  estimatedCosts    Json?       // [{age, annualCost, premiums, outOfPocket}]
+
+  // Assumptions
+  healthStatus      String      @default("average") // excellent, good, average, poor
+  chronicConditions Json?       // List of conditions affecting costs
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  retirementPlan    RetirementPlan @relation(fields: [retirementPlanId], references: [id], onDelete: Cascade)
+
+  @@index([retirementPlanId])
+  @@index([owner])
+  @@map("retirement_healthcare_plans")
+}
+
+model WithdrawalStrategy {
+  id                String      @id @default(cuid())
+  retirementPlanId  String
+
+  // Strategy Type
+  name              String
+  strategyType      String      @default("dynamic") // fixed_percentage, fixed_dollar, dynamic, guardrails, bucket, floor_ceiling, endowment
+  isPrimary         Boolean     @default(false)
+
+  // Fixed Percentage Rules
+  initialWithdrawalRate Float   @default(4.0) // The "4% rule"
+  annualAdjustment  String      @default("inflation") // inflation, fixed, real_return, none
+
+  // Fixed Dollar Rules
+  fixedAnnualAmount Float?
+
+  // Dynamic Rules (Guyton-Klinger, etc.)
+  prosperityRule    Boolean     @default(false)
+  prosperityThreshold Float?    // Portfolio gain % to trigger increase
+  capitalPreservationRule Boolean @default(false)
+  capitalPreservationThreshold Float? // Withdrawal rate ceiling
+  withdrawalCeiling Float?      // Max withdrawal rate %
+  withdrawalFloor   Float?      // Min withdrawal rate %
+
+  // Guardrails (Vanguard Dynamic Spending)
+  upperGuardrail    Float?      // % above which to increase spending
+  lowerGuardrail    Float?      // % below which to decrease spending
+  ceilingAdjustment Float?      // Max spending increase %
+  floorAdjustment   Float?      // Max spending decrease %
+
+  // Bucket Strategy
+  buckets           Json?       // [{name, years, allocation, amount}]
+  refillStrategy    String?     // annual, trigger_based, opportunistic
+
+  // Account Withdrawal Order
+  withdrawalOrder   Json?       // ["taxable", "tax_deferred", "tax_free"] or custom
+  taxBracketAwareness Boolean   @default(true)
+  rothConversionIntegration Boolean @default(false)
+
+  // Required Minimum Distributions
+  handleRMDs        String      @default("satisfy_first") // satisfy_first, reinvest_excess, charitable_qcd
+
+  // Social Security Integration
+  ssBridgeStrategy  Boolean     @default(false) // Higher withdrawals before SS starts
+
+  // Monte Carlo Results
+  successRate       Float?      // % of simulations successful
+  medianEndingBalance Float?
+  worstCaseEndingBalance Float?
+  bestCaseEndingBalance Float?
+
+  // Backtested Results
+  historicalSuccessRate Float?
+  worstStartYear    Int?        // Worst historical start year
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  retirementPlan    RetirementPlan @relation(fields: [retirementPlanId], references: [id], onDelete: Cascade)
+
+  @@index([retirementPlanId])
+  @@index([strategyType])
+  @@map("withdrawal_strategies")
+}
+
+model RothConversionPlan {
+  id                String      @id @default(cuid())
+  retirementPlanId  String
+
+  // Strategy
+  name              String      @default("Roth Conversion Strategy")
+  strategyType      String      @default("fill_bracket") // none, fill_bracket, fixed_amount, before_ss, before_rmd, aggressive, backdoor, mega_backdoor
+
+  // Target Tax Bracket
+  targetBracket     Float?      // Fill up to X% bracket (e.g., 22%)
+  targetAGI         Float?      // Or fill up to specific AGI
+
+  // Fixed Amount Strategy
+  annualConversionAmount Float? // Convert $X per year
+
+  // Timing
+  startYear         Int?
+  startAge          Int?
+  endYear           Int?
+  endAge            Int?
+
+  // Conversion Window
+  yearsBeforeSS     Int?        // Convert X years before SS
+  yearsBeforeRMD    Int?        // Convert X years before RMDs
+
+  // Conversion Schedule
+  conversionSchedule Json?      // [{year, amount, fromAccount, taxCost, cumulativeConverted}]
+
+  // Tax Impact Analysis
+  totalToConvert    Float?
+  totalTaxCost      Float?
+  estimatedTaxSavings Float?    // Lifetime tax savings vs no conversion
+  breakEvenYears    Int?        // Years until conversions pay off
+
+  // Constraints
+  maxAnnualTaxBill  Float?      // Don't exceed this tax bill
+  avoidIRMAA        Boolean     @default(true) // Stay below IRMAA thresholds
+  avoidNIIT         Boolean     @default(false) // Stay below NIIT threshold
+  preserveACASubsidy Boolean    @default(false)
+
+  // Current Progress
+  totalConverted    Float       @default(0)
+  lastConversionYear Int?
+  lastConversionAmount Float?
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  retirementPlan    RetirementPlan @relation(fields: [retirementPlanId], references: [id], onDelete: Cascade)
+
+  @@index([retirementPlanId])
+  @@index([strategyType])
+  @@map("roth_conversion_plans")
+}
+
+model RetirementScenario {
+  id                String      @id @default(cuid())
+  retirementPlanId  String
+
+  // Scenario Details
+  name              String
+  description       String?
+  type              String      @default("what_if") // base_case, optimistic, pessimistic, what_if, stress_test
+  isBaseCase        Boolean     @default(false)
+
+  // Overrides (null means use plan default)
+  retirementAge     Int?
+  spouseRetirementAge Int?
+  lifeExpectancy    Int?
+
+  annualExpenses    Float?
+  retirementIncome  Float?
+
+  // Market Assumptions
+  equityReturn      Float?
+  bondReturn        Float?
+  inflationRate     Float?
+
+  // Social Security
+  ssClaimAge        Int?
+  spouseSSClaimAge  Int?
+  ssReductionPct    Float?      // For stress testing SS cuts
+
+  // One-time Events
+  events            Json?       // [{year, type, amount, description}] e.g., inheritance, home sale, large expense
+
+  // Results
+  projectionResults Json?       // Year-by-year projection
+  successRate       Float?      // Monte Carlo success rate
+  retirementReadinessScore Int? // 0-100 score
+
+  // Gap Analysis
+  incomeGap         Float?      // Annual shortfall if any
+  savingsGap        Float?      // Additional savings needed
+  yearsOfSavingsGap Int?        // How many years short
+
+  // Key Metrics
+  portfolioAtRetirement Float?
+  portfolioAt80     Float?
+  portfolioAt90     Float?
+  portfolioDepletion Int?       // Age when money runs out (if applicable)
+  legacyAmount      Float?      // Expected inheritance
+
+  // Comparison to Base
+  vsBaseCase        Json?       // {successRateDiff, endingBalanceDiff, etc.}
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  retirementPlan    RetirementPlan @relation(fields: [retirementPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([retirementPlanId, name])
+  @@index([retirementPlanId])
+  @@index([type])
+  @@map("retirement_scenarios")
+}
+
+model RetirementProjection {
+  id                String      @id @default(cuid())
+  retirementPlanId  String
+
+  // Projection Metadata
+  calculatedAt      DateTime    @default(now())
+  projectionType    String      @default("monte_carlo") // deterministic, monte_carlo, historical
+  scenarioId        String?
+
+  // Input Summary
+  inputSnapshot     Json        // Snapshot of all inputs at calculation time
+
+  // Year-by-Year Detail
+  yearlyProjection  Json        // [{year, age, spouseAge, portfolioValue, income, expenses, taxes, withdrawals, contributions, ssIncome, pensionIncome, otherIncome, healthcareCosts, legacyValue}]
+
+  // Monte Carlo Results
+  monteCarloRuns    Int?
+  successRate       Float?      // % of runs that didn't deplete
+  failureRate       Float?
+
+  // Distribution of Outcomes
+  percentile10      Float?      // Worst 10%
+  percentile25      Float?
+  percentile50      Float?      // Median
+  percentile75      Float?
+  percentile90      Float?      // Best 10%
+
+  // Key Ages Analysis
+  portfolioAtRetirement Float?
+  portfolioAt70     Float?
+  portfolioAt80     Float?
+  portfolioAt90     Float?
+  portfolioAt100    Float?
+
+  // Depletion Analysis
+  depletionAge      Int?        // Age when portfolio depletes (if <100%)
+  medianDepletionAge Int?
+
+  // Income Analysis
+  totalLifetimeIncome Float?
+  totalSSBenefits   Float?
+  totalPensionBenefits Float?
+  totalWithdrawals  Float?
+
+  // Expense Analysis
+  totalLifetimeExpenses Float?
+  totalHealthcareCosts Float?
+  totalTaxes        Float?
+
+  // Legacy Analysis
+  expectedLegacy    Float?
+  legacyProbability Float?      // % chance of leaving target legacy
+
+  // Tax Efficiency
+  totalTaxesPaid    Float?
+  effectiveTaxRate  Float?
+  rothConversionBenefit Float?
+
+  // Recommendations
+  recommendations   Json?       // [{priority, category, title, description, impact}]
+
+  // Assumptions Used
+  assumptions       Json        // All assumptions used in this projection
+
+  // Relations
+  retirementPlan    RetirementPlan @relation(fields: [retirementPlanId], references: [id], onDelete: Cascade)
+
+  @@index([retirementPlanId])
+  @@index([calculatedAt])
+  @@index([projectionType])
+  @@map("retirement_projections")
+}
+
+model RetirementMilestone {
+  id                String      @id @default(cuid())
+  retirementPlanId  String
+
+  // Milestone Details
+  name              String
+  description       String?
+  category          String      // savings, age, income, expense, lifestyle, estate
+
+  // Target
+  targetType        String      // age, date, amount, percentage
+  targetAge         Int?
+  targetDate        DateTime?
+  targetAmount      Float?
+  targetPercentage  Float?
+
+  // Current Progress
+  currentValue      Float?
+  progressPct       Float?      // 0-100
+
+  // Status
+  status            String      @default("not_started") // not_started, in_progress, on_track, at_risk, achieved, missed
+  achievedDate      DateTime?
+
+  // Priority
+  priority          Int         @default(5) // 1-10
+  isKeyMilestone    Boolean     @default(false)
+
+  // Alerts
+  alertThreshold    Float?      // Alert if progress falls below
+  alertEnabled      Boolean     @default(true)
+  lastAlertSent     DateTime?
+
+  // Dependencies
+  dependsOnMilestones String[]  // Other milestone IDs this depends on
+
+  notes             String?     @db.Text
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  retirementPlan    RetirementPlan @relation(fields: [retirementPlanId], references: [id], onDelete: Cascade)
+
+  @@index([retirementPlanId])
+  @@index([status])
+  @@index([category])
+  @@map("retirement_milestones")
 }

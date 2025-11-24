@@ -1,6 +1,7 @@
 // FILE: src/components/finance/FinanceSidebar.tsx
 'use client';
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -54,6 +55,38 @@ const financeNavItems = [
 
 export function FinanceSidebar() {
   const pathname = usePathname();
+  const [accountSummary, setAccountSummary] = useState<{
+    count: number;
+    total: number;
+    loading: boolean;
+  }>({ count: 0, total: 0, loading: true });
+
+  // Fetch account summary data
+  useEffect(() => {
+    const fetchAccountSummary = async () => {
+      try {
+        const response = await fetch('/api/plaid/accounts');
+        if (response.ok) {
+          const data = await response.json();
+          const accounts = data.accounts || [];
+          const total = accounts.reduce((sum: number, acc: { currentBalance?: number }) =>
+            sum + (acc.currentBalance || 0), 0);
+          setAccountSummary({
+            count: accounts.length,
+            total,
+            loading: false,
+          });
+        } else {
+          setAccountSummary({ count: 0, total: 0, loading: false });
+        }
+      } catch (error) {
+        console.error('Error fetching account summary:', error);
+        setAccountSummary({ count: 0, total: 0, loading: false });
+      }
+    };
+
+    fetchAccountSummary();
+  }, []);
 
   // Determine if a nav link is active
   const isActive = (href: string) => {
@@ -133,10 +166,27 @@ export function FinanceSidebar() {
       {/* Account summary section */}
       <div className="mt-6 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-800 dark:to-indigo-800 rounded-lg border border-blue-100 dark:border-blue-600">
         <h3 className="text-sm font-medium text-blue-800 dark:text-white mb-2">Connected Accounts</h3>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-blue-600 dark:text-blue-200">5 accounts</span>
-          <span className="text-sm font-medium text-blue-900 dark:text-white">$124,350.28</span>
-        </div>
+        {accountSummary.loading ? (
+          <div className="flex items-center justify-center py-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          </div>
+        ) : accountSummary.count > 0 ? (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-blue-600 dark:text-blue-200">
+              {accountSummary.count} account{accountSummary.count !== 1 ? 's' : ''}
+            </span>
+            <span className="text-sm font-medium text-blue-900 dark:text-white">
+              {new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+              }).format(accountSummary.total)}
+            </span>
+          </div>
+        ) : (
+          <p className="text-sm text-blue-600 dark:text-blue-200 text-center">
+            No accounts connected
+          </p>
+        )}
       </div>
     </div>
   );

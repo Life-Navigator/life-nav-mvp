@@ -1,96 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/cards/Card';
 import { Button } from '@/components/ui/buttons/Button';
 
-// Mock data for financial goals
-const mockGoals = [
-  {
-    id: 'goal1',
-    name: 'Emergency Fund',
-    description: 'Build emergency fund to cover 6 months of expenses',
-    target: 30000,
-    current: 18000,
-    contributionFrequency: 'monthly',
-    contributionAmount: 1000,
-    targetDate: '2025-12-31',
-    priority: 'high',
-    category: 'savings',
-    progress: 60,
-    status: 'on-track',
-  },
-  {
-    id: 'goal2',
-    name: 'Retirement Savings',
-    description: 'Max out 401(k) contributions',
-    target: 22500,
-    current: 12000,
-    contributionFrequency: 'monthly',
-    contributionAmount: 1875,
-    targetDate: '2025-12-31',
-    priority: 'high',
-    category: 'retirement',
-    progress: 53,
-    status: 'on-track',
-  },
-  {
-    id: 'goal3',
-    name: 'Pay Off Student Loans',
-    description: 'Completely pay off remaining student loan balance',
-    target: 35000,
-    current: 22000,
-    contributionFrequency: 'monthly',
-    contributionAmount: 1500,
-    targetDate: '2026-06-30',
-    priority: 'medium',
-    category: 'debt',
-    progress: 37,
-    status: 'behind',
-  },
-  {
-    id: 'goal4',
-    name: 'Home Down Payment',
-    description: 'Save for 20% down payment on a house',
-    target: 80000,
-    current: 25000,
-    contributionFrequency: 'monthly',
-    contributionAmount: 1500,
-    targetDate: '2027-12-31',
-    priority: 'medium',
-    category: 'savings',
-    progress: 31,
-    status: 'on-track',
-  },
-  {
-    id: 'goal5',
-    name: 'Family Vacation',
-    description: 'Save for a European family vacation',
-    target: 10000,
-    current: 7500,
-    contributionFrequency: 'monthly',
-    contributionAmount: 500,
-    targetDate: '2025-06-30',
-    priority: 'low',
-    category: 'lifestyle',
-    progress: 75,
-    status: 'ahead',
-  },
-  {
-    id: 'goal6',
-    name: 'New Car',
-    description: 'Save for a new car purchase',
-    target: 25000,
-    current: 5000,
-    contributionFrequency: 'monthly',
-    contributionAmount: 800,
-    targetDate: '2026-12-31',
-    priority: 'low',
-    category: 'lifestyle',
-    progress: 20,
-    status: 'on-track',
-  },
-];
+interface FinancialGoal {
+  id: string;
+  name: string;
+  description: string;
+  target: number;
+  current: number;
+  contributionFrequency: string;
+  contributionAmount: number;
+  targetDate: string;
+  priority: string;
+  category: string;
+  progress: number;
+  status: string;
+}
 
 // Goal categories with icons and colors
 const goalCategories = [
@@ -102,14 +29,40 @@ const goalCategories = [
 ];
 
 export function GoalProgress() {
+  const [goals, setGoals] = useState<FinancialGoal[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
-  
+
+  useEffect(() => {
+    const fetchGoals = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/financial/goals');
+        if (!response.ok) {
+          throw new Error('Failed to fetch goals');
+        }
+        const data = await response.json();
+        setGoals(data || []);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching financial goals:', err);
+        setError(err instanceof Error ? err : new Error('Failed to fetch goals'));
+        setGoals([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchGoals();
+  }, []);
+
   // Filter goals by selected category
   const filteredGoals = selectedCategory === 'all'
-    ? mockGoals
-    : mockGoals.filter(goal => goal.category === selectedCategory);
-  
+    ? goals
+    : goals.filter(goal => goal.category === selectedCategory);
+
   // Get status color
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -123,30 +76,73 @@ export function GoalProgress() {
         return 'text-gray-600';
     }
   };
-  
+
   // Calculate time remaining
   const getTimeRemaining = (targetDate: string) => {
     const now = new Date();
     const target = new Date(targetDate);
     const diffTime = target.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays < 0) {
       return 'Overdue';
     }
-    
+
     if (diffDays < 30) {
       return `${diffDays} days left`;
     }
-    
+
     const diffMonths = Math.ceil(diffDays / 30);
     return `${diffMonths} ${diffMonths === 1 ? 'month' : 'months'} left`;
   };
-  
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold">Financial Goals</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map(i => (
+            <Card key={i} className="p-4">
+              <div className="animate-pulse space-y-3">
+                <div className="h-5 bg-slate-200 dark:bg-slate-700 rounded w-1/2"></div>
+                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4"></div>
+                <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded-full w-full"></div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state - no goals
+  if (goals.length === 0) {
+    return (
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold">Financial Goals</h2>
+        <Card className="p-8 text-center">
+          <div className="max-w-md mx-auto">
+            <div className="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium mb-2">No Financial Goals Yet</h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">
+              Set up financial goals to track your progress towards savings, retirement, debt payoff, and more.
+            </p>
+            <Button>Add New Financial Goal</Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <h2 className="text-xl font-semibold">Financial Goals</h2>
-      
+
       {/* Category Filter */}
       <div className="flex flex-wrap gap-2">
         {goalCategories.map(category => (
@@ -164,7 +160,7 @@ export function GoalProgress() {
           </button>
         ))}
       </div>
-      
+
       {/* Goals Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {filteredGoals.map(goal => (
@@ -184,9 +180,9 @@ export function GoalProgress() {
                    goal.status === 'behind' ? 'Behind schedule' : 'Unknown'}
                 </span>
               </div>
-              
+
               <p className="text-sm text-gray-600">{goal.description}</p>
-              
+
               {/* Progress Bar */}
               <div className="mt-4">
                 <div className="flex justify-between text-sm mb-1">
@@ -204,7 +200,7 @@ export function GoalProgress() {
                   ></div>
                 </div>
               </div>
-              
+
               {/* Goal Details */}
               <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mt-2">
                 <div>
@@ -220,7 +216,7 @@ export function GoalProgress() {
                   </span>
                 </div>
               </div>
-              
+
               {/* Extra Details (when goal is selected) */}
               {selectedGoal === goal.id && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
@@ -242,7 +238,7 @@ export function GoalProgress() {
                       <p className="font-medium capitalize">{goal.category}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex gap-2 mt-4">
                     <Button size="sm">Edit Goal</Button>
                     <Button variant="outline" size="sm">Adjust Contribution</Button>
@@ -253,41 +249,43 @@ export function GoalProgress() {
           </Card>
         ))}
       </div>
-      
+
       {/* Add Goal Button */}
       <div className="mt-6">
         <Button>
           Add New Financial Goal
         </Button>
       </div>
-      
+
       {/* Summary Section */}
-      <Card className="p-6 mt-4">
-        <h3 className="text-lg font-medium mb-4">Goals Summary</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Total Goal Amount</p>
-            <p className="text-xl font-semibold">
-              ${mockGoals.reduce((sum, goal) => sum + goal.target, 0).toLocaleString()}
-            </p>
+      {goals.length > 0 && (
+        <Card className="p-6 mt-4">
+          <h3 className="text-lg font-medium mb-4">Goals Summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Total Goal Amount</p>
+              <p className="text-xl font-semibold">
+                ${goals.reduce((sum, goal) => sum + goal.target, 0).toLocaleString()}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Current Progress</p>
+              <p className="text-xl font-semibold">
+                ${goals.reduce((sum, goal) => sum + goal.current, 0).toLocaleString()}
+                <span className="text-sm text-gray-500 ml-1">
+                  ({Math.round((goals.reduce((sum, goal) => sum + goal.current, 0) / goals.reduce((sum, goal) => sum + goal.target, 0)) * 100)}%)
+                </span>
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500 mb-1">Monthly Contributions</p>
+              <p className="text-xl font-semibold">
+                ${goals.reduce((sum, goal) => sum + goal.contributionAmount, 0).toLocaleString()}
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Current Progress</p>
-            <p className="text-xl font-semibold">
-              ${mockGoals.reduce((sum, goal) => sum + goal.current, 0).toLocaleString()} 
-              <span className="text-sm text-gray-500 ml-1">
-                ({Math.round((mockGoals.reduce((sum, goal) => sum + goal.current, 0) / mockGoals.reduce((sum, goal) => sum + goal.target, 0)) * 100)}%)
-              </span>
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500 mb-1">Monthly Contributions</p>
-            <p className="text-xl font-semibold">
-              ${mockGoals.reduce((sum, goal) => sum + goal.contributionAmount, 0).toLocaleString()}
-            </p>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }
