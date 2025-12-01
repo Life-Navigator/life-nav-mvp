@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { useOnClickOutside } from '@/hooks/useOnClickOutside';
 import { DirectThemeToggle } from '@/components/theme/DirectThemeToggle';
+import { getAuthHeaders } from '@/hooks/useAuth';
 
 type EmailAccount = {
   id: string;
@@ -14,12 +15,21 @@ type EmailAccount = {
   unreadCount: number;
 };
 
+type CalendarConnection = {
+  id: string;
+  provider: string;
+  calendarName: string;
+  status: string;
+};
+
 type Notification = {
   id: string;
   title: string;
-  description: string;
-  time: string;
-  read: boolean;
+  message: string;
+  type: string;
+  priority: string;
+  createdAt: string;
+  actionUrl?: string;
 };
 
 type UserProfile = {
@@ -44,20 +54,92 @@ const Header: FC = () => {
   const [showUserMenu, setShowUserMenu] = useState<boolean>(false);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
   const [showEmailDropdown, setShowEmailDropdown] = useState<boolean>(false);
-  
+  const [showCalendarDropdown, setShowCalendarDropdown] = useState<boolean>(false);
+
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([]);
+  const [calendarConnections, setCalendarConnections] = useState<CalendarConnection[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const emailDropdownRef = useRef<HTMLDivElement>(null);
+  const calendarDropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useOnClickOutside(userMenuRef as React.RefObject<HTMLElement>, () => setShowUserMenu(false));
   useOnClickOutside(notificationsRef as React.RefObject<HTMLElement>, () => setShowNotifications(false));
   useOnClickOutside(emailDropdownRef as React.RefObject<HTMLElement>, () => setShowEmailDropdown(false));
+  useOnClickOutside(calendarDropdownRef as React.RefObject<HTMLElement>, () => setShowCalendarDropdown(false));
 
   // After mounting, we can safely show the UI that depends on client-side features
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fetch email accounts
+  useEffect(() => {
+    const fetchEmailAccounts = async () => {
+      try {
+        const headers = getAuthHeaders();
+        const response = await fetch('/api/email/accounts', { headers });
+
+        if (response.ok) {
+          const data = await response.json();
+          setEmailAccounts(data.accounts || []);
+        }
+      } catch (error) {
+        console.error('Error fetching email accounts:', error);
+      }
+    };
+
+    if (mounted) {
+      fetchEmailAccounts();
+    }
+  }, [mounted]);
+
+  // Fetch calendar connections
+  useEffect(() => {
+    const fetchCalendarConnections = async () => {
+      try {
+        const headers = getAuthHeaders();
+        const response = await fetch('/api/calendar/sources', { headers });
+
+        if (response.ok) {
+          const data = await response.json();
+          setCalendarConnections(data.sources || []);
+        }
+      } catch (error) {
+        console.error('Error fetching calendar connections:', error);
+      }
+    };
+
+    if (mounted) {
+      fetchCalendarConnections();
+    }
+  }, [mounted]);
+
+  // Fetch notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const headers = getAuthHeaders();
+        const response = await fetch('/api/dashboard/notifications', { headers });
+
+        if (response.ok) {
+          const data = await response.json();
+          setNotifications(data.notifications || []);
+          setUnreadCount(data.unreadCount || 0);
+        }
+      } catch (error) {
+        console.error('Error fetching notifications:', error);
+      }
+    };
+
+    if (mounted) {
+      fetchNotifications();
+    }
+  }, [mounted]);
 
   // Get page title based on the current pathname
   const getPageTitle = (): string => {
@@ -65,60 +147,51 @@ const Header: FC = () => {
     if (!path) return 'Home';
     return path.charAt(0).toUpperCase() + path.slice(1);
   };
-  
-  // Sample notifications
-  const notifications: Notification[] = [
-    {
-      id: '1',
-      title: 'New message',
-      description: 'You have a new message from your financial advisor',
-      time: '5 minutes ago',
-      read: false,
-    },
-    {
-      id: '2',
-      title: 'Reminder',
-      description: 'Career coaching session tomorrow at 3 PM',
-      time: '1 hour ago',
-      read: false,
-    },
-    {
-      id: '3',
-      title: 'Update',
-      description: 'Your monthly financial report is ready to view',
-      time: 'Yesterday',
-      read: true,
-    },
-  ];
 
-  // Sample email accounts
-  const emailAccounts: EmailAccount[] = [
-    {
-      id: '1',
-      provider: 'Gmail',
-      email: 'thomas.riffe@gmail.com',
-      unreadCount: 3,
-    },
-    {
-      id: '2',
-      provider: 'Outlook',
-      email: 'thomas.riffe@outlook.com',
-      unreadCount: 5,
-    },
-    {
-      id: '3',
-      provider: 'Work',
-      email: 'thomas.riffe@company.com',
-      unreadCount: 0,
+  // Get user data from localStorage
+  const getUserData = (): UserProfile => {
+    if (typeof window === 'undefined') {
+      return { name: 'User', email: '', initials: 'U', image: null };
     }
-  ];
 
-  // Sample user
-  const user: UserProfile = {
-    name: 'Thomas Riffe',
-    email: 'thomas.riffe@example.com',
-    initials: 'TR',
-    image: null,
+    const userData = localStorage.getItem('user_data');
+    if (userData) {
+      try {
+        const parsed = JSON.parse(userData);
+        const name = parsed.name || 'User';
+        const email = parsed.email || '';
+        const initials = name
+          .split(' ')
+          .map((n: string) => n[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2);
+
+        return {
+          name,
+          email,
+          initials: initials || 'U',
+          image: parsed.image || null,
+        };
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+
+    return { name: 'User', email: '', initials: 'U', image: null };
+  };
+
+  const user = getUserData();
+
+  // Helper to format time ago
+  const getTimeAgo = (date: Date): string => {
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+    return date.toLocaleDateString();
   };
 
   const handleSignOut = () => {
@@ -144,14 +217,78 @@ const Header: FC = () => {
 
           {/* Right side - Actions */}
           <div className="flex items-center space-x-4">
-            {/* Calendar Link */}
-            <Link
-              href="/dashboard/calendar"
-              className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 relative"
-              aria-label="Calendar"
-            >
-              <CalendarIcon />
-            </Link>
+            {/* Calendar Dropdown */}
+            <div ref={calendarDropdownRef} className="relative">
+              <button
+                type="button"
+                className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300 relative"
+                onClick={() => {
+                  setShowCalendarDropdown(!showCalendarDropdown);
+                  setShowEmailDropdown(false);
+                  setShowNotifications(false);
+                  setShowUserMenu(false);
+                }}
+                aria-label="Calendar"
+              >
+                <CalendarIcon />
+                {calendarConnections.length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-green-500" />
+                )}
+              </button>
+
+              {/* Calendar dropdown */}
+              {showCalendarDropdown && (
+                <div className="absolute right-0 mt-2 w-72 origin-top-right rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none">
+                  <div className="py-1 divide-y divide-gray-200 dark:divide-gray-700">
+                    <div className="px-4 py-2">
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">Calendars</h3>
+                    </div>
+                    {calendarConnections.length > 0 ? (
+                      <>
+                        <div className="max-h-60 overflow-y-auto">
+                          {calendarConnections.map((connection) => (
+                            <Link
+                              key={connection.id}
+                              href="/dashboard/calendar"
+                              className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white">{connection.provider}</p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">{connection.calendarName || 'Calendar'}</p>
+                                </div>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                  connection.status === 'active'
+                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                                }`}>
+                                  {connection.status}
+                                </span>
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                        <div className="px-4 py-2">
+                          <Link href="/dashboard/integrations" className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                            Manage calendars
+                          </Link>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="px-4 py-6 text-center">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">No calendars connected</p>
+                        <Link
+                          href="/dashboard/integrations"
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                        >
+                          Connect Calendar
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Email Dropdown */}
             <div ref={emailDropdownRef} className="relative">
@@ -174,36 +311,50 @@ const Header: FC = () => {
               {/* Email accounts dropdown */}
               {showEmailDropdown && (
                 <div className="absolute right-0 mt-2 w-72 origin-top-right rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none">
-                  <div className="py-1 divide-y divide-gray-200">
+                  <div className="py-1 divide-y divide-gray-200 dark:divide-gray-700">
                     <div className="px-4 py-2">
                       <h3 className="text-sm font-medium text-gray-900 dark:text-white">Email Accounts</h3>
                     </div>
-                    <div className="max-h-60 overflow-y-auto">
-                      {emailAccounts.map((account) => (
+                    {emailAccounts.length > 0 ? (
+                      <>
+                        <div className="max-h-60 overflow-y-auto">
+                          {emailAccounts.map((account) => (
+                            <Link
+                              key={account.id}
+                              href="/dashboard/email"
+                              className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white">{account.provider}</p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">{account.email}</p>
+                                </div>
+                                {account.unreadCount > 0 && (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                                    {account.unreadCount}
+                                  </span>
+                                )}
+                              </div>
+                            </Link>
+                          ))}
+                        </div>
+                        <div className="px-4 py-2">
+                          <Link href="/dashboard/integrations" className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                            Manage email accounts
+                          </Link>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="px-4 py-6 text-center">
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">No email accounts connected</p>
                         <Link
-                          key={account.id}
-                          href="/email"
-                          className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          href="/dashboard/integrations"
+                          className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
                         >
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">{account.provider}</p>
-                              <p className="text-xs text-gray-600 dark:text-gray-400">{account.email}</p>
-                            </div>
-                            {account.unreadCount > 0 && (
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                                {account.unreadCount}
-                              </span>
-                            )}
-                          </div>
+                          Connect Email
                         </Link>
-                      ))}
-                    </div>
-                    <div className="px-4 py-2">
-                      <Link href="/email/connect" className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
-                        Add email account
-                      </Link>
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -227,7 +378,7 @@ const Header: FC = () => {
                 aria-label="Notifications"
               >
                 <BellIcon />
-                {notifications.some(n => !n.read) && (
+                {unreadCount > 0 && (
                   <span className="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-red-500" />
                 )}
               </button>
@@ -235,34 +386,39 @@ const Header: FC = () => {
               {/* Notifications dropdown */}
               {showNotifications && (
                 <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none">
-                  <div className="py-1 divide-y divide-gray-200">
-                    <div className="px-4 py-2">
+                  <div className="py-1 divide-y divide-gray-200 dark:divide-gray-700">
+                    <div className="px-4 py-2 flex justify-between items-center">
                       <h3 className="text-sm font-medium text-gray-900 dark:text-white">Notifications</h3>
+                      {unreadCount > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200">
+                          {unreadCount}
+                        </span>
+                      )}
                     </div>
                     <div className="max-h-60 overflow-y-auto">
                       {notifications.length > 0 ? (
-                        notifications.map((notification) => (
-                          <Link
-                            key={notification.id}
-                            href="#"
-                            className={classNames(
-                              'block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700',
-                              !notification.read ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                            )}
-                          >
-                            <div className="flex justify-between">
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">{notification.title}</p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">{notification.time}</p>
-                            </div>
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{notification.description}</p>
-                          </Link>
-                        ))
+                        notifications.map((notification) => {
+                          const timeAgo = getTimeAgo(new Date(notification.createdAt));
+                          return (
+                            <Link
+                              key={notification.id}
+                              href={notification.actionUrl || '#'}
+                              className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-l-4 border-transparent hover:border-blue-500"
+                            >
+                              <div className="flex justify-between">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">{notification.title}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{timeAgo}</p>
+                              </div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{notification.message}</p>
+                            </Link>
+                          );
+                        })
                       ) : (
-                        <p className="px-4 py-2 text-sm text-gray-500 dark:text-gray-400">No new notifications</p>
+                        <p className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">No new notifications</p>
                       )}
                     </div>
                     <div className="px-4 py-2">
-                      <Link href="/notifications" className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                      <Link href="/dashboard" className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
                         View all notifications
                       </Link>
                     </div>
