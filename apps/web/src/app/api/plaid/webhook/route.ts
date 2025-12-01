@@ -4,10 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { db as prisma } from '@/lib/db';
 import { plaidClient, isPlaidConfigured } from '@/lib/integrations/plaid-client';
 
-const prisma = new PrismaClient();
 
 // Plaid webhook types
 type WebhookType =

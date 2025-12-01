@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { SignJWT } from 'jose';
-
-const prisma = new PrismaClient();
+import { db as prisma } from '@/lib/db';
+import { withDatabaseRetry } from '@/lib/db-utils';
 
 // Interface for login data
 interface LoginRequestBody {
@@ -35,20 +34,22 @@ export async function POST(request: NextRequest) {
 
     console.log('[Login API Route] Attempting login for:', body.email);
 
-    // Find user in database
-    const user = await prisma.user.findUnique({
-      where: { email: body.email.toLowerCase() },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        password: true,
-        role: true,
-        pilotRole: true,
-        pilotEnabled: true,
-        setupCompleted: true,
-        emailVerified: true,
-      },
+    // Find user in database with retry logic
+    const user = await withDatabaseRetry(async () => {
+      return await prisma.user.findUnique({
+        where: { email: body.email.toLowerCase() },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          password: true,
+          role: true,
+          pilotRole: true,
+          pilotEnabled: true,
+          setupCompleted: true,
+          emailVerified: true,
+        },
+      });
     });
 
     if (!user) {

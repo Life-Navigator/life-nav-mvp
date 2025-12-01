@@ -6,11 +6,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { plaidClient, isPlaidConfigured } from '@/lib/integrations/plaid-client';
-import { PrismaClient } from '@prisma/client';
+import { db as prisma } from '@/lib/db';
 import { z } from 'zod';
 import { indexPlaidSync } from '@/lib/graphrag/plaid-indexer';
 
-const prisma = new PrismaClient();
 
 const syncSchema = z.object({
   itemId: z.string().optional(),

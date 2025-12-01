@@ -98,21 +98,49 @@ const useMockDb = process.env.NODE_ENV === 'development' &&
 
 // For Prisma, we want to make sure we don't create multiple instances
 // during hot reloads in development
-let prismaClient: PrismaClient | undefined;
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
 
 function getPrismaClient() {
   // If we already have a client, return it
-  if (prismaClient) {
-    return prismaClient;
+  if (globalForPrisma.prisma) {
+    return globalForPrisma.prisma;
   }
 
-  // Otherwise, create a new client
-  prismaClient = new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+  // Otherwise, create a new client with optimized connection pool settings
+  const client = new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
   });
 
-  return prismaClient;
+  // Store the client globally to prevent multiple instances
+  globalForPrisma.prisma = client;
+
+  // Add connection pool timeout handling
+  client.$connect()
+    .then(() => {
+      console.log('✅ Database connected successfully');
+    })
+    .catch((error) => {
+      console.error('❌ Database connection failed:', error);
+    });
+
+  return client;
 }
 
 // Export the appropriate database client
 export const db = useMockDb ? new MockDB() : getPrismaClient();
+
+// Gracefully handle shutdown to clean up connections
+if (typeof window === 'undefined') {
+  process.on('beforeExit', async () => {
+    if (globalForPrisma.prisma) {
+      await globalForPrisma.prisma.$disconnect();
+    }
+  });
+}

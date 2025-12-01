@@ -4,10 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { db as prisma } from '@/lib/db';
 import { verifyToken } from '@/lib/auth/jwt';
 
-const prisma = new PrismaClient();
 
 // GET /api/plaid/transactions - Get transactions for the user
 export async function GET(request: NextRequest) {

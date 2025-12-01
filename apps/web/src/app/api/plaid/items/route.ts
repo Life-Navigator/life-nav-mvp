@@ -4,11 +4,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { db as prisma } from '@/lib/db';
 import { plaidClient, isPlaidConfigured } from '@/lib/integrations/plaid-client';
 import { verifyToken } from '@/lib/auth/jwt';
 
-const prisma = new PrismaClient();
 
 // GET /api/plaid/items - List all connected Plaid items for the user
 export async function GET(request: NextRequest) {

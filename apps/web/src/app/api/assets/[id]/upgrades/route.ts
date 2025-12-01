@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
+import { db as prisma } from '@/lib/db';
 
-const prisma = new PrismaClient();
 
 interface JWTPayload {
   sub: string;
