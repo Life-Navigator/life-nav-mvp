@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { useAuth, getAuthHeaders } from '@/hooks/useAuth';
 
 export default function ProfilePage() {
-  const { data: session, status } = useSession();
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -17,19 +17,45 @@ export default function ProfilePage() {
     bio: '',
   });
 
+  // Fetch user profile data
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/login');
+    const fetchProfile = async () => {
+      if (!isAuthenticated) return;
+
+      try {
+        const headers = getAuthHeaders();
+        const response = await fetch('/api/user/profile', { headers });
+
+        if (response.ok) {
+          const data = await response.json();
+          setFormData({
+            name: data.name || '',
+            email: data.email || '',
+            bio: data.bio || '',
+          });
+        } else {
+          // If no profile exists, use data from localStorage
+          const userData = localStorage.getItem('user_data');
+          if (userData) {
+            const parsed = JSON.parse(userData);
+            setFormData({
+              name: parsed.name || '',
+              email: parsed.email || '',
+              bio: '',
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (isAuthenticated) {
+      fetchProfile();
     }
-    if (session?.user) {
-      setFormData({
-        name: session.user.name || '',
-        email: session.user.email || '',
-        bio: '',
-      });
-      setIsLoading(false);
-    }
-  }, [session, status, router]);
+  }, [isAuthenticated]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -41,13 +67,27 @@ export default function ProfilePage() {
     setIsSaving(true);
 
     try {
+      const headers = getAuthHeaders();
       const response = await fetch('/api/user/profile', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          ...headers,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(formData),
       });
 
       if (!response.ok) throw new Error('Failed to update profile');
+
+      // Update localStorage with new data
+      const userData = localStorage.getItem('user_data');
+      if (userData) {
+        const parsed = JSON.parse(userData);
+        localStorage.setItem('user_data', JSON.stringify({
+          ...parsed,
+          name: formData.name,
+        }));
+      }
 
       alert('Profile updated successfully!');
     } catch (error) {
@@ -58,12 +98,16 @@ export default function ProfilePage() {
     }
   };
 
-  if (status === 'loading' || isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="flex justify-center items-center min-h-[500px]">
         <div className="text-gray-600 dark:text-gray-400">Loading profile...</div>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return null; // Will redirect via useAuth hook
   }
 
   return (

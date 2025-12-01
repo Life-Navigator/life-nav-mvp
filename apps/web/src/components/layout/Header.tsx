@@ -464,13 +464,13 @@ const Header: FC = () => {
                       <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{user.email}</p>
                     </div>
                     <Link
-                      href="/profile"
+                      href="/dashboard/profile"
                       className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       Your Profile
                     </Link>
                     <Link
-                      href="/settings"
+                      href="/dashboard/settings"
                       className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       Settings
