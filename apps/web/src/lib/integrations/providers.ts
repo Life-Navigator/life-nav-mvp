@@ -393,13 +393,15 @@ export const PROVIDER_CONFIG: Provider[] = [
     category: 'healthcare',
     logo: '/images/integrations/fitbit.png',
     connected: false,
-    comingSoon: true,
+    comingSoon: false, // NOW AVAILABLE
     permissions: [
       'View activity and step data',
       'Access heart rate and sleep tracking',
-      'View exercise logs and calorie data'
+      'View exercise logs and calorie data',
+      'Monitor daily calories burned',
+      'Track workout sessions and zones'
     ],
-    modalDescription: 'Fitbit provides comprehensive fitness tracking with activity monitoring, heart rate analysis, and sleep insights.'
+    modalDescription: 'Fitbit provides comprehensive fitness tracking with activity monitoring, heart rate analysis, and sleep insights. Connect to automatically sync your health data.'
   },
   {
     id: 'apple_health',
@@ -408,28 +410,30 @@ export const PROVIDER_CONFIG: Provider[] = [
     category: 'healthcare',
     logo: '/images/integrations/apple-health.png',
     connected: false,
-    comingSoon: true,
+    comingSoon: true, // Requires iOS app for HealthKit API
     permissions: [
       'View health data from HealthKit',
       'Access activity and workout data',
       'View vital signs and medical records'
     ],
-    modalDescription: 'Apple Health aggregates health and fitness data from your iPhone, Apple Watch, and compatible third-party apps.'
+    modalDescription: 'Apple Health aggregates health and fitness data from your iPhone, Apple Watch, and compatible third-party apps. Note: Requires mobile app for full integration.'
   },
   {
     id: 'google_fit',
     name: 'Google Fit',
-    description: 'Activity tracking and health insights for Android',
+    description: 'Activity tracking and health insights for Android and Wear OS',
     category: 'healthcare',
     logo: '/images/integrations/google-fit.png',
     connected: false,
-    comingSoon: true,
+    comingSoon: false, // NOW AVAILABLE
     permissions: [
       'View activity data and move minutes',
       'Access heart points and workouts',
-      'View health metrics and trends'
+      'View health metrics and trends',
+      'Track steps, distance, and calories',
+      'Monitor heart rate and sleep data'
     ],
-    modalDescription: 'Google Fit tracks your movement and health data, providing insights to help you live a healthier, more active life.'
+    modalDescription: 'Google Fit tracks your movement and health data from Android phones and Wear OS watches, providing insights to help you live a healthier, more active life.'
   },
   {
     id: 'garmin',

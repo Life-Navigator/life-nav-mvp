@@ -61,7 +61,9 @@ export async function GET(request: NextRequest) {
       healthMetrics,
       healthRecords,
       educationCourses,
+      studyLogs,
       careerProfile,
+      careerConnections,
       jobApplications,
     ] = await Promise.all([
       // Financial data from Plaid (source of truth for connected accounts)
@@ -127,6 +129,21 @@ export async function GET(request: NextRequest) {
           expectedEndDate: true,
         },
       }),
+      // Study logs (last 30 days for streak calculation)
+      prisma.studyLog.findMany({
+        where: {
+          userId,
+          date: {
+            gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+          },
+        },
+        orderBy: { date: 'desc' },
+        select: {
+          id: true,
+          date: true,
+          durationMinutes: true,
+        },
+      }),
       // Career profile
       prisma.careerProfile.findFirst({
         where: { userId },
@@ -136,6 +153,15 @@ export async function GET(request: NextRequest) {
           company: true,
           skills: true,
           linkedInUrl: true,
+        },
+      }),
+      // Career connections (network)
+      prisma.careerConnection.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          name: true,
+          connectionStrength: true,
         },
       }),
       // Active job applications
@@ -252,8 +278,32 @@ export async function GET(request: NextRequest) {
         )
       : 0;
 
+    // Calculate study streak
+    let studyStreak = 0;
+    if (studyLogs.length > 0) {
+      // Group study logs by date (normalize to start of day)
+      const studyDates = new Set(
+        studyLogs.map(log => new Date(log.date).toISOString().split('T')[0])
+      );
+
+      // Check consecutive days starting from today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      let currentDate = new Date(today);
+      while (true) {
+        const dateStr = currentDate.toISOString().split('T')[0];
+        if (studyDates.has(dateStr)) {
+          studyStreak++;
+          currentDate.setDate(currentDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+
     // Career summary
-    const networkSize = careerProfile?.skills?.length || 0;
+    const networkSize = careerConnections.length;
     const activeApplications = jobApplications.length;
 
     // Construct response
@@ -283,8 +333,8 @@ export async function GET(request: NextRequest) {
       education: {
         activeCourses,
         completionRate,
-        studyStreak: 0, // Placeholder - would need study log
-        hasData: educationCourses.length > 0,
+        studyStreak,
+        hasData: educationCourses.length > 0 || studyLogs.length > 0,
       },
       hasAnyData: (
         hasPlaidConnection ||
@@ -292,7 +342,9 @@ export async function GET(request: NextRequest) {
         healthMetrics.length > 0 ||
         healthRecords.length > 0 ||
         educationCourses.length > 0 ||
+        studyLogs.length > 0 ||
         !!careerProfile ||
+        careerConnections.length > 0 ||
         jobApplications.length > 0
       ),
     };

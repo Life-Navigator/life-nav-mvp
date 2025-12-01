@@ -57,10 +57,14 @@ model User {
   financialGoals        FinancialGoal[]
   healthRecords         HealthRecord[]
   healthMetrics         HealthMetric[]
+  wearableConnections   WearableConnection[]
+  wearableMetrics       WearableMetric[]
   educationRecords      EducationRecord[]
   educationCourses      EducationCourse[]
+  studyLogs             StudyLog[]
   careerProfiles        CareerProfile[]
   careerApplications    JobApplication[]
+  careerConnections     CareerConnection[]
   resumes               Resume[]
   documents             Document[]
   notifications         Notification[]
@@ -85,6 +89,7 @@ model User {
   taxStrategies         TaxStrategy[]
   retirementPlans       RetirementPlan[]
   investmentHoldings    InvestmentHolding[]
+  featureVotes          FeatureVote[]
 
   @@index([email])
   @@index([createdAt])
@@ -924,6 +929,91 @@ model HealthMetric {
   @@map("health_metrics")
 }
 
+model WearableConnection {
+  id                String    @id @default(cuid())
+  userId            String
+  provider          String    // apple_health, google_fit, fitbit, garmin, samsung_health, oura, whoop
+  deviceType        String?   // watch, ring, band, scale, etc.
+  deviceModel       String?   // Apple Watch Series 9, Fitbit Charge 6, etc.
+  deviceName        String?   // User's custom device name
+  accessToken       String?   @db.Text
+  refreshToken      String?   @db.Text
+  expiresAt         DateTime?
+  scope             String?   // Permissions granted
+  lastSyncedAt      DateTime?
+  status            String    @default("active") // active, error, expired, disconnected
+  syncFrequency     String    @default("hourly") // realtime, hourly, daily, manual
+  dataTypes         String[]  // heart_rate, steps, sleep, calories, etc.
+  userId_external   String?   // External user ID from provider
+  metadata          Json?     // Provider-specific data
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  metrics           WearableMetric[]
+  syncLogs          WearableSyncLog[]
+
+  @@unique([userId, provider]) // One connection per provider per user
+  @@index([userId])
+  @@index([provider])
+  @@index([status])
+  @@map("wearable_connections")
+}
+
+model WearableMetric {
+  id                  String              @id @default(cuid())
+  userId              String
+  connectionId        String
+  metricType          String              // steps, heart_rate, calories, sleep, distance, etc.
+  value               Float
+  unit                String              // count, bpm, kcal, minutes, meters, etc.
+  timestamp           DateTime            // When the metric was recorded
+  startTime           DateTime?           // For duration metrics (sleep, workout)
+  endTime             DateTime?           // For duration metrics
+  metadata            Json?               // Additional data (e.g., sleep stages, workout type)
+  source              String              // apple_health, google_fit, fitbit, etc.
+  sourceRecordId      String?             // External record ID for deduplication
+  confidence          Float?              // Data quality/confidence score (0-1)
+  isManualEntry       Boolean             @default(false)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  // Relations
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection          WearableConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([connectionId, sourceRecordId]) // Prevent duplicates from same source
+  @@index([userId])
+  @@index([connectionId])
+  @@index([metricType])
+  @@index([timestamp])
+  @@map("wearable_metrics")
+}
+
+model WearableSyncLog {
+  id                String              @id @default(cuid())
+  connectionId      String
+  syncStartedAt     DateTime            @default(now())
+  syncCompletedAt   DateTime?
+  status            String              // success, partial, failed, in_progress
+  recordsSynced     Int                 @default(0)
+  recordsFailed     Int                 @default(0)
+  errorMessage      String?             @db.Text
+  dataTypes         String[]            // Which data types were synced
+  dateRangeStart    DateTime?           // Start of synced period
+  dateRangeEnd      DateTime?           // End of synced period
+  metadata          Json?
+
+  // Relations
+  connection        WearableConnection  @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId])
+  @@index([syncStartedAt])
+  @@index([status])
+  @@map("wearable_sync_logs")
+}
+
 //=====================
 // EDUCATION MODELS
 //=====================
@@ -989,6 +1079,27 @@ model EducationCourse {
   @@index([userId])
   @@index([status])
   @@map("education_courses")
+}
+
+model StudyLog {
+  id              String    @id @default(cuid())
+  userId          String
+  courseId        String?   // Optional link to EducationCourse
+  date            DateTime  @default(now())
+  durationMinutes Int       // Study duration in minutes
+  subject         String?   // What they studied
+  notes           String?
+  completed       Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([date])
+  @@index([courseId])
+  @@map("study_logs")
 }
 
 //=====================
@@ -1067,6 +1178,37 @@ model JobApplication {
   @@index([status])
   @@index([applicationDate])
   @@map("job_applications")
+}
+
+model CareerConnection {
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  email           String?
+  phone           String?
+  company         String?
+  title           String?
+  relationship    String?   // colleague, mentor, recruiter, friend, etc.
+  linkedInUrl     String?
+  twitterUrl      String?
+  notes           String?
+  tags            String[]  // For categorization
+  lastContactDate DateTime?
+  nextFollowUpDate DateTime?
+  connectionStrength String @default("weak") // strong, medium, weak
+  source          String?   // Where you met (conference, previous job, etc.)
+  industry        String?
+  location        String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([company])
+  @@index([tags])
+  @@map("career_connections")
 }
 
 model Resume {
@@ -3149,4 +3291,26 @@ model RetirementMilestone {
   @@index([status])
   @@index([category])
   @@map("retirement_milestones")
+}
+
+//=====================
+// FEATURE VOTING
+//=====================
+
+model FeatureVote {
+  id              String    @id @default(cuid())
+  userId          String
+  featureId       String    // ID of the feature (e.g., "habit-tracker", "ai-coach")
+  featureName     String    // Display name of the feature
+  voted           Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, featureId]) // Each user can only vote once per feature
+  @@index([userId])
+  @@index([featureId])
+  @@map("feature_votes")
 }

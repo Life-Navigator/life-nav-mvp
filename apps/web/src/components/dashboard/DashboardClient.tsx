@@ -41,6 +41,31 @@ interface DashboardData {
   hasAnyData: boolean;
 }
 
+interface CalendarTask {
+  id: string;
+  title: string;
+  startTime: string;
+  endTime: string;
+  isAllDay: boolean;
+  location?: string;
+  description?: string;
+  status: string;
+  meetingLink?: string;
+  calendarName?: string;
+  color?: string;
+}
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  category?: string;
+  priority: string;
+  actionUrl?: string;
+  createdAt: string;
+}
+
 interface DashboardClientProps {
   initialSession?: any;
 }
@@ -55,6 +80,14 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<'financial' | 'health' | 'career' | 'education' | null>(null);
+
+  // Calendar and Notifications state
+  const [calendarTasks, setCalendarTasks] = useState<CalendarTask[]>([]);
+  const [hasCalendarConnection, setHasCalendarConnection] = useState(false);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const quickActions = [
     { name: 'Benefits Discovery', icon: '🎨', href: '/discovery/benefits' },
@@ -170,6 +203,72 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
     fetchDashboardData();
   }, [currentSession]);
 
+  // Fetch calendar tasks
+  useEffect(() => {
+    const fetchCalendarTasks = async () => {
+      const token = localStorage.getItem('access_token');
+
+      if (!token && !currentSession?.user?.id) {
+        setTasksLoading(false);
+        return;
+      }
+
+      try {
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch('/api/dashboard/tasks', { headers });
+
+        if (response.ok) {
+          const data = await response.json();
+          setCalendarTasks(data.tasks || []);
+          setHasCalendarConnection(data.hasCalendarConnection || false);
+        }
+      } catch (err) {
+        console.error('Error fetching calendar tasks:', err);
+      } finally {
+        setTasksLoading(false);
+      }
+    };
+
+    fetchCalendarTasks();
+  }, [currentSession]);
+
+  // Fetch notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      const token = localStorage.getItem('access_token');
+
+      if (!token && !currentSession?.user?.id) {
+        setNotificationsLoading(false);
+        return;
+      }
+
+      try {
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch('/api/dashboard/notifications', { headers });
+
+        if (response.ok) {
+          const data = await response.json();
+          setNotifications(data.notifications || []);
+          setUnreadCount(data.unreadCount || 0);
+        }
+      } catch (err) {
+        console.error('Error fetching notifications:', err);
+      } finally {
+        setNotificationsLoading(false);
+      }
+    };
+
+    fetchNotifications();
+  }, [currentSession]);
+
   const handleVote = (moduleId: string) => {
     setVotedModules(prev => {
       const newSet = new Set(prev);
@@ -179,6 +278,38 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
         newSet.add(moduleId);
       }
       return newSet;
+    });
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch('/api/dashboard/notifications', {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ markAllRead: true })
+      });
+
+      if (response.ok) {
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error('Error marking notifications as read:', err);
+    }
+  };
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
     });
   };
 
@@ -477,42 +608,169 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Today's Tasks</h3>
-              <button className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-                View All
-              </button>
+              {hasCalendarConnection && calendarTasks.length > 0 && (
+                <Link href="/dashboard/calendar" className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                  View All
+                </Link>
+              )}
             </div>
 
             <div className="space-y-3">
-              {/* Task items will be populated from API */}
-              <div className="text-center py-8">
-                <span className="text-5xl mb-2 block">📅</span>
-                <p className="text-gray-500 dark:text-gray-400 mb-3">No calendar connected</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
-                  Connect your calendar to see today's tasks and events
-                </p>
-                <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600">
-                  Connect Calendar
-                </button>
-              </div>
+              {tasksLoading ? (
+                <div className="text-center py-8">
+                  <LoadingSpinner size="medium" />
+                </div>
+              ) : !hasCalendarConnection ? (
+                <div className="text-center py-8">
+                  <span className="text-5xl mb-2 block">📅</span>
+                  <p className="text-gray-500 dark:text-gray-400 mb-3">No calendar connected</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
+                    Connect your calendar to see today's tasks and events
+                  </p>
+                  <Link
+                    href="/dashboard/integrations"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                  >
+                    Connect Calendar
+                  </Link>
+                </div>
+              ) : calendarTasks.length === 0 ? (
+                <div className="text-center py-8">
+                  <span className="text-5xl mb-2 block">✅</span>
+                  <p className="text-gray-500 dark:text-gray-400">No tasks scheduled for today</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Enjoy your free time!</p>
+                </div>
+              ) : (
+                calendarTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                          {task.title}
+                        </h4>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                          <span>
+                            {task.isAllDay
+                              ? 'All Day'
+                              : `${formatTime(task.startTime)} - ${formatTime(task.endTime)}`}
+                          </span>
+                          {task.location && (
+                            <>
+                              <span>•</span>
+                              <span>{task.location}</span>
+                            </>
+                          )}
+                        </div>
+                        {task.meetingLink && (
+                          <a
+                            href={task.meetingLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mt-1 inline-block"
+                          >
+                            Join Meeting →
+                          </a>
+                        )}
+                      </div>
+                      {task.color && (
+                        <div
+                          className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
+                          style={{ backgroundColor: task.color }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
           {/* Alerts */}
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-md">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Alerts & Notifications</h3>
-              <button className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
-                Mark All Read
-              </button>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                Alerts & Notifications
+                {unreadCount > 0 && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                    {unreadCount}
+                  </span>
+                )}
+              </h3>
+              {notifications.length > 0 && (
+                <button
+                  onClick={handleMarkAllRead}
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  Mark All Read
+                </button>
+              )}
             </div>
 
             <div className="space-y-3">
-              {/* Alert items will be populated from API */}
-              <div className="text-center py-8">
-                <span className="text-5xl mb-2 block">🔔</span>
-                <p className="text-gray-500 dark:text-gray-400">No new alerts</p>
-                <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">You're all up to date!</p>
-              </div>
+              {notificationsLoading ? (
+                <div className="text-center py-8">
+                  <LoadingSpinner size="medium" />
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="text-center py-8">
+                  <span className="text-5xl mb-2 block">🔔</span>
+                  <p className="text-gray-500 dark:text-gray-400">No new alerts</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">You're all up to date!</p>
+                </div>
+              ) : (
+                notifications.map((notification) => {
+                  const priorityColors = {
+                    urgent: 'border-l-red-500 bg-red-50 dark:bg-red-900/10',
+                    high: 'border-l-orange-500 bg-orange-50 dark:bg-orange-900/10',
+                    normal: 'border-l-blue-500 bg-blue-50 dark:bg-blue-900/10',
+                    low: 'border-l-gray-400 bg-gray-50 dark:bg-gray-700/50',
+                  };
+                  const typeIcons = {
+                    info: 'ℹ️',
+                    success: '✅',
+                    warning: '⚠️',
+                    error: '❌',
+                    reminder: '⏰',
+                  };
+
+                  return (
+                    <div
+                      key={notification.id}
+                      className={`p-3 border-l-4 rounded-lg ${priorityColors[notification.priority as keyof typeof priorityColors] || priorityColors.normal}`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg flex-shrink-0">
+                          {typeIcons[notification.type as keyof typeof typeIcons] || '📢'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                            {notification.title}
+                          </h4>
+                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            {notification.message}
+                          </p>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-xs text-gray-400 dark:text-gray-500">
+                              {new Date(notification.createdAt).toLocaleString()}
+                            </span>
+                            {notification.actionUrl && (
+                              <Link
+                                href={notification.actionUrl}
+                                className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                              >
+                                View →
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>
