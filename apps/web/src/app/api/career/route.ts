@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     const [
       careerProfile,
       jobApplications,
+      careerConnections,
     ] = await Promise.all([
       // Career profile
       prisma.careerProfile.findFirst({
@@ -56,16 +57,26 @@ export async function GET(request: NextRequest) {
         },
         orderBy: { applicationDate: 'desc' },
       }),
+      // Career connections for network metrics
+      prisma.careerConnection.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          name: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
     ]);
 
-    // Transform skills data
+    // Transform skills data - only if profile exists
     const skills = careerProfile?.skills
       ? (Array.isArray(careerProfile.skills) ? careerProfile.skills : []).map((skill: any) => ({
           name: typeof skill === 'string' ? skill : skill.name || 'Unknown',
           level: typeof skill === 'object' ? skill.level || 70 : 70,
           target: typeof skill === 'object' ? skill.target || 85 : 85,
         }))
-      : generateDefaultSkills();
+      : [];
 
     // Generate job matches from applications
     const jobMatch = jobApplications
@@ -80,20 +91,14 @@ export async function GET(request: NextRequest) {
         location: app.location || 'Not specified',
       }));
 
-    // Generate network metrics (would need NetworkConnection table)
-    const networkMetrics = generateNetworkMetrics();
+    // Generate network metrics from real CareerConnection data
+    const networkMetrics = generateNetworkMetricsFromConnections(careerConnections);
 
-    // Generate upcoming events (would need Event table)
-    const upcomingEvents = generateUpcomingEvents();
+    // No upcoming events - return empty array (would integrate with CalendarEvent)
+    const upcomingEvents: any[] = [];
 
-    // Generate industry trends
-    const industryTrends = [
-      { skill: 'AI/ML', growth: 85 },
-      { skill: 'Cybersecurity', growth: 75 },
-      { skill: 'Cloud Computing', growth: 70 },
-      { skill: 'Blockchain', growth: 60 },
-      { skill: 'Edge Computing', growth: 55 },
-    ];
+    // No industry trends without real data - return empty array
+    const industryTrends: any[] = [];
 
     return NextResponse.json({
       skills: skills || [],
@@ -112,19 +117,6 @@ export async function GET(request: NextRequest) {
 }
 
 // Helper functions
-function generateDefaultSkills() {
-  return [
-    { name: 'Communication', level: 85, target: 90 },
-    { name: 'Leadership', level: 70, target: 85 },
-    { name: 'Technical', level: 90, target: 95 },
-    { name: 'Problem Solving', level: 80, target: 85 },
-    { name: 'Project Management', level: 75, target: 90 },
-    { name: 'Teamwork', level: 85, target: 90 },
-    { name: 'Adaptability', level: 80, target: 85 },
-    { name: 'Creativity', level: 65, target: 80 },
-  ];
-}
-
 function calculateJobMatch(application: any, skills: any[]): number {
   // Simple match calculation - in reality this would be more sophisticated
   const statusBonus = {
@@ -140,43 +132,38 @@ function calculateJobMatch(application: any, skills: any[]): number {
   return Math.min(100, baseMatch + skillBonus - Math.floor(Math.random() * 15));
 }
 
-function generateNetworkMetrics() {
-  return [
-    { month: 'Jan', connections: 5, messages: 12 },
-    { month: 'Feb', connections: 8, messages: 15 },
-    { month: 'Mar', connections: 12, messages: 20 },
-    { month: 'Apr', connections: 9, messages: 18 },
-    { month: 'May', connections: 15, messages: 25 },
-    { month: 'Jun', connections: 18, messages: 30 },
-  ];
-}
+function generateNetworkMetricsFromConnections(connections: any[]) {
+  if (connections.length === 0) {
+    return [];
+  }
 
-function generateUpcomingEvents() {
+  // Group connections by month
+  const monthlyData: { [key: string]: { connections: number; messages: number } } = {};
   const now = new Date();
-  return [
-    {
-      id: 'event1',
-      title: 'Tech Conference 2025',
-      date: new Date(now.getTime() + 45 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      type: 'Conference',
-    },
-    {
-      id: 'event2',
-      title: 'Networking Mixer',
-      date: new Date(now.getTime() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      type: 'Networking',
-    },
-    {
-      id: 'event3',
-      title: 'Industry Webinar',
-      date: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      type: 'Webinar',
-    },
-    {
-      id: 'event4',
-      title: 'Career Fair',
-      date: new Date(now.getTime() + 32 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      type: 'Fair',
-    },
-  ];
+
+  // Initialize last 6 months
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
+    monthlyData[monthKey] = { connections: 0, messages: 0 };
+  }
+
+  // Count connections added each month
+  connections.forEach(conn => {
+    const date = new Date(conn.createdAt);
+    const monthKey = date.toLocaleDateString('en-US', { month: 'short' });
+
+    if (monthlyData[monthKey]) {
+      monthlyData[monthKey].connections += 1;
+      // Estimate messages based on connection strength if available
+      // For now, use connections * 1.5 as rough estimate
+      monthlyData[monthKey].messages += 1;
+    }
+  });
+
+  return Object.entries(monthlyData).map(([month, data]) => ({
+    month,
+    connections: data.connections,
+    messages: data.messages,
+  }));
 }

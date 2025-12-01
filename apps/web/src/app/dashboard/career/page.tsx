@@ -1,13 +1,18 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  BarChart, Bar, LineChart, Line, ResponsiveContainer, 
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, RadarChart, 
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  BarChart, Bar, LineChart, Line, ResponsiveContainer,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, RadarChart,
   PolarGrid, PolarAngleAxis, Radar
 } from 'recharts';
+import { getAuthHeaders } from '@/hooks/useAuth';
 
 const CareerDashboard = () => {
+  const router = useRouter();
+
   // State for career data
   const [careerData, setCareerData] = useState({
     skills: [] as { name: string; level: number; target: number }[],
@@ -31,8 +36,9 @@ const CareerDashboard = () => {
       try {
         setLoading(true);
 
-        // Call real API endpoint
-        const response = await fetch('/api/career');
+        // Call real API endpoint with auth headers
+        const headers = getAuthHeaders();
+        const response = await fetch('/api/career', { headers });
         if (!response.ok) {
           throw new Error('Failed to fetch career data');
         }
@@ -110,9 +116,12 @@ const CareerDashboard = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Career Dashboard</h1>
           <p className="text-gray-600 dark:text-gray-400">Track your professional development and opportunities</p>
         </div>
-        <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg font-medium transition-colors">
-          Add Data
-        </button>
+        <Link
+          href="/dashboard/career/skills"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+        >
+          Add Career Data
+        </Link>
       </header>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
@@ -161,9 +170,12 @@ const CareerDashboard = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Add your skills to track your professional development
               </p>
-              <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors">
+              <Link
+                href="/dashboard/career/skills"
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors inline-block"
+              >
                 Add Skills
-              </button>
+              </Link>
             </div>
           )}
         </div>
@@ -215,9 +227,12 @@ const CareerDashboard = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Add your skills and preferences to see job recommendations
               </p>
-              <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors">
+              <Link
+                href="/dashboard/career/opportunities"
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors inline-block"
+              >
                 Set Job Preferences
-              </button>
+              </Link>
             </div>
           )}
         </div>
@@ -249,9 +264,12 @@ const CareerDashboard = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Track your professional networking activity and connections
               </p>
-              <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors">
-                Log Networking Activity
-              </button>
+              <Link
+                href="/dashboard/career/networking"
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors inline-block"
+              >
+                Add Connections
+              </Link>
             </div>
           )}
         </div>
@@ -289,44 +307,60 @@ const CareerDashboard = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Add networking events, conferences, and career fairs
               </p>
-              <button className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors">
+              <Link
+                href="/dashboard/calendar"
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors inline-block"
+              >
                 Add Event
-              </button>
+              </Link>
             </div>
           )}
         </div>
-        
-        {/* Industry Trends */}
+
+        {/* Industry Trends - Empty state */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Industry Trends</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-            Top growing skills in your industry for the next 12 months:
-          </p>
-          <div className="space-y-4">
-            {careerData.industryTrends.map((trend) => (
-              <div key={trend.skill} className="relative pt-1">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-sm font-medium text-gray-900 dark:text-white">
-                    {trend.skill}
+          {careerData.industryTrends.length > 0 ? (
+            <>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                Top growing skills in your industry for the next 12 months:
+              </p>
+              <div className="space-y-4">
+                {careerData.industryTrends.map((trend) => (
+                  <div key={trend.skill} className="relative pt-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {trend.skill}
+                      </div>
+                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        {trend.growth}% growth
+                      </div>
+                    </div>
+                    <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200 dark:bg-gray-700">
+                      <div
+                        style={{ width: `${trend.growth}%` }}
+                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-600 dark:bg-blue-500"
+                      ></div>
+                    </div>
                   </div>
-                  <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {trend.growth}% growth
-                  </div>
-                </div>
-                <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200 dark:bg-gray-700">
-                  <div
-                    style={{ width: `${trend.growth}%` }}
-                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-600 dark:bg-blue-500"
-                  ></div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-          <div className="mt-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded border border-yellow-100 dark:border-yellow-800">
-            <p className="text-sm text-yellow-800 dark:text-yellow-300">
-              <span className="font-medium">Career Insight:</span> Adding skills in AI/ML could increase your job match score by up to 15%.
-            </p>
-          </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="text-6xl mb-4">📈</div>
+              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Industry Trends</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Industry trends will be displayed once you add your industry and skills
+              </p>
+              <Link
+                href="/dashboard/career/skills"
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors inline-block"
+              >
+                Add Skills & Industry
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>
