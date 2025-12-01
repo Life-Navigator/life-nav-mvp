@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,6 +12,7 @@ import {
   Cog6ToothIcon,
   LockClosedIcon
 } from "@heroicons/react/24/outline";
+import { getAuthHeaders } from '@/hooks/useAuth';
 
 const healthNavItems = [
   {
@@ -47,6 +49,31 @@ const healthNavItems = [
 
 export function HealthSidebar() {
   const pathname = usePathname();
+  const [healthScore, setHealthScore] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch health score from dashboard summary
+  useEffect(() => {
+    const fetchHealthScore = async () => {
+      try {
+        const headers = getAuthHeaders();
+        const response = await fetch('/api/dashboard/summary', { headers });
+
+        if (response.ok) {
+          const data = await response.json();
+          // Get wellness score from health data
+          const score = data.health?.wellnessScore;
+          setHealthScore(score !== null && score !== undefined ? score : null);
+        }
+      } catch (error) {
+        console.error('Error fetching health score:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchHealthScore();
+  }, []);
 
   // Determine if a nav link is active
   const isActive = (href: string) => {
@@ -99,28 +126,53 @@ export function HealthSidebar() {
       {/* Health score */}
       <div className="mt-6 p-4 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950 dark:to-red-900 rounded-lg border border-red-100 dark:border-red-800">
         <h3 className="text-sm font-medium text-red-900 dark:text-red-200 mb-2">Health Score</h3>
-        <div className="flex justify-center">
-          <div className="relative w-24 h-24">
-            <svg className="w-full h-full" viewBox="0 0 36 36">
-              <path
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none"
-                stroke="#E5E7EB"
-                strokeWidth="3"
-                strokeDasharray="100, 100"
-              />
-              <path
-                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                fill="none"
-                stroke="#dc2626"
-                strokeWidth="3"
-                strokeDasharray="78, 100"
-              />
-              <text x="18" y="20.35" className="text-lg" textAnchor="middle" fill="#dc2626" fontWeight="bold">78</text>
-            </svg>
+        {loading ? (
+          <div className="flex justify-center items-center h-24">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
           </div>
-        </div>
-        <p className="text-xs text-center text-red-700 dark:text-red-300 mt-2">Good - Improved 5% this month</p>
+        ) : healthScore !== null ? (
+          <>
+            <div className="flex justify-center">
+              <div className="relative w-24 h-24">
+                <svg className="w-full h-full" viewBox="0 0 36 36">
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="#E5E7EB"
+                    strokeWidth="3"
+                    strokeDasharray="100, 100"
+                  />
+                  <path
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="#dc2626"
+                    strokeWidth="3"
+                    strokeDasharray={`${healthScore}, 100`}
+                  />
+                  <text x="18" y="20.35" className="text-lg" textAnchor="middle" fill="#dc2626" fontWeight="bold">
+                    {Math.round(healthScore)}
+                  </text>
+                </svg>
+              </div>
+            </div>
+            <p className="text-xs text-center text-red-700 dark:text-red-300 mt-2">
+              {healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs Attention'}
+            </p>
+          </>
+        ) : (
+          <div className="text-center py-4">
+            <div className="text-4xl font-bold text-red-600 dark:text-red-400 mb-2">N/A</div>
+            <p className="text-xs text-red-700 dark:text-red-300">
+              Connect health data to see your score
+            </p>
+            <Link
+              href="/dashboard/integrations"
+              className="mt-3 inline-block px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+            >
+              Connect Device
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
