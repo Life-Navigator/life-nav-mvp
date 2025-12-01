@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { SignJWT } from 'jose';
-import { db as prisma } from '@/lib/db';
+
+const prisma = new PrismaClient();
 
 // Interface for login data
 interface LoginRequestBody {
