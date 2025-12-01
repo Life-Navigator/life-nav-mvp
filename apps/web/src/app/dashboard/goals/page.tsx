@@ -2,36 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
 import LoadingSpinner from '@/components/ui/loaders/LoadingSpinner';
+import { useAuth, getAuthHeaders } from '@/hooks/useAuth';
 
 export default function GoalsPage() {
-  const { data: session, status } = useSession();
-  const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState<any>(null);
+  const { isAuthenticated, isLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (status === 'loading') {
-      return;
-    }
-
-    if (status === 'unauthenticated') {
-      setError('You must be logged in to view this page');
-      setLoading(false);
-      return;
-    }
-
-    if (session?.user) {
-      setUserData({
-        name: session.user.name || 'User',
-        email: session.user.email,
-        id: session.user.id
-      });
-    }
-
-    setLoading(false);
-  }, [session, status]);
 
   const [dashboardData, setDashboardData] = useState<any>({
     goals: [],
@@ -42,15 +18,17 @@ export default function GoalsPage() {
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      if (!session?.user?.id) return;
+      if (!isAuthenticated) return;
 
       try {
         setDataLoading(true);
 
-        const goalsRes = await fetch('/api/goals');
+        const headers = getAuthHeaders();
+
+        const goalsRes = await fetch('/api/goals', { headers });
         const goalsData = goalsRes.ok ? await goalsRes.json() : { goals: [] };
 
-        const riskRes = await fetch('/api/risk-assessment');
+        const riskRes = await fetch('/api/risk-assessment', { headers });
         const riskData = riskRes.ok ? await riskRes.json() : [];
 
         setDashboardData({
@@ -65,12 +43,24 @@ export default function GoalsPage() {
       }
     };
 
-    if (session?.user) {
+    if (isAuthenticated) {
       fetchDashboardData();
     }
-  }, [session]);
+  }, [isAuthenticated]);
 
-  if (loading || dataLoading) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
+        <LoadingSpinner size="large" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null; // Will redirect via useAuth hook
+  }
+
+  if (dataLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <LoadingSpinner size="large" />
