@@ -101,10 +101,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update last login
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
+    // Update last login (with retry logic)
+    await withDatabaseRetry(async () => {
+      return await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLogin: new Date() },
+      });
     });
 
     // Generate JWT tokens

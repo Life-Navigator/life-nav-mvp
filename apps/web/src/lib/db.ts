@@ -32,7 +32,7 @@ class MockDB {
   };
 
   user = {
-    findUnique: async ({ where }: { where: { id?: string; email?: string } }) => {
+    findUnique: async ({ where, select }: { where: { id?: string; email?: string }; select?: any }) => {
       if (where.id) {
         return this.users[where.id] || null;
       }
@@ -49,10 +49,11 @@ class MockDB {
       this.users[id] = { ...data, id };
       return this.users[id];
     },
-    update: async ({ where, data }: { where: { id: string }; data: any }) => {
-      if (!this.users[where.id]) return null;
-      this.users[where.id] = { ...this.users[where.id], ...data };
-      return this.users[where.id];
+    update: async ({ where, data }: { where: { id?: string; email?: string }; data: any }) => {
+      const id = where.id || Object.values(this.users).find(u => u.email === where.email)?.id;
+      if (!id || !this.users[id]) return null;
+      this.users[id] = { ...this.users[id], ...data };
+      return this.users[id];
     }
   };
 
@@ -134,7 +135,8 @@ function getPrismaClient() {
 }
 
 // Export the appropriate database client
-export const db = useMockDb ? new MockDB() : getPrismaClient();
+// Cast to PrismaClient for proper typing
+export const db = (useMockDb ? new MockDB() : getPrismaClient()) as unknown as PrismaClient;
 
 // Gracefully handle shutdown to clean up connections
 if (typeof window === 'undefined') {
