@@ -17,8 +17,19 @@ function getJwtSecret(): Uint8Array {
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse the request body
-    const body: LoginRequestBody = await request.json();
+    // Parse the request body with better error handling
+    let body: LoginRequestBody;
+    try {
+      const text = await request.text();
+      console.log('[Login API] Raw request body:', text);
+      body = JSON.parse(text);
+    } catch (parseError) {
+      console.error('[Login API] JSON parse error:', parseError);
+      return NextResponse.json(
+        { success: false, message: 'Invalid request format' },
+        { status: 400 }
+      );
+    }
 
     // Validate required fields
     if (!body.email || !body.password) {
