@@ -17,6 +17,8 @@ import {
   GlobeAltIcon,
   PencilIcon,
   CheckCircleIcon,
+  CameraIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 
 interface ProfileStats {
@@ -107,6 +109,7 @@ export default function ProfilePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'edit'>('overview');
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -221,6 +224,85 @@ export default function ProfilePage() {
     }));
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+
+    // Validate file type
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      alert('Only JPEG, PNG, and WebP images are allowed');
+      return;
+    }
+
+    setIsUploadingImage(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const headers = getAuthHeaders();
+      const response = await fetch('/api/user/profile/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': headers['Authorization'] || '',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('Failed to upload image');
+
+      const data = await response.json();
+
+      // Update profile with new image
+      if (profile) {
+        setProfile({ ...profile, image: data.imageUrl });
+      }
+
+      alert('Profile image uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Failed to upload image');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleImageRemove = async () => {
+    if (!confirm('Are you sure you want to remove your profile picture?')) {
+      return;
+    }
+
+    setIsUploadingImage(true);
+
+    try {
+      const headers = getAuthHeaders();
+      const response = await fetch('/api/user/profile/upload', {
+        method: 'DELETE',
+        headers,
+      });
+
+      if (!response.ok) throw new Error('Failed to remove image');
+
+      // Update profile to remove image
+      if (profile) {
+        setProfile({ ...profile, image: null });
+      }
+
+      alert('Profile image removed successfully!');
+    } catch (error) {
+      console.error('Error removing image:', error);
+      alert('Failed to remove image');
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -278,8 +360,43 @@ export default function ProfilePage() {
       <div className="mb-8">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-6">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold">
-              {profile.name ? profile.name.charAt(0).toUpperCase() : profile.email.charAt(0).toUpperCase()}
+            <div className="relative group">
+              {profile.image ? (
+                <img
+                  src={profile.image}
+                  alt={profile.name || 'Profile'}
+                  className="w-24 h-24 rounded-full object-cover border-4 border-white dark:border-gray-700 shadow-lg"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold border-4 border-white dark:border-gray-700 shadow-lg">
+                  {profile.name ? profile.name.charAt(0).toUpperCase() : profile.email.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="absolute inset-0 rounded-full bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <label className="cursor-pointer flex flex-col items-center">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    disabled={isUploadingImage}
+                  />
+                  <CameraIcon className="w-6 h-6 text-white mb-1" />
+                  <span className="text-xs text-white">
+                    {isUploadingImage ? 'Uploading...' : 'Change'}
+                  </span>
+                </label>
+              </div>
+              {profile.image && (
+                <button
+                  onClick={handleImageRemove}
+                  disabled={isUploadingImage}
+                  className="absolute -bottom-1 -right-1 w-8 h-8 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center text-white shadow-lg transition-colors"
+                  title="Remove picture"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              )}
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">

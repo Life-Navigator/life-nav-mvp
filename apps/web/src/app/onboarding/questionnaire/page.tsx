@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
 
 // Domain-specific questionnaire steps
+import BasicProfileQuestionnaire from '@/components/onboarding/BasicProfileQuestionnaire';
 import EducationQuestionnaire from '@/components/onboarding/EducationQuestionnaire';
 import CareerQuestionnaire from '@/components/onboarding/CareerQuestionnaire';
 import FinancialQuestionnaire from '@/components/onboarding/FinancialQuestionnaire';
@@ -16,12 +17,13 @@ import QuestionnaireComplete from '@/components/onboarding/QuestionnaireComplete
 // Define all steps in the questionnaire process
 const STEPS = {
   INTRO: 0,
-  EDUCATION: 1,
-  CAREER: 2,
-  FINANCIAL: 3,
-  HEALTH: 4,
-  RISK: 5,
-  COMPLETE: 6,
+  BASIC_PROFILE: 1,
+  EDUCATION: 2,
+  CAREER: 3,
+  FINANCIAL: 4,
+  HEALTH: 5,
+  RISK: 6,
+  COMPLETE: 7,
 };
 
 function QuestionnaireContent() {
@@ -33,6 +35,7 @@ function QuestionnaireContent() {
 
   const [currentStep, setCurrentStep] = useState(STEPS.INTRO);
   const [formData, setFormData] = useState({
+    basicProfile: {},
     education: {},
     career: {},
     financial: {},
@@ -78,6 +81,28 @@ function QuestionnaireContent() {
 
     setIsSubmitting(true);
     try {
+      // Submit basic profile data
+      const basicProfile = formData.basicProfile as any;
+      if (basicProfile && Object.keys(basicProfile).length > 0) {
+        const token = localStorage.getItem('access_token');
+        await fetch('/api/user/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            name: basicProfile.name,
+            phoneNumber: basicProfile.phoneNumber,
+            dateOfBirth: basicProfile.dateOfBirth,
+            gender: basicProfile.gender,
+            city: basicProfile.city,
+            state: basicProfile.state,
+            country: basicProfile.country,
+          }),
+        });
+      }
+
       // Submit education goals
       await fetch('/api/onboarding/education-goals', {
         method: 'POST',
@@ -134,7 +159,7 @@ function QuestionnaireContent() {
       console.error('Error submitting questionnaire:', error);
       addToast({
         title: "Error",
-        description: "Failed to save your goals. Please try again.",
+        description: "Failed to save your information. Please try again.",
         type: "error",
       });
     } finally {
@@ -150,6 +175,16 @@ function QuestionnaireContent() {
           onContinue={nextStep}
           onSwitchToEnhanced={switchToEnhancedOnboarding}
         />;
+
+      case STEPS.BASIC_PROFILE:
+        return (
+          <BasicProfileQuestionnaire
+            data={formData.basicProfile as any}
+            onChange={(data: any) => handleStepDataChange('basicProfile', data)}
+            onNext={nextStep}
+            onBack={prevStep}
+          />
+        );
 
       case STEPS.EDUCATION:
         return (
