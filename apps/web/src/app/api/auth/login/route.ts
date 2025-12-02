@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { SignJWT } from 'jose';
-
-const prisma = new PrismaClient();
+import { db } from '@/lib/db';
 
 // Interface for login data
 interface LoginRequestBody {
@@ -47,7 +45,7 @@ export async function POST(request: NextRequest) {
     console.log('[Login API Route] Attempting login for:', body.email);
 
     // Find user in database
-    const user = await prisma.user.findUnique({
+    const user = await db.user.findUnique({
       where: { email: body.email.toLowerCase() },
       select: {
         id: true,
@@ -112,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Update last login
-    await prisma.user.update({
+    await db.user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
     });
