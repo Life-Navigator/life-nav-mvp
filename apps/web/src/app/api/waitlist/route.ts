@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/auth-options';
+import { verifyToken } from '@/lib/auth/jwt';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const tokenPayload = await verifyToken(request);
 
-    if (!session?.user?.email) {
+    if (!tokenPayload) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -26,22 +25,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user by email
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
+    const userId = tokenPayload.sub;
 
     // Check if already on waitlist for this feature
     const existingEntry = await prisma.featureWaitlist.findFirst({
       where: {
-        userId: user.id,
+        userId,
         feature,
       },
     });
@@ -56,7 +45,7 @@ export async function POST(request: NextRequest) {
     // Add to waitlist
     const waitlistEntry = await prisma.featureWaitlist.create({
       data: {
-        userId: user.id,
+        userId,
         feature,
       },
     });
@@ -79,26 +68,16 @@ export async function POST(request: NextRequest) {
 // GET endpoint to retrieve waitlist stats (admin only)
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const tokenPayload = await verifyToken(request);
 
-    if (!session?.user?.email) {
+    if (!tokenPayload) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       );
     }
 
-    // Get user by email
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      );
-    }
+    const userId = tokenPayload.sub;
 
     // Get all waitlist entries grouped by feature
     const waitlistStats = await prisma.featureWaitlist.groupBy({
@@ -111,7 +90,7 @@ export async function GET(request: NextRequest) {
     // Get user's waitlist entries
     const userWaitlist = await prisma.featureWaitlist.findMany({
       where: {
-        userId: user.id,
+        userId,
       },
       select: {
         feature: true,
