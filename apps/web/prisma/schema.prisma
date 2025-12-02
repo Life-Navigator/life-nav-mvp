@@ -91,6 +91,10 @@ model User {
   investmentHoldings    InvestmentHolding[]
   featureVotes          FeatureVote[]
   featureWaitlist       FeatureWaitlist[]
+  studentProfiles       StudentProfile[]
+  degreeAnalyses        DegreeAnalysis[]
+  degreeComparisons     DegreeComparison[]
+  educationDocuments    EducationDocument[]
 
   @@index([email])
   @@index([createdAt])
@@ -3334,4 +3338,379 @@ model FeatureWaitlist {
   @@index([userId])
   @@index([feature])
   @@map("feature_waitlist")
+}
+
+//=====================
+// EDUCATION PLANNING MODULE
+// Most Advanced Education ROI & Planning System
+//=====================
+
+// School & Degree Data Repository
+model School {
+  id                    String    @id @default(cuid())
+  name                  String
+  city                  String?
+  state                 String?
+  country               String    @default("USA")
+  type                  String    // public, private, for-profit
+
+  // Basic Cost Data
+  tuitionInState        Float?    // Annual in-state tuition
+  tuitionOutOfState     Float?    // Annual out-of-state tuition
+  fees                  Float?    // Annual fees
+  roomAndBoard          Float?    // Annual room & board
+  books                 Float?    // Annual books/supplies
+  otherExpenses         Float?    // Transportation, personal, etc.
+
+  // Inflation Assumptions
+  tuitionInflationRate  Float     @default(0.03) // 3% default
+  coaInflationRate      Float     @default(0.025) // 2.5% default
+
+  // Metadata
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  degreePrograms        DegreeProgram[]
+  degreeAnalyses        DegreeAnalysis[]
+
+  @@index([name])
+  @@index([state])
+  @@index([type])
+  @@map("schools")
+}
+
+// Degree Program with Career Outcome Data
+model DegreeProgram {
+  id                    String    @id @default(cuid())
+  schoolId              String
+
+  // Program Details
+  degreeType            String    // bachelors, masters, jd, md, mba, phd, etc.
+  major                 String    // Computer Science, Law, Business, etc.
+  programLength         Int       // Years
+
+  // Career Outcome Data
+  startingSalary        Float?    // Median starting salary
+  salary25Percentile    Float?
+  salary75Percentile    Float?
+  midCareerSalary       Float?    // 10 years out
+  salaryGrowthRate      Float?    // Annual growth rate
+
+  // Employment Data
+  jobPlacementRate      Float?    // % employed within 6 months
+  underemploymentRate   Float?    // % working outside field
+  jobGrowthRate         Float?    // Industry job growth rate
+
+  // Alumni Network Impact Score (ANIS)
+  anisScore             Float     @default(1.0) // 0.8-1.5 range
+  anisJobFactor         Float     @default(1.0)
+  anisSalaryAlpha       Float     @default(0.0)
+  anisGrowthBeta        Float     @default(0.0)
+  anisUnderemployGamma  Float     @default(0.0)
+
+  // Network Metrics
+  alumniCount           Int?
+  alumniInTargetRoles   Int?
+  alumniLeadershipPct   Float?    // % in leadership roles
+  networkDensityScore   Float?    // Geographic & industry reach
+  brandPremiumScore     Float?    // Market perception
+
+  // Degree Type Category for ANIS weighting
+  networkImportance     String    @default("medium") // high, medium, low
+
+  // Follow-On Program Access Score (FPAS)
+  // Scores for admission to graduate/professional programs
+  fpasLawSchool         Float?    @default(1.0) // 0.5-2.0 multiplier for law school admission
+  fpasMedSchool         Float?    @default(1.0) // 0.5-2.0 multiplier for med school admission
+  fpasMBA               Float?    @default(1.0) // 0.5-2.0 multiplier for MBA programs
+  fpasPhD               Float?    @default(1.0) // 0.5-2.0 multiplier for PhD programs
+  fpasMasters           Float?    @default(1.0) // 0.5-2.0 multiplier for Masters programs
+
+  // FPAS Details (JSON: acceptance rates, feeder status, etc.)
+  fpasMetrics           String?   // {law_t14_rate, med_match_rate, mba_m7_rate, etc.}
+
+  // Metadata
+  lastUpdated           DateTime  @default(now())
+  dataSource            String?   // BLS, Payscale, LinkedIn, etc.
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  school                School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  degreeAnalyses        DegreeAnalysis[]
+
+  @@index([schoolId])
+  @@index([degreeType])
+  @@index([major])
+  @@index([networkImportance])
+  @@map("degree_programs")
+}
+
+// Student Profile for Education Planning
+model StudentProfile {
+  id                    String    @id @default(cuid())
+  userId                String
+
+  // Student Info
+  studentName           String
+  currentAge            Int
+  enrollmentYear        Int       // Year they'll start college
+  graduationYear        Int       // Expected graduation year
+
+  // Location & Preferences
+  currentState          String?
+  preferredRegion       String?   // For job market analysis
+
+  // Financial Background
+  householdIncome       Float?
+  expectedFamilyContribution Float?
+
+  // Goals & Career Targets
+  targetIndustry        String?
+  targetRole            String?
+  targetSalaryRange     String?   // JSON: {min, max}
+
+  // Long-Term Educational Goals (Follow-On Programs)
+  hasLongTermGoal       Boolean   @default(false)
+  longTermGoalType      String?   // jd, md, mba, phd, masters, etc.
+  targetProgramTier     String?   // top_10, top_25, top_50, any
+  targetGPA             Float?    // Target GPA for grad school
+  targetTestScore       String?   // JSON: {test_type, target_score}
+
+  // Life Goals Integration (JSON)
+  linkedGoalIds         String?   // Array of Goal IDs
+
+  // Metadata
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  financingAccounts     EducationFinancingAccount[]
+  degreeAnalyses        DegreeAnalysis[]
+  degreeComparisons     DegreeComparison[]
+
+  @@index([userId])
+  @@map("student_profiles")
+}
+
+// Education Financing Accounts (529, Custodial, Savings)
+model EducationFinancingAccount {
+  id                    String    @id @default(cuid())
+  studentProfileId      String
+
+  // Account Details
+  accountType           String    // 529, custodial, savings, brokerage
+  accountName           String
+  currentBalance        Float
+  monthlyContribution   Float     @default(0)
+  annualReturnRate      Float     @default(0.06) // 6% default
+
+  // Prioritization for Waterfall
+  priority              Int       @default(1) // Lower = used first
+
+  // Metadata
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  studentProfile        StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([studentProfileId])
+  @@index([accountType])
+  @@map("education_financing_accounts")
+}
+
+// Degree Analysis (Degree Decision Matrix)
+model DegreeAnalysis {
+  id                    String    @id @default(cuid())
+  userId                String
+  studentProfileId      String
+  schoolId              String
+  degreeProgramId       String?   // Null if custom/manual entry
+
+  // Custom Overrides (if not using DegreeProgram)
+  customSchoolName      String?
+  customDegreeName      String?
+  customDegreeType      String?
+  customProgramLength   Int?
+
+  // Cost Inputs
+  tuition               Float
+  fees                  Float
+  roomBoard             Float
+  books                 Float
+  otherExpenses         Float
+  tuitionInflation      Float     @default(0.03)
+  coaInflation          Float     @default(0.025)
+
+  // Financial Aid
+  scholarships          Float     @default(0) // Annual scholarships
+  grants                Float     @default(0) // Annual grants
+
+  // Career Inputs
+  expectedStartSalary   Float
+  expectedSalaryGrowth  Float
+  expectedJobPlacementRate Float
+  targetRegion          String?
+
+  // Network Preference
+  networkPriority       String    @default("medium") // low, medium, high
+
+  // === CALCULATED RESULTS ===
+
+  // Cost of Attendance Results
+  totalCostOfAttendance Float     // Total 4-year cost
+  yearlyBreakdown       String?   // JSON array of yearly costs
+
+  // Financing Waterfall Results
+  total529Used          Float     @default(0)
+  totalCustodialUsed    Float     @default(0)
+  totalSavingsUsed      Float     @default(0)
+  totalCashFlowUsed     Float     @default(0)
+  totalLoansNeeded      Float     @default(0)
+  loanBreakdown         String?   // JSON: yearly loan amounts
+
+  // Debt Projections
+  monthlyPayment        Float?
+  paybackPeriodMonths   Int?
+  totalInterestPaid     Float?
+  debtToIncomeRatio     Float?    // At graduation
+
+  // Career Outcomes (ANIS-Adjusted)
+  adjustedStartSalary   Float?
+  adjustedSalaryGrowth  Float?
+  adjustedPlacementRate Float?
+  adjustedUnderemploymentRate Float?
+
+  // ROI Calculations
+  paybackPeriodYears    Float?
+  lifetimeNetValue      Float?    // NPV of incremental earnings minus debt
+  npvIncrementalEarnings Float?
+
+  // Scenario Analysis (JSON)
+  conservativeScenario  String?   // {roi, payback, netValue}
+  baseScenario          String?
+  optimisticScenario    String?
+
+  // Goal Alignment
+  goalAlignmentScore    Float?    // 0-100
+  goalImpactAnalysis    String?   // JSON: impact on each goal
+
+  // AI Analysis
+  aiSummary             String?   // Plain language explanation
+  aiWarnings            String?   // JSON array of warnings
+  aiSuggestions         String?   // JSON array of suggestions
+  riskLevel             String?   // low, medium, high, extreme
+
+  // Metadata
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id])
+  studentProfile        StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  school                School    @relation(fields: [schoolId], references: [id])
+  degreeProgram         DegreeProgram? @relation(fields: [degreeProgramId], references: [id])
+  comparisonEntries     DegreeComparisonEntry[]
+
+  @@index([userId])
+  @@index([studentProfileId])
+  @@index([schoolId])
+  @@index([degreeProgramId])
+  @@map("degree_analyses")
+}
+
+// Degree Comparison (multi-degree comparison engine)
+model DegreeComparison {
+  id                    String    @id @default(cuid())
+  userId                String
+  studentProfileId      String
+
+  // Comparison Name
+  name                  String    @default("Degree Comparison")
+
+  // User Preferences / Weights
+  debtWeight            Float     @default(0.25)  // 25%
+  earningsWeight        Float     @default(0.25)
+  paybackWeight         Float     @default(0.20)
+  riskWeight            Float     @default(0.15)
+  goalAlignmentWeight   Float     @default(0.15)
+
+  // AI Recommendation
+  aiRecommendation      String?   // Plain language: "Choose X if Y, choose Z if..."
+  topChoice             String?   // degreeAnalysisId of recommended option
+
+  // Metadata
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id])
+  studentProfile        StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  entries               DegreeComparisonEntry[]
+
+  @@index([userId])
+  @@index([studentProfileId])
+  @@map("degree_comparisons")
+}
+
+// Junction table for comparison entries
+model DegreeComparisonEntry {
+  id                    String    @id @default(cuid())
+  comparisonId          String
+  degreeAnalysisId      String
+
+  // Ranking & Scores
+  overallRank           Int?      // 1 = best
+  weightedScore         Float?    // Combined weighted score
+
+  createdAt             DateTime  @default(now())
+
+  // Relations
+  comparison            DegreeComparison @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+  degreeAnalysis        DegreeAnalysis @relation(fields: [degreeAnalysisId], references: [id], onDelete: Cascade)
+
+  @@unique([comparisonId, degreeAnalysisId])
+  @@index([comparisonId])
+  @@index([degreeAnalysisId])
+  @@map("degree_comparison_entries")
+}
+
+// Document Uploads (Financial Aid Letters, 529 Statements, etc.)
+model EducationDocument {
+  id                    String    @id @default(cuid())
+  userId                String
+  studentProfileId      String?
+
+  // Document Info
+  fileName              String
+  fileType              String    // pdf, png, jpg
+  fileSize              Int       // bytes
+  storagePath           String    // Azure Blob Storage path
+
+  // Document Type
+  documentType          String    // aid_letter, scholarship_letter, 529_statement, school_costs
+
+  // Extracted Data (JSON)
+  extractedData         String?   // OCR + structured extraction results
+
+  // Processing Status
+  processingStatus      String    @default("pending") // pending, processing, completed, failed
+  extractedAt           DateTime?
+
+  // Metadata
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user                  User      @relation(fields: [userId], references: [id])
+  studentProfile        StudentProfile? @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([studentProfileId])
+  @@index([documentType])
+  @@index([processingStatus])
+  @@map("education_documents")
 }
