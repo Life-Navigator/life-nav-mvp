@@ -3490,6 +3490,7 @@ model StudentProfile {
   financingAccounts     EducationFinancingAccount[]
   degreeAnalyses        DegreeAnalysis[]
   degreeComparisons     DegreeComparison[]
+  educationDocuments    EducationDocument[]
 
   @@index([userId])
   @@map("student_profiles")
