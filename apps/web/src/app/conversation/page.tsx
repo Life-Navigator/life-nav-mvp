@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { WhatWhatWhyChat } from '@/components/conversation/WhatWhatWhyChat';
+import { DiscoveryChat } from '@/components/conversation/DiscoveryChat';
 import { Goal } from '@/lib/goals/types';
 
 function isAuthenticated(): boolean {
@@ -320,7 +320,7 @@ export default function ConversationPage() {
   }
 
   return (
-    <WhatWhatWhyChat
+    <DiscoveryChat
       userGoals={userGoals}
       benefitSelections={benefitSelections}
       userId={userId || ''}

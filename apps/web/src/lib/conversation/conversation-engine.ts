@@ -1,5 +1,5 @@
 /**
- * What-What-Why Conversation Engine
+ * Discovery Conversation Engine
  * Orchestrates multi-agent conversations to discover true motivations
  */
 

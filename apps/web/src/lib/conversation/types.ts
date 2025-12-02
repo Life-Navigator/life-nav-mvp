@@ -1,5 +1,5 @@
 /**
- * What-What-Why Conversation System Types
+ * Discovery Conversation System Types
  * Based on Marine Corps recruiting psychology adapted for life navigation
  */
 
@@ -172,7 +172,7 @@ export interface ActionItem {
 }
 
 /**
- * Question Templates for What-What-Why methodology
+ * Question Templates for Discovery methodology
  */
 export const QUESTION_TEMPLATES = {
   surface: [

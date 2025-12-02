@@ -92,7 +92,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
   const quickActions = [
     { name: 'Benefits Discovery', icon: '🎨', href: '/discovery/benefits' },
     { name: 'Create Goal', icon: '🎯', href: '/goals/create' },
-    { name: 'What-What-Why', icon: '💭', href: '/conversation' },
+    { name: 'Discovery', icon: '💭', href: '/conversation' },
     { name: 'Risk Assessment', icon: '📊', href: '/dashboard/goals' },
     { name: 'Calculators', icon: '🧮', href: '/dashboard/calculators' },
     { name: 'Family', icon: '👨‍👩‍👧‍👦', href: '/dashboard/family' }

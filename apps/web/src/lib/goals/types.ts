@@ -43,7 +43,7 @@ export interface Goal {
   // Psychological Alignment (from Benefits Discovery)
   primaryBenefits: string[]; // Benefit tag IDs this goal serves
   alignmentScore: number; // 0-100 how well aligned with user's authentic motivations
-  motivationNotes?: string; // From What-What-Why conversation
+  motivationNotes?: string; // From Discovery conversation
   
   // Visual Properties for Timeline
   color: string; // Hex color for the goal block
