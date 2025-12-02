@@ -12,7 +12,8 @@ import {
   ArrowPathIcon,
   CreditCardIcon,
   CogIcon,
-  HomeIcon
+  HomeIcon,
+  AcademicCapIcon
 } from "@heroicons/react/24/outline";
 
 const financeNavItems = [
@@ -50,6 +51,11 @@ const financeNavItems = [
     title: "Tax Planning",
     href: "/dashboard/finance/tax",
     icon: <CalculatorIcon className="w-5 h-5" />,
+  },
+  {
+    title: "Education Planning",
+    href: "/dashboard/finance/education",
+    icon: <AcademicCapIcon className="w-5 h-5" />,
   },
 ];
 
