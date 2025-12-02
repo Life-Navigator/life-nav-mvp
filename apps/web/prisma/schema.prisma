@@ -90,6 +90,7 @@ model User {
   retirementPlans       RetirementPlan[]
   investmentHoldings    InvestmentHolding[]
   featureVotes          FeatureVote[]
+  featureWaitlist       FeatureWaitlist[]
 
   @@index([email])
   @@index([createdAt])
@@ -3313,4 +3314,24 @@ model FeatureVote {
   @@index([userId])
   @@index([featureId])
   @@map("feature_votes")
+}
+
+//=====================
+// FEATURE WAITLIST
+//=====================
+
+model FeatureWaitlist {
+  id              String    @id @default(cuid())
+  userId          String
+  feature         String    // Feature name (e.g., "resume_builder", "courses")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, feature]) // Each user can only join waitlist once per feature
+  @@index([userId])
+  @@index([feature])
+  @@map("feature_waitlist")
 }

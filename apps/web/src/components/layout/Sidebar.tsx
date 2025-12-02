@@ -174,6 +174,14 @@ function ArrowRightIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function ChatIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+    </svg>
+  );
+}
+
 function EmailIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -274,12 +282,10 @@ const navigation = [
     href: '/dashboard/roadmap',
     icon: MapIcon,
     current: false,
-  },
-  {
-    name: 'Insights',
-    href: '/dashboard/insights',
-    icon: ChartBarIcon,
-    current: false,
+    children: [
+      { name: 'Insights', href: '/dashboard/roadmap/insights' },
+      { name: 'Chat', href: '/dashboard/roadmap/chat' },
+    ]
   },
   {
     name: 'Document Vault',
@@ -321,7 +327,11 @@ const getParentSection = (path: string): string | null => {
 };
 
 // Sidebar component
-export default function Sidebar() {
+interface SidebarProps {
+  collapsed?: boolean;
+}
+
+export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarProps = {}) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -329,8 +339,11 @@ export default function Sidebar() {
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [hoveredDropdown, setHoveredDropdown] = useState<string | null>(null);
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   const parentSection = getParentSection(pathname);
+
+  // Override isCollapsed if forceCollapsed is true
+  const effectiveCollapsed = forceCollapsed || isCollapsed;
 
   // Check if mobile on mount and on window resize
   useEffect(() => {
@@ -402,7 +415,9 @@ export default function Sidebar() {
 
   // Toggle collapsed state
   const toggleCollapsed = () => {
-    setIsCollapsed(!isCollapsed);
+    if (!forceCollapsed) {
+      setIsCollapsed(!isCollapsed);
+    }
   };
 
   // Handle dropdown hover
@@ -450,18 +465,18 @@ export default function Sidebar() {
               alt="LifeNavigator Logo" 
               className="w-8 h-8 flex-shrink-0" 
             />
-            {(!isCollapsed || isMobile) && (
+            {(!effectiveCollapsed || isMobile) && (
               <span className="text-lg font-semibold text-gray-900 dark:text-white">LifeNavigator</span>
             )}
           </Link>
           
-          {!isMobile && (
-            <button 
+          {!isMobile && !forceCollapsed && (
+            <button
               onClick={toggleCollapsed}
               className="p-1 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none"
-              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={effectiveCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
-              {isCollapsed ? (
+              {effectiveCollapsed ? (
                 <ChevronRightIcon className="h-5 w-5" />
               ) : (
                 <ChevronLeftIcon className="h-5 w-5" />
@@ -512,13 +527,13 @@ export default function Sidebar() {
                       )}
                       aria-hidden="true"
                     />
-                    {(!isCollapsed || isMobile) && (
+                    {(!effectiveCollapsed || isMobile) && (
                       <span className="flex-grow">{item.name}</span>
                     )}
                   </Link>
                   
                   {/* Dropdown toggle button - only show when not collapsed or on mobile */}
-                  {item.children && (!isCollapsed || isMobile) && (
+                  {item.children && (!effectiveCollapsed || isMobile) && (
                     <button
                       onClick={() => toggleSection(item.name)}
                       className="p-1 rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 focus:outline-none"
@@ -531,7 +546,7 @@ export default function Sidebar() {
                 </div>
                 
                 {/* Child items - only show when section is expanded and not collapsed or on mobile */}
-                {item.children && isExpanded && (!isCollapsed || isMobile) && (
+                {item.children && isExpanded && (!effectiveCollapsed || isMobile) && (
                   <div className="ml-8 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
                     {item.children.map((child) => {
                       const isChildActive = pathname === child.href;
@@ -542,7 +557,7 @@ export default function Sidebar() {
                           className={classNames(
                             isChildActive
                               ? 'text-blue-700 dark:text-blue-300 font-medium'
-                              : 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300',
+                              : 'text-gray-600 hover:text-gray-800 dark:text-white dark:hover:text-gray-200',
                             'block py-1.5 px-3 text-sm rounded-md'
                           )}
                           onClick={() => isMobile && setIsOpen(false)}
@@ -555,14 +570,14 @@ export default function Sidebar() {
                 )}
 
                 {/* Email accounts dropdown */}
-                {item.hasDropdown && isHovered && (!isCollapsed || isMobile) && (
+                {item.hasDropdown && isHovered && (!effectiveCollapsed || isMobile) && (
                   <div
                     className="absolute left-full top-0 ml-2 bg-white dark:bg-gray-800 shadow-lg rounded-md p-2 min-w-48 z-50 border border-gray-200 dark:border-gray-700"
                     onMouseEnter={() => handleMouseEnter(item.name)}
                     onMouseLeave={handleMouseLeave}
                   >
                     <div className="py-1 text-sm">
-                      <div className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
+                      <div className="px-3 py-2 font-medium text-gray-700 dark:text-white">
                         Email Accounts
                       </div>
                       <div className="mt-1 space-y-1">
@@ -584,7 +599,7 @@ export default function Sidebar() {
                             </div>
                           ))
                         ) : (
-                          <div className="px-3 py-3 text-center text-gray-500 dark:text-gray-400 text-xs">
+                          <div className="px-3 py-3 text-center text-gray-500 dark:text-gray-300 text-xs">
                             <p>No email accounts connected</p>
                             <Link
                               href="/dashboard/integrations"
@@ -620,7 +635,7 @@ export default function Sidebar() {
                     onMouseLeave={handleMouseLeave}
                   >
                     <div className="py-1">
-                      <div className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300">
+                      <div className="px-3 py-2 font-medium text-gray-700 dark:text-white">
                         {item.name}
                       </div>
                       <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
@@ -654,7 +669,7 @@ export default function Sidebar() {
                               </Link>
                             </>
                           ) : (
-                            <div className="px-3 py-3 text-center text-gray-500 dark:text-gray-400 text-xs">
+                            <div className="px-3 py-3 text-center text-gray-500 dark:text-gray-300 text-xs">
                               <p>No email accounts connected</p>
                               <Link
                                 href="/dashboard/integrations"
@@ -676,7 +691,7 @@ export default function Sidebar() {
         </nav>
 
         {/* Bottom section - only show when not collapsed or on mobile */}
-        {(!isCollapsed || isMobile) && (
+        {(!effectiveCollapsed || isMobile) && (
           <div className="absolute bottom-0 left-0 right-0 p-4">
             <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-3">
               <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">Premium Desktop</h3>

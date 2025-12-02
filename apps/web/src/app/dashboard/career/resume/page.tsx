@@ -824,6 +824,24 @@ export default function ResumePage() {
     );
   }
 
+  const handleJoinWaitlist = async () => {
+    try {
+      const response = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feature: 'resume_builder' }),
+      });
+      if (response.ok) {
+        alert('Thanks for your interest! We\'ll notify you when Resume Builder launches.');
+      } else {
+        alert('Failed to join waitlist. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error joining waitlist:', error);
+      alert('Failed to join waitlist. Please try again.');
+    }
+  };
+
   return (
     <div className="container mx-auto py-6 px-4 md:px-6">
       <div className="flex items-center justify-between mb-6">
@@ -848,6 +866,27 @@ export default function ResumePage() {
             <PlusIcon className="w-5 h-5" />
             New Resume
           </button>
+        </div>
+      </div>
+
+      {/* Coming Soon Banner */}
+      <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6 mb-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <SparklesIcon className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Coming Soon</h2>
+            </div>
+            <p className="text-gray-700 dark:text-gray-300 mb-4">
+              Our AI-powered Resume Builder is currently in development. Create professional, ATS-optimized resumes tailored to any job opportunity with intelligent keyword matching and formatting.
+            </p>
+            <button
+              onClick={handleJoinWaitlist}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            >
+              Join Waitlist
+            </button>
+          </div>
         </div>
       </div>
 

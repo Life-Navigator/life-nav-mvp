@@ -1,9 +1,10 @@
 'use client';
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  ChartBarIcon, 
+import {
+  ChartBarIcon,
   AcademicCapIcon,
   BookOpenIcon,
   DocumentCheckIcon,
@@ -41,6 +42,52 @@ const educationNavItems = [
 
 export function EducationSidebar() {
   const pathname = usePathname();
+  const [progressData, setProgressData] = useState<{
+    currentCourseProgress: number;
+    courseName: string;
+    nextAssignmentDays: number | null;
+    loading: boolean;
+  }>({
+    currentCourseProgress: 0,
+    courseName: '',
+    nextAssignmentDays: null,
+    loading: true
+  });
+
+  // Fetch learning progress data
+  useEffect(() => {
+    const fetchProgressData = async () => {
+      try {
+        const response = await fetch('/api/education/progress');
+        if (response.ok) {
+          const data = await response.json();
+          setProgressData({
+            currentCourseProgress: data.currentCourseProgress || 0,
+            courseName: data.courseName || 'No active course',
+            nextAssignmentDays: data.nextAssignmentDays,
+            loading: false
+          });
+        } else {
+          setProgressData({
+            currentCourseProgress: 0,
+            courseName: 'No active course',
+            nextAssignmentDays: null,
+            loading: false
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching progress data:', error);
+        setProgressData({
+          currentCourseProgress: 0,
+          courseName: 'No active course',
+          nextAssignmentDays: null,
+          loading: false
+        });
+      }
+    };
+
+    fetchProgressData();
+  }, []);
 
   // Determine if a nav link is active
   const isActive = (href: string) => {
@@ -62,7 +109,7 @@ export function EducationSidebar() {
             className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
               isActive(item.href)
                 ? "bg-amber-50 text-amber-900 dark:bg-amber-600 dark:text-white font-semibold"
-                : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800"
+                : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-white dark:hover:text-white dark:hover:bg-slate-800"
             }`}
           >
             <span className={isActive(item.href) ? "text-amber-600 dark:text-amber-400" : ""}>
@@ -80,7 +127,7 @@ export function EducationSidebar() {
           className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
             isActive("/dashboard/education/settings")
               ? "bg-amber-50 text-amber-900 dark:bg-amber-600 dark:text-white font-semibold"
-              : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800"
+              : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-white dark:hover:text-white dark:hover:bg-slate-800"
           }`}
         >
           <span className={isActive("/dashboard/education/settings") ? "text-amber-600 dark:text-amber-400" : ""}>
@@ -91,19 +138,23 @@ export function EducationSidebar() {
       </div>
       
       {/* Education progress */}
-      <div className="mt-6 p-4 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-amber-900 rounded-lg border border-amber-100 dark:border-amber-800">
-        <h3 className="text-sm font-medium text-amber-900 dark:text-amber-200 mb-2">Learning Progress</h3>
-        <div className="flex justify-between items-center mb-1">
-          <span className="text-xs text-amber-700 dark:text-amber-300">Current Course</span>
-          <span className="text-xs font-medium text-amber-900 dark:text-amber-100">67%</span>
+      {!progressData.loading && progressData.currentCourseProgress > 0 && (
+        <div className="mt-6 p-4 bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950 dark:to-amber-900 rounded-lg border border-amber-100 dark:border-amber-800">
+          <h3 className="text-sm font-medium text-amber-900 dark:text-amber-200 mb-2">Learning Progress</h3>
+          <div className="flex justify-between items-center mb-1">
+            <span className="text-xs text-amber-700 dark:text-amber-300">{progressData.courseName}</span>
+            <span className="text-xs font-medium text-amber-900 dark:text-amber-100">{progressData.currentCourseProgress}%</span>
+          </div>
+          <div className="w-full bg-amber-200 dark:bg-amber-800 rounded-full h-2.5">
+            <div className="bg-amber-500 dark:bg-amber-400 h-2.5 rounded-full" style={{ width: `${progressData.currentCourseProgress}%` }}></div>
+          </div>
+          {progressData.nextAssignmentDays !== null && (
+            <div className="mt-3 text-xs text-amber-700 dark:text-amber-300">
+              <p>Next Assignment Due: <span className="font-medium text-amber-900 dark:text-amber-200">{progressData.nextAssignmentDays} days</span></p>
+            </div>
+          )}
         </div>
-        <div className="w-full bg-amber-200 dark:bg-amber-800 rounded-full h-2.5">
-          <div className="bg-amber-500 dark:bg-amber-400 h-2.5 rounded-full" style={{ width: '67%' }}></div>
-        </div>
-        <div className="mt-3 text-xs text-amber-700 dark:text-amber-300">
-          <p>Next Assignment Due: <span className="font-medium text-amber-900 dark:text-amber-200">2 days</span></p>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
