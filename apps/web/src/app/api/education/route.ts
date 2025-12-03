@@ -20,11 +20,11 @@ export async function GET(request: NextRequest) {
         provider: true,
         progress: true,
         status: true,
-        enrollmentDate: true,
+        startDate: true,
         expectedEndDate: true,
-        completionDate: true,
+        endDate: true,
       },
-      orderBy: { enrollmentDate: 'desc' },
+      orderBy: { startDate: 'desc' },
     });
 
     // Calculate summary statistics

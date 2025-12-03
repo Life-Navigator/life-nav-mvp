@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
           isAchievable: validatedData.isAchievable,
           isRelevant: validatedData.isRelevant,
           isTimeBound: validatedData.isTimeBound,
-          progressPercentage: 0
+          progress: 0
         }
       });
 
@@ -191,8 +191,9 @@ export async function POST(request: NextRequest) {
       await tx.goalUpdate.create({
         data: {
           goalId: newGoal.id,
-          updateText: `Goal created: ${newGoal.title}`,
-          progressPercentage: 0
+          updateType: 'status_change',
+          content: `Goal created: ${newGoal.title}`,
+          newValue: 0
         }
       });
 
