@@ -168,22 +168,22 @@ export function Toaster() {
   );
 }
 
-// Export convenience methods
-export const toast = {
-  success: (title: string, description?: string, duration?: number) => {
-    const { addToast } = useToast();
-    addToast({ title, description, type: 'success', duration });
-  },
-  error: (title: string, description?: string, duration?: number) => {
-    const { addToast } = useToast();
-    addToast({ title, description, type: 'error', duration });
-  },
-  warning: (title: string, description?: string, duration?: number) => {
-    const { addToast } = useToast();
-    addToast({ title, description, type: 'warning', duration });
-  },
-  info: (title: string, description?: string, duration?: number) => {
-    const { addToast } = useToast();
-    addToast({ title, description, type: 'info', duration });
-  },
-};
+// Export convenience methods - these must be called from within a React component
+// that has access to the ToastContext
+export function useToastActions() {
+  const { addToast } = useToast();
+  return {
+    success: (title: string, description?: string, duration?: number) => {
+      addToast({ title, description, type: 'success', duration });
+    },
+    error: (title: string, description?: string, duration?: number) => {
+      addToast({ title, description, type: 'error', duration });
+    },
+    warning: (title: string, description?: string, duration?: number) => {
+      addToast({ title, description, type: 'warning', duration });
+    },
+    info: (title: string, description?: string, duration?: number) => {
+      addToast({ title, description, type: 'info', duration });
+    },
+  };
+}

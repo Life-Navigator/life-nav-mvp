@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
       today.setHours(0, 0, 0, 0);
       let currentDate = new Date(today);
 
-      while (true) {
+      for (let i = 0; i < 365; i++) {
         const dateStr = currentDate.toISOString().split('T')[0];
         if (studyDates.has(dateStr)) {
           studyStreak++;

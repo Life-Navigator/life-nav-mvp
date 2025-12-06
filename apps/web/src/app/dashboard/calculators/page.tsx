@@ -3,9 +3,9 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/cards/Card';
-import { Search, Calculator } from 'lucide-react';
+import { Search, Calculator as CalculatorIcon } from 'lucide-react';
 
-interface Calculator {
+interface CalculatorItem {
   id: string;
   name: string;
   description: string;
@@ -15,7 +15,7 @@ interface Calculator {
   available: boolean;
 }
 
-const calculators: Calculator[] = [
+const calculators: CalculatorItem[] = [
   { id: 'retirement', name: 'Retirement Calculator', description: 'Plan your retirement savings', category: 'financial', icon: 'retirement-icon', color: 'from-blue-500 to-blue-600', available: true },
   { id: 'mortgage', name: 'Mortgage Calculator', description: 'Calculate mortgage payments', category: 'financial', icon: 'mortgage-icon', color: 'from-green-500 to-green-600', available: true },
   { id: 'loan', name: 'Loan Payment Calculator', description: 'Estimate loan payments', category: 'financial', icon: 'loan-icon', color: 'from-yellow-500 to-yellow-600', available: true },
@@ -74,7 +74,7 @@ export default function CalculatorsPage() {
 
         {filteredCalculators.length === 0 && (
           <div className="text-center py-12">
-            <Calculator className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <CalculatorIcon className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
               No calculators found
             </h3>

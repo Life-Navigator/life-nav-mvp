@@ -39,9 +39,9 @@ export async function renderEmailTemplate(
 
   // Render React component to HTML
   const html = ReactDOMServer.renderToStaticMarkup(
-    React.createElement(EmailLayout, {
-      children: React.createElement(Template, data),
-    })
+    React.createElement(EmailLayout, {},
+      React.createElement(Template, data)
+    )
   );
 
   // Generate text version (simplified)

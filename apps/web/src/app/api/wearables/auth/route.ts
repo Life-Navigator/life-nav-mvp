@@ -30,15 +30,17 @@ export async function GET(request: NextRequest) {
     let authUrl: string;
 
     switch (provider.toLowerCase()) {
-      case 'fitbit':
+      case 'fitbit': {
         const fitbitAdapter = createFitbitAdapter();
         authUrl = fitbitAdapter.getAuthUrl(state);
         break;
+      }
 
-      case 'google_fit':
+      case 'google_fit': {
         const googleFitAdapter = createGoogleFitAdapter();
         authUrl = googleFitAdapter.getAuthUrl(state);
         break;
+      }
 
       // Add more providers here
       case 'apple_health':

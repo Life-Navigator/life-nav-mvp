@@ -61,6 +61,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: getThemeScript() }} />
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script src="/force-dark-mode.js" />
       </head>
       <body

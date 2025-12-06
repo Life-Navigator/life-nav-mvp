@@ -123,22 +123,26 @@ export class FitbitAdapter implements WearableProviderAdapter {
     for (const type of dataTypes) {
       try {
         switch (type) {
-          case 'steps':
+          case 'steps': {
             const stepsData = await this.fetchSteps(accessToken, dateStr);
             metrics.push(...stepsData);
             break;
-          case 'heart_rate':
+          }
+          case 'heart_rate': {
             const hrData = await this.fetchHeartRate(accessToken, dateStr);
             metrics.push(...hrData);
             break;
-          case 'sleep':
+          }
+          case 'sleep': {
             const sleepData = await this.fetchSleep(accessToken, dateStr);
             metrics.push(...sleepData);
             break;
-          case 'calories':
+          }
+          case 'calories': {
             const caloriesData = await this.fetchCalories(accessToken, dateStr);
             metrics.push(...caloriesData);
             break;
+          }
           // Add more metric types as needed
         }
       } catch (error) {

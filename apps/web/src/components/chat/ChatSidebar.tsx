@@ -114,6 +114,7 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
       let accumulatedContent = '';
       let metadata = null;
 
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;

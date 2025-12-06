@@ -66,7 +66,7 @@ export class GoalAlignmentEngine implements IGoalAlignmentEngine {
     let description = '';
 
     switch (category) {
-      case 'retirement':
+      case 'retirement': {
         // Higher salary accelerates retirement savings
         // But debt delays ability to save
         const salaryBoost = earlyCareerIncome > 60000 ? 1 : 0; // Threshold
@@ -88,9 +88,10 @@ export class GoalAlignmentEngine implements IGoalAlignmentEngine {
           description = 'Minimal impact on retirement timeline.';
         }
         break;
+      }
 
-      case 'purchase': // Home purchase
-        // Calculate how debt affects home buying capacity
+      case 'purchase': {
+        // Home purchase - Calculate how debt affects home buying capacity
         const dtiRatio = degreeAnalysis.debtProjection?.debtToIncomeRatio || 0;
         const monthlyDebtPayment = loanPayment;
 
@@ -116,6 +117,7 @@ export class GoalAlignmentEngine implements IGoalAlignmentEngine {
           description = 'Degree has neutral impact on home purchase timeline.';
         }
         break;
+      }
 
       case 'education': // Kids' education / further education
         // Student debt impacts ability to save for children's education
@@ -134,8 +136,8 @@ export class GoalAlignmentEngine implements IGoalAlignmentEngine {
         }
         break;
 
-      case 'protection': // Emergency fund, insurance
-        // Debt reduces ability to build emergency fund
+      case 'protection': {
+        // Emergency fund, insurance - Debt reduces ability to build emergency fund
         const monthlyDiscretionary = earlyCareerIncome / 12 - loanPayment - 3000; // Assume $3k living expenses
 
         if (monthlyDiscretionary < 500) {
@@ -152,10 +154,10 @@ export class GoalAlignmentEngine implements IGoalAlignmentEngine {
           description = 'Adequate capacity to build emergency fund on normal timeline.';
         }
         break;
+      }
 
-      case 'wealth': // Investment, wealth building
-        // High-paying degree accelerates wealth building
-        // Heavy debt delays it
+      case 'wealth': {
+        // Investment, wealth building - High-paying degree accelerates, heavy debt delays
         const netWealthCapacity = earlyCareerIncome * 0.2 - loanPayment * 12;
 
         if (netWealthCapacity > 15000) {
@@ -175,6 +177,7 @@ export class GoalAlignmentEngine implements IGoalAlignmentEngine {
           description = 'Moderate wealth-building capacity during early career.';
         }
         break;
+      }
 
       case 'career':
         // Career goals are typically accelerated by degree
@@ -183,7 +186,7 @@ export class GoalAlignmentEngine implements IGoalAlignmentEngine {
         description = `Degree provides credentials and network to advance career ${yearsImpact} years faster than without degree.`;
         break;
 
-      case 'lifestyle':
+      case 'lifestyle': {
         // Discretionary spending affected by debt burden
         const lifestyleDiscretionary = (earlyCareerIncome / 12 - loanPayment - 3000) * 0.3;
 
@@ -203,6 +206,7 @@ export class GoalAlignmentEngine implements IGoalAlignmentEngine {
           description = 'Moderate discretionary income for lifestyle goals.';
         }
         break;
+      }
 
       default:
         description = 'Impact varies based on specific goal details.';

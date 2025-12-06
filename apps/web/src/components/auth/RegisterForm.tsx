@@ -45,6 +45,7 @@ export default function RegisterForm() {
     }
 
     // Check password strength (at least 12 characters, uppercase, lowercase, number, special char)
+    // eslint-disable-next-line no-useless-escape
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{12,}$/;
     if (!passwordRegex.test(formData.password)) {
       setError('Password must be at least 12 characters and include uppercase letters, lowercase letters, numbers, and special characters.');

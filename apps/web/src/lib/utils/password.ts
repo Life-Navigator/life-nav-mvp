@@ -23,6 +23,7 @@ export async function hashPassword(password: string, saltRounds: number = 10): P
  * Standard password validation regex for use across the application
  * Requires at least 12 characters with uppercase, lowercase, numbers, and special characters
  */
+// eslint-disable-next-line no-useless-escape
 export const STRONG_PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{12,}$/;
 
 /**

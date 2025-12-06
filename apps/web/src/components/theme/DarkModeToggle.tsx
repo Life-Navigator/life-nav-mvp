@@ -35,8 +35,10 @@ export function DarkModeToggle() {
     document.body.style.backgroundColor = '';
     document.body.style.color = '';
     
-    // Force re-render by refreshing the body class
-    document.body.className = document.body.className;
+    // Force re-render by triggering a class change
+    const currentClass = document.body.className;
+    document.body.className = currentClass + ' ';
+    document.body.className = currentClass;
     
     // Update state
     setIsDark(!isDark);

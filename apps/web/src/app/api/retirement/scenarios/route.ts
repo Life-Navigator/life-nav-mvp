@@ -274,7 +274,7 @@ function generateScenarioProjections(input: ScenarioInput): ScenarioResult {
       );
       break;
 
-    case 'INHERITANCE':
+    case 'INHERITANCE': {
       const inheritanceAmount = modifications.oneTimeInflow || 200000;
       modifiedData.currentSavings = baselineData.currentSavings + inheritanceAmount;
       scenarioName = 'Inheritance Received';
@@ -288,8 +288,9 @@ function generateScenarioProjections(input: ScenarioInput): ScenarioResult {
         'Evaluate charitable giving strategies'
       );
       break;
+    }
 
-    case 'PART_TIME_WORK':
+    case 'PART_TIME_WORK': {
       modifiedData.retirementAge = baselineData.retirementAge - 2;
       const partTimeIncome = 25000;
       scenarioName = 'Part-Time Work in Retirement';
@@ -303,6 +304,7 @@ function generateScenarioProjections(input: ScenarioInput): ScenarioResult {
         'Review healthcare coverage options'
       );
       break;
+    }
 
     case 'RELOCATION':
       modifiedData.annualExpenses = baselineData.annualExpenses * 0.8; // 20% lower COL

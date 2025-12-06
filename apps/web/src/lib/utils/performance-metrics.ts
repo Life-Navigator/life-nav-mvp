@@ -42,9 +42,10 @@ function recordMetric(metricName: string, value: number): void {
  * 
  * @returns Cleanup function
  */
-export function measurePerformance(): () => void {
+export function useMeasurePerformance(): () => void {
   const mountTime = performance.now();
-  
+
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
     const metrics: PerformanceMetrics = {
       fcp: null,
