@@ -13,8 +13,9 @@ on:
       - beta
       - main
     paths:
-      - 'apps/**'
-      - 'packages/**'
+      - 'backend/**'
+      - 'services/**'
+      - 'docker/**'
       - 'terraform/gcp/**'
       - '.github/workflows/deploy-beta.yml'
   workflow_dispatch:
@@ -44,22 +45,22 @@ jobs:
       matrix:
         service:
           - name: api-gateway
-            dockerfile: apps/api-gateway/Dockerfile
+            dockerfile: docker/api-gateway.Dockerfile
             context: .
           - name: agent-orchestrator
-            dockerfile: apps/agent-orchestrator/Dockerfile
+            dockerfile: docker/agent-orchestrator.Dockerfile
             context: .
           - name: graphrag-api
-            dockerfile: apps/graphrag-api/Dockerfile
+            dockerfile: docker/graphrag-api.Dockerfile
             context: .
           - name: compliance-checker
-            dockerfile: apps/compliance-checker/Dockerfile
+            dockerfile: docker/compliance-checker.Dockerfile
             context: .
           - name: proactive-engine
-            dockerfile: apps/proactive-engine/Dockerfile
+            dockerfile: docker/proactive-engine.Dockerfile
             context: .
           - name: ingestion-worker
-            dockerfile: apps/ingestion-worker/Dockerfile
+            dockerfile: docker/ingestion-worker.Dockerfile
             context: .
 
     steps:
