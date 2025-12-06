@@ -77,10 +77,7 @@ resource "google_storage_bucket" "buckets" {
     }
   }
 
-  # Encryption (use Google-managed keys by default)
-  encryption {
-    default_kms_key_name = null
-  }
+  # Encryption uses Google-managed keys by default (no explicit block needed)
 
   # Labels
   labels = merge(

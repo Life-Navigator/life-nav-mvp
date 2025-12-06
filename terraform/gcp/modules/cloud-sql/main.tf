@@ -110,9 +110,9 @@ resource "google_sql_database_instance" "postgres" {
     tier              = var.tier
     availability_type = var.availability_type
 
-    # Disk configuration
+    # Disk configuration - smaller disk for micro instances
     disk_type       = "PD_SSD"
-    disk_size       = 100
+    disk_size       = startswith(var.tier, "db-f1-") ? 10 : 100
     disk_autoresize = true
 
     # Backup configuration
@@ -141,25 +141,37 @@ resource "google_sql_database_instance" "postgres" {
       update_track = "stable"
     }
 
-    # Database flags
-    database_flags {
-      name  = "max_connections"
-      value = var.env == "prod" ? "500" : "100"
+    # Database flags - only apply for larger instances (not db-f1-micro)
+    dynamic "database_flags" {
+      for_each = !startswith(var.tier, "db-f1-") ? [1] : []
+      content {
+        name  = "max_connections"
+        value = var.env == "prod" ? "500" : "100"
+      }
     }
 
-    database_flags {
-      name  = "shared_buffers"
-      value = var.env == "prod" ? "2097152" : "524288"  # 8GB for prod, 2GB for dev
+    dynamic "database_flags" {
+      for_each = !startswith(var.tier, "db-f1-") ? [1] : []
+      content {
+        name  = "shared_buffers"
+        value = var.env == "prod" ? "2097152" : "524288"  # 8GB for prod, 2GB for dev
+      }
     }
 
-    database_flags {
-      name  = "work_mem"
-      value = "32768"  # 128MB
+    dynamic "database_flags" {
+      for_each = !startswith(var.tier, "db-f1-") ? [1] : []
+      content {
+        name  = "work_mem"
+        value = "32768"  # 128MB
+      }
     }
 
-    database_flags {
-      name  = "effective_cache_size"
-      value = var.env == "prod" ? "6291456" : "1572864"  # 24GB for prod, 6GB for dev
+    dynamic "database_flags" {
+      for_each = !startswith(var.tier, "db-f1-") ? [1] : []
+      content {
+        name  = "effective_cache_size"
+        value = var.env == "prod" ? "6291456" : "1572864"  # 24GB for prod, 6GB for dev
+      }
     }
 
     database_flags {
@@ -167,9 +179,9 @@ resource "google_sql_database_instance" "postgres" {
       value = "1000"  # Log queries > 1s
     }
 
-    # pgvector optimization flags
+    # pgvector optimization flags - only for larger instances
     dynamic "database_flags" {
-      for_each = var.enable_pgvector ? [1] : []
+      for_each = var.enable_pgvector && !startswith(var.tier, "db-f1-") ? [1] : []
       content {
         name  = "maintenance_work_mem"
         value = "2097152"  # 8GB for vector index building
@@ -177,7 +189,7 @@ resource "google_sql_database_instance" "postgres" {
     }
 
     dynamic "database_flags" {
-      for_each = var.enable_pgvector ? [1] : []
+      for_each = var.enable_pgvector && !startswith(var.tier, "db-f1-") ? [1] : []
       content {
         name  = "max_parallel_workers"
         value = "8"
@@ -185,7 +197,7 @@ resource "google_sql_database_instance" "postgres" {
     }
 
     dynamic "database_flags" {
-      for_each = var.enable_pgvector ? [1] : []
+      for_each = var.enable_pgvector && !startswith(var.tier, "db-f1-") ? [1] : []
       content {
         name  = "max_parallel_workers_per_gather"
         value = "4"

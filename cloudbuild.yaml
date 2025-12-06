@@ -1,0 +1,98 @@
+# ===========================================================================
+# Cloud Build Configuration for Life Navigator
+# ===========================================================================
+# Builds all 6 Cloud Run container images in parallel
+# Usage: gcloud builds submit --config=cloudbuild.yaml --substitutions=_ENV=beta
+# ===========================================================================
+
+substitutions:
+  _ENV: beta
+  _REGION: us-central1
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  # Build API Gateway
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-api-gateway'
+    args:
+      - 'build'
+      - '-f'
+      - 'docker/api-gateway.Dockerfile'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/api-gateway:${_ENV}'
+      - '.'
+    waitFor: ['-']
+
+  # Build Agent Orchestrator
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-agent-orchestrator'
+    args:
+      - 'build'
+      - '-f'
+      - 'docker/agent-orchestrator.Dockerfile'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/agent-orchestrator:${_ENV}'
+      - '.'
+    waitFor: ['-']
+
+  # Build GraphRAG API (Python wrapper)
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-graphrag-api'
+    args:
+      - 'build'
+      - '-f'
+      - 'docker/graphrag-api.Dockerfile'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/graphrag-api:${_ENV}'
+      - '.'
+    waitFor: ['-']
+
+  # Build Compliance Checker
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-compliance-checker'
+    args:
+      - 'build'
+      - '-f'
+      - 'docker/compliance-checker.Dockerfile'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/compliance-checker:${_ENV}'
+      - '.'
+    waitFor: ['-']
+
+  # Build Proactive Engine
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-proactive-engine'
+    args:
+      - 'build'
+      - '-f'
+      - 'docker/proactive-engine.Dockerfile'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/proactive-engine:${_ENV}'
+      - '.'
+    waitFor: ['-']
+
+  # Build Ingestion Worker
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-ingestion-worker'
+    args:
+      - 'build'
+      - '-f'
+      - 'docker/ingestion-worker.Dockerfile'
+      - '-t'
+      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/ingestion-worker:${_ENV}'
+      - '.'
+    waitFor: ['-']
+
+# Push all images to Artifact Registry
+images:
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/api-gateway:${_ENV}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/agent-orchestrator:${_ENV}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/graphrag-api:${_ENV}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/compliance-checker:${_ENV}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/proactive-engine:${_ENV}'
+  - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/life-navigator/ingestion-worker:${_ENV}'
+
+timeout: '2400s'  # 40 minutes max
