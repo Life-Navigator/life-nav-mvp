@@ -202,7 +202,7 @@ importers:
         specifier: ^0.292.0
         version: 0.292.0(react@19.0.0)
       next:
-        specifier: ^15.4.7
+        specifier: 15.5.6
         version: 15.5.6(@babel/core@7.28.5)(@playwright/test@1.56.1)(react-dom@19.0.0)(react@19.0.0)
       next-auth:
         specifier: ^4.24.13
@@ -290,7 +290,7 @@ importers:
         specifier: ^8.57.0
         version: 8.57.1
       eslint-config-next:
-        specifier: ^15.4.7
+        specifier: 15.5.6
         version: 15.5.6(eslint@8.57.1)(typescript@5.9.3)
       jest:
         specifier: ^29.0.0
@@ -4216,7 +4216,7 @@ packages:
     resolution: {integrity: sha512-zmPitbQ8+6zNutpwgcQuLcsEpn/Cj54Kbn7L5pX0Os5kdWplB7xPgEh/g+SWOB/qmows2gpuCaPyduq8ZZRnxA==}
     deprecated: This is a stub types definition. minimatch provides its own type definitions, so you do not need this installed.
     dependencies:
-      minimatch: 9.0.5
+      minimatch: 10.1.1
     dev: true
 
   /@types/ms@2.1.0:
@@ -5207,7 +5207,7 @@ packages:
     hasBin: true
     dependencies:
       baseline-browser-mapping: 2.8.25
-      caniuse-lite: 1.0.30001754
+      caniuse-lite: 1.0.30001757
       electron-to-chromium: 1.5.245
       node-releases: 2.0.27
       update-browserslist-db: 1.1.4(browserslist@4.27.0)
@@ -5353,9 +5353,6 @@ packages:
   /camelcase@6.3.0:
     resolution: {integrity: sha512-Gmy6FhYlCY7uOElZUSbxo2UCDH8owEk996gkbrpsgGtrJLM3J7jGxl9Ic7Qwwj4ivOE5AWZWRMecDdF7hqGjFA==}
     engines: {node: '>=10'}
-
-  /caniuse-lite@1.0.30001754:
-    resolution: {integrity: sha512-x6OeBXueoAceOmotzx3PO4Zpt4rzpeIFsSr6AAePTZxSkXiYDUmpypEl7e2+8NCd9bD7bXjqyef8CJYPC1jfxg==}
 
   /caniuse-lite@1.0.30001757:
     resolution: {integrity: sha512-r0nnL/I28Zi/yjk1el6ilj27tKcdjLsNqAOZr0yVjWPrSQyHgKI2INaEWw21bAQSv2LXRt1XuCS/GomNpWOxsQ==}
@@ -9856,6 +9853,7 @@ packages:
   /next@15.5.6(@babel/core@7.28.5)(@playwright/test@1.56.1)(react-dom@19.0.0)(react@19.0.0):
     resolution: {integrity: sha512-zTxsnI3LQo3c9HSdSf91O1jMNsEzIXDShXd4wVdg9y5shwLqBXi4ZtUUJyB86KGVSJLZx0PFONvO54aheGX8QQ==}
     engines: {node: ^18.18.0 || ^19.8.0 || >= 20.0.0}
+    deprecated: This version has a security vulnerability. Please upgrade to a patched version. See https://nextjs.org/blog/CVE-2025-66478 for more details.
     hasBin: true
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
@@ -9877,7 +9875,7 @@ packages:
       '@next/env': 15.5.6
       '@playwright/test': 1.56.1
       '@swc/helpers': 0.5.15
-      caniuse-lite: 1.0.30001754
+      caniuse-lite: 1.0.30001757
       postcss: 8.4.31
       react: 19.0.0
       react-dom: 19.0.0(react@19.0.0)
