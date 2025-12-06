@@ -121,17 +121,23 @@ module "artifact_registry" {
 }
 
 # ===========================================================================
-# Cloud SQL (PostgreSQL) - Cost Optimized
+# Cloud SQL (PostgreSQL) - Multi-Database Architecture for Compliance
+# ===========================================================================
+# Three separate databases for data isolation:
+# 1. Core DB - User accounts, sessions, preferences, general app data
+# 2. Finance DB - Financial accounts, transactions (GLBA/PCI DSS)
+# 3. Health DB - Health records, medical data (HIPAA)
 # ===========================================================================
 
-module "cloud_sql" {
+# Core Database - General application data
+module "cloud_sql_core" {
   source = "../../modules/cloud-sql"
 
   project_id = var.project_id
   region     = var.region
   env        = local.env
 
-  instance_name     = "life-navigator-db-beta"
+  instance_name     = "ln-core-db-beta"
   database_version  = "POSTGRES_15"
   tier              = "db-f1-micro"  # Smallest instance for cost savings
   availability_type = "ZONAL"
@@ -140,7 +146,7 @@ module "cloud_sql" {
 
   databases = [
     {
-      name      = "lifenavigator_beta"
+      name      = "lifenavigator_core"
       charset   = "UTF8"
       collation = "en_US.UTF8"
     }
@@ -149,7 +155,7 @@ module "cloud_sql" {
   backup_configuration = {
     enabled                        = true
     start_time                     = "03:00"
-    point_in_time_recovery_enabled = false  # Disabled for cost savings
+    point_in_time_recovery_enabled = false
     transaction_log_retention_days = 3
   }
 
@@ -157,7 +163,98 @@ module "cloud_sql" {
   require_ssl     = true
   enable_pgvector = false
 
-  labels = local.common_labels
+  labels = merge(local.common_labels, {
+    data_classification = "general"
+    compliance          = "soc2"
+  })
+
+  depends_on = [module.vpc]
+}
+
+# Finance Database - GLBA/PCI DSS Compliant
+# Contains: FinancialAccount, Transaction, Asset, Investment, Tax data
+module "cloud_sql_finance" {
+  source = "../../modules/cloud-sql"
+
+  project_id = var.project_id
+  region     = var.region
+  env        = local.env
+
+  instance_name     = "ln-finance-db-beta"
+  database_version  = "POSTGRES_15"
+  tier              = "db-f1-micro"  # Can upgrade to db-g1-small for production
+  availability_type = "ZONAL"
+
+  enable_schedule = false
+
+  databases = [
+    {
+      name      = "lifenavigator_finance"
+      charset   = "UTF8"
+      collation = "en_US.UTF8"
+    }
+  ]
+
+  backup_configuration = {
+    enabled                        = true
+    start_time                     = "02:00"  # Different backup window
+    point_in_time_recovery_enabled = true     # Required for financial data
+    transaction_log_retention_days = 7        # Longer retention for compliance
+  }
+
+  private_network = module.vpc.network_id
+  require_ssl     = true
+  enable_pgvector = false
+
+  labels = merge(local.common_labels, {
+    data_classification = "financial-pii"
+    compliance          = "glba-pci-dss"
+    hipaa_covered       = "false"
+  })
+
+  depends_on = [module.vpc]
+}
+
+# Health Database - HIPAA Compliant
+# Contains: HealthRecord, HealthMetric, WearableData, MedicalDocuments
+module "cloud_sql_health" {
+  source = "../../modules/cloud-sql"
+
+  project_id = var.project_id
+  region     = var.region
+  env        = local.env
+
+  instance_name     = "ln-health-db-beta"
+  database_version  = "POSTGRES_15"
+  tier              = "db-f1-micro"  # Can upgrade to db-g1-small for production
+  availability_type = "ZONAL"
+
+  enable_schedule = false
+
+  databases = [
+    {
+      name      = "lifenavigator_health"
+      charset   = "UTF8"
+      collation = "en_US.UTF8"
+    }
+  ]
+
+  backup_configuration = {
+    enabled                        = true
+    start_time                     = "04:00"  # Different backup window
+    point_in_time_recovery_enabled = true     # Required for HIPAA
+    transaction_log_retention_days = 7        # Longer retention for compliance
+  }
+
+  private_network = module.vpc.network_id
+  require_ssl     = true
+  enable_pgvector = false
+
+  labels = merge(local.common_labels, {
+    data_classification = "phi"
+    compliance          = "hipaa"
+    hipaa_covered       = "true"
+  })
 
   depends_on = [module.vpc]
 }
@@ -202,11 +299,24 @@ module "secrets" {
   env        = local.env
 
   secrets = [
+    # Legacy (will be removed after migration)
     { name = "database-password", replication = { automatic = true } },
     { name = "database-url", replication = { automatic = true } },
+    # Core database secrets
+    { name = "core-database-url", replication = { automatic = true } },
+    { name = "core-database-password", replication = { automatic = true } },
+    # Finance database secrets (GLBA/PCI DSS)
+    { name = "finance-database-url", replication = { automatic = true } },
+    { name = "finance-database-password", replication = { automatic = true } },
+    # Health database secrets (HIPAA)
+    { name = "health-database-url", replication = { automatic = true } },
+    { name = "health-database-password", replication = { automatic = true } },
+    # Application secrets
     { name = "jwt-secret", replication = { automatic = true } },
     { name = "nextauth-secret", replication = { automatic = true } },
-    { name = "dgx-spark-api-key", replication = { automatic = true } }
+    { name = "dgx-spark-api-key", replication = { automatic = true } },
+    # Encryption keys for field-level encryption
+    { name = "encryption-master-key", replication = { automatic = true } }
   ]
 
   labels = local.common_labels
@@ -744,14 +854,61 @@ output "artifact_registry_url" {
   value = module.artifact_registry.repository_url
 }
 
-output "cloud_sql_connection" {
-  value     = module.cloud_sql.connection_name
-  sensitive = true
+# Core Database Outputs
+output "core_db_connection" {
+  value       = module.cloud_sql_core.connection_name
+  description = "Core database Cloud SQL connection name"
+  sensitive   = true
 }
 
-output "cloud_sql_private_ip" {
-  value     = module.cloud_sql.private_ip_address
-  sensitive = true
+output "core_db_private_ip" {
+  value       = module.cloud_sql_core.private_ip_address
+  description = "Core database private IP"
+  sensitive   = true
+}
+
+output "core_db_password" {
+  value       = module.cloud_sql_core.database_password
+  description = "Core database password"
+  sensitive   = true
+}
+
+# Finance Database Outputs (GLBA/PCI DSS)
+output "finance_db_connection" {
+  value       = module.cloud_sql_finance.connection_name
+  description = "Finance database Cloud SQL connection name (GLBA/PCI DSS)"
+  sensitive   = true
+}
+
+output "finance_db_private_ip" {
+  value       = module.cloud_sql_finance.private_ip_address
+  description = "Finance database private IP"
+  sensitive   = true
+}
+
+output "finance_db_password" {
+  value       = module.cloud_sql_finance.database_password
+  description = "Finance database password"
+  sensitive   = true
+}
+
+# Health Database Outputs (HIPAA)
+output "health_db_connection" {
+  value       = module.cloud_sql_health.connection_name
+  description = "Health database Cloud SQL connection name (HIPAA)"
+  sensitive   = true
+}
+
+output "health_db_private_ip" {
+  value       = module.cloud_sql_health.private_ip_address
+  description = "Health database private IP"
+  sensitive   = true
+}
+
+output "health_db_password" {
+  value       = module.cloud_sql_health.database_password
+  description = "Health database password"
+  sensitive   = true
 }
 
 output "redis_host" {
@@ -759,9 +916,11 @@ output "redis_host" {
   sensitive = true
 }
 
+# Legacy output for backward compatibility (will be removed)
 output "database_password" {
-  value     = module.cloud_sql.database_password
-  sensitive = true
+  value       = module.cloud_sql_core.database_password
+  description = "DEPRECATED: Use core_db_password instead"
+  sensitive   = true
 }
 
 output "jwt_secret" {
