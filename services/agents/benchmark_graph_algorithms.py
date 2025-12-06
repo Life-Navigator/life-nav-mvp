@@ -25,7 +25,7 @@ except ImportError:
 
 # Try to import NetworkX
 try:
-    import networkx as nx
+    import networkx as nx  # noqa: F401
     NETWORKX_AVAILABLE = True
 except ImportError:
     NETWORKX_AVAILABLE = False

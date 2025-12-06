@@ -21,11 +21,10 @@ Categories:
 - Medical: HIPAA, state medical privacy
 """
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 from datetime import datetime
-import json
 import uuid
 
 from utils.logging import get_logger
@@ -250,7 +249,7 @@ class ComplianceValidator:
         processing_time = (time.time() - start_time) * 1000
 
         logger.info(
-            f"Compliance validation completed",
+            "Compliance validation completed",
             extra={
                 "user_id": user_id,
                 "is_compliant": is_compliant,
@@ -688,14 +687,14 @@ COMPLIANT RESPONSE:"""
 
         return {
             "total_validations": len(logs),
-            "compliant": len([l for l in logs if l.is_compliant]),
-            "non_compliant": len([l for l in logs if not l.is_compliant]),
-            "pending_review": len([l for l in logs if not l.reviewed and l.action_taken != "passed"]),
-            "reviewed": len([l for l in logs if l.reviewed]),
+            "compliant": len([log for log in logs if log.is_compliant]),
+            "non_compliant": len([log for log in logs if not log.is_compliant]),
+            "pending_review": len([log for log in logs if not log.reviewed and log.action_taken != "passed"]),
+            "reviewed": len([log for log in logs if log.reviewed]),
             "actions": {
-                "passed": len([l for l in logs if l.action_taken == "passed"]),
-                "logged": len([l for l in logs if l.action_taken == "logged"]),
-                "blocked_and_rewritten": len([l for l in logs if l.action_taken == "blocked_and_rewritten"])
+                "passed": len([log for log in logs if log.action_taken == "passed"]),
+                "logged": len([log for log in logs if log.action_taken == "logged"]),
+                "blocked_and_rewritten": len([log for log in logs if log.action_taken == "blocked_and_rewritten"])
             }
         }
 

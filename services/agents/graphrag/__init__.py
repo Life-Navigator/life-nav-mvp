@@ -68,7 +68,7 @@ from graphrag.document_ingestion import (
     DocumentIngestionPipeline,
     DocumentType,
     ChunkingStrategy,
-    CENTRALIZED_USER_ID as DOC_CENTRALIZED_USER_ID
+    CENTRALIZED_USER_ID as DOC_CENTRALIZED_USER_ID  # noqa: F401
 )
 
 # Orchestrator

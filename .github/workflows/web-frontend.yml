@@ -39,6 +39,11 @@ env:
   IMAGE_NAME: web-frontend
   SERVICE_NAME: ln-web-frontend
 
+# Required for Workload Identity Federation
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   # ===========================================================================
   # Lint & Type Check

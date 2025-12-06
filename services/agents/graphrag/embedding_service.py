@@ -7,7 +7,6 @@ Uses all-MiniLM-L6-v2 model (384 dimensions) for efficient semantic embeddings.
 
 from typing import List, Union, Optional
 import numpy as np
-from functools import lru_cache
 import asyncio
 
 from utils.logging import get_logger

@@ -436,7 +436,7 @@ Keep advice brief and specific.
         transactions = payload.get("transactions", [])
         filing_status = payload.get("filing_status", "single")
         has_mortgage = payload.get("has_mortgage", False)
-        payload.get("has_children", False)
+        total_income = payload.get("total_income", 0)
 
         # Categorize potentially deductible expenses
         deductible_categories = {

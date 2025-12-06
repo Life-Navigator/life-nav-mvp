@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 try:
     from graphrag.client import get_graphrag_client
     from graphrag.document_ingestion_rust import get_ingestion_pipeline  # 🚀 RUST-POWERED (5-10x faster!)
-    from utils.metrics_client import get_metrics_client
+    from utils.metrics_client import get_metrics_client  # noqa: F401
     from utils.logging import get_logger
     # Phase 4: REAL security - validation, auditing
     from utils.security_validator import SecurityValidator

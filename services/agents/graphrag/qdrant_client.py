@@ -17,7 +17,6 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
-    SearchParams,
     HnswConfigDiff,
     OptimizersConfigDiff
 )

@@ -4,7 +4,7 @@ import asyncio
 import importlib
 import importlib.util
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import structlog
 
 from ..plugins.base import BasePlugin, PluginStatus
