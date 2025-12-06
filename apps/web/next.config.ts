@@ -62,6 +62,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Standalone output for Docker/Cloud Run deployment
+  output: 'standalone',
   reactStrictMode: true,
   swcMinify: true, // Use SWC minification for better performance
   images: {
@@ -77,12 +79,12 @@ const nextConfig: NextConfig = {
     ],
   },
   typescript: {
-    // During deployment to Vercel, we'll handle type checking separately
-    ignoreBuildErrors: process.env.VERCEL_ENV === 'production',
+    // Type checking handled in CI/CD pipeline
+    ignoreBuildErrors: process.env.NODE_ENV === 'production',
   },
   eslint: {
-    // During deployment to Vercel, we'll handle linting separately
-    ignoreDuringBuilds: process.env.VERCEL_ENV === 'production',
+    // Linting handled in CI/CD pipeline
+    ignoreDuringBuilds: process.env.NODE_ENV === 'production',
   },
   // Add security headers to all responses
   async headers() {

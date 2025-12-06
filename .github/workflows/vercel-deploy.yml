@@ -1,13 +1,26 @@
-name: Deploy to Vercel
+# ===========================================================================
+# DISABLED: Web app moved to GCP Cloud Run for HIPAA/GLBA compliance
+# This workflow will be re-enabled for marketing site (apps/marketing/)
+# ===========================================================================
+name: Deploy to Vercel (DISABLED)
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  # DISABLED - uncomment when marketing site is ready
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'apps/marketing/**'
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'apps/marketing/**'
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "enable" to run this workflow manually'
+        required: true
 
 jobs:
   lint-and-test:

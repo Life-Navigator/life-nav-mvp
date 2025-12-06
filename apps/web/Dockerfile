@@ -11,8 +11,7 @@
 FROM node:20-alpine AS base
 
 # Install pnpm globally
-RUN coreutils enable && coreutils prepare pnpm@8.12.0 --activate || \
-    npm install -g pnpm@8.12.0
+RUN npm install -g pnpm@8.12.0
 
 # -----------------------------------------------------------------------------
 # Stage 1: Dependencies - Install all workspace dependencies

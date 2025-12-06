@@ -203,6 +203,7 @@ module "secrets" {
 
   secrets = [
     { name = "database-password", replication = { automatic = true } },
+    { name = "database-url", replication = { automatic = true } },
     { name = "jwt-secret", replication = { automatic = true } },
     { name = "nextauth-secret", replication = { automatic = true } },
     { name = "dgx-spark-api-key", replication = { automatic = true } }
@@ -311,6 +312,16 @@ module "iam" {
         "roles/redis.editor",
         "roles/run.invoker",
         "roles/cloudscheduler.jobRunner"
+      ]
+    },
+    {
+      account_id   = "ln-web-frontend-beta"
+      display_name = "Web Frontend Service (Beta)"
+      description  = "Service account for Next.js Web Frontend Cloud Run service"
+      roles = [
+        "roles/cloudsql.client",
+        "roles/secretmanager.secretAccessor",
+        "roles/run.invoker"
       ]
     }
   ]
@@ -546,6 +557,67 @@ module "compliance_checker" {
 }
 
 # ===========================================================================
+# Web Frontend Service (Next.js) - HIPAA Compliant
+# ===========================================================================
+
+module "web_frontend" {
+  source = "../../modules/cloud-run"
+
+  project_id   = var.project_id
+  region       = var.region
+  env          = local.env
+  service_name = "ln-web-frontend"
+
+  image  = "${local.image_registry}/web-frontend:beta"
+  port   = 3000
+  cpu    = "1"
+  memory = "512Mi"
+
+  min_instances   = 0  # Scale to zero when idle
+  max_instances   = 10
+  timeout_seconds = 60
+  concurrency     = 100
+
+  vpc_connector = module.vpc_connector.connector_id
+  vpc_egress    = "PRIVATE_RANGES_ONLY"
+
+  service_account       = module.iam.service_account_emails["ln-web-frontend-beta"]
+  allow_unauthenticated = true  # Public frontend (auth handled by app)
+
+  env_vars = {
+    NODE_ENV                = "production"
+    NEXT_PUBLIC_APP_URL     = "https://app.lifenavigator.tech"
+    NEXT_PUBLIC_API_URL     = module.api_gateway.service_uri
+    NEXTAUTH_URL            = "https://app.lifenavigator.tech"
+  }
+
+  secret_env_vars = [
+    {
+      name        = "NEXTAUTH_SECRET"
+      secret_name = "projects/${var.project_id}/secrets/nextauth-secret-beta"
+      version     = "latest"
+    },
+    {
+      name        = "DATABASE_URL"
+      secret_name = "projects/${var.project_id}/secrets/database-url-beta"
+      version     = "latest"
+    }
+  ]
+
+  startup_probe = {
+    path              = "/api/health"
+    initial_delay     = 10
+    period            = 10
+    failure_threshold = 3
+    timeout           = 5
+  }
+
+  labels = local.common_labels
+
+  depends_on = [module.vpc_connector, module.artifact_registry, module.api_gateway]
+}
+
+# ===========================================================================
 # Cloud Run Jobs - Batch Processing
 # ===========================================================================
 
@@ -714,6 +786,11 @@ output "compliance_url" {
   value = module.compliance_checker.service_uri
 }
 
+output "web_frontend_url" {
+  value       = module.web_frontend.service_uri
+  description = "Web Frontend Cloud Run service URL"
+}
+
 # Service Account Emails
 output "service_accounts" {
   value = {
@@ -722,5 +799,6 @@ output "service_accounts" {
     graphrag           = module.iam.service_account_emails["ln-graphrag-beta"]
     compliance_checker = module.iam.service_account_emails["ln-compliance-beta"]
     jobs               = module.iam.service_account_emails["ln-jobs-beta"]
+    web_frontend       = module.iam.service_account_emails["ln-web-frontend-beta"]
   }
 }
