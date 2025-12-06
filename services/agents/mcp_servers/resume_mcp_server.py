@@ -227,8 +227,8 @@ class ResumeMCPServer:
                 )
                 data = response.json()
                 return [TextContent(type="text", text=str(data))]
-            except Exception as e:
-                # Specific exception caught for better error handling
+            except Exception:
+                # Request failed, LinkedIn not connected
                 return [TextContent(type="text", text="LinkedIn not connected")]
 
     async def _get_user_profile(self, args: Dict[str, Any]) -> List[TextContent]:

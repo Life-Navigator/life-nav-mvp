@@ -206,8 +206,8 @@ class FastParserFactory:
                     try:
                         obj = json.loads(line)
                         texts.append(cls._extract_json_text(obj))
-                    except Exception as e:
-                        # Specific exception caught for better error handling
+                    except Exception:
+                        # JSON parsing failed for this line, skip it
                         continue
                 text = "\n".join(texts)
             else:

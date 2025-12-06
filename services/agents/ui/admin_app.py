@@ -1013,8 +1013,8 @@ elif page == "🤖 Agent Management":
     try:
         response = requests.get("http://localhost:8080/health", timeout=2)
         server_running = response.status_code == 200
-    except Exception as e:
-        # Specific exception caught for better error handling
+    except Exception:
+        # Server health check failed
         server_running = False
 
     if not server_running:

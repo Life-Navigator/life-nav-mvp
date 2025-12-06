@@ -200,10 +200,7 @@ class DOCXParser(DocumentParser):
                     "subject": core_props.subject or '',
                 })
             except Exception as e:
-                # Log error for debugging
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.debug(f"Operation failed: {e}")
+                # Log error for debugging - metadata extraction failed, continue
                 pass
 
             # Extract text from paragraphs

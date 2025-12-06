@@ -42,11 +42,14 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/pnpm-lock.yaml ./
 
+# Copy package configurations
+COPY pnpm-workspace.yaml package.json turbo.json ./
+
 # Copy all source code
 COPY . .
 
-# Generate Prisma client
-RUN cd apps/web && pnpm exec prisma generate
+# Generate Prisma client (using npx since prisma is a devDependency)
+RUN cd apps/web && npx prisma generate
 
 # Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1

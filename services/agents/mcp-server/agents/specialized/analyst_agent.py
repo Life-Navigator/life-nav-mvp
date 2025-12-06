@@ -345,7 +345,7 @@ class AnalystAgent(BaseAgent):
         }
 
         # Compare based on type
-        if type(item1) != type(item2):
+        if type(item1) is not type(item2):
             comparison["differences"].append(
                 f"Different types: {type(item1).__name__} vs {type(item2).__name__}"
             )
