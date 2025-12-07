@@ -29,13 +29,13 @@ RUN pip install poetry==1.7.1
 WORKDIR /app
 
 # Copy dependency files
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml poetry.lock ./
 
 # Configure Poetry to not create virtual env (we're in a container)
 RUN poetry config virtualenvs.create false
 
-# Install dependencies
-RUN poetry install --only main --no-interaction --no-ansi
+# Install dependencies (skip dev dependencies for production)
+RUN poetry install --only main --no-interaction --no-ansi --no-root
 
 # -----------------------------------------------------------------------------
 # Stage 2: Runtime - Minimal production image

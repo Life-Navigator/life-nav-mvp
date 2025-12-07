@@ -85,8 +85,9 @@ override.tf.json
 *_override.tf.json
 
 # Rust
-Cargo.lock
 target/
+# Include Cargo.lock for binary services (but not libraries)
+!services/graphrag-rs/Cargo.lock
 
 # Temporary files
 tmp/

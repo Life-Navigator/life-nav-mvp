@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for Life Navigator Agents
 
 # =============================================================================
-# Stage 1: Builder - Install dependencies
+# Stage 1: Builder - Install dependencies with Poetry
 # =============================================================================
 FROM python:3.12-slim as builder
 
@@ -14,12 +14,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files
-COPY pyproject.toml ./
+# Install Poetry
+RUN pip install poetry==1.7.1
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir .
+# Copy dependency files
+COPY pyproject.toml poetry.lock ./
+
+# Configure Poetry to not create virtual env (we're in a container)
+RUN poetry config virtualenvs.create false
+
+# Install dependencies (skip dev dependencies for production)
+RUN poetry install --only main --no-interaction --no-ansi --no-root
 
 # =============================================================================
 # Stage 2: Runtime - Minimal runtime image
