@@ -3,7 +3,7 @@
 # =============================================================================
 # Stage 1: Builder - Install dependencies with Poetry
 # =============================================================================
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 # Set working directory
 WORKDIR /app
@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install poetry==1.7.1
+# Install Poetry (2.0+ required for package-mode setting)
+RUN pip install poetry==2.0.1
 
 # Copy dependency files
 COPY pyproject.toml poetry.lock ./
