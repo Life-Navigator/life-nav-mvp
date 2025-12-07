@@ -130,25 +130,38 @@ impl Config {
         // Load from environment variables first
         dotenvy::dotenv().ok();
 
-        let config = config::Config::builder()
+        let mut config: Config = config::Config::builder()
             // Load from config.toml if it exists
             .add_source(config::File::with_name("config").required(false))
             // Override with environment variables (GRAPHRAG_ prefix)
             .add_source(config::Environment::with_prefix("GRAPHRAG"))
             .build()
+            .map_err(|e| GraphRAGError::Config(e.to_string()))?
+            .try_deserialize()
             .map_err(|e| GraphRAGError::Config(e.to_string()))?;
 
-        config
-            .try_deserialize()
-            .map_err(|e| GraphRAGError::Config(e.to_string()))
+        // Override port with PORT env var if set (for Cloud Run)
+        if let Ok(port) = std::env::var("PORT") {
+            if let Ok(port) = port.parse::<u16>() {
+                config.server.port = port;
+            }
+        }
+
+        Ok(config)
     }
 
     /// Create default configuration for development
     pub fn default_dev() -> Self {
+        // Respect PORT env var for Cloud Run
+        let port = std::env::var("PORT")
+            .ok()
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(50051);
+
         Self {
             server: ServerConfig {
                 host: "0.0.0.0".to_string(),
-                port: 50051,
+                port,
             },
             neo4j: Neo4jConfig {
                 uri: "bolt://localhost:7687".to_string(),

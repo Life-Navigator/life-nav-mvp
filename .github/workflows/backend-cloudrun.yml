@@ -137,6 +137,15 @@ jobs:
             --region ${{ env.REGION }} \
             --quiet || echo "Service does not exist, proceeding with fresh deploy"
 
+      - name: Ensure secrets exist
+        if: github.event_name != 'pull_request'
+        run: |
+          # Create secret-key-beta if it doesn't exist
+          if ! gcloud secrets describe secret-key-beta --project=${{ env.PROJECT_ID }} 2>/dev/null; then
+            echo "Creating secret-key-beta..."
+            openssl rand -hex 32 | gcloud secrets create secret-key-beta --data-file=- --project=${{ env.PROJECT_ID }}
+          fi
+
       - name: Deploy to Cloud Run
         if: github.event_name != 'pull_request'
         run: |
@@ -280,36 +289,20 @@ jobs:
           platforms: linux/amd64
         timeout-minutes: 30  # Rust builds take longer
 
-      - name: Delete existing service (clean slate)
+      # NOTE: GraphRAG deployment is disabled until we have Neo4j and Qdrant infrastructure
+      # The service requires these backends to start
+      - name: Skip deployment (no backends yet)
         if: github.event_name != 'pull_request'
         run: |
-          gcloud run services delete ln-graphrag-api \
-            --region ${{ env.REGION }} \
-            --quiet || echo "Service does not exist, proceeding with fresh deploy"
-
-      - name: Deploy to Cloud Run
-        if: github.event_name != 'pull_request'
-        run: |
-          gcloud run deploy ln-graphrag-api \
-            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/graphrag-api:beta \
-            --region ${{ env.REGION }} \
-            --platform managed \
-            --port 8080 \
-            --cpu 1 \
-            --memory 1Gi \
-            --min-instances 0 \
-            --max-instances 3 \
-            --timeout 300s \
-            --concurrency 40 \
-            --service-account "ln-graphrag-beta@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
-            --set-env-vars "ENVIRONMENT=beta,LOG_LEVEL=INFO" \
-            --set-secrets "DATABASE_URL=database-url-beta:latest" \
-            --vpc-connector "ln-vpc-connector-beta" \
-            --vpc-egress private-ranges-only \
-            --allow-unauthenticated
+          echo "⚠️ GraphRAG API deployment skipped - requires Neo4j and Qdrant infrastructure"
+          echo "To deploy GraphRAG, first set up:"
+          echo "  - Neo4j database"
+          echo "  - Qdrant vector database"
+          echo "  - GraphDB (optional)"
+          echo "Then update this workflow to enable deployment"
 
       - name: Get service URL
-        if: github.event_name != 'pull_request'
+        if: false  # Disabled - service not deployed
         run: |
           URL=$(gcloud run services describe ln-graphrag-api --region ${{ env.REGION }} --format 'value(status.url)') || echo "Service not yet available"
           echo "GraphRAG API: $URL"
