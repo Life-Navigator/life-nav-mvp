@@ -3,7 +3,7 @@ Meetup API integration service
 """
 
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+import httpx
 from app.core.config import settings
 import logging
 
@@ -18,42 +18,95 @@ class MeetupService:
     def __init__(self):
         self.api_key = getattr(settings, "MEETUP_API_KEY", None)
 
+    def is_configured(self) -> bool:
+        """Check if Meetup API credentials are configured."""
+        return bool(self.api_key)
+
     async def search_events(
         self,
         keywords: Optional[str] = None,
         location: Optional[str] = None,
         category: Optional[str] = None,
+        radius: int = 25,
         limit: int = 20,
     ) -> List[Dict[str, Any]]:
-        """Search for meetup events"""
+        """
+        Search for events on Meetup
+
+        Args:
+            keywords: Search keywords
+            location: Location/city
+            category: Event category
+            radius: Search radius in miles
+            limit: Maximum number of results
+
+        Returns:
+            List of event listings
+        """
+        if not self.is_configured():
+            logger.warning("Meetup API not configured. Set MEETUP_API_KEY.")
+            return []
+
         try:
+            params = {
+                "text": keywords or "",
+                "page": limit,
+                "radius": radius,
+            }
+
+            if location:
+                params["location"] = location
+            if category:
+                params["category"] = category
+
             logger.info(f"Searching Meetup events: {keywords}")
-            return self._get_mock_events(keywords, location, limit)
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/find/upcoming_events",
+                    params=params,
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("events", [])
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Meetup API HTTP error: {e.response.status_code} - {e.response.text}")
+            return []
         except Exception as e:
             logger.error(f"Error searching Meetup events: {str(e)}")
             return []
 
-    def _get_mock_events(
-        self, keywords: Optional[str], location: Optional[str], limit: int
-    ) -> List[Dict[str, Any]]:
-        """Generate mock Meetup event data"""
-        return [
-            {
-                "id": f"meetup_{i}",
-                "title": f"{keywords or 'Tech'} Meetup {i}",
-                "description": f"Monthly {keywords or 'tech'} meetup",
-                "category": "meetup",
-                "organizer_name": f"Meetup Group {i}",
-                "start_date": (datetime.utcnow() + timedelta(days=i * 5)).isoformat(),
-                "is_virtual": i % 4 == 0,
-                "venue_name": "Coffee Shop" if i % 4 != 0 else None,
-                "city": location or "Austin",
-                "state": "TX",
-                "online_url": f"https://meet.google.com/{i}" if i % 4 == 0 else None,
-                "is_free": True,
-                "attendees_count": 20 + (i * 5),
-                "external_url": f"https://www.meetup.com/events/{i}",
-                "topics": ["technology", "networking", "startups"],
-            }
-            for i in range(min(limit, 10))
-        ]
+    async def get_event_details(self, event_id: str, group_urlname: str) -> Optional[Dict[str, Any]]:
+        """
+        Get detailed information about a specific event
+
+        Args:
+            event_id: Meetup event ID
+            group_urlname: URL name of the group hosting the event
+
+        Returns:
+            Event details
+        """
+        if not self.is_configured():
+            logger.warning("Meetup API not configured.")
+            return None
+
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/{group_urlname}/events/{event_id}",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                return response.json()
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Meetup API HTTP error: {e.response.status_code}")
+            return None
+        except Exception as e:
+            logger.error(f"Error fetching Meetup event details: {str(e)}")
+            return None

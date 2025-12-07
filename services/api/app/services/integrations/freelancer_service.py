@@ -3,7 +3,7 @@ Freelancer.com API integration service
 """
 
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+import httpx
 from app.core.config import settings
 import logging
 
@@ -18,35 +18,63 @@ class FreelancerService:
     def __init__(self):
         self.api_key = getattr(settings, "FREELANCER_API_KEY", None)
 
-    async def search_gigs(
+    def is_configured(self) -> bool:
+        """Check if Freelancer API credentials are configured."""
+        return bool(self.api_key)
+
+    async def search_projects(
         self,
         keywords: Optional[str] = None,
         budget_min: Optional[float] = None,
+        budget_max: Optional[float] = None,
         limit: int = 20,
     ) -> List[Dict[str, Any]]:
-        """Search for projects on Freelancer.com"""
-        try:
-            logger.info(f"Searching Freelancer gigs: {keywords}")
-            return self._get_mock_gigs(keywords, limit)
-        except Exception as e:
-            logger.error(f"Error searching Freelancer gigs: {str(e)}")
+        """
+        Search for projects on Freelancer.com
+
+        Args:
+            keywords: Search keywords
+            budget_min: Minimum budget
+            budget_max: Maximum budget
+            limit: Maximum number of results
+
+        Returns:
+            List of project listings
+        """
+        if not self.is_configured():
+            logger.warning("Freelancer API not configured. Set FREELANCER_API_KEY.")
             return []
 
-    def _get_mock_gigs(self, keywords: Optional[str], limit: int) -> List[Dict[str, Any]]:
-        """Generate mock Freelancer gig data"""
-        return [
-            {
-                "id": f"freelancer_gig_{i}",
-                "title": f"{keywords or 'Software'} Development Project",
-                "description": f"Need {keywords or 'developer'} for project",
-                "budget_type": "fixed",
-                "budget_amount": 3000 + (i * 500),
-                "currency": "USD",
-                "client_rating": 4.2 + (i * 0.15) % 0.8,
-                "skills_required": ["PHP", "MySQL", "WordPress", "Laravel"][:i % 4 + 1],
-                "posted_date": (datetime.utcnow() - timedelta(days=i * 2)).isoformat(),
-                "external_url": f"https://www.freelancer.com/projects/{i}",
-                "proposals_count": 15 + i * 3,
+        try:
+            params = {
+                "query": keywords or "",
+                "limit": limit,
             }
-            for i in range(min(limit, 10))
-        ]
+
+            if budget_min:
+                params["min_budget"] = budget_min
+            if budget_max:
+                params["max_budget"] = budget_max
+
+            logger.info(f"Searching Freelancer projects: {keywords}")
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/projects/0.1/projects/active",
+                    params=params,
+                    headers={
+                        "freelancer-oauth-v1": self.api_key,
+                        "Content-Type": "application/json",
+                    },
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("result", {}).get("projects", [])
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Freelancer API HTTP error: {e.response.status_code} - {e.response.text}")
+            return []
+        except Exception as e:
+            logger.error(f"Error searching Freelancer projects: {str(e)}")
+            return []

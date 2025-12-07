@@ -3,7 +3,7 @@ Upwork API integration service
 """
 
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+import httpx
 from app.core.config import settings
 import logging
 
@@ -19,6 +19,10 @@ class UpworkService:
         self.api_key = getattr(settings, "UPWORK_API_KEY", None)
         self.api_secret = getattr(settings, "UPWORK_API_SECRET", None)
 
+    def is_configured(self) -> bool:
+        """Check if Upwork API credentials are configured."""
+        return bool(self.api_key and self.api_secret)
+
     async def search_gigs(
         self,
         keywords: Optional[str] = None,
@@ -26,35 +30,57 @@ class UpworkService:
         budget_min: Optional[float] = None,
         budget_max: Optional[float] = None,
         limit: int = 20,
+        access_token: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Search for gigs on Upwork"""
+        """
+        Search for gigs on Upwork
+
+        Args:
+            keywords: Search keywords
+            category: Job category
+            budget_min: Minimum budget
+            budget_max: Maximum budget
+            limit: Maximum number of results
+            access_token: User's OAuth access token
+
+        Returns:
+            List of gig listings
+        """
+        if not self.is_configured():
+            logger.warning("Upwork API not configured. Set UPWORK_API_KEY and UPWORK_API_SECRET.")
+            return []
+
+        if not access_token:
+            logger.warning("Upwork access token required for gig search.")
+            return []
+
         try:
+            params = {
+                "q": keywords or "",
+                "paging": f"0;{limit}",
+            }
+
+            if category:
+                params["category2"] = category
+            if budget_min:
+                params["budget"] = f"[{budget_min} TO {budget_max or '*'}]"
+
             logger.info(f"Searching Upwork gigs: {keywords}")
-            return self._get_mock_gigs(keywords, category, limit)
+
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/profiles/v2/search/jobs.json",
+                    params=params,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("jobs", [])
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Upwork API HTTP error: {e.response.status_code} - {e.response.text}")
+            return []
         except Exception as e:
             logger.error(f"Error searching Upwork gigs: {str(e)}")
             return []
-
-    def _get_mock_gigs(
-        self, keywords: Optional[str], category: Optional[str], limit: int
-    ) -> List[Dict[str, Any]]:
-        """Generate mock Upwork gig data"""
-        return [
-            {
-                "id": f"upwork_gig_{i}",
-                "title": f"{keywords or 'Development'} Project {i}",
-                "description": f"Looking for expert in {keywords or 'software development'}",
-                "budget_type": ["fixed", "hourly"][i % 2],
-                "budget_amount": 5000 + (i * 500) if i % 2 == 0 else None,
-                "budget_min": 50 + (i * 10) if i % 2 == 1 else None,
-                "budget_max": 100 + (i * 10) if i % 2 == 1 else None,
-                "currency": "USD",
-                "client_rating": 4.5 + (i * 0.1) % 0.5,
-                "client_verified": i % 2 == 0,
-                "skills_required": ["Python", "JavaScript", "React", "Node.js"][:i % 4 + 1],
-                "posted_date": (datetime.utcnow() - timedelta(days=i)).isoformat(),
-                "external_url": f"https://www.upwork.com/jobs/{i}",
-                "proposals_count": 10 + i * 2,
-            }
-            for i in range(min(limit, 10))
-        ]

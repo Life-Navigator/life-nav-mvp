@@ -3,7 +3,7 @@ LinkedIn Jobs API integration service
 """
 
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+import httpx
 from app.core.config import settings
 import logging
 
@@ -16,9 +16,12 @@ class LinkedInJobsService:
     BASE_URL = "https://api.linkedin.com/v2"
 
     def __init__(self):
-        self.api_key = getattr(settings, "LINKEDIN_API_KEY", None)
         self.client_id = getattr(settings, "LINKEDIN_CLIENT_ID", None)
         self.client_secret = getattr(settings, "LINKEDIN_CLIENT_SECRET", None)
+
+    def is_configured(self) -> bool:
+        """Check if LinkedIn API credentials are configured."""
+        return bool(self.client_id and self.client_secret)
 
     async def search_jobs(
         self,
@@ -28,6 +31,7 @@ class LinkedInJobsService:
         experience_level: Optional[str] = None,
         posted_within_days: int = 30,
         limit: int = 20,
+        access_token: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
         Search for jobs on LinkedIn
@@ -39,19 +43,24 @@ class LinkedInJobsService:
             experience_level: Experience level required
             posted_within_days: Filter jobs posted within X days
             limit: Maximum number of results
+            access_token: User's OAuth access token
 
         Returns:
             List of job listings
         """
-        try:
-            # Note: This is a placeholder implementation
-            # In production, use official LinkedIn Jobs API or RapidAPI
+        if not self.is_configured():
+            logger.warning("LinkedIn API not configured. Set LINKEDIN_CLIENT_ID and LINKEDIN_CLIENT_SECRET.")
+            return []
 
+        if not access_token:
+            logger.warning("LinkedIn access token required for job search.")
+            return []
+
+        try:
             params = {
                 "keywords": keywords or "",
                 "location": location or "",
-                "datePosted": f"past{posted_within_days}Days",
-                "limit": limit,
+                "count": limit,
             }
 
             if job_type:
@@ -59,92 +68,64 @@ class LinkedInJobsService:
             if experience_level:
                 params["experienceLevel"] = experience_level
 
-            # Simulate API call with mock data for now
             logger.info(f"Searching LinkedIn jobs with params: {params}")
 
-            # In production, replace with actual API call:
-            # async with httpx.AsyncClient() as client:
-            #     headers = {"Authorization": f"Bearer {self.api_key}"}
-            #     response = await client.get(f"{self.BASE_URL}/jobs", params=params, headers=headers)
-            #     response.raise_for_status()
-            #     return response.json().get("elements", [])
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/jobSearch",
+                    params=params,
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+                return data.get("elements", [])
 
-            return self._get_mock_jobs(keywords, location, limit)
-
+        except httpx.HTTPStatusError as e:
+            logger.error(f"LinkedIn API HTTP error: {e.response.status_code} - {e.response.text}")
+            return []
         except Exception as e:
             logger.error(f"Error searching LinkedIn jobs: {str(e)}")
             return []
 
-    async def get_job_details(self, job_id: str) -> Optional[Dict[str, Any]]:
+    async def get_job_details(self, job_id: str, access_token: str) -> Optional[Dict[str, Any]]:
         """
         Get detailed information about a specific job
 
         Args:
             job_id: LinkedIn job ID
+            access_token: User's OAuth access token
 
         Returns:
             Job details
         """
-        try:
-            logger.info(f"Fetching LinkedIn job details for: {job_id}")
-
-            # In production, replace with actual API call:
-            # async with httpx.AsyncClient() as client:
-            #     headers = {"Authorization": f"Bearer {self.api_key}"}
-            #     response = await client.get(f"{self.BASE_URL}/jobs/{job_id}", headers=headers)
-            #     response.raise_for_status()
-            #     return response.json()
-
+        if not self.is_configured():
+            logger.warning("LinkedIn API not configured.")
             return None
 
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.BASE_URL}/jobs/{job_id}",
+                    headers={"Authorization": f"Bearer {access_token}"},
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                return response.json()
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"LinkedIn API HTTP error: {e.response.status_code}")
+            return None
         except Exception as e:
             logger.error(f"Error fetching LinkedIn job details: {str(e)}")
             return None
 
-    def _get_mock_jobs(
-        self, keywords: Optional[str], location: Optional[str], limit: int
-    ) -> List[Dict[str, Any]]:
-        """
-        Generate mock job data for development/testing
-
-        Args:
-            keywords: Search keywords
-            location: Location filter
-            limit: Number of jobs to return
-
-        Returns:
-            List of mock job listings
-        """
-        mock_jobs = [
-            {
-                "id": f"linkedin_job_{i}",
-                "title": f"Software Engineer - {keywords or 'Technology'}" if i % 3 == 0 else "Senior Developer",
-                "company": ["Google", "Microsoft", "Amazon", "Meta", "Apple"][i % 5],
-                "location": location or "San Francisco, CA",
-                "location_type": ["remote", "hybrid", "onsite"][i % 3],
-                "employment_type": ["full-time", "part-time", "contract"][i % 3],
-                "description": f"Exciting opportunity for a {keywords or 'tech'} professional...",
-                "requirements": [
-                    "Bachelor's degree in Computer Science or related field",
-                    "3+ years of experience",
-                    "Strong problem-solving skills",
-                ],
-                "skills": ["Python", "JavaScript", "React", "Node.js", "AWS"],
-                "salary_min": 120000 + (i * 10000),
-                "salary_max": 180000 + (i * 10000),
-                "salary_currency": "USD",
-                "salary_period": "yearly",
-                "posted_date": (datetime.utcnow() - timedelta(days=i)).isoformat(),
-                "external_url": f"https://www.linkedin.com/jobs/view/{i}",
-                "applicants": 50 + (i * 10),
-                "experience_level": ["entry-level", "mid-level", "senior-level"][i % 3],
-            }
-            for i in range(min(limit, 10))
-        ]
-        return mock_jobs
-
     async def get_recommended_jobs(
-        self, user_skills: List[str], user_experience: int, limit: int = 20
+        self,
+        user_skills: List[str],
+        user_experience: int,
+        access_token: str,
+        limit: int = 20,
     ) -> List[Dict[str, Any]]:
         """
         Get job recommendations based on user profile
@@ -152,35 +133,31 @@ class LinkedInJobsService:
         Args:
             user_skills: List of user skills
             user_experience: Years of experience
+            access_token: User's OAuth access token
             limit: Maximum number of results
 
         Returns:
-            List of recommended jobs
+            List of recommended jobs with match scores
         """
-        try:
-            # Build search based on user profile
-            keywords = " OR ".join(user_skills[:3]) if user_skills else None
+        keywords = " OR ".join(user_skills[:3]) if user_skills else None
+        experience_level = self._map_experience_to_level(user_experience)
 
-            jobs = await self.search_jobs(
-                keywords=keywords,
-                experience_level=self._map_experience_to_level(user_experience),
-                limit=limit,
+        jobs = await self.search_jobs(
+            keywords=keywords,
+            experience_level=experience_level,
+            limit=limit,
+            access_token=access_token,
+        )
+
+        # Calculate match scores
+        for job in jobs:
+            job["match_score"] = self._calculate_match_score(
+                job, user_skills, user_experience
             )
 
-            # Calculate match scores
-            for job in jobs:
-                job["match_score"] = self._calculate_match_score(
-                    job, user_skills, user_experience
-                )
-
-            # Sort by match score
-            jobs.sort(key=lambda x: x.get("match_score", 0), reverse=True)
-
-            return jobs
-
-        except Exception as e:
-            logger.error(f"Error getting recommended jobs: {str(e)}")
-            return []
+        # Sort by match score
+        jobs.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+        return jobs
 
     def _map_experience_to_level(self, years: int) -> str:
         """Map years of experience to experience level"""
@@ -194,17 +171,7 @@ class LinkedInJobsService:
     def _calculate_match_score(
         self, job: Dict[str, Any], user_skills: List[str], user_experience: int
     ) -> float:
-        """
-        Calculate how well a job matches user profile
-
-        Args:
-            job: Job data
-            user_skills: User's skills
-            user_experience: User's years of experience
-
-        Returns:
-            Match score (0-100)
-        """
+        """Calculate how well a job matches user profile (0-100)"""
         score = 0.0
 
         # Skill matching (60% weight)
@@ -221,10 +188,10 @@ class LinkedInJobsService:
         user_level = self._map_experience_to_level(user_experience)
         if job_experience_level == user_level:
             score += 40
-        elif abs(
-            ["entry-level", "mid-level", "senior-level"].index(job_experience_level)
-            - ["entry-level", "mid-level", "senior-level"].index(user_level)
-        ) == 1:
-            score += 20
+        elif job_experience_level and user_level:
+            levels = ["entry-level", "mid-level", "senior-level"]
+            if job_experience_level in levels and user_level in levels:
+                if abs(levels.index(job_experience_level) - levels.index(user_level)) == 1:
+                    score += 20
 
         return min(score, 100.0)
