@@ -72,9 +72,20 @@ class Settings(BaseSettings):
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
-    def parse_cors_origins(cls, v: str | list[str]) -> list[str]:
+    def parse_cors_origins(cls, v: str | list[str] | None) -> list[str]:
+        if v is None or v == "":
+            return ["http://localhost:3000"]
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
+            # Handle JSON array format
+            if v.startswith("["):
+                import json
+                try:
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    return ["http://localhost:3000"]
+            # Handle comma-separated format
+            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
+            return origins if origins else ["http://localhost:3000"]
         return v
 
     # Multi-tenancy
