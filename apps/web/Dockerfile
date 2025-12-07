@@ -48,10 +48,9 @@ COPY pnpm-workspace.yaml package.json turbo.json ./
 # Copy all source code
 COPY . .
 
-# Generate Prisma client using the installed version from node_modules
-# Important: Use the locked version (5.22.0) to avoid breaking changes in Prisma 7.x
-# node_modules are at root level in pnpm monorepo
-RUN cd apps/web && /app/node_modules/.bin/prisma generate
+# Generate Prisma client using pnpm exec which properly resolves paths in monorepo
+# This uses the locked version (5.22.0) from the lockfile
+RUN pnpm --filter @life-navigator/web exec prisma generate
 
 # Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1

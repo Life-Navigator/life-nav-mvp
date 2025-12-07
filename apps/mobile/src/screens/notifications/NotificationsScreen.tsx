@@ -537,7 +537,7 @@ const mockNotifications: Notification[] = [
     id: '5',
     type: 'insight',
     title: 'New AI insight available',
-    message: 'We've detected a new spending pattern you should review',
+    message: "We've detected a new spending pattern you should review",
     priority: 'low',
     read: false,
     actionable: true,
