@@ -38,8 +38,9 @@ RUN pnpm install --frozen-lockfile --prefer-offline
 FROM base AS builder
 WORKDIR /app
 
-# Copy dependencies from deps stage
+# Copy dependencies from deps stage - include workspace node_modules
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 COPY --from=deps /app/pnpm-lock.yaml ./
 
 # Copy package configurations
@@ -48,9 +49,9 @@ COPY pnpm-workspace.yaml package.json turbo.json ./
 # Copy all source code
 COPY . .
 
-# Generate Prisma client using pnpm exec which properly resolves paths in monorepo
-# This uses the locked version (5.22.0) from the lockfile
-RUN pnpm --filter @life-navigator/web exec prisma generate
+# Generate Prisma client - use the binary from apps/web/node_modules/.bin
+# which pnpm creates as a symlink to the hoisted package
+RUN cd apps/web && ./node_modules/.bin/prisma generate
 
 # Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1

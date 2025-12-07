@@ -442,7 +442,7 @@ export function NotificationsScreen() {
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>🔔</Text>
             <Text style={styles.emptyTitle}>No notifications</Text>
-            <Text style={styles.emptyDescription}>You're all caught up!</Text>
+            <Text style={styles.emptyDescription}>You&apos;re all caught up!</Text>
           </View>
         )}
         <View style={styles.bottomPadding} />
@@ -511,7 +511,7 @@ const mockNotifications: Notification[] = [
     id: '3',
     type: 'budget',
     title: 'Budget alert',
-    message: 'You've spent 85% of your grocery budget this month',
+    message: "You've spent 85% of your grocery budget this month",
     priority: 'medium',
     read: true,
     actionable: false,
@@ -524,7 +524,7 @@ const mockNotifications: Notification[] = [
     id: '4',
     type: 'goal',
     title: 'Goal milestone reached',
-    message: 'You've saved 50% towards your vacation fund!',
+    message: "You've saved 50% towards your vacation fund!",
     priority: 'low',
     read: true,
     actionable: false,
