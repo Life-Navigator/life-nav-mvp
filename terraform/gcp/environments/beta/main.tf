@@ -332,6 +332,49 @@ resource "google_secret_manager_secret_version" "jwt_secret" {
   secret_data = random_password.jwt_secret.result
 }
 
+# NEXTAUTH_SECRET for web frontend authentication
+resource "random_password" "nextauth_secret" {
+  length  = 64
+  special = true
+}
+
+resource "google_secret_manager_secret_version" "nextauth_secret" {
+  secret      = module.secrets.secret_ids["nextauth-secret"]
+  secret_data = random_password.nextauth_secret.result
+}
+
+# DATABASE_URL for web frontend (points to core database)
+resource "google_secret_manager_secret_version" "database_url" {
+  secret      = module.secrets.secret_ids["database-url"]
+  secret_data = "postgresql://lifenavigator:${module.cloud_sql_core.database_password}@${module.cloud_sql_core.private_ip_address}:5432/lifenavigator_core?sslmode=require"
+
+  depends_on = [module.cloud_sql_core]
+}
+
+# Core database URL (same as above, for new architecture)
+resource "google_secret_manager_secret_version" "core_database_url" {
+  secret      = module.secrets.secret_ids["core-database-url"]
+  secret_data = "postgresql://lifenavigator:${module.cloud_sql_core.database_password}@${module.cloud_sql_core.private_ip_address}:5432/lifenavigator_core?sslmode=require"
+
+  depends_on = [module.cloud_sql_core]
+}
+
+# Finance database URL (GLBA/PCI DSS compliant)
+resource "google_secret_manager_secret_version" "finance_database_url" {
+  secret      = module.secrets.secret_ids["finance-database-url"]
+  secret_data = "postgresql://lifenavigator:${module.cloud_sql_finance.database_password}@${module.cloud_sql_finance.private_ip_address}:5432/lifenavigator_finance?sslmode=require"
+
+  depends_on = [module.cloud_sql_finance]
+}
+
+# Health database URL (HIPAA compliant)
+resource "google_secret_manager_secret_version" "health_database_url" {
+  secret      = module.secrets.secret_ids["health-database-url"]
+  secret_data = "postgresql://lifenavigator:${module.cloud_sql_health.database_password}@${module.cloud_sql_health.private_ip_address}:5432/lifenavigator_health?sslmode=require"
+
+  depends_on = [module.cloud_sql_health]
+}
+
 # ===========================================================================
 # Cloud Storage
 # ===========================================================================
