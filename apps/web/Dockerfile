@@ -55,6 +55,9 @@ COPY . .
 # which pnpm creates as a symlink to the hoisted package
 RUN cd apps/web && ./node_modules/.bin/prisma generate
 
+# Debug: Find where Prisma generated the client
+RUN find /app -name ".prisma" -type d 2>/dev/null || echo "No .prisma found"
+
 # Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -82,9 +85,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 
 # Copy Prisma schema and generated client
-# In pnpm workspaces, Prisma generates to the workspace-local node_modules
+# In pnpm, Prisma client is in the pnpm virtual store - copy entire @prisma/client
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/prisma ./apps/web/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/node_modules/.prisma ./node_modules/.prisma
+# Copy the Prisma client from wherever it was generated (pnpm puts it in node_modules/@prisma/client/default)
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.pnpm/@prisma+client* ./node_modules/.pnpm/
 
 # Security: Switch to non-root user
 USER nextjs
