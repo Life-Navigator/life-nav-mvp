@@ -6,7 +6,7 @@ Loads from environment variables and .env file.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, RedisDsn, field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -43,11 +43,11 @@ class Settings(BaseSettings):
     DATABASE_ECHO: bool = False
 
     # Redis Cache
-    REDIS_URL: RedisDsn = Field(default="redis://localhost:6379/0")
+    REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_MAX_CONNECTIONS: int = 50
 
     # Security
-    SECRET_KEY: str = Field(..., min_length=32)
+    SECRET_KEY: str = Field(default="development-secret-key-change-in-production-32chars")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
@@ -93,12 +93,12 @@ class Settings(BaseSettings):
     NEO4J_DATABASE: str = "neo4j"
 
     # Qdrant Vector Database
-    QDRANT_URL: AnyHttpUrl = Field(default="http://localhost:6333")
+    QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str | None = None
     QDRANT_COLLECTION: str = "life_navigator"
 
     # GraphDB Semantic Store
-    GRAPHDB_URL: AnyHttpUrl = Field(default="http://localhost:7200")
+    GRAPHDB_URL: str = "http://localhost:7200"
     GRAPHDB_REPOSITORY: str = "life-navigator"
     GRAPHDB_USERNAME: str = "admin"
     GRAPHDB_PASSWORD: str | None = None
