@@ -148,8 +148,7 @@ jobs:
     needs: test
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     outputs:
-      image-tag: ${{ steps.meta.outputs.version }}
-      full-image: ${{ steps.image.outputs.full }}
+      image-tag: ${{ steps.env.outputs.environment }}
 
     steps:
       - name: Checkout code
@@ -185,11 +184,6 @@ jobs:
           tags: |
             type=raw,value=${{ steps.env.outputs.environment }}
             type=sha,prefix=${{ steps.env.outputs.environment }}-
-
-      - name: Set full image name
-        id: image
-        run: |
-          echo "full=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ steps.env.outputs.environment }}" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -242,7 +236,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ needs.build.outputs.full-image }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }} \
             --region ${{ env.REGION }} \
             --platform managed \
             --allow-unauthenticated \
@@ -285,6 +279,6 @@ jobs:
           echo "- **Environment:** ${{ steps.env.outputs.environment }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Service URL:** ${{ steps.service.outputs.url }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Custom Domain:** https://${{ steps.env.outputs.domain }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image:** ${{ needs.build.outputs.full-image }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "HIPAA/GLBA compliant deployment on GCP Cloud Run" >> $GITHUB_STEP_SUMMARY
