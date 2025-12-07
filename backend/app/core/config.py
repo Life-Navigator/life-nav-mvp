@@ -6,7 +6,7 @@ Loads from environment variables and .env file.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, PostgresDsn, RedisDsn, field_validator
+from pydantic import AnyHttpUrl, Field, RedisDsn, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
 
     # Database (PostgreSQL)
-    DATABASE_URL: PostgresDsn
+    DATABASE_URL: str  # Accept any string, validation at runtime
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
     DATABASE_POOL_TIMEOUT: int = 30
