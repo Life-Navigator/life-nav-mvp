@@ -1887,23 +1887,19 @@ dependencies = [
 
 [[package]]
 name = "qdrant-client"
-version = "1.16.0"
+version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a76499f3e8385dae785d65a0216e0dfa8fadaddd18038adf04f438631683b26a"
+checksum = "2d6f6d5ba9d6440fa312fa9e8dcdcd0c03bd28db2543c478bc43e2e175620453"
 dependencies = [
  "anyhow",
  "derive_builder",
- "futures",
  "futures-util",
- "parking_lot",
  "prost 0.13.5",
  "prost-types 0.13.5",
  "reqwest 0.12.24",
- "semver",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "tokio",
  "tonic 0.12.3",
 ]
 
@@ -2411,12 +2407,6 @@ dependencies = [
  "core-foundation-sys",
  "libc",
 ]
-
-[[package]]
-name = "semver"
-version = "1.0.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
 
 [[package]]
 name = "serde"

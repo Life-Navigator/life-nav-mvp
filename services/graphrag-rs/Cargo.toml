@@ -10,7 +10,7 @@ prost = "0.12"
 
 # Database clients
 neo4rs = "0.7"                    # Neo4j async client
-qdrant-client = "1.7"             # Official Qdrant client
+qdrant-client = "=1.11.0"         # Pin to stable version compatible with stable Rust
 
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }

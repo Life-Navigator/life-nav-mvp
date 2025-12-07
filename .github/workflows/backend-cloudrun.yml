@@ -146,6 +146,7 @@ jobs:
             --concurrency 80 \
             --service-account "ln-api-gateway-beta@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
             --set-env-vars "ENVIRONMENT=beta,LOG_LEVEL=INFO" \
+            --clear-secrets \
             --set-secrets "DATABASE_URL=database-url-beta:latest,JWT_SECRET=jwt-secret-beta:latest" \
             --vpc-connector "ln-vpc-connector-beta" \
             --vpc-egress private-ranges-only
