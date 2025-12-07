@@ -50,25 +50,34 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     logger.info("Starting Life Navigator API", version=__version__, env=settings.ENVIRONMENT)
 
-    # Initialize database
-    if settings.is_development:
-        await init_db()
-        logger.info("Database initialized (dev mode)")
+    # Initialize database (gracefully handle connection failures)
+    try:
+        if settings.is_development:
+            await init_db()
+            logger.info("Database initialized (dev mode)")
 
-    # Check database health
-    if await check_db_health():
-        logger.info("Database health check passed")
-    else:
-        logger.error("Database health check failed")
+        # Check database health (non-blocking)
+        if await check_db_health():
+            logger.info("Database health check passed")
+        else:
+            logger.warning("Database health check failed - service will start but DB operations may fail")
+    except Exception as e:
+        logger.warning("Database initialization failed - service will start but DB operations may fail", error=str(e))
 
     yield
 
     # Shutdown
     logger.info("Shutting down Life Navigator API")
-    await close_db()
-    logger.info("Database connections closed")
-    await close_redis()
-    logger.info("Redis connections closed")
+    try:
+        await close_db()
+        logger.info("Database connections closed")
+    except Exception:
+        pass
+    try:
+        await close_redis()
+        logger.info("Redis connections closed")
+    except Exception:
+        pass
     shutdown_telemetry()
     logger.info("Telemetry shutdown complete")
 
