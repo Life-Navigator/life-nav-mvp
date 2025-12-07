@@ -38,9 +38,11 @@ RUN pnpm install --frozen-lockfile --prefer-offline
 FROM base AS builder
 WORKDIR /app
 
-# Copy dependencies from deps stage - include workspace node_modules
+# Copy all dependencies from deps stage including workspace packages
+# pnpm creates .pnpm symlinks that need the full node_modules structure
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=deps /app/apps ./apps
+COPY --from=deps /app/packages ./packages
 COPY --from=deps /app/pnpm-lock.yaml ./
 
 # Copy package configurations
