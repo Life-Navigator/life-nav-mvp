@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     )
 
     # Environment
-    ENVIRONMENT: Literal["development", "staging", "production"] = "development"
+    ENVIRONMENT: Literal["development", "staging", "beta", "production"] = "development"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
 
@@ -217,9 +217,19 @@ class Settings(BaseSettings):
         return self.ENVIRONMENT == "production"
 
     @property
+    def is_beta(self) -> bool:
+        """Check if running in beta environment."""
+        return self.ENVIRONMENT == "beta"
+
+    @property
     def is_development(self) -> bool:
         """Check if running in development environment."""
         return self.ENVIRONMENT == "development"
+
+    @property
+    def is_deployed(self) -> bool:
+        """Check if running in a deployed environment (beta or production)."""
+        return self.ENVIRONMENT in ("beta", "staging", "production")
 
     @property
     def database_url_sync(self) -> str:
