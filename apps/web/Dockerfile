@@ -85,11 +85,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 
 # Copy Prisma schema and generated client
-# In pnpm, Prisma client is in the pnpm virtual store - copy entire @prisma/client
+# In pnpm, Prisma client is in the pnpm virtual store at a versioned path
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/prisma ./apps/web/prisma
-# Copy the Prisma client from wherever it was generated (pnpm puts it in node_modules/@prisma/client/default)
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.pnpm/@prisma+client* ./node_modules/.pnpm/
+# Copy the full pnpm structure for @prisma packages to maintain symlinks
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0 ./node_modules/.pnpm/@prisma+client@5.22.0_prisma@5.22.0
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.pnpm/@prisma+engines@5.22.0 ./node_modules/.pnpm/@prisma+engines@5.22.0
 
 # Security: Switch to non-root user
 USER nextjs
