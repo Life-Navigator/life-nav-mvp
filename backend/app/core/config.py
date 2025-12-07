@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     VERSION: str = "0.1.0"
 
     # Database (PostgreSQL)
-    DATABASE_URL: str  # Accept any string, validation at runtime
+    DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/lifenavigator"
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
     DATABASE_POOL_TIMEOUT: int = 30

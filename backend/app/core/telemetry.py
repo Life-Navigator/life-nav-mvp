@@ -5,25 +5,60 @@ Provides distributed tracing, metrics, and logging for production observability.
 Integrates with Google Cloud Trace and Cloud Monitoring.
 """
 
-import logging
+from __future__ import annotations
 
-from opentelemetry import metrics, trace
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
-from opentelemetry.instrumentation.logging import LoggingInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+import logging
+from typing import Any
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+# Conditionally import OpenTelemetry components
+# Only import if telemetry is enabled to avoid startup failures
+_otel_available = False
+
+if settings.OTEL_TRACES_ENABLED or settings.OTEL_METRICS_ENABLED:
+    try:
+        from opentelemetry import metrics, trace
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        from opentelemetry.sdk.metrics import MeterProvider
+        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        _otel_available = True
+    except ImportError as e:
+        logger.warning(f"OpenTelemetry not available: {e}. Telemetry will be disabled.")
+        _otel_available = False
+
+# Optional instrumentation packages - don't fail if missing
+HTTPXClientInstrumentor = None
+LoggingInstrumentor = None
+RedisInstrumentor = None
+SQLAlchemyInstrumentor = None
+
+try:
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+except ImportError:
+    pass
+
+try:
+    from opentelemetry.instrumentation.logging import LoggingInstrumentor
+except ImportError:
+    pass
+
+try:
+    from opentelemetry.instrumentation.redis import RedisInstrumentor
+except ImportError:
+    pass
+
+try:
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+except ImportError:
+    pass
 
 
 def init_telemetry() -> None:
@@ -38,6 +73,10 @@ def init_telemetry() -> None:
     """
     if not settings.OTEL_TRACES_ENABLED and not settings.OTEL_METRICS_ENABLED:
         logger.info("OpenTelemetry disabled via configuration")
+        return
+
+    if not _otel_available:
+        logger.info("OpenTelemetry packages not available, skipping initialization")
         return
 
     # Create resource to identify this service
@@ -68,7 +107,7 @@ def init_telemetry() -> None:
     logger.info("OpenTelemetry instrumentation complete")
 
 
-def _init_tracing(resource: Resource) -> None:
+def _init_tracing(resource: Any) -> None:
     """Initialize distributed tracing."""
     # Create OTLP trace exporter (sends to Cloud Trace via GKE default config)
     trace_exporter = OTLPSpanExporter(
@@ -91,7 +130,7 @@ def _init_tracing(resource: Resource) -> None:
     trace.set_tracer_provider(tracer_provider)
 
 
-def _init_metrics(resource: Resource) -> None:
+def _init_metrics(resource: Any) -> None:
     """Initialize metrics collection."""
     # Create OTLP metrics exporter
     metric_exporter = OTLPMetricExporter(
@@ -127,16 +166,25 @@ def _instrument_libraries() -> None:
     - Logging (correlate logs with traces)
     """
     # Instrument logging to correlate with traces
-    LoggingInstrumentor().instrument(set_logging_format=True)
+    if LoggingInstrumentor:
+        try:
+            LoggingInstrumentor().instrument(set_logging_format=True)
+        except Exception as e:
+            logger.warning(f"Failed to instrument logging: {e}")
 
     # Instrument HTTPX for external API calls
-    HTTPXClientInstrumentor().instrument()
+    if HTTPXClientInstrumentor:
+        try:
+            HTTPXClientInstrumentor().instrument()
+        except Exception as e:
+            logger.warning(f"Failed to instrument HTTPX: {e}")
 
     # Instrument Redis for cache operations
-    try:
-        RedisInstrumentor().instrument()
-    except Exception as e:
-        logger.warning("Failed to instrument Redis", error=str(e))
+    if RedisInstrumentor:
+        try:
+            RedisInstrumentor().instrument()
+        except Exception as e:
+            logger.warning(f"Failed to instrument Redis: {e}")
 
 
 def instrument_fastapi(app) -> None:
@@ -152,15 +200,18 @@ def instrument_fastapi(app) -> None:
     Args:
         app: FastAPI application instance
     """
-    if not settings.OTEL_TRACES_ENABLED:
+    if not settings.OTEL_TRACES_ENABLED or not _otel_available:
         return
 
-    FastAPIInstrumentor.instrument_app(
-        app,
-        tracer_provider=trace.get_tracer_provider(),
-        excluded_urls="/health,/metrics",  # Don't trace health checks
-    )
-    logger.info("FastAPI instrumented for OpenTelemetry")
+    try:
+        FastAPIInstrumentor.instrument_app(
+            app,
+            tracer_provider=trace.get_tracer_provider(),
+            excluded_urls="/health,/metrics",  # Don't trace health checks
+        )
+        logger.info("FastAPI instrumented for OpenTelemetry")
+    except Exception as e:
+        logger.warning(f"Failed to instrument FastAPI: {e}")
 
 
 def instrument_sqlalchemy_engine(engine) -> None:
@@ -170,7 +221,7 @@ def instrument_sqlalchemy_engine(engine) -> None:
     Args:
         engine: SQLAlchemy async engine instance
     """
-    if not settings.OTEL_TRACES_ENABLED:
+    if not settings.OTEL_TRACES_ENABLED or not _otel_available or not SQLAlchemyInstrumentor:
         return
 
     try:
@@ -180,10 +231,10 @@ def instrument_sqlalchemy_engine(engine) -> None:
         )
         logger.info("SQLAlchemy engine instrumented for OpenTelemetry")
     except Exception as e:
-        logger.warning("Failed to instrument SQLAlchemy", error=str(e))
+        logger.warning(f"Failed to instrument SQLAlchemy: {e}")
 
 
-def get_tracer(name: str) -> trace.Tracer:
+def get_tracer(name: str):
     """
     Get a tracer for manual span creation.
 
@@ -191,7 +242,7 @@ def get_tracer(name: str) -> trace.Tracer:
         name: Name of the tracer (usually module name)
 
     Returns:
-        Tracer instance for creating custom spans
+        Tracer instance for creating custom spans, or None if unavailable
 
     Example:
         ```python
@@ -203,10 +254,12 @@ def get_tracer(name: str) -> trace.Tracer:
             span.set_attribute("result_count", len(result))
         ```
     """
+    if not _otel_available:
+        return None
     return trace.get_tracer(name)
 
 
-def get_meter(name: str) -> metrics.Meter:
+def get_meter(name: str):
     """
     Get a meter for custom metrics.
 
@@ -214,7 +267,7 @@ def get_meter(name: str) -> metrics.Meter:
         name: Name of the meter (usually module name)
 
     Returns:
-        Meter instance for creating custom metrics
+        Meter instance for creating custom metrics, or None if unavailable
 
     Example:
         ```python
@@ -228,6 +281,8 @@ def get_meter(name: str) -> metrics.Meter:
         request_counter.add(1, {"endpoint": "/users", "status": "200"})
         ```
     """
+    if not _otel_available:
+        return None
     return metrics.get_meter(name)
 
 
@@ -238,14 +293,23 @@ def shutdown_telemetry() -> None:
     Ensures all pending spans and metrics are exported before shutdown.
     Should be called during application shutdown.
     """
+    if not _otel_available:
+        return
+
     if settings.OTEL_TRACES_ENABLED:
-        trace_provider = trace.get_tracer_provider()
-        if hasattr(trace_provider, "shutdown"):
-            trace_provider.shutdown()
-            logger.info("OpenTelemetry trace provider shutdown")
+        try:
+            trace_provider = trace.get_tracer_provider()
+            if hasattr(trace_provider, "shutdown"):
+                trace_provider.shutdown()
+                logger.info("OpenTelemetry trace provider shutdown")
+        except Exception as e:
+            logger.warning(f"Error shutting down trace provider: {e}")
 
     if settings.OTEL_METRICS_ENABLED:
-        meter_provider = metrics.get_meter_provider()
-        if hasattr(meter_provider, "shutdown"):
-            meter_provider.shutdown()
-            logger.info("OpenTelemetry meter provider shutdown")
+        try:
+            meter_provider = metrics.get_meter_provider()
+            if hasattr(meter_provider, "shutdown"):
+                meter_provider.shutdown()
+                logger.info("OpenTelemetry meter provider shutdown")
+        except Exception as e:
+            logger.warning(f"Error shutting down meter provider: {e}")
