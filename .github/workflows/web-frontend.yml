@@ -239,7 +239,6 @@ jobs:
             --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image-tag }} \
             --region ${{ env.REGION }} \
             --platform managed \
-            --allow-unauthenticated \
             --port 3000 \
             --cpu 1 \
             --memory 512Mi \
@@ -252,6 +251,13 @@ jobs:
             --set-secrets "NEXTAUTH_SECRET=nextauth-secret-${{ steps.env.outputs.environment }}:latest,DATABASE_URL=database-url-${{ steps.env.outputs.environment }}:latest" \
             --vpc-connector "ln-vpc-connector-${{ steps.env.outputs.environment }}" \
             --vpc-egress private-ranges-only
+
+      - name: Allow unauthenticated access
+        run: |
+          gcloud run services add-iam-policy-binding ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --member="allUsers" \
+            --role="roles/run.invoker"
 
       - name: Get service URL
         id: service
