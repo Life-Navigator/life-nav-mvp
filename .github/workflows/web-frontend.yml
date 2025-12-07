@@ -253,11 +253,13 @@ jobs:
             --vpc-egress private-ranges-only
 
       - name: Allow unauthenticated access
+        # May fail due to organization policy - continue anyway
+        continue-on-error: true
         run: |
           gcloud run services add-iam-policy-binding ${{ env.SERVICE_NAME }} \
             --region ${{ env.REGION }} \
             --member="allUsers" \
-            --role="roles/run.invoker"
+            --role="roles/run.invoker" || echo "Note: Public access requires org admin to enable 'allUsers' in organization policy"
 
       - name: Get service URL
         id: service
