@@ -52,41 +52,40 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
-    # CORS
-    CORS_ORIGINS: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    # CORS - Use str type to avoid pydantic-settings JSON parsing issues
+    CORS_ORIGINS: str = "http://localhost:3000"
     CORS_CREDENTIALS: bool = True
-    CORS_METHODS: list[str] = Field(
-        default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-    )
-    CORS_HEADERS: list[str] = Field(
-        default_factory=lambda: [
-            "Content-Type",
-            "Authorization",
-            "Accept",
-            "Origin",
-            "User-Agent",
-            "X-Requested-With",
-            "X-Tenant-ID",
-        ]
-    )
+    CORS_METHODS: str = "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+    CORS_HEADERS: str = "Content-Type,Authorization,Accept,Origin,User-Agent,X-Requested-With,X-Tenant-ID"
 
-    @field_validator("CORS_ORIGINS", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: str | list[str] | None) -> list[str]:
-        if v is None or v == "":
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse CORS_ORIGINS string into list."""
+        if not self.CORS_ORIGINS:
             return ["http://localhost:3000"]
-        if isinstance(v, str):
-            # Handle JSON array format
-            if v.startswith("["):
-                import json
-                try:
-                    return json.loads(v)
-                except json.JSONDecodeError:
-                    return ["http://localhost:3000"]
-            # Handle comma-separated format
-            origins = [origin.strip() for origin in v.split(",") if origin.strip()]
-            return origins if origins else ["http://localhost:3000"]
-        return v
+        # Handle JSON array format
+        if self.CORS_ORIGINS.startswith("["):
+            import json
+            try:
+                return json.loads(self.CORS_ORIGINS)
+            except json.JSONDecodeError:
+                pass
+        # Handle comma-separated format
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def cors_methods_list(self) -> list[str]:
+        """Parse CORS_METHODS string into list."""
+        if not self.CORS_METHODS:
+            return ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+        return [method.strip() for method in self.CORS_METHODS.split(",") if method.strip()]
+
+    @property
+    def cors_headers_list(self) -> list[str]:
+        """Parse CORS_HEADERS string into list."""
+        if not self.CORS_HEADERS:
+            return ["Content-Type", "Authorization", "Accept", "Origin", "User-Agent", "X-Requested-With", "X-Tenant-ID"]
+        return [header.strip() for header in self.CORS_HEADERS.split(",") if header.strip()]
 
     # Multi-tenancy
     DEFAULT_TENANT_ID: str | None = None
@@ -135,32 +134,35 @@ class Settings(BaseSettings):
 
     # File Upload
     MAX_UPLOAD_SIZE: int = 10485760  # 10MB
-    ALLOWED_EXTENSIONS: list[str] = Field(
-        default_factory=lambda: ["jpg", "jpeg", "png", "pdf", "doc", "docx"]
-    )
+    ALLOWED_EXTENSIONS: str = "jpg,jpeg,png,pdf,doc,docx"
 
-    @field_validator("ALLOWED_EXTENSIONS", mode="before")
-    @classmethod
-    def parse_allowed_extensions(cls, v: str | list[str]) -> list[str]:
-        if isinstance(v, str):
-            return [ext.strip() for ext in v.split(",")]
-        return v
+    @property
+    def allowed_extensions_list(self) -> list[str]:
+        """Parse ALLOWED_EXTENSIONS string into list."""
+        if not self.ALLOWED_EXTENSIONS:
+            return ["jpg", "jpeg", "png", "pdf", "doc", "docx"]
+        return [ext.strip() for ext in self.ALLOWED_EXTENSIONS.split(",") if ext.strip()]
 
     # Plaid (Finance Integration)
     PLAID_CLIENT_ID: str | None = None
     PLAID_SECRET: str | None = None
     PLAID_ENV: Literal["sandbox", "development", "production"] = "sandbox"
-    PLAID_PRODUCTS: list[str] = Field(
-        default_factory=lambda: ["auth", "transactions", "investments"]
-    )
-    PLAID_COUNTRY_CODES: list[str] = Field(default_factory=lambda: ["US", "CA"])
+    PLAID_PRODUCTS: str = "auth,transactions,investments"
+    PLAID_COUNTRY_CODES: str = "US,CA"
 
-    @field_validator("PLAID_PRODUCTS", "PLAID_COUNTRY_CODES", mode="before")
-    @classmethod
-    def parse_plaid_lists(cls, v: str | list[str]) -> list[str]:
-        if isinstance(v, str):
-            return [item.strip() for item in v.split(",")]
-        return v
+    @property
+    def plaid_products_list(self) -> list[str]:
+        """Parse PLAID_PRODUCTS string into list."""
+        if not self.PLAID_PRODUCTS:
+            return ["auth", "transactions", "investments"]
+        return [p.strip() for p in self.PLAID_PRODUCTS.split(",") if p.strip()]
+
+    @property
+    def plaid_country_codes_list(self) -> list[str]:
+        """Parse PLAID_COUNTRY_CODES string into list."""
+        if not self.PLAID_COUNTRY_CODES:
+            return ["US", "CA"]
+        return [c.strip() for c in self.PLAID_COUNTRY_CODES.split(",") if c.strip()]
 
     # Stripe (Payments)
     STRIPE_API_KEY: str | None = None
