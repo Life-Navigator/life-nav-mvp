@@ -130,6 +130,13 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+      - name: Delete existing service (clean slate)
+        if: github.event_name != 'pull_request'
+        run: |
+          gcloud run services delete ln-api-gateway \
+            --region ${{ env.REGION }} \
+            --quiet || echo "Service does not exist, proceeding with fresh deploy"
+
       - name: Deploy to Cloud Run
         if: github.event_name != 'pull_request'
         run: |
@@ -146,9 +153,10 @@ jobs:
             --concurrency 80 \
             --service-account "ln-api-gateway-beta@${{ env.PROJECT_ID }}.iam.gserviceaccount.com" \
             --set-env-vars "ENVIRONMENT=beta,LOG_LEVEL=INFO" \
-            --update-secrets "DATABASE_URL=database-url-beta:latest,JWT_SECRET=jwt-secret-beta:latest" \
+            --set-secrets "DATABASE_URL=database-url-beta:latest,JWT_SECRET=jwt-secret-beta:latest" \
             --vpc-connector "ln-vpc-connector-beta" \
-            --vpc-egress private-ranges-only
+            --vpc-egress private-ranges-only \
+            --allow-unauthenticated
 
       - name: Get service URL
         if: github.event_name != 'pull_request'

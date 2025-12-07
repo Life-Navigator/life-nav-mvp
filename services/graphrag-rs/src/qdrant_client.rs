@@ -6,12 +6,13 @@ use qdrant_client::qdrant::{
     Filter, Condition, FieldCondition, Match,
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 use crate::config::QdrantConfig;
 use crate::error::{GraphRAGError, Result};
 
 #[derive(Clone)]
 pub struct QdrantVectorClient {
-    client: Qdrant,
+    client: Arc<Qdrant>,
     collection_name: String,
     vector_size: usize,
 }
@@ -29,7 +30,7 @@ impl QdrantVectorClient {
             .map_err(|e| GraphRAGError::Qdrant(e.to_string()))?;
 
         Ok(Self {
-            client,
+            client: Arc::new(client),
             collection_name: config.collection_name.clone(),
             vector_size: config.vector_size,
         })
