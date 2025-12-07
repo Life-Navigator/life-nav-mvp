@@ -48,8 +48,10 @@ COPY pnpm-workspace.yaml package.json turbo.json ./
 # Copy all source code
 COPY . .
 
-# Generate Prisma client (using npx since prisma is a devDependency)
-RUN cd apps/web && npx prisma generate
+# Generate Prisma client using the installed version from node_modules
+# Important: Use the locked version (5.22.0) to avoid breaking changes in Prisma 7.x
+# node_modules are at root level in pnpm monorepo
+RUN cd apps/web && /app/node_modules/.bin/prisma generate
 
 # Disable Next.js telemetry
 ENV NEXT_TELEMETRY_DISABLED=1

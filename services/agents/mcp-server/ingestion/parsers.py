@@ -199,8 +199,8 @@ class DOCXParser(DocumentParser):
                     "author": core_props.author or '',
                     "subject": core_props.subject or '',
                 })
-            except Exception as e:
-                # Log error for debugging - metadata extraction failed, continue
+            except Exception:
+                # Metadata extraction failed, continue without metadata
                 pass
 
             # Extract text from paragraphs
