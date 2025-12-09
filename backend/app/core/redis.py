@@ -1,6 +1,8 @@
 """
 Redis client for caching and token blacklist.
 Handles connection pooling and token revocation.
+
+Note: Redis is optional for beta. If unavailable, token blacklisting is skipped.
 """
 
 from typing import Optional
@@ -12,23 +14,40 @@ from app.core.logging import logger
 
 # Global Redis client
 _redis_client: Optional[redis.Redis] = None
+_redis_available: bool = True  # Track if Redis is available
 
 
-async def get_redis() -> redis.Redis:
+async def get_redis() -> Optional[redis.Redis]:
     """
     Get Redis client instance.
     Creates connection pool on first use.
+    Returns None if Redis is unavailable (beta fallback).
     """
-    global _redis_client
+    global _redis_client, _redis_available
+
+    if not _redis_available:
+        return None
 
     if _redis_client is None:
-        _redis_client = redis.from_url(
-            str(settings.REDIS_URL),
-            encoding="utf-8",
-            decode_responses=True,
-            max_connections=settings.REDIS_MAX_CONNECTIONS,
-        )
-        logger.info("Redis client initialized", url=str(settings.REDIS_URL))
+        try:
+            _redis_client = redis.from_url(
+                str(settings.REDIS_URL),
+                encoding="utf-8",
+                decode_responses=True,
+                max_connections=settings.REDIS_MAX_CONNECTIONS,
+            )
+            # Test connection
+            await _redis_client.ping()
+            logger.info("Redis client initialized", url=str(settings.REDIS_URL))
+        except Exception as e:
+            logger.warning(
+                "Redis unavailable - token blacklisting disabled for beta",
+                error=str(e),
+                redis_url=str(settings.REDIS_URL),
+            )
+            _redis_available = False
+            _redis_client = None
+            return None
 
     return _redis_client
 
@@ -58,8 +77,14 @@ async def blacklist_token(token: str, expires_in: int) -> None:
 
     The token is stored in Redis with an expiration matching the JWT expiration.
     This ensures the blacklist entry is automatically cleaned up.
+
+    Note: If Redis is unavailable, this is a no-op (beta fallback).
     """
     client = await get_redis()
+    if client is None:
+        logger.debug("Token blacklist skipped - Redis unavailable", token_prefix=token[:20])
+        return
+
     key = f"blacklist:token:{token}"
 
     # Store with expiration matching the token's remaining lifetime
@@ -76,9 +101,13 @@ async def is_token_blacklisted(token: str) -> bool:
         token: The JWT token to check
 
     Returns:
-        True if the token is blacklisted, False otherwise
+        True if the token is blacklisted, False otherwise.
+        Returns False if Redis is unavailable (beta fallback).
     """
     client = await get_redis()
+    if client is None:
+        return False  # Can't check blacklist without Redis
+
     key = f"blacklist:token:{token}"
 
     exists = await client.exists(key)
@@ -94,8 +123,14 @@ async def blacklist_user_tokens(user_id: str) -> None:
 
     Args:
         user_id: The user ID whose tokens should be blacklisted
+
+    Note: If Redis is unavailable, this is a no-op (beta fallback).
     """
     client = await get_redis()
+    if client is None:
+        logger.warning("User token blacklist skipped - Redis unavailable", user_id=user_id)
+        return
+
     key = f"blacklist:user:{user_id}"
 
     # Set a flag that lasts for the maximum token lifetime (30 days for refresh tokens)
@@ -112,9 +147,13 @@ async def is_user_blacklisted(user_id: str) -> bool:
         user_id: The user ID to check
 
     Returns:
-        True if all user tokens are blacklisted, False otherwise
+        True if all user tokens are blacklisted, False otherwise.
+        Returns False if Redis is unavailable (beta fallback).
     """
     client = await get_redis()
+    if client is None:
+        return False  # Can't check blacklist without Redis
+
     key = f"blacklist:user:{user_id}"
 
     exists = await client.exists(key)
@@ -134,8 +173,13 @@ async def cache_set(key: str, value: str, expire: int = 3600) -> None:
         key: Cache key
         value: Value to store
         expire: Expiration time in seconds (default: 1 hour)
+
+    Note: If Redis is unavailable, this is a no-op.
     """
     client = await get_redis()
+    if client is None:
+        return
+
     await client.setex(f"cache:{key}", expire, value)
 
 
@@ -147,9 +191,12 @@ async def cache_get(key: str) -> Optional[str]:
         key: Cache key
 
     Returns:
-        Cached value or None if not found
+        Cached value or None if not found or Redis unavailable
     """
     client = await get_redis()
+    if client is None:
+        return None
+
     return await client.get(f"cache:{key}")
 
 
@@ -159,6 +206,11 @@ async def cache_delete(key: str) -> None:
 
     Args:
         key: Cache key
+
+    Note: If Redis is unavailable, this is a no-op.
     """
     client = await get_redis()
+    if client is None:
+        return
+
     await client.delete(f"cache:{key}")
