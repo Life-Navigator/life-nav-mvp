@@ -163,7 +163,11 @@ if not settings.is_production:
 if settings.is_production:
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["*.lifenavigator.ai", "lifenavigator.ai"],
+        allowed_hosts=[
+            "*.lifenavigator.ai",
+            "lifenavigator.ai",
+            "*.run.app",  # Cloud Run URLs
+        ],
     )
 
 
