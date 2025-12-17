@@ -1,110 +1,84 @@
 // FILE: src/app/dashboard/finance/overview/page.tsx
 'use client';
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useMemo } from "react";
 import { AccountsSummary } from "@/components/domain/finance/overview/AccountsSummary";
 import { SpendingTrends } from "@/components/domain/finance/overview/SpendingTrends";
 import { UpcomingBills } from "@/components/domain/finance/overview/UpcomingBills";
 import { FinancialInsights } from "@/components/domain/finance/overview/FinancialInsights";
 import { CashFlow } from "@/components/domain/finance/overview/CashFlow";
 import { LoadingSpinner } from "@/components/ui/loaders/LoadingSpinner";
+import { useFinancialAccounts, useTransactions } from "@/lib/hooks/useFinanceData";
 
 export default function OverviewPage() {
-  const [loading, setLoading] = useState(true);
-  const [financialSummary, setFinancialSummary] = useState({
-    totalAssets: 0,
-    totalLiabilities: 0,
-    netWorth: 0,
-    monthlyCashFlow: 0
+  // Fetch real data using React Query hooks
+  const { data: accounts, isLoading: accountsLoading } = useFinancialAccounts();
+  const { data: transactions, isLoading: transactionsLoading } = useTransactions({
+    limit: 100,
   });
 
-  useEffect(() => {
-    const fetchFinancialData = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('/api/financial');
+  const loading = accountsLoading || transactionsLoading;
 
-        // Handle non-OK responses gracefully - show empty state
-        if (!response.ok) {
-          // Log but don't throw - just show $0 values
-          console.warn('[Overview] API returned non-OK status:', response.status);
-          setFinancialSummary({
-            totalAssets: 0,
-            totalLiabilities: 0,
-            netWorth: 0,
-            monthlyCashFlow: 0
-          });
-          setLoading(false);
-          return;
-        }
+  // Calculate financial summary from real data
+  const financialSummary = useMemo(() => {
+    if (!accounts) {
+      return {
+        totalAssets: 0,
+        totalLiabilities: 0,
+        netWorth: 0,
+        monthlyCashFlow: 0
+      };
+    }
 
-        const data = await response.json();
+    // Calculate total assets (checking, savings, investment accounts with positive balance)
+    const totalAssets = accounts
+      .filter((acc) =>
+        acc.account_type === 'checking' ||
+        acc.account_type === 'savings' ||
+        acc.account_type === 'investment'
+      )
+      .reduce((sum, acc) => sum + (Number(acc.current_balance) || 0), 0);
 
-        // Safely access accounts array with fallback
-        const accounts = Array.isArray(data?.accounts) ? data.accounts : [];
+    // Calculate total liabilities (credit card, loan accounts)
+    const totalLiabilities = accounts
+      .filter((acc) =>
+        acc.account_type === 'credit_card' ||
+        acc.account_type === 'loan'
+      )
+      .reduce((sum, acc) => sum + Math.abs(Number(acc.current_balance) || 0), 0);
 
-        // Calculate total assets (sum of banking + investment accounts + investment portfolio value)
-        const bankingAssets = accounts
-          .filter((acc: any) => acc.type === 'banking' || acc.type === 'investment')
-          .reduce((sum: number, acc: any) => sum + (acc.balance || 0), 0);
+    // Calculate net worth
+    const netWorth = totalAssets - totalLiabilities;
 
-        const investmentValue = data.investments?.totalValue || 0;
-        const totalAssets = bankingAssets + investmentValue;
+    // Calculate monthly cash flow from recent transactions (30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        // Calculate total liabilities (sum of credit accounts)
-        const totalLiabilities = accounts
-          .filter((acc: any) => acc.type === 'credit')
-          .reduce((sum: number, acc: any) => sum + Math.abs(acc.balance || 0), 0);
+    const recentTransactions = transactions || [];
 
-        // Calculate net worth
-        const netWorth = totalAssets - totalLiabilities;
+    const income = recentTransactions
+      .filter((tx) => {
+        const txDate = new Date(tx.transaction_date);
+        return tx.transaction_type === 'credit' && txDate >= thirtyDaysAgo;
+      })
+      .reduce((sum, tx) => sum + Number(tx.amount), 0);
 
-        // Calculate monthly cash flow from recent transactions (30 days)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const expenses = recentTransactions
+      .filter((tx) => {
+        const txDate = new Date(tx.transaction_date);
+        return tx.transaction_type === 'debit' && txDate >= thirtyDaysAgo;
+      })
+      .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0);
 
-        const recentTransactions = Array.isArray(data.transactions?.recentTransactions)
-          ? data.transactions.recentTransactions
-          : [];
+    const monthlyCashFlow = income - expenses;
 
-        const income = recentTransactions
-          .filter((tx: any) => {
-            const txDate = new Date(tx.date);
-            return tx.amount > 0 && txDate >= thirtyDaysAgo;
-          })
-          .reduce((sum: number, tx: any) => sum + tx.amount, 0);
-
-        const expenses = recentTransactions
-          .filter((tx: any) => {
-            const txDate = new Date(tx.date);
-            return tx.amount < 0 && txDate >= thirtyDaysAgo;
-          })
-          .reduce((sum: number, tx: any) => sum + Math.abs(tx.amount), 0);
-
-        const monthlyCashFlow = income - expenses;
-
-        setFinancialSummary({
-          totalAssets,
-          totalLiabilities,
-          netWorth,
-          monthlyCashFlow
-        });
-        setLoading(false);
-      } catch (error) {
-        // Log error but don't crash - show empty state
-        console.error('[Overview] Error fetching financial data:', error);
-        setFinancialSummary({
-          totalAssets: 0,
-          totalLiabilities: 0,
-          netWorth: 0,
-          monthlyCashFlow: 0
-        });
-        setLoading(false);
-      }
+    return {
+      totalAssets,
+      totalLiabilities,
+      netWorth,
+      monthlyCashFlow
     };
-
-    fetchFinancialData();
-  }, []);
+  }, [accounts, transactions]);
 
   return (
     <div className="container mx-auto py-6">

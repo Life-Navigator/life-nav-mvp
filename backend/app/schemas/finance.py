@@ -164,6 +164,41 @@ class TransactionResponse(IDTimestampSchema):
     notes: str | None
 
 
+class TransactionBulkItem(BaseSchema):
+    """Single transaction in bulk create request (from OCR)."""
+
+    transaction_date: date | str
+    description: str = Field(min_length=1)
+    amount: Decimal
+    transaction_type: str = "debit"  # String for OCR compatibility
+    category: str = Field(default="Uncategorized")
+    is_manual: bool = Field(default=False)
+    metadata_: dict[str, Any] | None = Field(default=None, alias="metadata")
+
+    class Config:
+        populate_by_name = True
+
+
+class TransactionBulkCreate(BaseSchema):
+    """Bulk transaction creation from OCR extraction."""
+
+    user_id: UUID | None = Field(default=None, alias="userId")
+    account_id: UUID | None = Field(default=None, alias="accountId")
+    transactions: list[TransactionBulkItem]
+
+    class Config:
+        populate_by_name = True
+
+
+class TransactionBulkResponse(BaseSchema):
+    """Response for bulk transaction creation."""
+
+    created_count: int
+    skipped_count: int
+    errors: list[str] = []
+    transaction_ids: list[UUID] = []
+
+
 # ============================================================================
 # Budget Schemas
 # ============================================================================

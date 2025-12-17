@@ -4,7 +4,7 @@ Handles health conditions and medications.
 """
 
 from datetime import date, time
-from typing import Any
+from typing import Any, Optional, Union
 from uuid import UUID
 
 from pydantic import Field
@@ -12,6 +12,7 @@ from pydantic import Field
 from app.models.health import (
     ConditionStatus,
     ConditionType,
+    LabResultStatus,
     MedicationRoute,
     MedicationStatus,
     Severity,
@@ -161,3 +162,109 @@ class MedicationResponse(IDTimestampSchema):
     interactions: list[str] | None
     metadata: dict[str, Any]
     notes: str | None
+
+
+# ============================================================================
+# LabResult Schemas
+# ============================================================================
+
+
+class LabResultCreate(BaseSchema):
+    """LabResult creation schema."""
+
+    test_name: str = Field(min_length=1, max_length=255)
+    test_code: str | None = Field(default=None, max_length=50)
+    result_value: str = Field(min_length=1, max_length=100)
+    result_unit: str | None = Field(default=None, max_length=50)
+    reference_range_low: str | None = Field(default=None, max_length=50)
+    reference_range_high: str | None = Field(default=None, max_length=50)
+    reference_range: str | None = Field(default=None, max_length=100)
+    status: LabResultStatus = Field(default=LabResultStatus.PENDING)
+    test_date: date
+    result_date: date | None = None
+    ordering_provider: str | None = Field(default=None, max_length=255)
+    performing_lab: str | None = Field(default=None, max_length=255)
+    condition_id: UUID | None = None
+    source: str | None = Field(default=None, max_length=50)
+    document_id: str | None = Field(default=None, max_length=255)
+    metadata: dict[str, Any] | None = None
+    notes: str | None = None
+
+
+class LabResultUpdate(BaseSchema):
+    """LabResult update schema."""
+
+    test_name: str | None = Field(default=None, max_length=255)
+    test_code: str | None = Field(default=None, max_length=50)
+    result_value: str | None = Field(default=None, max_length=100)
+    result_unit: str | None = Field(default=None, max_length=50)
+    reference_range_low: str | None = Field(default=None, max_length=50)
+    reference_range_high: str | None = Field(default=None, max_length=50)
+    reference_range: str | None = Field(default=None, max_length=100)
+    status: LabResultStatus | None = None
+    test_date: date | None = None
+    result_date: date | None = None
+    ordering_provider: str | None = Field(default=None, max_length=255)
+    performing_lab: str | None = Field(default=None, max_length=255)
+    condition_id: UUID | None = None
+    source: str | None = Field(default=None, max_length=50)
+    document_id: str | None = Field(default=None, max_length=255)
+    metadata: dict[str, Any] | None = None
+    notes: str | None = None
+
+
+class LabResultResponse(IDTimestampSchema):
+    """LabResult response schema."""
+
+    test_name: str
+    test_code: str | None
+    result_value: str
+    result_unit: str | None
+    reference_range_low: str | None
+    reference_range_high: str | None
+    reference_range: str | None
+    status: LabResultStatus
+    test_date: date
+    result_date: date | None
+    ordering_provider: str | None
+    performing_lab: str | None
+    condition_id: UUID | None
+    source: str | None
+    document_id: str | None
+    metadata: dict[str, Any]
+    notes: str | None
+
+
+class LabResultBulkItem(BaseSchema):
+    """Single lab result in bulk create request (from OCR)."""
+
+    test_name: str = Field(min_length=1)
+    result_value: str = Field(min_length=1)
+    result_unit: str | None = None
+    reference_range: str | None = None
+    test_date: Optional[Union[date, str]] = Field(default=None, alias="test_date")
+    provider: str | None = Field(default=None, alias="ordering_provider")
+    confidence: float = 0.0
+    metadata_: dict[str, Any] | None = Field(default=None, alias="metadata")
+
+    class Config:
+        populate_by_name = True
+
+
+class LabResultBulkCreate(BaseSchema):
+    """Bulk lab result creation from OCR extraction."""
+
+    user_id: UUID | None = Field(default=None, alias="userId")
+    lab_results: list[LabResultBulkItem] = Field(alias="labResults")
+
+    class Config:
+        populate_by_name = True
+
+
+class LabResultBulkResponse(BaseSchema):
+    """Response for bulk lab result creation."""
+
+    created_count: int
+    skipped_count: int
+    errors: list[str] = []
+    lab_result_ids: list[UUID] = []

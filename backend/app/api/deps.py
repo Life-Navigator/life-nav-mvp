@@ -11,7 +11,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_session, set_tenant_context
+from app.core.database import (
+    get_session,
+    get_main_session,
+    get_financial_session,
+    get_supabase_session,
+    set_tenant_context
+)
 from app.core.logging import logger
 from app.core.redis import is_token_blacklisted, is_user_blacklisted
 from app.core.security import verify_token
@@ -420,6 +426,9 @@ CurrentUser = Annotated[User, Depends(get_current_active_user)]
 TenantID = Annotated[UUID, Depends(get_tenant_id_from_token)]
 UserTenantMembership = Annotated[UserTenant, Depends(verify_tenant_access)]
 DBSession = Annotated[AsyncSession, Depends(set_rls_context)]
+HIPAADBSession = Annotated[AsyncSession, Depends(get_main_session)]
+FinancialDBSession = Annotated[AsyncSession, Depends(get_financial_session)]
+SupabaseDBSession = Annotated[AsyncSession, Depends(get_supabase_session)]
 AdminUser = Annotated[UserTenant, Depends(require_admin)]
 OwnerUser = Annotated[UserTenant, Depends(require_owner)]
 

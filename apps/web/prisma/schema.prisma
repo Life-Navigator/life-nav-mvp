@@ -1308,16 +1308,82 @@ model Document {
   expiresAt     DateTime?
   metadata      Json?    // Additional file metadata
   ocrText       String?  // Extracted text for searchability
+
+  // Virus Scanning
+  virusScanStatus   String?   // pending, clean, infected, error, skipped
+  virusScanAt       DateTime?
+  virusName         String?   // If infected
+  isQuarantined     Boolean   @default(false)
+
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
+
   // Relations
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   @@index([userId])
   @@index([category])
   @@index([createdAt])
+  @@index([virusScanStatus])
   @@map("documents")
+}
+
+//=====================
+// VIRUS SCANNING & SECURITY
+//=====================
+
+model VirusScanResult {
+  id              String    @id @default(cuid())
+  fileId          String
+  userId          String
+  status          String    // clean, infected, error, timeout, skipped
+  virusName       String?   // Name of detected virus/malware if infected
+  scanDurationMs  Int       // Scan duration in milliseconds
+  scannedAt       DateTime
+  clamavVersion   String?   // ClamAV version used for scan
+  errorMessage    String?   // Error message if scan failed
+  fileHash        String?   // SHA-256 hash of scanned file
+  fileSize        Int?      // Size of scanned file in bytes
+  originalFilename String?  // Original filename
+  domain          String?   // Domain context (financial, health, etc.)
+  scanMode        String?   // sync, async
+  retryCount      Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([fileId])
+  @@index([userId])
+  @@index([status])
+  @@index([scannedAt])
+  @@index([virusName])
+  @@map("virus_scan_results")
+}
+
+model QuarantineRecord {
+  id               String    @id @default(cuid())
+  fileId           String    @unique
+  userId           String
+  originalPath     String    // Original storage path
+  quarantinePath   String    // Quarantine storage path
+  virusName        String    // Detected virus name
+  originalFilename String    // Original filename
+  fileSize         Int?      // File size in bytes
+  fileHash         String?   // SHA-256 hash
+  domain           String?   // Domain context
+  status           String    @default("quarantined") // quarantined, reviewed, deleted, restored
+  reviewedBy       String?   // Admin user ID who reviewed
+  reviewedAt       DateTime?
+  reviewNotes      String?   // Admin notes from review
+  deletedAt        DateTime? // When file was permanently deleted
+  metadata         Json?     // Additional metadata
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([virusName])
+  @@index([createdAt])
+  @@map("quarantine_records")
 }
 
 //=====================

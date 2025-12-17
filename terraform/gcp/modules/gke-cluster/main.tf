@@ -2,19 +2,6 @@
 # GKE Autopilot Cluster Module
 # ===========================================================================
 
-terraform {
-  required_providers {
-    google = {
-      source  = "hashicorp/google"
-      version = "~> 5.0"
-    }
-    google-beta = {
-      source  = "hashicorp/google-beta"
-      version = "~> 5.0"
-    }
-  }
-}
-
 # ===========================================================================
 # Variables
 # ===========================================================================
@@ -98,13 +85,13 @@ variable "maintenance_window_start_time" {
 variable "maintenance_window_end_time" {
   description = "Maintenance window end time (RFC3339)"
   type        = string
-  default     = "2024-01-01T07:00:00Z"
+  default     = "2024-01-01T11:00:00Z"
 }
 
 variable "maintenance_window_recurrence" {
   description = "Maintenance window recurrence (RFC5545)"
   type        = string
-  default     = "FREQ=WEEKLY;BYDAY=SA"
+  default     = "FREQ=WEEKLY;BYDAY=SA,SU,WE"
 }
 
 variable "labels" {
@@ -177,25 +164,13 @@ resource "google_container_cluster" "primary" {
     }
   }
 
-  # Addons
+  # Addons (some not supported in Autopilot)
   addons_config {
     http_load_balancing {
       disabled = false
     }
     horizontal_pod_autoscaling {
       disabled = false
-    }
-    network_policy_config {
-      disabled = false
-    }
-    gce_persistent_disk_csi_driver_config {
-      enabled = true
-    }
-    gcs_fuse_csi_driver_config {
-      enabled = true
-    }
-    config_connector_config {
-      enabled = true
     }
   }
 
@@ -206,21 +181,18 @@ resource "google_container_cluster" "primary" {
 
   # Monitoring and logging
   monitoring_config {
-    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
+    enable_components = ["SYSTEM_COMPONENTS", "APISERVER", "CONTROLLER_MANAGER", "SCHEDULER"]
     managed_prometheus {
       enabled = true
     }
   }
 
   logging_config {
-    enable_components = ["SYSTEM_COMPONENTS", "WORKLOADS"]
+    enable_components = ["SYSTEM_COMPONENTS", "APISERVER", "CONTROLLER_MANAGER", "SCHEDULER"]
   }
 
-  # Network policy
-  network_policy {
-    enabled  = true
-    provider = "PROVIDER_UNSPECIFIED"  # Uses Dataplane V2
-  }
+  # Network policy - not supported in Autopilot mode (uses Dataplane V2 by default)
+  # network_policy is automatically enabled in Autopilot clusters
 
   # Dataplane V2 (Cilium)
   datapath_provider = "ADVANCED_DATAPATH"
@@ -324,18 +296,19 @@ resource "google_compute_security_policy" "ingress_policy" {
     description = "Rate limiting rule"
   }
 
-  # Block known bad IPs (example)
-  rule {
-    action   = "deny(403)"
-    priority = "100"
-    match {
-      versioned_expr = "SRC_IPS_V1"
-      config {
-        src_ip_ranges = []  # Add known bad IPs here
-      }
-    }
-    description = "Block known bad IPs"
-  }
+  # Block known bad IPs (example - placeholder for actual bad IPs)
+  # Uncomment and add actual IPs when needed:
+  # rule {
+  #   action   = "deny(403)"
+  #   priority = "100"
+  #   match {
+  #     versioned_expr = "SRC_IPS_V1"
+  #     config {
+  #       src_ip_ranges = ["192.0.2.0/24"]  # Add known bad IPs here
+  #     }
+  #   }
+  #   description = "Block known bad IPs"
+  # }
 }
 
 # ===========================================================================

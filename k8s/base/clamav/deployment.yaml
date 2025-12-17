@@ -1,0 +1,189 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clamav
+  labels:
+    app: clamav
+    component: antivirus
+    app.kubernetes.io/name: clamav
+    app.kubernetes.io/component: antivirus
+    app.kubernetes.io/part-of: life-navigator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: clamav
+      component: antivirus
+  template:
+    metadata:
+      labels:
+        app: clamav
+        component: antivirus
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9810"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: clamav
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+      # Initialize virus signatures on first boot
+      - name: init-signatures
+        image: clamav/clamav:1.2
+        command: ['sh', '-c', 'freshclam --datadir=/var/lib/clamav || true']
+        volumeMounts:
+        - name: clamav-signatures
+          mountPath: /var/lib/clamav
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      containers:
+      # ClamAV daemon
+      - name: clamd
+        image: clamav/clamav:1.2
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: clamd
+          containerPort: 3310
+          protocol: TCP
+        env:
+        - name: CLAMAV_NO_FRESHCLAMD
+          value: "true"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          tcpSocket:
+            port: clamd
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - /usr/bin/clamdscan
+            - --ping
+            - "1"
+          initialDelaySeconds: 90
+          periodSeconds: 10
+          timeoutSeconds: 30
+          failureThreshold: 3
+        startupProbe:
+          tcpSocket:
+            port: clamd
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - name: clamav-signatures
+          mountPath: /var/lib/clamav
+        - name: clamav-config
+          mountPath: /etc/clamav/clamd.conf
+          subPath: clamd.conf
+        - name: tmp
+          mountPath: /tmp
+        - name: log
+          mountPath: /var/log/clamav
+      # Freshclam sidecar for signature updates
+      - name: freshclam
+        image: clamav/clamav:1.2
+        command: ['freshclam', '--daemon', '--checks=4', '--datadir=/var/lib/clamav']
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: clamav-signatures
+          mountPath: /var/lib/clamav
+        - name: freshclam-config
+          mountPath: /etc/clamav/freshclam.conf
+          subPath: freshclam.conf
+        - name: log
+          mountPath: /var/log/clamav
+      # Prometheus exporter sidecar
+      - name: exporter
+        image: hivemq/prometheus-clamav-exporter:latest
+        ports:
+        - name: metrics
+          containerPort: 9810
+          protocol: TCP
+        env:
+        - name: CLAMD_HOST
+          value: "localhost"
+        - name: CLAMD_PORT
+          value: "3310"
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+      volumes:
+      - name: clamav-signatures
+        persistentVolumeClaim:
+          claimName: clamav-signatures-pvc
+      - name: clamav-config
+        configMap:
+          name: clamav-config
+      - name: freshclam-config
+        configMap:
+          name: clamav-config
+      - name: tmp
+        emptyDir: {}
+      - name: log
+        emptyDir: {}
+      terminationGracePeriodSeconds: 60
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - clamav
+              topologyKey: kubernetes.io/hostname

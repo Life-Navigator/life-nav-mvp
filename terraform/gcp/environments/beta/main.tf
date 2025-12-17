@@ -76,6 +76,21 @@ module "vpc" {
       ip_cidr_range = "10.10.0.0/24"
       region        = var.region
       secondary_ip_ranges = []
+    },
+    {
+      name          = "gke-subnet"
+      ip_cidr_range = "10.20.0.0/20"
+      region        = var.region
+      secondary_ip_ranges = [
+        {
+          range_name    = "pods"
+          ip_cidr_range = "10.100.0.0/14"
+        },
+        {
+          range_name    = "services"
+          ip_cidr_range = "10.104.0.0/20"
+        }
+      ]
     }
   ]
 }
@@ -100,6 +115,39 @@ module "vpc_connector" {
   max_instances  = 3
   min_throughput = 200
   max_throughput = 300
+
+  depends_on = [module.vpc]
+}
+
+# ===========================================================================
+# GKE Autopilot Cluster
+# ===========================================================================
+
+module "gke_cluster" {
+  source = "../../modules/gke-cluster"
+
+  project_id   = var.project_id
+  region       = var.region
+  env          = local.env
+  cluster_name = "life-navigator-gke"
+
+  network    = module.vpc.network_name
+  subnetwork = module.vpc.subnet_names["gke-subnet"]
+
+  enable_autopilot    = true
+  enable_private_nodes = true
+  master_ipv4_cidr_block = "172.16.0.0/28"
+
+  release_channel = "REGULAR"
+
+  master_authorized_networks = [
+    {
+      cidr_block   = "0.0.0.0/0"
+      display_name = "All (for initial setup)"
+    }
+  ]
+
+  labels = local.common_labels
 
   depends_on = [module.vpc]
 }
@@ -1003,4 +1051,26 @@ output "service_accounts" {
     jobs               = module.iam.service_account_emails["ln-jobs-beta"]
     web_frontend       = module.iam.service_account_emails["ln-web-frontend-beta"]
   }
+}
+
+# GKE Cluster Outputs
+output "gke_cluster_name" {
+  value       = module.gke_cluster.cluster_name
+  description = "GKE cluster name"
+}
+
+output "gke_cluster_endpoint" {
+  value       = module.gke_cluster.cluster_endpoint
+  description = "GKE cluster endpoint"
+  sensitive   = true
+}
+
+output "gke_cluster_location" {
+  value       = module.gke_cluster.cluster_location
+  description = "GKE cluster location"
+}
+
+output "gke_workload_identity_pool" {
+  value       = module.gke_cluster.workload_identity_pool
+  description = "Workload Identity pool for GKE"
 }

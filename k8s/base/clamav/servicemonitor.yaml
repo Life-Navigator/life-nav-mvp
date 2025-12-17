@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: clamav-metrics
+  labels:
+    app: clamav
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: clamav
+  endpoints:
+  - port: metrics
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

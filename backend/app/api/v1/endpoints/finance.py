@@ -21,6 +21,8 @@ from app.schemas.finance import (
     TransactionCreate,
     TransactionResponse,
     TransactionUpdate,
+    TransactionBulkCreate,
+    TransactionBulkResponse,
 )
 
 router = APIRouter()
@@ -358,6 +360,107 @@ async def delete_transaction(
 
     logger.info("Transaction deleted", transaction_id=str(transaction_id))
     return None
+
+
+@router.post("/transactions/bulk", response_model=TransactionBulkResponse)
+async def create_transactions_bulk(
+    data: TransactionBulkCreate,
+    db: DBSession,
+    current_user: CurrentUser,
+    tenant_id: TenantID,
+):
+    """
+    Bulk create transactions from OCR extraction.
+
+    Used by the OCR pipeline to save extracted transactions.
+    Creates transactions in a single database operation for efficiency.
+    """
+    from datetime import datetime as dt
+    from app.models.finance import TransactionType as TxType
+
+    created_ids: list[UUID] = []
+    errors: list[str] = []
+    skipped = 0
+
+    # Get default account if not specified
+    default_account_id = data.account_id
+    if not default_account_id:
+        # Try to get user's first account
+        result = await db.execute(
+            select(FinancialAccount)
+            .where(FinancialAccount.user_id == current_user.id)
+            .order_by(FinancialAccount.created_at)
+            .limit(1)
+        )
+        default_account = result.scalar_one_or_none()
+
+        if not default_account:
+            # Create a default "OCR Imports" account
+            default_account = FinancialAccount(
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                account_name="OCR Imports",
+                account_type="CHECKING",
+                is_manual=True,
+                currency="USD",
+            )
+            db.add(default_account)
+            await db.flush()
+
+        default_account_id = default_account.id
+
+    for i, tx_item in enumerate(data.transactions):
+        try:
+            # Parse date if string
+            tx_date = tx_item.transaction_date
+            if isinstance(tx_date, str):
+                try:
+                    tx_date = dt.strptime(tx_date, "%Y-%m-%d").date()
+                except ValueError:
+                    tx_date = dt.now().date()
+
+            # Map transaction type string to enum
+            tx_type = TxType.DEBIT
+            if tx_item.transaction_type.lower() in ("credit", "cr"):
+                tx_type = TxType.CREDIT
+
+            transaction = Transaction(
+                user_id=current_user.id,
+                tenant_id=tenant_id,
+                account_id=default_account_id,
+                transaction_date=tx_date,
+                amount=tx_item.amount,
+                description=tx_item.description,
+                category=tx_item.category,
+                transaction_type=tx_type,
+                is_recurring=False,
+                is_pending=False,
+                metadata_=tx_item.metadata_ or {"source": "ocr"},
+            )
+            db.add(transaction)
+            await db.flush()
+            created_ids.append(transaction.id)
+
+        except Exception as e:
+            errors.append(f"Transaction {i + 1}: {str(e)}")
+            skipped += 1
+
+    await db.commit()
+
+    logger.info(
+        "Bulk transactions created",
+        user_id=str(current_user.id),
+        created_count=len(created_ids),
+        skipped_count=skipped,
+        error_count=len(errors),
+    )
+
+    return TransactionBulkResponse(
+        created_count=len(created_ids),
+        skipped_count=skipped,
+        errors=errors,
+        transaction_ids=created_ids,
+    )
 
 
 # ============================================================================

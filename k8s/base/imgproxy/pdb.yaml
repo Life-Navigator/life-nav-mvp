@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: imgproxy
+  labels:
+    app: imgproxy
+    component: image-processor
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: imgproxy
+      component: image-processor

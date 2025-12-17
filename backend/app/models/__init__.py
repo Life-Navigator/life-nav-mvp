@@ -5,6 +5,12 @@ from app.models.education import Course, EducationCredential
 from app.models.finance import Budget, FinancialAccount, Transaction
 from app.models.goals import Goal, Milestone
 from app.models.health import HealthCondition, Medication
+from app.models.integration import (
+    OAuthConnection,
+    PlaidItem,
+    WearableConnection,
+    WebhookEvent,
+)
 from app.models.mixins import (
     BaseModel,
     BaseSoftDeleteModel,
@@ -62,4 +68,9 @@ __all__ = [
     # Relationships
     "Contact",
     "ContactInteraction",
+    # Integrations
+    "OAuthConnection",
+    "PlaidItem",
+    "WearableConnection",
+    "WebhookEvent",
 ]

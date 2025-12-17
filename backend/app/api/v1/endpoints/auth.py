@@ -1,6 +1,13 @@
 """
 Authentication endpoints.
 Handles user registration, login, logout, and token refresh.
+
+Security:
+- Strict rate limiting on all auth endpoints to prevent brute force attacks
+- Login: 5 attempts per minute per IP (strict for security)
+- Register: 3 attempts per minute per IP (prevent spam)
+- Refresh: 20 per minute (higher since legitimate)
+- Logout: 10 per minute
 """
 
 from datetime import datetime
@@ -39,7 +46,19 @@ limiter = Limiter(key_func=get_remote_address)
 security = HTTPBearer()
 
 
+# =============================================================================
+# Rate Limit Constants
+# =============================================================================
+
+# Strict limits for security-sensitive endpoints
+RATE_LIMIT_LOGIN = "5/minute"          # Prevent brute force attacks
+RATE_LIMIT_REGISTER = "3/minute"       # Prevent spam registrations
+RATE_LIMIT_REFRESH = "20/minute"       # Higher since used by legitimate clients
+RATE_LIMIT_LOGOUT = "10/minute"        # Reasonable for logout operations
+
+
 @router.post("/register", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit(RATE_LIMIT_REGISTER)
 async def register(
     http_request: Request,
     request: RegisterRequest,
@@ -140,6 +159,7 @@ async def register(
 
 
 @router.post("/login", response_model=LoginResponse)
+@limiter.limit(RATE_LIMIT_LOGIN)
 async def login(
     http_request: Request,
     request: LoginRequest,
@@ -229,7 +249,8 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_token_endpoint(request: RefreshTokenRequest):
+@limiter.limit(RATE_LIMIT_REFRESH)
+async def refresh_token_endpoint(http_request: Request, request: RefreshTokenRequest):
     """
     Refresh access token using refresh token.
 
@@ -289,7 +310,9 @@ async def refresh_token_endpoint(request: RefreshTokenRequest):
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit(RATE_LIMIT_LOGOUT)
 async def logout(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """

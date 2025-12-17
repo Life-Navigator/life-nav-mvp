@@ -1,0 +1,37 @@
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: imgproxy-backendconfig
+  labels:
+    app: imgproxy
+    component: image-processor
+spec:
+  healthCheck:
+    checkIntervalSec: 15
+    timeoutSec: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    type: HTTP
+    requestPath: /health
+    port: 8080
+  connectionDraining:
+    drainingTimeoutSec: 30
+  timeoutSec: 60
+  sessionAffinity:
+    affinityType: "NONE"
+  iap:
+    enabled: false
+  cdn:
+    enabled: true
+    cachePolicy:
+      includeHost: true
+      includeProtocol: true
+      includeQueryString: true
+      queryStringWhitelist:
+      - "s"
+      - "preset"
+    signedUrlCacheMaxAgeSec: 86400
+    cacheMode: CACHE_ALL_STATIC
+    defaultTtl: 2592000
+    maxTtl: 31536000
+    clientTtl: 604800

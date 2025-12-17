@@ -1,5 +1,6 @@
 /**
  * Base API client for making requests to the backend
+ * Supports multi-database architecture with automatic tenant ID injection
  */
 'use client';
 
@@ -11,6 +12,7 @@ type FetchOptions = {
   body?: any;
   cache?: RequestCache;
   next?: { revalidate?: number | false; tags?: string[] };
+  tenantId?: string; // For multi-tenant API calls
 };
 
 export class ApiError extends Error {
@@ -38,9 +40,15 @@ async function fetchAPI<T = any>(
     body,
     cache,
     next,
+    tenantId,
   } = options;
 
   const requestHeaders = { ...defaultHeaders, ...headers };
+
+  // Add tenant ID header for multi-tenant API calls
+  if (tenantId) {
+    requestHeaders['X-Tenant-ID'] = tenantId;
+  }
 
   // Add CSRF token header for mutation requests
   if (csrfToken && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {

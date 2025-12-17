@@ -71,56 +71,80 @@ module "vpc" {
 }
 
 # ===========================================================================
-# Cloud SQL (PostgreSQL) - Small tier for dev
+# Cloud SQL (PostgreSQL) - Isolated Instances for Dev
 # ===========================================================================
 
-module "cloud_sql" {
+module "cloud_sql_hipaa" {
   source = "../../modules/cloud-sql"
 
   project_id = var.project_id
   region     = var.region
   env        = "dev"
 
-  instance_name     = "life-navigator-db-dev"
-  database_version  = "POSTGRES_15"
-  tier              = "db-custom-2-7680"  # 2 vCPU, 7.5GB RAM
-  availability_type = "ZONAL"             # Single zone for dev
+  instance_name           = "life-navigator-hipaa-dev"
+  database_version        = "POSTGRES_15"
+  tier                    = "db-g1-small" # Smaller tier for dev
+  availability_type       = "ZONAL"
+  db_password_secret_name = "life-navigator-hipaa-db-password-dev"
 
-  # Scheduled start/stop for cost savings
-  enable_schedule = true
-  schedule_start  = "0 7 * * 1-5"  # 7 AM weekdays
-  schedule_end    = "0 19 * * 1-5" # 7 PM weekdays
+  databases = [{
+    name      = "lifenavigator_hipaa"
+    charset   = "UTF8"
+    collation = "en_US.UTF8"
+  }]
 
-  databases = [
-    {
-      name      = "graphrag"
-      charset   = "UTF8"
-      collation = "en_US.UTF8"
-    },
-    {
-      name      = "auth"
-      charset   = "UTF8"
-      collation = "en_US.UTF8"
-    }
-  ]
-
-  # Backup configuration
   backup_configuration = {
     enabled                        = true
     start_time                     = "03:00"
-    point_in_time_recovery_enabled = false  # Disabled for dev
+    point_in_time_recovery_enabled = false
     transaction_log_retention_days = 3
   }
 
-  # Network configuration
   private_network = module.vpc.network_id
   require_ssl     = true
 
-  # Tags
   labels = {
     environment = "dev"
     managed_by  = "terraform"
     cost_center = "development"
+    data_class  = "hipaa"
+  }
+}
+
+module "cloud_sql_financial" {
+  source = "../../modules/cloud-sql"
+
+  project_id = var.project_id
+  region     = var.region
+  env        = "dev"
+
+  instance_name           = "life-navigator-financial-dev"
+  database_version        = "POSTGRES_15"
+  tier                    = "db-g1-small" # Smaller tier for dev
+  availability_type       = "ZONAL"
+  db_password_secret_name = "life-navigator-financial-db-password-dev"
+
+  databases = [{
+    name      = "lifenavigator_financial"
+    charset   = "UTF8"
+    collation = "en_US.UTF8"
+  }]
+
+  backup_configuration = {
+    enabled                        = true
+    start_time                     = "03:30"
+    point_in_time_recovery_enabled = false
+    transaction_log_retention_days = 3
+  }
+
+  private_network = module.vpc.network_id
+  require_ssl     = true
+
+  labels = {
+    environment = "dev"
+    managed_by  = "terraform"
+    cost_center = "development"
+    data_class  = "financial"
   }
 }
 
@@ -244,6 +268,18 @@ module "secrets" {
 
   secrets = [
     {
+      name = "life-navigator-hipaa-db-url"
+      replication = {
+        automatic = true
+      }
+    },
+    {
+      name = "life-navigator-financial-db-url"
+      replication = {
+        automatic = true
+      }
+    },
+    {
       name = "neo4j-aura-connection-string"
       replication = {
         automatic = true
@@ -266,6 +302,24 @@ module "secrets" {
       replication = {
         automatic = true
       }
+    },
+    {
+      name = "life-navigator-supabase-url"
+      replication = {
+        automatic = true
+      }
+    },
+    {
+      name = "life-navigator-supabase-service-key"
+      replication = {
+        automatic = true
+      }
+    },
+    {
+      name = "life-navigator-supabase-key"
+      replication = {
+        automatic = true
+      }
     }
   ]
 
@@ -274,6 +328,24 @@ module "secrets" {
     environment = "dev"
     managed_by  = "terraform"
   }
+}
+
+resource "google_secret_manager_secret_version" "hipaa_db_url" {
+  project     = var.project_id
+  secret      = "life-navigator-hipaa-db-url"
+  secret_data = "postgresql+asyncpg://${module.cloud_sql_hipaa.database_user}:${module.cloud_sql_hipaa.database_password}@${module.cloud_sql_hipaa.private_ip_address}/lifenavigator_hipaa"
+  depends_on = [
+    module.cloud_sql_hipaa
+  ]
+}
+
+resource "google_secret_manager_secret_version" "financial_db_url" {
+  project     = var.project_id
+  secret      = "life-navigator-financial-db-url"
+  secret_data = "postgresql+asyncpg://${module.cloud_sql_financial.database_user}:${module.cloud_sql_financial.database_password}@${module.cloud_sql_financial.private_ip_address}/lifenavigator_financial"
+  depends_on = [
+    module.cloud_sql_financial
+  ]
 }
 
 # ===========================================================================
@@ -533,14 +605,25 @@ module "external_secrets_operator" {
 # Outputs
 # ===========================================================================
 
-output "cloud_sql_connection_name" {
-  description = "Cloud SQL connection name"
-  value       = module.cloud_sql.connection_name
+output "cloud_sql_hipaa_connection_name" {
+  description = "Cloud SQL HIPAA connection name"
+  value       = module.cloud_sql_hipaa.connection_name
 }
 
-output "cloud_sql_private_ip" {
-  description = "Cloud SQL private IP"
-  value       = module.cloud_sql.private_ip_address
+output "cloud_sql_financial_connection_name" {
+  description = "Cloud SQL Financial connection name"
+  value       = module.cloud_sql_financial.connection_name
+}
+
+output "cloud_sql_hipaa_password_secret_id" {
+  description = "Cloud SQL HIPAA password secret ID"
+  value       = module.cloud_sql_hipaa.database_password_secret_id
+  sensitive   = true
+}
+
+output "cloud_sql_financial_password_secret_id" {
+  description = "Cloud SQL Financial password secret ID"
+  value       = module.cloud_sql_financial.database_password_secret_id
   sensitive   = true
 }
 

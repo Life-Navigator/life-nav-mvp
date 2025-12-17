@@ -1,0 +1,32 @@
+steps:
+  # Build the migration image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/$PROJECT_ID/life-navigator/migration-runner:latest', '.']
+
+  # Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/$PROJECT_ID/life-navigator/migration-runner:latest']
+
+  # Deploy Cloud Run Job
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'deploy'
+      - 'database-migration-runner'
+      - '--image=us-central1-docker.pkg.dev/$PROJECT_ID/life-navigator/migration-runner:latest'
+      - '--region=us-central1'
+      - '--vpc-connector=ln-vpc-connector-beta'
+      - '--vpc-egress=all-traffic'
+      - '--set-secrets=HEALTH_DATABASE_URL=health-database-url-beta:latest,FINANCE_DATABASE_URL=finance-database-url-beta:latest,CORE_DATABASE_URL=core-database-url-beta:latest'
+      - '--cpu=1'
+      - '--memory=512Mi'
+      - '--max-retries=0'
+      - '--task-timeout=600s'
+
+images:
+  - 'us-central1-docker.pkg.dev/$PROJECT_ID/life-navigator/migration-runner:latest'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

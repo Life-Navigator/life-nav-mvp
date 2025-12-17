@@ -288,5 +288,45 @@ export const addScheduledTask = (data: ScheduledTaskJobData, cron: string, optio
 export const addAIProcessingJob = (data: AIProcessingJobData, options?: JobOptions) => 
   aiProcessingQueue.add(data, options);
 
-export const addFileProcessingJob = (data: FileProcessingJobData, options?: JobOptions) => 
+export const addFileProcessingJob = (data: FileProcessingJobData, options?: JobOptions) =>
   fileProcessingQueue.add(data, options);
+
+/**
+ * Virus Scan Queue
+ */
+export interface VirusScanJobData {
+  fileId: string;
+  fileUrl: string;
+  userId: string;
+  domain: string;
+  originalFilename: string;
+  scanMode: 'sync' | 'async';
+  buffer?: number[]; // Optional for sync mode with small files
+  priority?: 'high' | 'normal' | 'low';
+}
+
+export const virusScanQueue = new QueueService<VirusScanJobData>({
+  name: 'virus-scan',
+  redis: redisConfig,
+  defaultJobOptions: {
+    attempts: 3,
+    timeout: 120000, // 2 minutes
+    backoff: {
+      type: 'exponential',
+      delay: 5000,
+    },
+    removeOnComplete: 100,
+    removeOnFail: false, // Keep failed jobs for investigation
+  },
+});
+
+/**
+ * Add virus scan job with priority handling
+ */
+export const addVirusScanJob = async (
+  data: VirusScanJobData,
+  options?: JobOptions
+) => {
+  const priority = data.priority === 'high' ? 1 : data.priority === 'low' ? 10 : 5;
+  return virusScanQueue.add(data, { ...options, priority });
+};

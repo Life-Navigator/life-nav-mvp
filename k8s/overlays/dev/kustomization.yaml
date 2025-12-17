@@ -13,7 +13,9 @@ commonLabels:
   app.kubernetes.io/version: dev
 
 images:
-- name: gcr.io/PROJECT_ID/life-navigator-backend
+- name: gcr.io/lifenav-prod/life-navigator-backend
+  newTag: dev-latest
+- name: gcr.io/lifenav-prod/finance-api
   newTag: dev-latest
 
 replicas:
@@ -76,7 +78,7 @@ patches:
   patch: |-
     - op: replace
       path: /metadata/annotations/iam.gke.io~1gcp-service-account
-      value: "api-server-dev@PROJECT_ID.iam.gserviceaccount.com"
+      value: "api-server-dev@lifenav-prod.iam.gserviceaccount.com"
 
 # Patch Ingress for dev domain
 - target:

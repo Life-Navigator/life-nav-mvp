@@ -1,0 +1,89 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Note: Using beta namespace resources from base/namespace.yaml
+resources:
+- ../../base
+
+labels:
+- pairs:
+    environment: beta
+    app.kubernetes.io/version: beta
+  includeSelectors: false
+
+# Image references pointing to Artifact Registry
+images:
+- name: gcr.io/lifenav-prod/life-navigator-backend
+  newName: us-central1-docker.pkg.dev/lifenav-prod/life-navigator/backend
+  newTag: beta
+- name: gcr.io/lifenav-prod/finance-api
+  newName: us-central1-docker.pkg.dev/lifenav-prod/life-navigator/finance-api
+  newTag: beta
+
+replicas:
+- name: backend
+  count: 2
+
+patches:
+# Patch deployment for beta environment
+- target:
+    kind: Deployment
+    name: backend
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: 500m
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: 512Mi
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: 2000m
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: 4Gi
+
+# Patch HPA for beta environment
+- target:
+    kind: HorizontalPodAutoscaler
+    name: backend
+  patch: |-
+    - op: replace
+      path: /spec/minReplicas
+      value: 2
+    - op: replace
+      path: /spec/maxReplicas
+      value: 10
+
+# Patch ConfigMap for beta environment
+- target:
+    kind: ConfigMap
+    name: backend-config
+  patch: |-
+    - op: replace
+      path: /data/ENVIRONMENT
+      value: "beta"
+    - op: replace
+      path: /data/LOG_LEVEL
+      value: "INFO"
+    - op: replace
+      path: /data/ENABLE_SWAGGER_UI
+      value: "true"
+
+# Patch ServiceAccount with beta GCP SA (Workload Identity)
+- target:
+    kind: ServiceAccount
+    name: backend
+  patch: |-
+    - op: replace
+      path: /metadata/annotations/iam.gke.io~1gcp-service-account
+      value: "ln-api-gateway-beta@lifenav-prod.iam.gserviceaccount.com"
+
+# Patch PDB for availability
+- target:
+    kind: PodDisruptionBudget
+    name: backend
+  patch: |-
+    - op: replace
+      path: /spec/minAvailable
+      value: 1

@@ -11,6 +11,36 @@ resources:
 - backend/pdb.yaml
 - backend/networkpolicy.yaml
 - backend/backendconfig.yaml
+# Finance API
+- finance-api/deployment.yaml
+- finance-api/service.yaml
+- finance-api/serviceaccount.yaml
+- finance-api/configmap.yaml
+- finance-api/hpa.yaml
+- finance-api/pdb.yaml
+- finance-api/networkpolicy.yaml
+- finance-api/pvc.yaml
+- finance-api/external-secrets.yaml
+# ClamAV Antivirus Scanner
+- clamav/deployment.yaml
+- clamav/service.yaml
+- clamav/serviceaccount.yaml
+- clamav/configmap.yaml
+- clamav/pvc.yaml
+- clamav/hpa.yaml
+- clamav/pdb.yaml
+- clamav/networkpolicy.yaml
+- clamav/servicemonitor.yaml
+- clamav/prometheusrule.yaml
+# Imgproxy Image Optimizer
+- imgproxy/deployment.yaml
+- imgproxy/service.yaml
+- imgproxy/serviceaccount.yaml
+- imgproxy/configmap.yaml
+- imgproxy/hpa.yaml
+- imgproxy/pdb.yaml
+- imgproxy/networkpolicy.yaml
+- imgproxy/backendconfig.yaml
 
 commonLabels:
   app.kubernetes.io/part-of: life-navigator

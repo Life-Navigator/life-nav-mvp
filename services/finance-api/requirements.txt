@@ -12,7 +12,7 @@ passlib[bcrypt]==1.7.4  # Secure password hashing
 python-multipart==0.0.18  # File upload security
 yfinance==0.2.33  # Market data
 pandas==2.3.3  # Latest - Performance and security
-numpy==2.3.4  # Latest - Memory safety improvements
+numpy>=1.23.2,<1.28.0  # Compatible with scipy 1.11.4
 scipy==1.11.4  # Scientific computing
 plotly==5.18.0  # Data visualization
 stripe==7.12.0  # Payment processing
@@ -35,9 +35,9 @@ python-docx==1.1.0  # DOCX parsing
 pytesseract==0.3.10  # Tesseract wrapper
 Pillow==12.0.0  # Latest - Multiple security fixes
 openpyxl==3.1.2  # Excel parsing
-opencv-python==4.8.1.78  # Image processing
+opencv-python<=4.6.0.66  # Image processing (constrained by paddleocr)
 paddleocr==2.7.3  # Self-hosted OCR (91% accuracy)
-paddlepaddle==2.6.0  # PaddleOCR framework
+paddlepaddle==2.6.2  # PaddleOCR framework (2.6.0 not available for Python 3.11+)
 transformers==4.57.1  # Latest - DeepSeek-OCR support (96% accuracy)
 torch==2.9.0  # Latest - Deep learning framework
 

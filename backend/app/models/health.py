@@ -98,6 +98,64 @@ class HealthCondition(BaseTenantModel, Base):
     notes: Mapped[str | None] = mapped_column(Text)
 
 
+class LabResultStatus(str, PyEnum):
+    """Lab result status enumeration."""
+
+    PENDING = "pending"
+    NORMAL = "normal"
+    ABNORMAL_LOW = "abnormal_low"
+    ABNORMAL_HIGH = "abnormal_high"
+    CRITICAL = "critical"
+
+
+class LabResult(BaseTenantModel, Base):
+    """
+    Lab result model.
+    Tracks laboratory test results extracted from documents or entered manually.
+    """
+
+    __tablename__ = "lab_results"
+
+    # Test details
+    test_name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    test_code: Mapped[str | None] = mapped_column(String(50))  # LOINC code
+    result_value: Mapped[str] = mapped_column(String(100), nullable=False)
+    result_unit: Mapped[str | None] = mapped_column(String(50))
+    reference_range_low: Mapped[str | None] = mapped_column(String(50))
+    reference_range_high: Mapped[str | None] = mapped_column(String(50))
+    reference_range: Mapped[str | None] = mapped_column(String(100))  # Display format
+
+    # Status
+    status: Mapped[LabResultStatus] = mapped_column(
+        Enum(LabResultStatus),
+        default=LabResultStatus.PENDING,
+        nullable=False,
+        index=True,
+    )
+
+    # Dates
+    test_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    result_date: Mapped[date | None] = mapped_column(Date)
+
+    # Provider details
+    ordering_provider: Mapped[str | None] = mapped_column(String(255))
+    performing_lab: Mapped[str | None] = mapped_column(String(255))
+
+    # Condition relationship
+    condition_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("health_conditions.id", ondelete="SET NULL"),
+        index=True,
+    )
+
+    # Source tracking
+    source: Mapped[str | None] = mapped_column(String(50))  # ocr, manual, api
+    document_id: Mapped[str | None] = mapped_column(String(255))
+
+    # Metadata
+    metadata_: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, server_default="{}")
+    notes: Mapped[str | None] = mapped_column(Text)
+
+
 class Medication(BaseTenantModel, Base):
     """
     Medication model.

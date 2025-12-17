@@ -188,6 +188,186 @@ resource "google_compute_firewall" "allow_ssh" {
   source_ranges = ["35.235.240.0/20"]
 }
 
+# ===========================================================================
+# Cloudflare-Only Origin Access
+# Restrict HTTP/HTTPS traffic to only Cloudflare IP ranges
+# ===========================================================================
+
+# Variable for enabling Cloudflare-only mode
+variable "enable_cloudflare_origin_protection" {
+  description = "Enable Cloudflare-only origin protection for HTTP/HTTPS"
+  type        = bool
+  default     = true
+}
+
+# Official Cloudflare IP ranges (Updated Dec 2024)
+# https://www.cloudflare.com/ips/
+locals {
+  # IPv4 ranges
+  cloudflare_ipv4_ranges = [
+    "173.245.48.0/20",
+    "103.21.244.0/22",
+    "103.22.200.0/22",
+    "103.31.4.0/22",
+    "141.101.64.0/18",
+    "108.162.192.0/18",
+    "190.93.240.0/20",
+    "188.114.96.0/20",
+    "197.234.240.0/22",
+    "198.41.128.0/17",
+    "162.158.0.0/15",
+    "104.16.0.0/13",
+    "104.24.0.0/14",
+    "172.64.0.0/13",
+    "131.0.72.0/22",
+  ]
+
+  # IPv6 ranges
+  cloudflare_ipv6_ranges = [
+    "2400:cb00::/32",
+    "2606:4700::/32",
+    "2803:f800::/32",
+    "2405:b500::/32",
+    "2405:8100::/32",
+    "2a06:98c0::/29",
+    "2c0f:f248::/32",
+  ]
+
+  # Combined ranges for firewall rules
+  cloudflare_all_ranges = concat(
+    local.cloudflare_ipv4_ranges,
+    local.cloudflare_ipv6_ranges
+  )
+
+  # GCP Health Check ranges (required for Load Balancers)
+  gcp_health_check_ranges = [
+    "35.191.0.0/16",
+    "130.211.0.0/22",
+  ]
+}
+
+# Allow HTTP/HTTPS only from Cloudflare IPs
+resource "google_compute_firewall" "allow_cloudflare_https" {
+  count   = var.enable_cloudflare_origin_protection ? 1 : 0
+  name    = "${var.vpc_name}-allow-cloudflare-https"
+  network = google_compute_network.vpc.id
+  project = var.project_id
+
+  description = "Allow HTTPS traffic only from Cloudflare IP ranges"
+  priority    = 900
+
+  allow {
+    protocol = "tcp"
+    ports    = ["443"]
+  }
+
+  # Note: GCP firewall rules don't support mixing IPv4 and IPv6 in the same rule
+  # Using only IPv4 ranges here; IPv6 can be added via separate rules if needed
+  source_ranges = local.cloudflare_ipv4_ranges
+
+  # Target all instances (or use target_tags for specific instances)
+  target_tags = ["web", "api", "imgproxy", "cloudflare-origin"]
+
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
+}
+
+resource "google_compute_firewall" "allow_cloudflare_http" {
+  count   = var.enable_cloudflare_origin_protection ? 1 : 0
+  name    = "${var.vpc_name}-allow-cloudflare-http"
+  network = google_compute_network.vpc.id
+  project = var.project_id
+
+  description = "Allow HTTP traffic only from Cloudflare IP ranges (for redirects)"
+  priority    = 900
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80"]
+  }
+
+  # Note: GCP firewall rules don't support mixing IPv4 and IPv6 in the same rule
+  source_ranges = local.cloudflare_ipv4_ranges
+
+  target_tags = ["web", "api", "imgproxy", "cloudflare-origin"]
+
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
+}
+
+# Allow GCP Health Checks (required for Load Balancers)
+resource "google_compute_firewall" "allow_health_checks" {
+  name    = "${var.vpc_name}-allow-health-checks"
+  network = google_compute_network.vpc.id
+  project = var.project_id
+
+  description = "Allow GCP health check probes"
+  priority    = 850
+
+  allow {
+    protocol = "tcp"
+    ports    = ["80", "443", "8080", "15021"]
+  }
+
+  source_ranges = local.gcp_health_check_ranges
+
+  target_tags = ["web", "api", "gke-node", "cloudflare-origin"]
+
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
+}
+
+# Deny all other HTTP/HTTPS from non-Cloudflare IPs
+resource "google_compute_firewall" "deny_non_cloudflare_https" {
+  count   = var.enable_cloudflare_origin_protection ? 1 : 0
+  name    = "${var.vpc_name}-deny-non-cloudflare-https"
+  network = google_compute_network.vpc.id
+  project = var.project_id
+
+  description = "Deny HTTPS from non-Cloudflare sources"
+  priority    = 1000
+
+  deny {
+    protocol = "tcp"
+    ports    = ["443"]
+  }
+
+  # This effectively denies all sources not matched by higher priority rules
+  source_ranges = ["0.0.0.0/0"]
+
+  target_tags = ["cloudflare-origin"]
+
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
+}
+
+resource "google_compute_firewall" "deny_non_cloudflare_http" {
+  count   = var.enable_cloudflare_origin_protection ? 1 : 0
+  name    = "${var.vpc_name}-deny-non-cloudflare-http"
+  network = google_compute_network.vpc.id
+  project = var.project_id
+
+  description = "Deny HTTP from non-Cloudflare sources"
+  priority    = 1000
+
+  deny {
+    protocol = "tcp"
+    ports    = ["80"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+
+  target_tags = ["cloudflare-origin"]
+
+  log_config {
+    metadata = "INCLUDE_ALL_METADATA"
+  }
+}
+
 # Private Service Connection for Cloud SQL
 resource "google_compute_global_address" "private_ip_address" {
   name          = "${var.vpc_name}-private-ip"
@@ -227,7 +407,7 @@ output "subnet_ids" {
 
 output "subnet_names" {
   description = "Subnet names as map"
-  value       = { for subnet in google_compute_subnetwork.subnets : split("-", subnet.name)[length(split("-", subnet.name))-1] => subnet.name }
+  value       = { for idx, subnet in google_compute_subnetwork.subnets : var.subnets[idx].name => subnet.name }
 }
 
 output "subnet_self_links" {

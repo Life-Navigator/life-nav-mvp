@@ -13,8 +13,12 @@ from app.api.v1.endpoints import (
     goals,
     graphrag,
     health,
+    integrations,
+    ocr,
     relationships,
+    user_sync,
     users,
+    webhooks,
 )
 
 api_router = APIRouter()
@@ -80,4 +84,32 @@ api_router.include_router(
     graphrag.router,
     prefix="/search",
     tags=["GraphRAG Search"],
+)
+
+# Integrations (Plaid, Stripe, etc.)
+api_router.include_router(
+    integrations.router,
+    prefix="/integrations",
+    tags=["Integrations"],
+)
+
+# Webhooks (Stripe, Plaid callbacks)
+api_router.include_router(
+    webhooks.router,
+    prefix="/webhooks",
+    tags=["Webhooks"],
+)
+
+# OCR processing
+api_router.include_router(
+    ocr.router,
+    prefix="/ocr",
+    tags=["OCR Processing"],
+)
+
+# User synchronization (cross-database)
+api_router.include_router(
+    user_sync.router,
+    prefix="/user-sync",
+    tags=["User Synchronization"],
 )

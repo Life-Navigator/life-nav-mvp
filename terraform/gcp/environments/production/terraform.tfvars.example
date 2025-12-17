@@ -1,0 +1,18 @@
+# ===========================================================================
+# Life Navigator - Production Environment Variables
+# ===========================================================================
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to version control
+# ===========================================================================
+
+project_id  = "lifenav-prod"
+region      = "us-central1"
+alert_email = "alerts@lifenavigator.ai"
+
+# Supabase project reference (get from Supabase dashboard after creation)
+supabase_project_ref = "your-supabase-project-ref"
+
+# Database scaling (adjust based on load)
+hipaa_db_tier     = "db-custom-2-8192"  # 2 vCPU, 8GB RAM
+financial_db_tier = "db-custom-2-8192"  # 2 vCPU, 8GB RAM
+redis_memory_gb   = 4

@@ -99,6 +99,12 @@ variable "enable_pgvector" {
   default     = true
 }
 
+variable "db_password_secret_name" {
+  description = "Name of the GCP Secret Manager secret for the database password"
+  type        = string
+  default     = null
+}
+
 # Cloud SQL Instance
 resource "google_sql_database_instance" "postgres" {
   name             = var.instance_name
@@ -236,6 +242,25 @@ resource "random_password" "db_password" {
   special = true
 }
 
+# Secret Manager for the database password (optional)
+resource "google_secret_manager_secret" "db_password_secret" {
+  count     = var.db_password_secret_name != null ? 1 : 0
+  project   = var.project_id
+  secret_id = var.db_password_secret_name
+
+  replication {
+    auto {}
+  }
+
+  labels = var.labels
+}
+
+resource "google_secret_manager_secret_version" "db_password_secret_version" {
+  count       = var.db_password_secret_name != null ? 1 : 0
+  secret      = google_secret_manager_secret.db_password_secret[0].id
+  secret_data = random_password.db_password.result
+}
+
 # Cloud Scheduler jobs for start/stop (dev/staging only)
 resource "google_cloud_scheduler_job" "start_db" {
   count = var.enable_schedule ? 1 : 0
@@ -322,6 +347,11 @@ output "private_ip_address" {
 output "instance_name" {
   description = "Instance name"
   value       = google_sql_database_instance.postgres.name
+}
+
+output "database_password_secret_id" {
+  description = "The ID of the Secret Manager secret containing the database password"
+  value       = var.db_password_secret_name != null ? google_secret_manager_secret.db_password_secret[0].id : null
 }
 
 output "database_password" {

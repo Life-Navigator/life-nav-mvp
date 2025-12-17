@@ -45,7 +45,7 @@ metadata:
     component: embeddings
 annotations:
   # Workload Identity - will be patched by Kustomize per environment
-  iam.gke.io/gcp-service-account: "maverick-dev@PROJECT_ID.iam.gserviceaccount.com"
+  iam.gke.io/gcp-service-account: "maverick-dev@lifenav-prod.iam.gserviceaccount.com"
 
 ---
 apiVersion: apps/v1

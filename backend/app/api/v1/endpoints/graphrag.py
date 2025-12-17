@@ -1,6 +1,11 @@
 """
 GraphRAG endpoints.
 Handles semantic search and RAG queries via gRPC to the GraphRAG service.
+
+Security:
+- All error messages are sanitized before returning to clients
+- Internal errors logged with full details, clients receive generic messages
+- Rate limiting applied via app-level middleware
 """
 
 from typing import Any
@@ -10,9 +15,70 @@ from pydantic import BaseModel, Field
 
 from app.api.deps import CurrentUser, TenantID
 from app.clients.graphrag import get_graphrag_client
+from app.core.config import settings
 from app.core.logging import logger
 
 router = APIRouter()
+
+
+# =============================================================================
+# Error Sanitization
+# =============================================================================
+
+class ServiceError:
+    """Sanitized error messages for external consumption."""
+
+    GRAPHRAG_UNAVAILABLE = "Knowledge graph service temporarily unavailable"
+    QUERY_FAILED = "Query processing failed. Please try again"
+    INDEX_REBUILD_FAILED = "Index rebuild request failed"
+    INDEX_STATUS_FAILED = "Unable to retrieve index status"
+    JOB_NOT_FOUND = "Job not found"
+    ACCESS_DENIED = "Access denied"
+    INVALID_REQUEST = "Invalid request parameters"
+    INTERNAL_ERROR = "An internal error occurred"
+
+
+def sanitize_error(error: Exception, context: str = "") -> str:
+    """
+    Sanitize error messages for external clients.
+
+    In production, returns generic error messages.
+    In development, includes more detail for debugging.
+
+    Args:
+        error: The exception to sanitize
+        context: Additional context for logging
+
+    Returns:
+        Safe error message for client response
+    """
+    error_msg = str(error)
+
+    # Log full error internally
+    logger.error(
+        "graphrag_error",
+        context=context,
+        error=error_msg,
+        error_type=type(error).__name__,
+    )
+
+    # In development, provide more detail
+    if settings.is_development:
+        return f"{context}: {error_msg}" if context else error_msg
+
+    # In production, return generic messages based on error type
+    error_lower = error_msg.lower()
+
+    if "connection" in error_lower or "unavailable" in error_lower:
+        return ServiceError.GRAPHRAG_UNAVAILABLE
+    elif "not found" in error_lower:
+        return ServiceError.JOB_NOT_FOUND
+    elif "access" in error_lower or "permission" in error_lower:
+        return ServiceError.ACCESS_DENIED
+    elif "invalid" in error_lower or "validation" in error_lower:
+        return ServiceError.INVALID_REQUEST
+
+    return ServiceError.INTERNAL_ERROR
 
 
 class GraphRAGQueryRequest(BaseModel):
@@ -133,15 +199,9 @@ async def search_knowledge_graph(
         return GraphRAGQueryResponse(**response)
 
     except Exception as e:
-        logger.error(
-            "GraphRAG query failed",
-            error=str(e),
-            user_id=str(current_user.id),
-            tenant_id=str(tenant_id),
-        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"GraphRAG service error: {str(e)}",
+            detail=sanitize_error(e, "GraphRAG query failed"),
         )
 
 
@@ -184,14 +244,11 @@ async def get_graphrag_status(
         return health
 
     except Exception as e:
-        logger.error(
-            "GraphRAG health check failed",
-            error=str(e),
-        )
+        sanitized = sanitize_error(e, "GraphRAG health check")
         return {
             "status": "unhealthy",
             "connected": False,
-            "error": str(e),
+            "error": sanitized,
             "services": {},
             "version": "unknown",
         }
@@ -323,14 +380,9 @@ async def rebuild_knowledge_graph_index(
         )
 
     except Exception as e:
-        logger.error(
-            "GraphRAG index rebuild failed",
-            error=str(e),
-            tenant_id=str(tenant_id),
-        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start index rebuild: {str(e)}",
+            detail=sanitize_error(e, "Index rebuild"),
         )
 
 
@@ -406,14 +458,9 @@ async def get_index_status(
             return IndexStatusResponse(**metrics, active_jobs=active_jobs)
 
     except Exception as e:
-        logger.error(
-            "GraphRAG index status failed",
-            error=str(e),
-            tenant_id=str(tenant_id),
-        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get index status: {str(e)}",
+            detail=sanitize_error(e, "Index status"),
         )
 
 
@@ -500,12 +547,7 @@ async def get_rebuild_job_status(
         raise
 
     except Exception as e:
-        logger.error(
-            "GraphRAG job status failed",
-            job_id=job_id,
-            error=str(e),
-        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get job status: {str(e)}",
+            detail=sanitize_error(e, f"Job status {job_id}"),
         )

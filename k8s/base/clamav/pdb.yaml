@@ -1,0 +1,13 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: clamav
+  labels:
+    app: clamav
+    component: antivirus
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: clamav
+      component: antivirus

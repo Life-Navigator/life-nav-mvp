@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: imgproxy-config
+  labels:
+    app: imgproxy
+    component: image-processor
+data:
+  # Presets for common transformations
+  # Format: preset_name:processing_options
+  IMGPROXY_PRESETS: |
+    avatar_thumbnail:resize:fill:48:48:ce:1/quality:80,
+    avatar_small:resize:fill:96:96:ce:1/quality:80,
+    avatar_medium:resize:fill:192:192:ce:1/quality:85,
+    avatar_large:resize:fill:384:384:ce:1/quality:90,
+    profile_hero:resize:fit:1200:400:ce:0/quality:85,
+    goal_card:resize:fill:400:300:ce:1/quality:80,
+    goal_detail:resize:fit:800:600:ce:0/quality:85,
+    achievement_badge_sm:resize:fill:64:64:ce:1/quality:85,
+    achievement_badge_md:resize:fill:128:128:ce:1/quality:85,
+    achievement_badge_lg:resize:fill:256:256:ce:1/quality:90,
+    thumbnail:resize:fill:150:150:ce:1/quality:75,
+    preview:resize:fit:600:400:ce:0/quality:80,
+    full:resize:fit:1920:1080:ce:0/quality:85,
+    og_image:resize:fill:1200:630:ce:1/quality:85,
+    mobile_hero:resize:fit:750:500:ce:0/quality:80,
+    blur_placeholder:resize:fit:32:32:ce:0/blur:10/quality:30
+
+  # Allowed source URLs (GCS buckets)
+  IMGPROXY_ALLOWED_SOURCES: "gs://lifenav-prod-avatars/,gs://lifenav-prod-goal-images/,gs://lifenav-prod-achievement-badges/,gs://lifenav-prod-public-assets/"
+
+  # Development/staging mode
+  IMGPROXY_DEVELOPMENT_ERRORS_MODE: "false"
+
+  # Signature configuration
+  IMGPROXY_SIGNATURE_SIZE: "32"
+
+  # Path style
+  IMGPROXY_PATH_PREFIX: ""
+
+  # Base URL for canonical headers
+  IMGPROXY_BASE_URL: "https://images.life-navigator.app"
+
+  # Fallback image for errors
+  IMGPROXY_FALLBACK_IMAGE_URL: "gs://lifenav-prod-public-assets/fallback/image-unavailable.png"
+  IMGPROXY_FALLBACK_IMAGE_HTTP_CODE: "200"

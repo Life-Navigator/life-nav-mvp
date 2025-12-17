@@ -1,0 +1,14 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'us-central1-docker.pkg.dev/lifenav-prod/life-navigator/finance-api:v1'
+      - '-f'
+      - 'Dockerfile.core'
+      - '.'
+
+images:
+  - 'us-central1-docker.pkg.dev/lifenav-prod/life-navigator/finance-api:v1'
+
+timeout: '1200s'

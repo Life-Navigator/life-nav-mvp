@@ -54,7 +54,7 @@ spec:
 
       containers:
         - name: migrate
-          image: gcr.io/PROJECT_ID/life-navigator-backend:latest  # Kustomize will replace
+          image: gcr.io/lifenav-prod/life-navigator-backend:latest  # Kustomize will replace
           command:
             - /bin/sh
             - -c

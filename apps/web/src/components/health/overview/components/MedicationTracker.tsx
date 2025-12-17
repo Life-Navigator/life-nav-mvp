@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { Card } from '@/components/ui/cards/Card';
 import { Button } from '@/components/ui/buttons/Button';
 import Link from 'next/link';
+import { useMedications, type Medication as APIMedication } from '@/lib/hooks/useHealthData';
 
-interface Medication {
+interface MedicationDisplay {
   id: string;
   name: string;
   dosage: string;
@@ -26,7 +27,7 @@ interface DoseLog {
 }
 
 interface MedicationData {
-  activeMedications: Medication[];
+  activeMedications: MedicationDisplay[];
   todaysDoses: DoseLog[];
   upcomingRefills: Array<{
     medicationName: string;
@@ -36,29 +37,53 @@ interface MedicationData {
 }
 
 export default function MedicationTracker() {
-  const [data, setData] = useState<MedicationData | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Fetch real medication data using React Query
+  const { data: medications, isLoading: loading } = useMedications({
+    status: 'active',
+  });
 
-  useEffect(() => {
-    const fetchMedicationData = async () => {
-      try {
-        // TODO: Implement API endpoint for fetching medication data
-        // const response = await fetch('/api/health/medications');
-        // const medicationData = await response.json();
-        // setData(medicationData);
+  // Transform API data to component format
+  const data = useMemo<MedicationData | null>(() => {
+    if (!medications || medications.length === 0) {
+      return null;
+    }
 
-        // For now, set null - will be populated when users add medication information
-        setData(null);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching medication data:', error);
-        setData(null);
-        setLoading(false);
-      }
+    const activeMedications: MedicationDisplay[] = medications.map((med) => ({
+      id: med.id,
+      name: med.medication_name,
+      dosage: med.dosage || 'N/A',
+      frequency: med.frequency || 'As directed',
+      timeOfDay: med.reminder_times?.map(t => t.toString()) || ['Morning'],
+      prescribedBy: med.prescribed_by || 'Unknown',
+      startDate: med.start_date,
+      endDate: med.end_date || undefined,
+      notes: med.notes || undefined,
+      refillRemaining: med.next_refill_date
+        ? Math.max(0, Math.ceil((new Date(med.next_refill_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+        : 30,
+    }));
+
+    // Calculate upcoming refills (medications needing refill in 14 days)
+    const upcomingRefills = activeMedications
+      .filter(med => med.refillRemaining <= 14)
+      .map(med => ({
+        medicationName: med.name,
+        daysRemaining: med.refillRemaining,
+      }));
+
+    // For now, todaysDoses is empty - would need a separate dose tracking system
+    const todaysDoses: DoseLog[] = [];
+
+    // Adherence rate - placeholder calculation (would need dose log data)
+    const adherenceRate = 95;
+
+    return {
+      activeMedications,
+      todaysDoses,
+      upcomingRefills,
+      adherenceRate,
     };
-
-    fetchMedicationData();
-  }, []);
+  }, [medications]);
 
   if (loading) {
     return (

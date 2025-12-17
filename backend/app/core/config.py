@@ -1,13 +1,24 @@
 """
 Application configuration using Pydantic Settings.
 Loads from environment variables and .env file.
+
+Security:
+- Production validation ensures no insecure defaults
+- Fails fast on startup if critical settings are missing
+- Sensitive values are never logged
 """
 
 from functools import lru_cache
 from typing import Literal
+import sys
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class ConfigurationError(Exception):
+    """Raised when configuration is invalid for the current environment."""
+    pass
 
 
 class Settings(BaseSettings):
@@ -34,8 +45,40 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Life Navigator"
     VERSION: str = "0.1.0"
 
-    # Database (PostgreSQL)
+    # ===========================================================================
+    # Database Configuration - Three-Database Isolated Architecture
+    # ===========================================================================
+    # Architecture:
+    #   - Supabase (Primary): All non-compliance data (auth, career, education, etc.)
+    #   - CloudSQL HIPAA: Isolated health/medical data (HIPAA compliant)
+    #   - CloudSQL Financial: Isolated financial data (PCI-DSS/SOX compliant)
+    # ===========================================================================
+
+    # Supabase - Primary Database (us-east-1 North Virginia)
+    # Compute: Small (2-core ARM, 4GB RAM) - scale up as needed
+    # Handles: Auth, Users, Career, Education, Goals, Relationships, Preferences
+    SUPABASE_URL: str | None = None
+    SUPABASE_KEY: str | None = None  # anon/public key
+    SUPABASE_SERVICE_KEY: str | None = None  # service_role key (admin)
+    SUPABASE_JWT_SECRET: str | None = None  # For verifying Supabase JWTs
+
+    # CloudSQL HIPAA - Isolated Health Data (us-central1)
+    # Handles: health_conditions, medications, diagnoses, treatments, health_records
+    DATABASE_HIPAA_URL: str | None = None
+    DATABASE_HIPAA_POOL_SIZE: int = 10
+    DATABASE_HIPAA_MAX_OVERFLOW: int = 5
+
+    # CloudSQL Financial - Isolated Financial Data (us-central1)
+    # Handles: financial_accounts, transactions, investments, tax_documents, plaid_connections
+    DATABASE_FINANCIAL_URL: str | None = None
+    DATABASE_FINANCIAL_POOL_SIZE: int = 10
+    DATABASE_FINANCIAL_MAX_OVERFLOW: int = 5
+
+    # Legacy DATABASE_URL - kept for backwards compatibility during migration
+    # Will be deprecated once three-database architecture is fully deployed
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/lifenavigator"
+
+    # Shared pool settings (applied to all databases)
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
     DATABASE_POOL_TIMEOUT: int = 30
@@ -149,6 +192,7 @@ class Settings(BaseSettings):
     PLAID_ENV: Literal["sandbox", "development", "production"] = "sandbox"
     PLAID_PRODUCTS: str = "auth,transactions,investments"
     PLAID_COUNTRY_CODES: str = "US,CA"
+    PLAID_WEBHOOK_SECRET: str | None = None
 
     @property
     def plaid_products_list(self) -> list[str]:
@@ -246,9 +290,180 @@ class Settings(BaseSettings):
 
     @property
     def database_url_sync(self) -> str:
-        """Get synchronous database URL (for Alembic migrations)."""
+        """Get synchronous legacy database URL (for Alembic migrations)."""
         url = str(self.DATABASE_URL)
         return url.replace("postgresql+asyncpg://", "postgresql://")
+
+    @property
+    def database_hipaa_url_sync(self) -> str | None:
+        """Get synchronous HIPAA database URL (for Alembic migrations)."""
+        if not self.DATABASE_HIPAA_URL:
+            return None
+        return self.DATABASE_HIPAA_URL.replace("postgresql+asyncpg://", "postgresql://")
+
+    @property
+    def database_financial_url_sync(self) -> str | None:
+        """Get synchronous Financial database URL (for Alembic migrations)."""
+        if not self.DATABASE_FINANCIAL_URL:
+            return None
+        return self.DATABASE_FINANCIAL_URL.replace("postgresql+asyncpg://", "postgresql://")
+
+    @property
+    def has_three_database_architecture(self) -> bool:
+        """Check if all three databases are configured."""
+        return all([
+            self.SUPABASE_URL,
+            self.SUPABASE_SERVICE_KEY,
+            self.DATABASE_HIPAA_URL,
+            self.DATABASE_FINANCIAL_URL,
+        ])
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        """
+        Validate that production/deployed environments have secure configuration.
+
+        FAILS FAST: This validator will raise ConfigurationError and prevent
+        the application from starting if critical security settings are insecure.
+        """
+        if not self.is_deployed:
+            return self
+
+        errors: list[str] = []
+
+        # =================================================================
+        # CRITICAL: These MUST be changed from defaults in production
+        # =================================================================
+
+        # Secret Key - NEVER use default in production
+        if self.SECRET_KEY == "development-secret-key-change-in-production-32chars":
+            errors.append(
+                "SECRET_KEY: Using default development key. "
+                "Set a secure random key (32+ characters) for production."
+            )
+
+        # Encryption Key - NEVER use default in production
+        if self.ENCRYPTION_KEY == "0" * 64:
+            errors.append(
+                "ENCRYPTION_KEY: Using default null key. "
+                "Generate a secure 64-character hex key for production."
+            )
+
+        # Database URL - Must not use default localhost
+        if "localhost" in self.DATABASE_URL or "password" in self.DATABASE_URL:
+            errors.append(
+                "DATABASE_URL: Contains localhost or default credentials. "
+                "Use proper cloud database URL for production."
+            )
+
+        # =================================================================
+        # THREE-DATABASE ARCHITECTURE VALIDATION (Production Only)
+        # =================================================================
+        if self.is_production:
+            # Supabase (Primary Database) - Required
+            if not self.SUPABASE_URL:
+                errors.append(
+                    "SUPABASE_URL: Not configured. "
+                    "Required for production (primary database)."
+                )
+            if not self.SUPABASE_SERVICE_KEY:
+                errors.append(
+                    "SUPABASE_SERVICE_KEY: Not configured. "
+                    "Required for production (admin operations)."
+                )
+            if not self.SUPABASE_JWT_SECRET:
+                errors.append(
+                    "SUPABASE_JWT_SECRET: Not configured. "
+                    "Required for production (JWT verification)."
+                )
+
+            # CloudSQL HIPAA Database - Required
+            if not self.DATABASE_HIPAA_URL:
+                errors.append(
+                    "DATABASE_HIPAA_URL: Not configured. "
+                    "Required for production (HIPAA-compliant health data)."
+                )
+            elif "localhost" in self.DATABASE_HIPAA_URL:
+                errors.append(
+                    "DATABASE_HIPAA_URL: Contains localhost. "
+                    "Must use CloudSQL private IP for production."
+                )
+
+            # CloudSQL Financial Database - Required
+            if not self.DATABASE_FINANCIAL_URL:
+                errors.append(
+                    "DATABASE_FINANCIAL_URL: Not configured. "
+                    "Required for production (PCI-DSS compliant financial data)."
+                )
+            elif "localhost" in self.DATABASE_FINANCIAL_URL:
+                errors.append(
+                    "DATABASE_FINANCIAL_URL: Contains localhost. "
+                    "Must use CloudSQL private IP for production."
+                )
+
+        # Redis URL - Must not use default localhost in prod
+        if self.is_production and "localhost" in self.REDIS_URL:
+            errors.append(
+                "REDIS_URL: Contains localhost. "
+                "Use proper cloud Redis URL for production."
+            )
+
+        # =================================================================
+        # WARNING: These are recommended but not strictly required
+        # =================================================================
+
+        warnings: list[str] = []
+
+        # Sentry DSN - Highly recommended for production monitoring
+        if self.is_production and not self.SENTRY_DSN:
+            warnings.append(
+                "SENTRY_DSN: Not configured. "
+                "Sentry is highly recommended for production error tracking."
+            )
+
+        # CORS Origins - Should not be wildcard in production
+        if self.is_production and "*" in self.cors_origins_list:
+            errors.append(
+                "CORS_ORIGINS: Contains wildcard (*). "
+                "Specify explicit origins for production security."
+            )
+
+        # Debug mode - Must be disabled in production
+        if self.is_production and self.DEBUG:
+            errors.append(
+                "DEBUG: Enabled in production. "
+                "Set DEBUG=false for production security."
+            )
+
+        # Email provider - Recommended for production
+        if self.is_production and not self.RESEND_API_KEY:
+            warnings.append(
+                "RESEND_API_KEY: Not configured. "
+                "Email notifications will not work."
+            )
+
+        # Log warnings (these don't prevent startup)
+        if warnings:
+            import logging
+            logger = logging.getLogger(__name__)
+            for warning in warnings:
+                logger.warning(f"[CONFIG WARNING] {warning}")
+
+        # Fail fast on critical errors
+        if errors:
+            error_msg = (
+                f"\n{'='*60}\n"
+                f"CONFIGURATION ERROR: Production environment detected\n"
+                f"The following critical settings must be fixed:\n"
+                f"{'='*60}\n"
+                + "\n".join(f"  - {e}" for e in errors)
+                + f"\n{'='*60}\n"
+                f"Application startup BLOCKED for security.\n"
+                f"{'='*60}"
+            )
+            raise ConfigurationError(error_msg)
+
+        return self
 
 
 @lru_cache

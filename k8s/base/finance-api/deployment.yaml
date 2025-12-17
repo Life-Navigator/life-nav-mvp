@@ -20,20 +20,10 @@ spec:
     spec:
       serviceAccountName: finance-api
 
-      # GPU node selector and tolerations
-      nodeSelector:
-        cloud.google.com/gke-nodepool: gpu-t4-pool
-
-      tolerations:
-      - key: nvidia.com/gpu
-        operator: Equal
-        value: present
-        effect: NoSchedule
-
       # Init container for database migrations
       initContainers:
       - name: migrations
-        image: gcr.io/PROJECT_ID/finance-api:latest
+        image: gcr.io/lifenav-prod/finance-api:latest
         command: ["alembic", "upgrade", "head"]
         env:
         - name: DATABASE_URL
@@ -51,7 +41,7 @@ spec:
 
       containers:
       - name: finance-api
-        image: gcr.io/PROJECT_ID/finance-api:latest
+        image: gcr.io/lifenav-prod/finance-api:latest
         ports:
         - containerPort: 8001
           name: http
@@ -102,13 +92,11 @@ spec:
 
         resources:
           requests:
+            cpu: 1000m
+            memory: 2Gi
+          limits:
             cpu: 2000m
             memory: 4Gi
-            nvidia.com/gpu: 1
-          limits:
-            cpu: 4000m
-            memory: 8Gi
-            nvidia.com/gpu: 1
 
         volumeMounts:
         - name: ocr-models
