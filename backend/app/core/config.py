@@ -134,6 +134,11 @@ class Settings(BaseSettings):
     DEFAULT_TENANT_ID: str | None = None
     ENABLE_TENANT_ISOLATION: bool = True
 
+    # LN-Core Multi-Agent System (ln-core-prod)
+    LN_CORE_URL: str | None = None  # e.g., https://ln-core-700579030748.us-central1.run.app
+    LN_CORE_TIMEOUT: int = 60
+    LN_CORE_MAX_RETRIES: int = 3
+
     # GraphRAG Service (Rust gRPC)
     GRAPHRAG_URL: str = "localhost:50051"
     GRAPHRAG_TIMEOUT: int = 30

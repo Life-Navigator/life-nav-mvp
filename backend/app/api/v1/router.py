@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     auth,
     career,
+    chat,
     education,
     finance,
     goals,
@@ -112,4 +113,11 @@ api_router.include_router(
     user_sync.router,
     prefix="/user-sync",
     tags=["User Synchronization"],
+)
+
+# AI Chat (ln-core multi-agent system)
+api_router.include_router(
+    chat.router,
+    prefix="/chat",
+    tags=["AI Chat"],
 )
