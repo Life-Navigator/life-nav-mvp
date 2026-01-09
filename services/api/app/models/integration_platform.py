@@ -4,7 +4,7 @@ from app.db.base_class import Base
 
 
 class IntegrationPlatform(Base):
-    """Integration platform definitions - all available platforms users can connect"""
+    """Integration platform definitions - all available platforms users can connect - uses string IDs to match Prisma"""
     __tablename__ = "integration_platforms"
 
     id = Column(String, primary_key=True, index=True)  # e.g., 'plaid', 'smartcar'

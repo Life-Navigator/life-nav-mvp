@@ -15,9 +15,8 @@ from sqlalchemy import (
     Boolean,
     Enum,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-import uuid
 import enum
 
 from app.core.database import Base
@@ -55,13 +54,13 @@ class GoalPriority(str, enum.Enum):
 
 
 class Goal(Base):
-    """Goal model"""
+    """Goal model - uses string IDs to match Prisma"""
 
     __tablename__ = "goals"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
@@ -103,13 +102,13 @@ class Goal(Base):
 
 
 class GoalMilestone(Base):
-    """Goal milestone model"""
+    """Goal milestone model - uses string IDs to match Prisma"""
 
     __tablename__ = "goal_milestones"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     goal_id = Column(
-        UUID(as_uuid=True), ForeignKey("goals.id"), nullable=False, index=True
+        String(255), ForeignKey("goals.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 

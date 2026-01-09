@@ -3,19 +3,18 @@ Resume models for AI-powered resume builder
 """
 
 from sqlalchemy import Column, String, Boolean, DateTime, Float, Integer, ForeignKey, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
-import uuid
 from app.db.base_class import Base
 
 
 class Resume(Base):
-    """User's resume document with AI-generated content"""
+    """User's resume document with AI-generated content - uses string IDs to match Prisma"""
     __tablename__ = "resumes"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    id = Column(String(255), primary_key=True)
+    user_id = Column(String(255), ForeignKey("users.id"), nullable=False)
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Basic Info
@@ -39,7 +38,7 @@ class Resume(Base):
     # Job Targeting (optional - for tailored resumes)
     target_job_title = Column(String(255), nullable=True)
     target_company = Column(String(255), nullable=True)
-    target_job_id = Column(UUID(as_uuid=True), nullable=True)  # Link to job listing if available
+    target_job_id = Column(String(255), nullable=True)  # Link to job listing if available
     target_job_description = Column(Text, nullable=True)  # Stored for re-optimization
 
     # Timestamps
@@ -53,11 +52,11 @@ class Resume(Base):
 
 
 class ResumeVersion(Base):
-    """Version history for resume changes"""
+    """Version history for resume changes - uses string IDs to match Prisma"""
     __tablename__ = "resume_versions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    resume_id = Column(UUID(as_uuid=True), ForeignKey("resumes.id"), nullable=False)
+    id = Column(String(255), primary_key=True)
+    resume_id = Column(String(255), ForeignKey("resumes.id"), nullable=False)
 
     # Version Info
     version_number = Column(Integer, nullable=False)
@@ -79,7 +78,7 @@ class ResumeVersion(Base):
 
 
 class ResumeTemplate(Base):
-    """Resume templates with different styles and layouts"""
+    """Resume templates with different styles and layouts - uses string IDs to match Prisma"""
     __tablename__ = "resume_templates"
 
     id = Column(String(100), primary_key=True)  # "modern-tech", "classic-professional", "creative-designer"

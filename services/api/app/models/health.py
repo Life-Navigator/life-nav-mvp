@@ -13,9 +13,8 @@ from sqlalchemy import (
     Boolean,
     Enum,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-import uuid
 import enum
 
 from app.core.database import Base
@@ -34,13 +33,13 @@ class RecordType(str, enum.Enum):
 
 
 class HealthRecord(Base):
-    """Health record model (FHIR-inspired)"""
+    """Health record model (FHIR-inspired) - uses string IDs to match Prisma"""
 
     __tablename__ = "health_records"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
@@ -56,7 +55,7 @@ class HealthRecord(Base):
     snomed_code = Column(String(50))  # SNOMED CT code
 
     # Provider
-    provider_id = Column(UUID(as_uuid=True), ForeignKey("health_providers.id"))
+    provider_id = Column(String(255), ForeignKey("health_providers.id"))
     provider_name = Column(String(255))
     facility_name = Column(String(255))
 
@@ -85,15 +84,15 @@ class HealthRecord(Base):
 
 
 class Medication(Base):
-    """Medication model"""
+    """Medication model - uses string IDs to match Prisma"""
 
     __tablename__ = "medications"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    health_record_id = Column(UUID(as_uuid=True), ForeignKey("health_records.id"))
+    health_record_id = Column(String(255), ForeignKey("health_records.id", ondelete="CASCADE"))
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Medication Info
@@ -138,13 +137,13 @@ class Medication(Base):
 
 
 class HealthProvider(Base):
-    """Health provider model"""
+    """Health provider model - uses string IDs to match Prisma"""
 
     __tablename__ = "health_providers"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 

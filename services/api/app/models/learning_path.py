@@ -38,7 +38,7 @@ class DifficultyLevel(str, enum.Enum):
 
 
 class LearningPath(Base):
-    """Model for curated learning paths."""
+    """Model for curated learning paths. - uses string IDs to match Prisma"""
 
     __tablename__ = "learning_paths"
 
@@ -101,7 +101,7 @@ class LearningPath(Base):
 
 
 class PathCourse(Base):
-    """Model for courses within a learning path."""
+    """Model for courses within a learning path. - uses string IDs to match Prisma"""
 
     __tablename__ = "path_courses"
 

@@ -14,9 +14,8 @@ from sqlalchemy import (
     Date,
     Enum as SQLEnum,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-import uuid
 import enum
 
 from app.core.database import Base
@@ -54,13 +53,13 @@ class ClaimStatus(str, enum.Enum):
 
 
 class HealthInsurance(Base):
-    """Health insurance model"""
+    """Health insurance model - uses string IDs to match Prisma"""
 
     __tablename__ = "health_insurance"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
@@ -137,16 +136,16 @@ class HealthInsurance(Base):
 
 
 class InsuranceClaim(Base):
-    """Insurance claim model"""
+    """Insurance claim model - uses string IDs to match Prisma"""
 
     __tablename__ = "insurance_claims"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     insurance_id = Column(
-        UUID(as_uuid=True), ForeignKey("health_insurance.id"), nullable=False
+        String(255), ForeignKey("health_insurance.id", ondelete="CASCADE"), nullable=False
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 

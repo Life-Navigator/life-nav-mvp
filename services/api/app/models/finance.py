@@ -13,9 +13,8 @@ from sqlalchemy import (
     Boolean,
     Enum,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
-import uuid
 import enum
 
 from app.core.database import Base
@@ -57,13 +56,13 @@ class InvestmentType(str, enum.Enum):
 
 
 class FinancialAccount(Base):
-    """Financial account model"""
+    """Financial account model - uses string IDs to match Prisma"""
 
     __tablename__ = "financial_accounts"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
@@ -116,17 +115,17 @@ class FinancialAccount(Base):
 
 
 class Transaction(Base):
-    """Transaction model"""
+    """Transaction model - uses string IDs to match Prisma"""
 
     __tablename__ = "transactions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     account_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("financial_accounts.id"),
+        String(255),
+        ForeignKey("financial_accounts.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
@@ -175,17 +174,17 @@ class Transaction(Base):
 
 
 class Investment(Base):
-    """Investment holding model"""
+    """Investment holding model - uses string IDs to match Prisma"""
 
     __tablename__ = "investments"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     account_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("financial_accounts.id"),
+        String(255),
+        ForeignKey("financial_accounts.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

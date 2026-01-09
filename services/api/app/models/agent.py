@@ -3,7 +3,6 @@ Agent models for AI agent system
 """
 
 from datetime import datetime
-import uuid
 import enum
 from sqlalchemy import (
     Column,
@@ -16,7 +15,7 @@ from sqlalchemy import (
     Enum as SQLEnum,
     Text,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 
 from app.core.database import Base
@@ -52,16 +51,16 @@ class TaskStatus(str, enum.Enum):
 
 
 class Agent(Base):
-    """Agent configuration and metadata"""
+    """Agent configuration and metadata - uses string IDs to match Prisma"""
 
     __tablename__ = "agents"
 
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
 
     # Multi-tenancy
     user_id = Column(
-        UUID(as_uuid=True),
+        String(255),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -110,16 +109,16 @@ class Agent(Base):
 
 
 class AgentTask(Base):
-    """Agent task execution tracking"""
+    """Agent task execution tracking - uses string IDs to match Prisma"""
 
     __tablename__ = "agent_tasks"
 
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
 
     # Multi-tenancy
     user_id = Column(
-        UUID(as_uuid=True),
+        String(255),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -128,7 +127,7 @@ class AgentTask(Base):
 
     # Agent reference
     agent_id = Column(
-        UUID(as_uuid=True),
+        String(255),
         ForeignKey("agents.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -175,16 +174,16 @@ class AgentTask(Base):
 
 
 class Conversation(Base):
-    """Agent conversation history"""
+    """Agent conversation history - uses string IDs to match Prisma"""
 
     __tablename__ = "conversations"
 
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
 
     # Multi-tenancy
     user_id = Column(
-        UUID(as_uuid=True),
+        String(255),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -193,7 +192,7 @@ class Conversation(Base):
 
     # Agent reference
     agent_id = Column(
-        UUID(as_uuid=True),
+        String(255),
         ForeignKey("agents.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -228,16 +227,16 @@ class Conversation(Base):
 
 
 class ConversationMessage(Base):
-    """Individual messages in a conversation"""
+    """Individual messages in a conversation - uses string IDs to match Prisma"""
 
     __tablename__ = "conversation_messages"
 
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
 
     # Conversation reference
     conversation_id = Column(
-        UUID(as_uuid=True),
+        String(255),
         ForeignKey("conversations.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
@@ -245,7 +244,7 @@ class ConversationMessage(Base):
 
     # Multi-tenancy (denormalized for query performance)
     user_id = Column(
-        UUID(as_uuid=True),
+        String(255),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,

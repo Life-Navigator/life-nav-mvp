@@ -58,7 +58,7 @@ class CourseDifficulty(str, enum.Enum):
 
 
 class Course(Base):
-    """Model for individual courses from various platforms."""
+    """Model for individual courses from various platforms. - uses string IDs to match Prisma"""
 
     __tablename__ = "courses"
 
@@ -140,7 +140,7 @@ class Course(Base):
 
 
 class StudySession(Base):
-    """Model for tracking individual study sessions."""
+    """Model for tracking individual study sessions. - uses string IDs to match Prisma"""
 
     __tablename__ = "study_sessions"
 

@@ -14,8 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Enum as SQLEnum,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-import uuid
+from sqlalchemy.dialects.postgresql import JSONB
 import enum
 
 from app.core.database import Base
@@ -57,13 +56,13 @@ class GigComplexity(str, enum.Enum):
 
 
 class GigListing(Base):
-    """Freelance gig listing model from external platforms"""
+    """Freelance gig listing model from external platforms - uses string IDs to match Prisma"""
 
     __tablename__ = "gig_listings"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 

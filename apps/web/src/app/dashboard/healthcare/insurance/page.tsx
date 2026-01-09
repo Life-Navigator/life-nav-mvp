@@ -1,67 +1,107 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import InsuranceCard, { HealthInsurance } from '@/components/health/InsuranceCard';
 import { PlusIcon } from '@heroicons/react/24/outline';
-
-// Mock data for demonstration
-const mockInsuranceData: HealthInsurance[] = [
-  {
-    id: '1',
-    insuranceType: 'health',
-    carrierName: 'Blue Cross Blue Shield',
-    planName: 'PPO Gold Plan',
-    memberId: 'ABC123456789',
-    groupNumber: 'GRP001234',
-    binNumber: '610014',
-    pcnNumber: 'MEDDPRIME',
-    coverageType: 'family',
-    effectiveDate: '2024-01-01',
-    monthlyPremium: 850,
-    deductibleIndividual: 2000,
-    deductibleFamily: 4000,
-    outOfPocketMaxIndividual: 6000,
-    outOfPocketMaxFamily: 12000,
-    copayPrimaryCare: 25,
-    copaySpecialist: 50,
-    copayUrgentCare: 75,
-    copayEmergencyRoom: 250,
-    networkType: 'PPO',
-    inNetwork: true,
-    primaryCarePhysician: 'Dr. John Smith',
-    pcpPhone: '(555) 123-4567',
-    customerServicePhone: '1-800-555-1234',
-    websiteUrl: 'https://www.bcbs.com',
-    policyNumber: 'POL987654',
-    employer: 'Acme Corporation',
-    notes: 'Family coverage with dental and vision riders',
-    isActive: true,
-  },
-];
+import { useAuth, getAuthHeaders } from '@/hooks/useAuth';
 
 export default function InsurancePage() {
-  const [insurancePolicies, setInsurancePolicies] = useState<HealthInsurance[]>(mockInsuranceData);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const router = useRouter();
+  const { isAuthenticated } = useAuth();
+  const [insurancePolicies, setInsurancePolicies] = useState<HealthInsurance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchInsurancePolicies();
+    }
+  }, [isAuthenticated]);
+
+  const fetchInsurancePolicies = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const headers = getAuthHeaders();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/v1/health/insurance`, { headers });
+
+      if (response.ok) {
+        const data = await response.json();
+        setInsurancePolicies(data || []);
+      } else if (response.status === 404) {
+        // No insurance policies found - not an error
+        setInsurancePolicies([]);
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Failed to load insurance policies');
+      }
+    } catch (err) {
+      console.error('Error fetching insurance policies:', err);
+      setError('Unable to connect to server. Please check your connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEdit = (id: string) => {
     // TODO: Implement edit functionality
     console.log('Edit insurance:', id);
   };
 
-  const handleDelete = (id: string) => {
-    // TODO: Implement delete functionality
-    console.log('Delete insurance:', id);
-    setInsurancePolicies(insurancePolicies.filter(ins => ins.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      const headers = getAuthHeaders();
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/v1/health/insurance/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+
+      if (response.ok) {
+        setInsurancePolicies(insurancePolicies.filter(ins => ins.id !== id));
+      } else {
+        const errorData = await response.json();
+        alert(errorData.error || 'Failed to delete insurance policy');
+      }
+    } catch (err) {
+      console.error('Error deleting insurance:', err);
+      alert('Failed to delete insurance policy');
+    }
   };
 
   const handleAddNew = () => {
-    setShowAddForm(true);
-    // TODO: Implement add new insurance form
+    router.push('/dashboard/healthcare/add');
   };
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="h-full w-full p-8">
+        <div className="max-w-7xl mx-auto flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="mt-4 text-gray-600 dark:text-gray-400">Loading insurance policies...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-full p-8">
       <div className="max-w-7xl mx-auto">
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+            <p className="text-red-800 dark:text-red-200">{error}</p>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>

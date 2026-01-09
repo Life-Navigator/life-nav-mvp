@@ -2,9 +2,9 @@
 Application configuration using Pydantic Settings
 """
 
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic_settings import BaseSettings
-from pydantic import validator
+from pydantic import validator, field_validator
 
 
 class Settings(BaseSettings):
@@ -42,18 +42,23 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:19006"]
+    CORS_ORIGINS: Union[str, List[str]] = "http://localhost:3000,http://localhost:19006"
 
     @validator("CORS_ORIGINS", pre=True)
     def parse_cors_origins(cls, v):
         if isinstance(v, str):
+            # Handle empty string
+            if not v or v.strip() == "":
+                return ["http://localhost:3000", "http://localhost:19006"]
             # Handle both comma-separated and JSON list formats
             if v.startswith("["):
                 import json
 
                 return json.loads(v)
             return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+        if isinstance(v, list):
+            return v
+        return ["http://localhost:3000", "http://localhost:19006"]
 
     # AI Services
     ANTHROPIC_API_KEY: Optional[str] = None

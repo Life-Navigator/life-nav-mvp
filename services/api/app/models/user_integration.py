@@ -1,18 +1,17 @@
 from sqlalchemy import Column, String, ForeignKey, DateTime, Text
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
-import uuid
 from app.db.base_class import Base
 
 
 class UserIntegration(Base):
-    """Track which integrations each user has connected"""
+    """Track which integrations each user has connected - uses string IDs to match Prisma"""
     __tablename__ = "user_integrations"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    platform_id = Column(String, ForeignKey("integration_platforms.id"), nullable=False)
+    id = Column(String(255), primary_key=True)
+    user_id = Column(String(255), ForeignKey("users.id"), nullable=False)
+    platform_id = Column(String(255), ForeignKey("integration_platforms.id"), nullable=False)
 
     # Connection status
     status = Column(String, default="active")  # active, needs_attention, expired, disconnected

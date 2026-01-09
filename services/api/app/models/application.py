@@ -13,8 +13,7 @@ from sqlalchemy import (
     Float,
     Integer,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-import uuid
+from sqlalchemy.dialects.postgresql import JSONB
 import enum
 
 from app.core.database import Base
@@ -46,18 +45,18 @@ class InterviewType(str, enum.Enum):
 
 
 class JobApplication(Base):
-    """Job application tracking model"""
+    """Job application tracking model - uses string IDs to match Prisma"""
 
     __tablename__ = "job_applications"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Job reference (can reference external or internal job)
-    job_listing_id = Column(UUID(as_uuid=True), ForeignKey("job_listings.id"))
+    job_listing_id = Column(String(255), ForeignKey("job_listings.id"))
     external_job_id = Column(String(255))  # External platform job ID
     job_title = Column(String(500), nullable=False)
     company = Column(String(255), nullable=False)
@@ -110,18 +109,18 @@ class JobApplication(Base):
 
 
 class GigProposal(Base):
-    """Freelance gig proposal tracking model"""
+    """Freelance gig proposal tracking model - uses string IDs to match Prisma"""
 
     __tablename__ = "gig_proposals"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Gig reference
-    gig_listing_id = Column(UUID(as_uuid=True), ForeignKey("gig_listings.id"))
+    gig_listing_id = Column(String(255), ForeignKey("gig_listings.id"))
     external_gig_id = Column(String(255))
     gig_title = Column(String(500), nullable=False)
     platform = Column(String(50), nullable=False)

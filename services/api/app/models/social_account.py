@@ -14,8 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     Enum as SQLEnum,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-import uuid
+from sqlalchemy.dialects.postgresql import JSONB
 import enum
 
 from app.core.database import Base
@@ -42,13 +41,13 @@ class ConnectionStatus(str, enum.Enum):
 
 
 class SocialAccount(Base):
-    """Social media account connection model"""
+    """Social media account connection model - uses string IDs to match Prisma"""
 
     __tablename__ = "social_accounts"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
@@ -96,13 +95,13 @@ class SocialAccount(Base):
 
 
 class SocialPost(Base):
-    """Social media post tracking for cross-posting"""
+    """Social media post tracking for cross-posting - uses string IDs to match Prisma"""
 
     __tablename__ = "social_posts"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
@@ -144,13 +143,13 @@ class SocialPost(Base):
 
 
 class NetworkConnection(Base):
-    """Professional network connections from LinkedIn"""
+    """Professional network connections from LinkedIn - uses string IDs to match Prisma"""
 
     __tablename__ = "network_connections"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 

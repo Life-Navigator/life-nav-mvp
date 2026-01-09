@@ -15,9 +15,8 @@ from sqlalchemy import (
     Boolean,
     Enum,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import relationship
-import uuid
 import enum
 
 from app.core.database import Base
@@ -44,13 +43,13 @@ class SkillLevel(str, enum.Enum):
 
 
 class CareerProfile(Base):
-    """Career profile model"""
+    """Career profile model - uses string IDs to match Prisma"""
 
     __tablename__ = "career_profiles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True),
+        String(255),
         ForeignKey("users.id"),
         nullable=False,
         unique=True,
@@ -114,16 +113,16 @@ class CareerProfile(Base):
 
 
 class JobExperience(Base):
-    """Job experience model"""
+    """Job experience model - uses string IDs to match Prisma"""
 
     __tablename__ = "job_experiences"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     profile_id = Column(
-        UUID(as_uuid=True), ForeignKey("career_profiles.id"), nullable=False, index=True
+        String(255), ForeignKey("career_profiles.id"), nullable=False, index=True
     )
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
@@ -167,16 +166,16 @@ class JobExperience(Base):
 
 
 class Skill(Base):
-    """Skill model"""
+    """Skill model - uses string IDs to match Prisma"""
 
     __tablename__ = "skills"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     profile_id = Column(
-        UUID(as_uuid=True), ForeignKey("career_profiles.id"), nullable=False, index=True
+        String(255), ForeignKey("career_profiles.id"), nullable=False, index=True
     )
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 

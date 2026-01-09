@@ -4,19 +4,18 @@ User model
 
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, Boolean, DateTime, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
-import uuid
 
 from app.core.database import Base
 
 
 class User(Base):
-    """User model"""
+    """User model - uses string IDs to match Prisma/Supabase schema"""
 
     __tablename__ = "users"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # String ID to match Prisma (cuid/ulid format)
+    id = Column(String(255), primary_key=True)
     tenant_id = Column(String(255), nullable=False, index=True)
 
     # Basic Info

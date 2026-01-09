@@ -51,7 +51,7 @@ class GoalStatus(str, enum.Enum):
 
 
 class LearningGoal(Base):
-    """Model for learning goals and planning."""
+    """Model for learning goals and planning. - uses string IDs to match Prisma"""
 
     __tablename__ = "learning_goals"
 
@@ -124,7 +124,7 @@ class LearningGoal(Base):
 
 
 class GoalProgressLog(Base):
-    """Model for tracking progress updates on learning goals."""
+    """Model for tracking progress updates on learning goals. - uses string IDs to match Prisma"""
 
     __tablename__ = "goal_progress_logs"
 

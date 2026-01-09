@@ -4,19 +4,18 @@ Email verification token model
 
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
 
 from app.core.database import Base
 
 
 class EmailVerificationToken(Base):
-    """Email verification token for user registration"""
+    """Email verification token for user registration - uses string IDs to match Prisma"""
 
     __tablename__ = "email_verification_tokens"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    id = Column(String(255), primary_key=True)
+    user_id = Column(String(255), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     token = Column(String(255), unique=True, nullable=False, index=True)
     expires_at = Column(DateTime, nullable=False)
     is_used = Column(Boolean, default=False, nullable=False)

@@ -30,7 +30,7 @@ class CredentialType(str, enum.Enum):
 
 
 class EducationCredential(Base):
-    """Model for educational credentials."""
+    """Model for educational credentials. - uses string IDs to match Prisma"""
 
     __tablename__ = "education_credentials"
 

@@ -53,7 +53,7 @@ class ProgramStatus(str, enum.Enum):
 
 
 class EducationProgram(Base):
-    """Model for long-term education programs."""
+    """Model for long-term education programs. - uses string IDs to match Prisma"""
 
     __tablename__ = "education_programs"
 
@@ -131,7 +131,7 @@ class EducationProgram(Base):
 
 
 class ProgramCourse(Base):
-    """Model for courses within an education program."""
+    """Model for courses within an education program. - uses string IDs to match Prisma"""
 
     __tablename__ = "program_courses"
 

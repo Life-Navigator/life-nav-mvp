@@ -14,9 +14,8 @@ from sqlalchemy import (
     Boolean,
     Enum,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import relationship
-import uuid
 import enum
 
 from app.core.database import Base
@@ -46,13 +45,13 @@ class CourseStatus(str, enum.Enum):
 
 
 class EducationRecord(Base):
-    """Education record model"""
+    """Education record model - uses string IDs to match Prisma"""
 
     __tablename__ = "education_records"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
@@ -109,16 +108,16 @@ class EducationRecord(Base):
 
 
 class Course(Base):
-    """Course model"""
+    """Course model - uses string IDs to match Prisma"""
 
     __tablename__ = "courses"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     education_record_id = Column(
-        UUID(as_uuid=True), ForeignKey("education_records.id"), index=True
+        String(255), ForeignKey("education_records.id"), index=True
     )
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
@@ -164,13 +163,13 @@ class Course(Base):
 
 
 class Certification(Base):
-    """Certification model"""
+    """Certification model - uses string IDs to match Prisma"""
 
     __tablename__ = "certifications"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(String(255), primary_key=True)
     user_id = Column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        String(255), ForeignKey("users.id"), nullable=False, index=True
     )
     tenant_id = Column(String(255), nullable=False, index=True)
 
