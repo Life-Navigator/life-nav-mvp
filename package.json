@@ -12,12 +12,20 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:contract": "turbo run test:contract",
+    "test:e2e": "turbo run test:e2e",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "clean": "turbo run clean && rm -rf node_modules",
     "codegen": "./scripts/codegen.sh",
-    "local-dev": "./scripts/local-dev.sh"
+    "local-dev": "./scripts/local-dev.sh",
+    "security:scan": "turbo run security:scan",
+    "security:secrets": "detect-secrets scan --baseline .secrets.baseline",
+    "db:migrate:check": "turbo run db:migrate:check",
+    "release-gate": "turbo run release-gate",
+    "pre-deploy": "pnpm run release-gate"
   },
   "devDependencies": {
     "@turbo/gen": "^1.11.0",

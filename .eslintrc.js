@@ -12,7 +12,91 @@ module.exports = {
     // Disable rules that might conflict with TypeScript
     'no-unused-vars': 'off',
     'no-undef': 'off',
+
+    // ===========================================================================
+    // DEPLOYMENT BOUNDARY ENFORCEMENT (Pre-Production Hardening)
+    // ===========================================================================
+    'no-restricted-imports': [
+      'error',
+      {
+        patterns: [
+          {
+            group: ['backend/app/**', 'backend/**'],
+            message:
+              '❌ DEPLOYMENT BOUNDARY VIOLATION: Web app cannot import server-only backend code. Use API clients from packages/api-client instead.',
+          },
+          {
+            group: ['services/**/app/**', 'services/**'],
+            message:
+              '❌ DEPLOYMENT BOUNDARY VIOLATION: Web app cannot import internal service code. Services are private and communicate via S2S JWT only.',
+          },
+          {
+            group: ['**/node_modules/@prisma/client'],
+            message:
+              '❌ SECURITY VIOLATION: Direct database access is forbidden in client code. Use API routes (/api/*) instead.',
+          },
+        ],
+      },
+    ],
+
+    // Deprecated path warnings
+    'no-restricted-syntax': [
+      'error',
+      {
+        selector: "ImportDeclaration[source.value=/services\\/api/]",
+        message:
+          '⚠️  DEPRECATED: services/api is being migrated to backend/. Use backend/app/api/v1 instead.',
+      },
+      {
+        selector: "ImportDeclaration[source.value=/pages\\/api\\/legacy/]",
+        message:
+          '⚠️  DEPRECATED: pages/api/legacy is deprecated. Use app/api routes instead.',
+      },
+      {
+        selector: "ImportDeclaration[source.value=/backend\\/app\\/api\\/v0/]",
+        message: '⚠️  DEPRECATED: API v0 is deprecated. Upgrade to v1.',
+      },
+      {
+        selector: "ImportDeclaration[source.value=/services\\/shared/]",
+        message:
+          '⚠️  DEPRECATED: services/shared is deprecated. Use packages/* instead.',
+      },
+    ],
   },
+  overrides: [
+    {
+      // Server-side code (API routes) can import backend
+      files: [
+        'apps/web/app/api/**/*.ts',
+        'apps/web/src/app/api/**/*.ts',
+        'apps/web/pages/api/**/*.ts',
+      ],
+      rules: {
+        'no-restricted-imports': 'off',
+      },
+    },
+    {
+      // Packages have stricter boundaries
+      files: ['packages/**/*.ts', 'packages/**/*.tsx'],
+      rules: {
+        'no-restricted-imports': [
+          'error',
+          {
+            patterns: [
+              {
+                group: ['apps/**'],
+                message: '❌ Shared packages cannot depend on apps (circular dependency)',
+              },
+              {
+                group: ['services/**'],
+                message: '❌ Shared packages cannot depend on services (deployment coupling)',
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
   ignorePatterns: [
     'node_modules/',
     'dist/',

@@ -30,6 +30,7 @@
       "@life-navigator/provenance": ["./packages/provenance/src"]
     }
   },
+  "files": [],
   "include": [],
   "exclude": [
     "node_modules",

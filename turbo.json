@@ -7,7 +7,7 @@
   ],
   "pipeline": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "lint", "type-check", "test:unit"],
       "outputs": [
         "dist/**",
         ".next/**",
@@ -16,15 +16,6 @@
         "*.whl",
         "*.egg-info/**",
         "target/**"
-      ],
-      "cache": true
-    },
-    "test": {
-      "dependsOn": ["build"],
-      "outputs": [
-        "coverage/**",
-        ".coverage",
-        "htmlcov/**"
       ],
       "cache": true
     },
@@ -37,12 +28,71 @@
       "cache": true,
       "outputs": []
     },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": [
+        "coverage/**",
+        ".coverage",
+        "htmlcov/**"
+      ],
+      "cache": true
+    },
+    "test:unit": {
+      "cache": true,
+      "outputs": [
+        "coverage/**",
+        ".coverage",
+        "htmlcov/**"
+      ]
+    },
+    "test:contract": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "outputs": []
+    },
+    "test:e2e": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "outputs": []
+    },
+    "security:scan": {
+      "cache": false,
+      "outputs": []
+    },
+    "security:secrets": {
+      "cache": false,
+      "outputs": []
+    },
+    "db:migrate:check": {
+      "cache": false,
+      "outputs": []
+    },
     "dev": {
       "cache": false,
       "persistent": true
     },
     "deploy": {
-      "dependsOn": ["build", "test"],
+      "dependsOn": [
+        "build",
+        "test",
+        "test:contract",
+        "security:scan",
+        "security:secrets",
+        "db:migrate:check"
+      ],
+      "cache": false,
+      "outputs": []
+    },
+    "release-gate": {
+      "dependsOn": [
+        "lint",
+        "type-check",
+        "test:unit",
+        "test:contract",
+        "security:scan",
+        "security:secrets",
+        "db:migrate:check"
+      ],
       "cache": false,
       "outputs": []
     },

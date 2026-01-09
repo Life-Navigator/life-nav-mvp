@@ -1,0 +1,35 @@
+{
+  "name": "@life-navigator/risk-client",
+  "version": "1.0.0",
+  "description": "Shared client for risk-engine API (web + mobile)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "jest",
+    "lint": "eslint src"
+  },
+  "keywords": [
+    "risk",
+    "monte-carlo",
+    "financial-planning"
+  ],
+  "author": "LifeNavigator",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "dependencies": {
+    "eventsource": "^2.0.2",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/eventsource": "^1.1.15",
+    "@types/react": "^18.2.0",
+    "typescript": "^5.3.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.0",
+    "eslint": "^8.56.0"
+  }
+}

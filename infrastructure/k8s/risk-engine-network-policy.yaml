@@ -1,0 +1,281 @@
+---
+# ===========================================================================
+# Risk Engine NetworkPolicy
+# ===========================================================================
+# Restricts inbound access to risk-engine service.
+#
+# Security Model:
+# - ONLY main backend can call risk-engine
+# - Frontend NEVER calls risk-engine directly
+# - No external access (no Ingress)
+# - Private network only
+#
+# Rationale:
+# - Data boundary enforcement (prevent PHI/PCI leakage)
+# - Service-to-service auth enforcement
+# - Reduce attack surface
+# ===========================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: risk-engine-network-policy
+  namespace: lifenav-backend
+  labels:
+    app: risk-engine
+    tier: backend-internal
+spec:
+  # Apply to risk-engine pods
+  podSelector:
+    matchLabels:
+      app: risk-engine
+
+  # Policy types
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # ===========================================================================
+  # Ingress Rules (who can call risk-engine)
+  # ===========================================================================
+  ingress:
+    # Rule 1: Allow from main backend only
+    - from:
+        - podSelector:
+            matchLabels:
+              app: lifenav-backend
+      ports:
+        - protocol: TCP
+          port: 8001 # Risk engine service port
+
+    # Rule 2: Allow from Prometheus (for metrics scraping)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 8001 # Metrics endpoint /metrics
+
+  # ===========================================================================
+  # Egress Rules (what risk-engine can call)
+  # ===========================================================================
+  egress:
+    # Rule 1: Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # Rule 2: Allow Redis (for caching)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # Rule 3: Allow external HTTP/HTTPS (for market data providers - optional)
+    # COMMENT OUT if not needed
+    # - to:
+    #     - namespaceSelector: {}
+    #   ports:
+    #     - protocol: TCP
+    #       port: 443
+
+---
+# ===========================================================================
+# Main Backend NetworkPolicy (allow outbound to risk-engine)
+# ===========================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: lifenav-backend-to-risk-engine
+  namespace: lifenav-backend
+  labels:
+    app: lifenav-backend
+spec:
+  # Apply to main backend pods
+  podSelector:
+    matchLabels:
+      app: lifenav-backend
+
+  policyTypes:
+    - Egress
+
+  # Allow main backend to call risk-engine
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: risk-engine
+      ports:
+        - protocol: TCP
+          port: 8001
+
+---
+# ===========================================================================
+# Service Definition (ClusterIP - internal only)
+# ===========================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: risk-engine
+  namespace: lifenav-backend
+  labels:
+    app: risk-engine
+    tier: backend-internal
+  annotations:
+    # Internal load balancer only
+    cloud.google.com/load-balancer-type: "Internal"
+spec:
+  type: ClusterIP # Internal only - no external access
+  selector:
+    app: risk-engine
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8001
+      targetPort: 8001
+  # Session affinity for streaming
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 300 # 5 minutes (matches stream max duration)
+
+---
+# ===========================================================================
+# Deployment (risk-engine pods)
+# ===========================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: risk-engine
+  namespace: lifenav-backend
+  labels:
+    app: risk-engine
+    tier: backend-internal
+spec:
+  replicas: 3 # Scale based on load
+  selector:
+    matchLabels:
+      app: risk-engine
+  template:
+    metadata:
+      labels:
+        app: risk-engine
+        tier: backend-internal
+    spec:
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      containers:
+        - name: risk-engine
+          image: gcr.io/life-navigator/risk-engine:latest
+          ports:
+            - containerPort: 8001
+              name: http
+              protocol: TCP
+
+          # Environment variables (from ConfigMap/Secrets)
+          env:
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: risk-engine-secrets
+                  key: redis-url
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: risk-engine-secrets
+                  key: jwt-secret
+
+            - name: LOG_LEVEL
+              value: "INFO"
+
+            - name: NUM_WORKERS
+              value: "4"
+
+          # Resource limits
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "2000m"
+
+          # Health checks
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8001
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8001
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+
+          # Security
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+---
+# ===========================================================================
+# HorizontalPodAutoscaler (auto-scaling)
+# ===========================================================================
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: risk-engine-hpa
+  namespace: lifenav-backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: risk-engine
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

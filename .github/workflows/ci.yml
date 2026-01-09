@@ -277,7 +277,90 @@ jobs:
         continue-on-error: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          
+
+  sast:
+    name: SAST (Static Analysis)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for better analysis
+
+      - name: Run Semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/python
+            p/typescript
+            p/jwt
+            p/sql-injection
+            p/xss
+          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
+          publishDeployment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
+          generateSarif: true
+
+      - name: Upload Semgrep SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: 'sast-semgrep'
+
+  secrets-scan:
+    name: Secrets Scanning
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comprehensive scan
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install detect-secrets
+        run: |
+          pip install detect-secrets==1.4.0
+
+      - name: Run detect-secrets scan
+        run: |
+          detect-secrets scan --all-files \
+            --force-use-all-plugins \
+            --exclude-files 'pnpm-lock.yaml|poetry.lock|.*\.lock|.*\.md|docs/.*' \
+            --baseline .secrets.baseline
+
+      - name: Verify secrets baseline
+        run: |
+          # Check if any new secrets were found
+          detect-secrets audit .secrets.baseline --report \
+            --fail-on-unaudited \
+            --fail-on-live \
+            --fail-on-audited-real
+
+      - name: Scan recent commits for secrets
+        if: github.event_name == 'pull_request'
+        run: |
+          # Scan commits in this PR
+          git log origin/${{ github.base_ref }}..${{ github.sha }} --pretty=format:"%H" | \
+          while read commit; do
+            echo "Scanning commit: $commit"
+            git show $commit | detect-secrets scan --string
+          done
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -366,7 +449,24 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ghcr.io/${{ github.repository }}:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'  # Fail build on CRITICAL/HIGH vulnerabilities
+          ignore-unfixed: true  # Only fail on fixable vulnerabilities
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()  # Upload even if scan fails
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'container-web-app'
+
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest

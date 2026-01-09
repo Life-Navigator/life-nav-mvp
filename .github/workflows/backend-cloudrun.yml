@@ -130,6 +130,23 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+      - name: Run Trivy vulnerability scanner on API Gateway
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/api-gateway:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-api-gateway-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy results for API Gateway
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-api-gateway-results.sarif'
+          category: 'container-api-gateway'
+
       - name: Delete existing service (clean slate)
         if: github.event_name != 'pull_request'
         run: |
@@ -223,6 +240,23 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+      - name: Run Trivy vulnerability scanner on Agent Orchestrator
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/agent-orchestrator:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-agent-orchestrator-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy results for Agent Orchestrator
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-agent-orchestrator-results.sarif'
+          category: 'container-agent-orchestrator'
+
       - name: Delete existing service (clean slate)
         if: github.event_name != 'pull_request'
         run: |
@@ -298,6 +332,23 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
         timeout-minutes: 30  # Rust builds take longer
+
+      - name: Run Trivy vulnerability scanner on GraphRAG API
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/graphrag-api:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-graphrag-api-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy results for GraphRAG API
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-graphrag-api-results.sarif'
+          category: 'container-graphrag-api'
 
       # NOTE: GraphRAG deployment is disabled until we have Neo4j and Qdrant infrastructure
       # The service requires these backends to start

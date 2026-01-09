@@ -1,0 +1,320 @@
+---
+# ===========================================================================
+# Market Data Service - Deployment
+# ===========================================================================
+# Deploys market-data microservice for normalized market snapshots
+#
+# Security:
+# - Non-root user
+# - Read-only root filesystem
+# - NetworkPolicy restricts access to backend only
+# - Service-to-service JWT auth required
+# ===========================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-data
+  namespace: lifenav-backend
+  labels:
+    app: market-data
+    tier: backend-internal
+    component: market-feeds
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: market-data
+  template:
+    metadata:
+      labels:
+        app: market-data
+        tier: backend-internal
+        component: market-feeds
+    spec:
+      # Security context
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+
+      containers:
+        - name: market-data
+          image: gcr.io/life-navigator/market-data:latest
+          ports:
+            - containerPort: 8002
+              name: http
+              protocol: TCP
+            - containerPort: 9090
+              name: metrics
+              protocol: TCP
+
+          # Environment variables
+          env:
+            - name: SERVICE_NAME
+              value: "market-data"
+
+            - name: ENVIRONMENT
+              value: "production"
+
+            - name: PORT
+              value: "8002"
+
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: market-data-secrets
+                  key: jwt-secret
+
+            - name: GCS_BUCKET_NAME
+              value: "lifenav-market-snapshots"
+
+            - name: GCS_PROJECT_ID
+              value: "life-navigator"
+
+            - name: FRED_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: market-data-secrets
+                  key: fred-api-key
+                  optional: true
+
+            - name: LOG_LEVEL
+              value: "INFO"
+
+          # Resource limits
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+
+          # Health checks
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8002
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8002
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+
+          # Security
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+---
+# ===========================================================================
+# Service (ClusterIP - internal only)
+# ===========================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-data
+  namespace: lifenav-backend
+  labels:
+    app: market-data
+    tier: backend-internal
+  annotations:
+    cloud.google.com/load-balancer-type: "Internal"
+spec:
+  type: ClusterIP  # Internal only - no external access
+  selector:
+    app: market-data
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8002
+      targetPort: 8002
+    - name: metrics
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+
+---
+# ===========================================================================
+# NetworkPolicy (restrict access)
+# ===========================================================================
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: market-data-network-policy
+  namespace: lifenav-backend
+  labels:
+    app: market-data
+spec:
+  podSelector:
+    matchLabels:
+      app: market-data
+
+  policyTypes:
+    - Ingress
+    - Egress
+
+  # Ingress: Only backend can call market-data
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: lifenav-backend
+      ports:
+        - protocol: TCP
+          port: 8002
+
+    # Allow Prometheus scraping
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+
+  # Egress: Allow DNS, external APIs (FRED, Yahoo)
+  egress:
+    # DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+    # GCS (internal GCP service)
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443
+
+    # External HTTP/HTTPS for FRED + Yahoo
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443
+
+---
+# ===========================================================================
+# HorizontalPodAutoscaler
+# ===========================================================================
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: market-data-hpa
+  namespace: lifenav-backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: market-data
+  minReplicas: 2
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+# ===========================================================================
+# ServiceMonitor (Prometheus)
+# ===========================================================================
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: market-data
+  namespace: lifenav-backend
+  labels:
+    app: market-data
+spec:
+  selector:
+    matchLabels:
+      app: market-data
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+
+---
+# ===========================================================================
+# CronJob - Daily Snapshot Build
+# ===========================================================================
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: market-snapshot-builder
+  namespace: lifenav-backend
+spec:
+  # Run daily at 6 AM UTC (after markets close + data availability)
+  schedule: "0 6 * * *"
+
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: market-snapshot-builder
+        spec:
+          restartPolicy: OnFailure
+
+          containers:
+            - name: build-trigger
+              image: curlimages/curl:latest
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  # Generate service token (simplified - use proper JWT in production)
+                  TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+
+                  # Call build endpoint
+                  curl -X POST http://market-data:8002/v1/snapshots/build \
+                    -H "Authorization: Bearer $TOKEN" \
+                    -H "Content-Type: application/json" \
+                    --fail \
+                    --max-time 300
+
+              env:
+                - name: JWT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: market-data-secrets
+                      key: jwt-secret

@@ -1,0 +1,62 @@
+# ===========================================================================
+# Pre-commit hooks for code quality and security
+# ===========================================================================
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+# ===========================================================================
+
+repos:
+  # Secrets detection - CRITICAL for HIPAA/PCI compliance
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ['--baseline', '.secrets.baseline']
+        exclude: |
+          (?x)^(
+            pnpm-lock.yaml|
+            poetry.lock|
+            package-lock.json|
+            .*\.lock|
+            .*\.md|
+            docs/.*|
+            .*/test.*|
+            .*/.*_test\..*
+          )$
+
+  # General code quality hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: .*\.md$
+      - id: end-of-file-fixer
+        exclude: .*\.md$
+      - id: check-yaml
+        args: ['--allow-multiple-documents']
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: detect-private-key
+        exclude: |
+          (?x)^(
+            .*/test.*|
+            .*/fixtures/.*
+          )$
+      - id: check-merge-conflict
+      - id: check-case-conflict
+
+  # Python-specific hooks
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3.12
+        files: ^(backend|services)/.*\.py$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^(backend|services)/.*\.py$

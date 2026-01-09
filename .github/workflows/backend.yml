@@ -218,6 +218,23 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+      - name: Run Trivy vulnerability scanner on backend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.GCR_REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE_NAME }}:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-backend-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'  # Fail build on CRITICAL/HIGH vulnerabilities
+          ignore-unfixed: true  # Only fail on fixable vulnerabilities
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-backend-results.sarif'
+          category: 'container-backend'
+
   # ===========================================================================
   # Deploy to GKE
   # ===========================================================================
