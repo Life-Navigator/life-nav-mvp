@@ -15,7 +15,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
 
 interface BackendUserInfo {
   backendUserId: string;
@@ -46,7 +46,10 @@ const SYNC_CACHE_KEY = 'user-sync';
  * Hook to manage user synchronization across databases.
  */
 export function useUserSync(): UserSyncResult {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   const queryClient = useQueryClient();
   const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);

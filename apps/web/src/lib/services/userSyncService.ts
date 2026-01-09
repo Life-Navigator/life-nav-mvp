@@ -9,7 +9,7 @@
  * Ensures seamless UX by maintaining consistent user records across all databases.
  */
 
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createBrowserClient } from '@supabase/ssr';
 import { db as prisma } from '@/lib/db';
 import { hashPassword } from '@/lib/utils/password';
 
@@ -205,7 +205,10 @@ async function createPrismaUser(
 export async function registerUserWithSync(
   input: CreateUserInput
 ): Promise<SyncedUser> {
-  const supabase = createClientComponentClient();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   // Step 1: Create user in Supabase
   const { data: authData, error: authError } = await supabase.auth.signUp({
