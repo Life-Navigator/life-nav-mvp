@@ -187,3 +187,6 @@ export function useToastActions() {
     },
   };
 }
+
+// Re-export as 'toast' for convenience - this is a hook and must follow React hooks rules
+export { useToastActions as toast };

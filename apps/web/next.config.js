@@ -27,14 +27,9 @@ const nextConfig = {
   serverExternalPackages: [
     'bcrypt',
     'crypto',
-    '@prisma/client'
+    '@prisma/client',
+    'bull'
   ],
-  // Disable ESLint during build (Next.js 16 way)
-  experimental: {
-    turbo: {
-      rules: {},
-    },
-  },
 };
 
 module.exports = nextConfig;
