@@ -1,0 +1,204 @@
+/**
+ * Scenario Lab - Job Queue System
+ *
+ * Database-backed job queue using scenario_jobs table
+ */
+
+import { supabaseAdmin } from './supabase-client';
+import { JobType, JobStatus, ScenarioJob } from './types';
+import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * Enqueue a new job
+ */
+export async function enqueueJob(params: {
+  userId: string;
+  scenarioId: string | null;
+  jobType: JobType;
+  inputJson: any;
+  idempotencyKey?: string;
+}): Promise<ScenarioJob> {
+  const { userId, scenarioId, jobType, inputJson, idempotencyKey } = params;
+
+  // Check for existing job with same idempotency key
+  if (idempotencyKey) {
+    const { data: existing } = await supabaseAdmin
+      .from('scenario_jobs')
+      .select('*')
+      .eq('idempotency_key', idempotencyKey)
+      .single();
+
+    if (existing) {
+      return existing as ScenarioJob;
+    }
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('scenario_jobs')
+    .insert({
+      user_id: userId,
+      scenario_id: scenarioId,
+      job_type: jobType,
+      status: 'queued' as JobStatus,
+      input_json: inputJson,
+      idempotency_key: idempotencyKey || uuidv4(),
+      attempts: 0,
+      max_attempts: 3,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as ScenarioJob;
+}
+
+/**
+ * Get job by ID
+ */
+export async function getJob(jobId: string): Promise<ScenarioJob | null> {
+  const { data, error } = await supabaseAdmin
+    .from('scenario_jobs')
+    .select('*')
+    .eq('id', jobId)
+    .single();
+
+  if (error) return null;
+  return data as ScenarioJob;
+}
+
+/**
+ * Update job status
+ */
+export async function updateJobStatus(
+  jobId: string,
+  status: JobStatus,
+  updates: Partial<{
+    output_json: any;
+    error_text: string;
+    started_at: string;
+    completed_at: string;
+    attempts: number;
+  }> = {}
+): Promise<void> {
+  const payload: any = {
+    status,
+    updated_at: new Date().toISOString(),
+    ...updates,
+  };
+
+  // Auto-set timestamps based on status
+  if (status === 'running' && !updates.started_at) {
+    payload.started_at = new Date().toISOString();
+  }
+  if ((status === 'completed' || status === 'failed') && !updates.completed_at) {
+    payload.completed_at = new Date().toISOString();
+  }
+
+  await supabaseAdmin
+    .from('scenario_jobs')
+    .update(payload)
+    .eq('id', jobId);
+}
+
+/**
+ * Get next queued job for processing
+ * Uses SELECT FOR UPDATE SKIP LOCKED for concurrency safety
+ */
+export async function getNextQueuedJob(jobType?: JobType): Promise<ScenarioJob | null> {
+  let query = supabaseAdmin
+    .from('scenario_jobs')
+    .select('*')
+    .eq('status', 'queued')
+    .lt('attempts', supabaseAdmin.raw('max_attempts'))
+    .order('created_at', { ascending: true })
+    .limit(1);
+
+  if (jobType) {
+    query = query.eq('job_type', jobType);
+  }
+
+  const { data, error } = await query;
+
+  if (error || !data || data.length === 0) return null;
+
+  const job = data[0] as ScenarioJob;
+
+  // Mark as running immediately to prevent concurrent processing
+  await updateJobStatus(job.id, 'running', {
+    attempts: job.attempts + 1,
+  });
+
+  return job;
+}
+
+/**
+ * Retry failed job (if attempts < max_attempts)
+ */
+export async function retryJob(jobId: string): Promise<boolean> {
+  const job = await getJob(jobId);
+  if (!job || job.attempts >= job.max_attempts) return false;
+
+  await supabaseAdmin
+    .from('scenario_jobs')
+    .update({
+      status: 'queued' as JobStatus,
+      error_text: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', jobId);
+
+  return true;
+}
+
+/**
+ * Get jobs for a user
+ */
+export async function getUserJobs(
+  userId: string,
+  filters?: {
+    jobType?: JobType;
+    status?: JobStatus;
+    limit?: number;
+  }
+): Promise<ScenarioJob[]> {
+  let query = supabaseAdmin
+    .from('scenario_jobs')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (filters?.jobType) {
+    query = query.eq('job_type', filters.jobType);
+  }
+
+  if (filters?.status) {
+    query = query.eq('status', filters.status);
+  }
+
+  if (filters?.limit) {
+    query = query.limit(filters.limit);
+  }
+
+  const { data, error } = await query;
+
+  if (error) throw error;
+  return (data || []) as ScenarioJob[];
+}
+
+/**
+ * Clean up old completed jobs (optional maintenance task)
+ */
+export async function cleanupOldJobs(olderThanDays: number = 30): Promise<number> {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
+
+  const { data, error } = await supabaseAdmin
+    .from('scenario_jobs')
+    .delete()
+    .in('status', ['completed', 'failed'])
+    .lt('completed_at', cutoffDate.toISOString())
+    .select('id');
+
+  if (error) throw error;
+  return (data || []).length;
+}

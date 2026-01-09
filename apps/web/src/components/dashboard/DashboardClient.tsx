@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/ui/loaders/LoadingSpinner';
 import AddDataModal from '@/components/dashboard/AddDataModal';
+import PinnedScenarioWidget from '@/components/scenario-lab/PinnedScenarioWidget';
 
 interface DashboardData {
   financial: {
@@ -360,6 +361,11 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
               </Link>
             ))}
           </div>
+        </div>
+
+        {/* Pinned Scenario Widget */}
+        <div className="mb-8">
+          <PinnedScenarioWidget />
         </div>
 
         {/* Metric Cards - 2x2 Grid */}
