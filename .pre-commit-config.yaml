@@ -24,6 +24,16 @@ repos:
             .*/.*_test\..*
           )$
 
+  # Block .env files (except .env.example) - CRITICAL for production safety
+  - repo: local
+    hooks:
+      - id: block-env-files
+        name: Block .env files (production safety)
+        entry: bash -c 'if git diff --cached --name-only --diff-filter=ACM | grep -E "\.env($|\.)" | grep -v "\.env\.example$"; then echo "❌ ERROR: .env files cannot be committed (except .env.example)"; echo "Production uses environment variables from GCP Secret Manager / Vercel"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
   # General code quality hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0

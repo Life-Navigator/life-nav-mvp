@@ -26,6 +26,7 @@ from app.core.database import check_db_health, close_db, init_db
 from app.core.logging import configure_logging, logger
 from app.core.redis import close_redis
 from app.core.telemetry import init_telemetry, instrument_fastapi, shutdown_telemetry
+from app.middleware.data_boundary import data_boundary_validator_middleware
 
 # Configure logging at import time
 configure_logging()
@@ -169,6 +170,12 @@ if settings.is_production:
             "*.run.app",  # Cloud Run URLs
         ],
     )
+
+# Data boundary enforcement (blocks PHI/PCI at gateway)
+# Applied to all deployed environments (staging, beta, production)
+if settings.is_deployed:
+    app.middleware("http")(data_boundary_validator_middleware)
+    logger.info("Data boundary enforcement enabled")
 
 
 # =============================================================================

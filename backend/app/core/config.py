@@ -1,16 +1,21 @@
 """
-Application configuration using Pydantic Settings.
-Loads from environment variables and .env file.
+Production-Safe Configuration Loader.
 
-Security:
-- Production validation ensures no insecure defaults
-- Fails fast on startup if critical settings are missing
-- Sensitive values are never logged
+This module provides a strict configuration system for production deployments:
+- NO .env files in production runtime
+- GCP Secret Manager integration (optional)
+- Fail-fast validation
+- Never logs secrets
+
+Usage:
+    from app.core.config_production import get_settings
+    settings = get_settings()
 """
 
-from functools import lru_cache
-from typing import Literal
+import os
 import sys
+from functools import lru_cache
+from typing import Literal, Optional
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,23 +23,88 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class ConfigurationError(Exception):
     """Raised when configuration is invalid for the current environment."""
+
     pass
 
 
+class GCPSecretManagerAdapter:
+    """
+    Adapter for fetching secrets from GCP Secret Manager.
+
+    Only used in GCP runtime (Cloud Run, GKE).
+    Local development does NOT fetch from GCP.
+    """
+
+    def __init__(self):
+        self.client = None
+        self.project_id = os.getenv("GCP_PROJECT_ID")
+
+    def get_secret(self, secret_name: str, version: str = "latest") -> Optional[str]:
+        """
+        Fetch secret from GCP Secret Manager.
+
+        Args:
+            secret_name: Name of the secret
+            version: Version ID (default: "latest")
+
+        Returns:
+            Secret value or None if not found
+        """
+        if not self.project_id:
+            return None
+
+        try:
+            if self.client is None:
+                from google.cloud import secretmanager
+
+                self.client = secretmanager.SecretManagerServiceClient()
+
+            name = f"projects/{self.project_id}/secrets/{secret_name}/versions/{version}"
+            response = self.client.access_secret_version(request={"name": name})
+            return response.payload.data.decode("UTF-8")
+        except Exception as e:
+            # Don't fail startup if secret is optional
+            import structlog
+
+            logger = structlog.get_logger()
+            logger.warning(
+                "gcp_secret_fetch_failed",
+                secret=secret_name,
+                error=str(e),
+            )
+            return None
+
+
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """
+    Application settings loaded from environment variables.
+
+    Production behavior:
+    - NEVER reads .env files
+    - Fetches from environment variables (set by Cloud Run, Vercel, etc.)
+    - Optionally fetches from GCP Secret Manager if USE_GCP_SECRET_MANAGER=true
+    - Fails fast if critical secrets are missing or insecure
+    """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # CRITICAL: Do NOT load .env in production
+        env_file=".env.local" if os.getenv("ENVIRONMENT", "development") == "development" else None,
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="ignore",
+        extra="forbid",  # Reject unknown environment variables
     )
 
     # Environment
     ENVIRONMENT: Literal["development", "staging", "beta", "production"] = "development"
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
+
+    # GCP Secret Manager (optional)
+    USE_GCP_SECRET_MANAGER: bool = Field(
+        default=False,
+        description="Fetch secrets from GCP Secret Manager instead of environment variables",
+    )
+    GCP_PROJECT_ID: Optional[str] = None
 
     # API Server
     API_HOST: str = "0.0.0.0"
@@ -48,37 +118,27 @@ class Settings(BaseSettings):
     # ===========================================================================
     # Database Configuration - Three-Database Isolated Architecture
     # ===========================================================================
-    # Architecture:
-    #   - Supabase (Primary): All non-compliance data (auth, career, education, etc.)
-    #   - CloudSQL HIPAA: Isolated health/medical data (HIPAA compliant)
-    #   - CloudSQL Financial: Isolated financial data (PCI-DSS/SOX compliant)
-    # ===========================================================================
 
-    # Supabase - Primary Database (us-east-1 North Virginia)
-    # Compute: Small (2-core ARM, 4GB RAM) - scale up as needed
-    # Handles: Auth, Users, Career, Education, Goals, Relationships, Preferences
-    SUPABASE_URL: str | None = None
-    SUPABASE_KEY: str | None = None  # anon/public key
-    SUPABASE_SERVICE_KEY: str | None = None  # service_role key (admin)
-    SUPABASE_JWT_SECRET: str | None = None  # For verifying Supabase JWTs
+    # Supabase - Primary Database
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_KEY: Optional[str] = None
+    SUPABASE_SERVICE_KEY: Optional[str] = None
+    SUPABASE_JWT_SECRET: Optional[str] = None
 
-    # CloudSQL HIPAA - Isolated Health Data (us-central1)
-    # Handles: health_conditions, medications, diagnoses, treatments, health_records
-    DATABASE_HIPAA_URL: str | None = None
+    # CloudSQL HIPAA - Isolated Health Data
+    DATABASE_HIPAA_URL: Optional[str] = None
     DATABASE_HIPAA_POOL_SIZE: int = 10
     DATABASE_HIPAA_MAX_OVERFLOW: int = 5
 
-    # CloudSQL Financial - Isolated Financial Data (us-central1)
-    # Handles: financial_accounts, transactions, investments, tax_documents, plaid_connections
-    DATABASE_FINANCIAL_URL: str | None = None
+    # CloudSQL Financial - Isolated Financial Data
+    DATABASE_FINANCIAL_URL: Optional[str] = None
     DATABASE_FINANCIAL_POOL_SIZE: int = 10
     DATABASE_FINANCIAL_MAX_OVERFLOW: int = 5
 
-    # Legacy DATABASE_URL - kept for backwards compatibility during migration
-    # Will be deprecated once three-database architecture is fully deployed
+    # Legacy DATABASE_URL (migration compatibility)
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/lifenavigator"
 
-    # Shared pool settings (applied to all databases)
+    # Shared pool settings
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
     DATABASE_POOL_TIMEOUT: int = 30
@@ -89,13 +149,23 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_MAX_CONNECTIONS: int = 50
 
-    # Security
-    SECRET_KEY: str = Field(default="development-secret-key-change-in-production-32chars")
+    # Security (CRITICAL)
+    SECRET_KEY: str = Field(
+        default="INSECURE-CHANGE-IN-PRODUCTION",
+        min_length=32,
+        description="JWT signing key (64-char hex recommended)",
+    )
+    ENCRYPTION_KEY: str = Field(
+        default="0" * 64,
+        min_length=64,
+        max_length=64,
+        description="Field-level encryption key (64-char hex)",
+    )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
-    # CORS - Use str type to avoid pydantic-settings JSON parsing issues
+    # CORS
     CORS_ORIGINS: str = "http://localhost:3000"
     CORS_CREDENTIALS: bool = True
     CORS_METHODS: str = "GET,POST,PUT,DELETE,PATCH,OPTIONS"
@@ -106,145 +176,119 @@ class Settings(BaseSettings):
         """Parse CORS_ORIGINS string into list."""
         if not self.CORS_ORIGINS:
             return ["http://localhost:3000"]
-        # Handle JSON array format
         if self.CORS_ORIGINS.startswith("["):
             import json
+
             try:
                 return json.loads(self.CORS_ORIGINS)
             except json.JSONDecodeError:
                 pass
-        # Handle comma-separated format
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
     @property
     def cors_methods_list(self) -> list[str]:
-        """Parse CORS_METHODS string into list."""
-        if not self.CORS_METHODS:
-            return ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
-        return [method.strip() for method in self.CORS_METHODS.split(",") if method.strip()]
+        return [m.strip() for m in self.CORS_METHODS.split(",") if m.strip()]
 
     @property
     def cors_headers_list(self) -> list[str]:
-        """Parse CORS_HEADERS string into list."""
-        if not self.CORS_HEADERS:
-            return ["Content-Type", "Authorization", "Accept", "Origin", "User-Agent", "X-Requested-With", "X-Tenant-ID"]
-        return [header.strip() for header in self.CORS_HEADERS.split(",") if header.strip()]
+        return [h.strip() for h in self.CORS_HEADERS.split(",") if h.strip()]
 
     # Multi-tenancy
-    DEFAULT_TENANT_ID: str | None = None
+    DEFAULT_TENANT_ID: Optional[str] = None
     ENABLE_TENANT_ISOLATION: bool = True
 
-    # LN-Core Multi-Agent System (ln-core-prod)
-    LN_CORE_URL: str | None = None  # e.g., https://ln-core-700579030748.us-central1.run.app
+    # External Services
+    LN_CORE_URL: Optional[str] = None
     LN_CORE_TIMEOUT: int = 60
     LN_CORE_MAX_RETRIES: int = 3
 
-    # GraphRAG Service (Rust gRPC)
     GRAPHRAG_URL: str = "localhost:50051"
     GRAPHRAG_TIMEOUT: int = 30
     GRAPHRAG_MAX_RETRIES: int = 3
 
-    # Neo4j Knowledge Graph
     NEO4J_URI: str = "bolt://localhost:7687"
     NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str | None = None  # Optional for beta without graph features
+    NEO4J_PASSWORD: Optional[str] = None
     NEO4J_DATABASE: str = "neo4j"
 
-    # Qdrant Vector Database
     QDRANT_URL: str = "http://localhost:6333"
-    QDRANT_API_KEY: str | None = None
+    QDRANT_API_KEY: Optional[str] = None
     QDRANT_COLLECTION: str = "life_navigator"
 
-    # GraphDB Semantic Store
     GRAPHDB_URL: str = "http://localhost:7200"
     GRAPHDB_REPOSITORY: str = "life-navigator"
     GRAPHDB_USERNAME: str = "admin"
-    GRAPHDB_PASSWORD: str | None = None
+    GRAPHDB_PASSWORD: Optional[str] = None
 
-    # Email (Resend - Modern transactional email API)
-    RESEND_API_KEY: str | None = None
+    # Email & SMS
+    RESEND_API_KEY: Optional[str] = None
     EMAIL_FROM: str = "Life Navigator <noreply@lifenavigator.ai>"
-    FRONTEND_URL: str = "http://localhost:3000"  # For email verification links
+    FRONTEND_URL: str = "http://localhost:3000"
 
-    # SMS (Twilio)
-    TWILIO_ACCOUNT_SID: str | None = None
-    TWILIO_AUTH_TOKEN: str | None = None
-    TWILIO_FROM_NUMBER: str | None = None
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_FROM_NUMBER: Optional[str] = None
 
     # Storage
     STORAGE_PROVIDER: Literal["local", "gcs", "s3"] = "local"
-    GCS_BUCKET_NAME: str | None = None
-    GCS_PROJECT_ID: str | None = None
-    S3_BUCKET_NAME: str | None = None
+    GCS_BUCKET_NAME: Optional[str] = None
+    S3_BUCKET_NAME: Optional[str] = None
     S3_REGION: str = "us-east-1"
-    AWS_ACCESS_KEY_ID: str | None = None
-    AWS_SECRET_ACCESS_KEY: str | None = None
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
 
-    # File Upload
     MAX_UPLOAD_SIZE: int = 10485760  # 10MB
     ALLOWED_EXTENSIONS: str = "jpg,jpeg,png,pdf,doc,docx"
 
     @property
     def allowed_extensions_list(self) -> list[str]:
-        """Parse ALLOWED_EXTENSIONS string into list."""
-        if not self.ALLOWED_EXTENSIONS:
-            return ["jpg", "jpeg", "png", "pdf", "doc", "docx"]
-        return [ext.strip() for ext in self.ALLOWED_EXTENSIONS.split(",") if ext.strip()]
+        return [e.strip() for e in self.ALLOWED_EXTENSIONS.split(",") if e.strip()]
 
-    # Plaid (Finance Integration)
-    PLAID_CLIENT_ID: str | None = None
-    PLAID_SECRET: str | None = None
+    # Plaid
+    PLAID_CLIENT_ID: Optional[str] = None
+    PLAID_SECRET: Optional[str] = None
     PLAID_ENV: Literal["sandbox", "development", "production"] = "sandbox"
     PLAID_PRODUCTS: str = "auth,transactions,investments"
     PLAID_COUNTRY_CODES: str = "US,CA"
-    PLAID_WEBHOOK_SECRET: str | None = None
+    PLAID_WEBHOOK_SECRET: Optional[str] = None
 
     @property
     def plaid_products_list(self) -> list[str]:
-        """Parse PLAID_PRODUCTS string into list."""
-        if not self.PLAID_PRODUCTS:
-            return ["auth", "transactions", "investments"]
         return [p.strip() for p in self.PLAID_PRODUCTS.split(",") if p.strip()]
 
     @property
     def plaid_country_codes_list(self) -> list[str]:
-        """Parse PLAID_COUNTRY_CODES string into list."""
-        if not self.PLAID_COUNTRY_CODES:
-            return ["US", "CA"]
         return [c.strip() for c in self.PLAID_COUNTRY_CODES.split(",") if c.strip()]
 
-    # Stripe (Payments)
-    STRIPE_API_KEY: str | None = None
-    STRIPE_WEBHOOK_SECRET: str | None = None
-    STRIPE_PRICE_ID_BASIC: str | None = None
-    STRIPE_PRICE_ID_PRO: str | None = None
-    STRIPE_PRICE_ID_ENTERPRISE: str | None = None
+    # Stripe
+    STRIPE_API_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
+    STRIPE_PRICE_ID_BASIC: Optional[str] = None
+    STRIPE_PRICE_ID_PRO: Optional[str] = None
+    STRIPE_PRICE_ID_ENTERPRISE: Optional[str] = None
 
-    # OAuth Providers
-    GOOGLE_CLIENT_ID: str | None = None
-    GOOGLE_CLIENT_SECRET: str | None = None
-    MICROSOFT_CLIENT_ID: str | None = None
-    MICROSOFT_CLIENT_SECRET: str | None = None
-    APPLE_CLIENT_ID: str | None = None
-    APPLE_CLIENT_SECRET: str | None = None
+    # OAuth
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    MICROSOFT_CLIENT_ID: Optional[str] = None
+    MICROSOFT_CLIENT_SECRET: Optional[str] = None
+    APPLE_CLIENT_ID: Optional[str] = None
+    APPLE_CLIENT_SECRET: Optional[str] = None
 
-    # OpenAI (for embeddings and LLM)
-    OPENAI_API_KEY: str | None = None
-    OPENAI_MODEL: str = "gpt-4-turbo-preview"
-    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+    # Embeddings Provider (NO OPENAI in production)
+    EMBEDDINGS_PROVIDER: Literal["graphrag", "null"] = "graphrag"
 
-    # Monitoring (Sentry)
-    SENTRY_DSN: str | None = None
+    # Monitoring
+    SENTRY_DSN: Optional[str] = None
     SENTRY_ENVIRONMENT: str = "development"
     SENTRY_TRACES_SAMPLE_RATE: float = 1.0
 
-    # OpenTelemetry
     OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://localhost:4317"
     OTEL_SERVICE_NAME: str = "life-navigator-backend"
     OTEL_TRACES_ENABLED: bool = True
     OTEL_METRICS_ENABLED: bool = True
 
-    # Celery (Background Tasks)
+    # Celery
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
     CELERY_TASK_ALWAYS_EAGER: bool = False
@@ -264,72 +308,60 @@ class Settings(BaseSettings):
     # HIPAA Compliance
     ENABLE_AUDIT_LOGGING: bool = True
     DATA_RETENTION_DAYS: int = 2555  # 7 years
-
-    # Field-Level Encryption (AES-256-GCM with envelope encryption)
-    ENCRYPTION_KEY: str = Field(
-        default="0" * 64, min_length=64, max_length=64
-    )  # 64-char hex (32 bytes)
-    ENCRYPTION_ENABLED: bool = True
     ENABLE_ENCRYPTION_AT_REST: bool = True
     REQUIRE_MFA_FOR_HEALTH_DATA: bool = True
+    ENCRYPTION_ENABLED: bool = True
 
+    # Computed properties
     @property
     def is_production(self) -> bool:
-        """Check if running in production environment."""
         return self.ENVIRONMENT == "production"
 
     @property
     def is_beta(self) -> bool:
-        """Check if running in beta environment."""
         return self.ENVIRONMENT == "beta"
 
     @property
     def is_development(self) -> bool:
-        """Check if running in development environment."""
         return self.ENVIRONMENT == "development"
 
     @property
     def is_deployed(self) -> bool:
-        """Check if running in a deployed environment (beta or production)."""
         return self.ENVIRONMENT in ("beta", "staging", "production")
 
     @property
     def database_url_sync(self) -> str:
-        """Get synchronous legacy database URL (for Alembic migrations)."""
-        url = str(self.DATABASE_URL)
-        return url.replace("postgresql+asyncpg://", "postgresql://")
+        return str(self.DATABASE_URL).replace("postgresql+asyncpg://", "postgresql://")
 
     @property
-    def database_hipaa_url_sync(self) -> str | None:
-        """Get synchronous HIPAA database URL (for Alembic migrations)."""
+    def database_hipaa_url_sync(self) -> Optional[str]:
         if not self.DATABASE_HIPAA_URL:
             return None
         return self.DATABASE_HIPAA_URL.replace("postgresql+asyncpg://", "postgresql://")
 
     @property
-    def database_financial_url_sync(self) -> str | None:
-        """Get synchronous Financial database URL (for Alembic migrations)."""
+    def database_financial_url_sync(self) -> Optional[str]:
         if not self.DATABASE_FINANCIAL_URL:
             return None
         return self.DATABASE_FINANCIAL_URL.replace("postgresql+asyncpg://", "postgresql://")
 
     @property
     def has_three_database_architecture(self) -> bool:
-        """Check if all three databases are configured."""
-        return all([
-            self.SUPABASE_URL,
-            self.SUPABASE_SERVICE_KEY,
-            self.DATABASE_HIPAA_URL,
-            self.DATABASE_FINANCIAL_URL,
-        ])
+        return all(
+            [
+                self.SUPABASE_URL,
+                self.SUPABASE_SERVICE_KEY,
+                self.DATABASE_HIPAA_URL,
+                self.DATABASE_FINANCIAL_URL,
+            ]
+        )
 
     @model_validator(mode="after")
     def validate_production_settings(self) -> "Settings":
         """
-        Validate that production/deployed environments have secure configuration.
+        Validate production/deployed environments have secure configuration.
 
-        FAILS FAST: This validator will raise ConfigurationError and prevent
-        the application from starting if critical security settings are insecure.
+        FAILS FAST: Prevents application startup if critical settings are insecure.
         """
         if not self.is_deployed:
             return self
@@ -337,136 +369,105 @@ class Settings(BaseSettings):
         errors: list[str] = []
 
         # =================================================================
-        # CRITICAL: These MUST be changed from defaults in production
+        # CRITICAL: Must be changed from defaults
         # =================================================================
 
-        # Secret Key - NEVER use default in production
-        if self.SECRET_KEY == "development-secret-key-change-in-production-32chars":
+        # Secret Key
+        if self.SECRET_KEY == "INSECURE-CHANGE-IN-PRODUCTION" or len(self.SECRET_KEY) < 32:
             errors.append(
-                "SECRET_KEY: Using default development key. "
-                "Set a secure random key (32+ characters) for production."
+                "SECRET_KEY: Using default or too short. "
+                "Generate with: openssl rand -hex 32"
             )
 
-        # Encryption Key - NEVER use default in production
+        # Encryption Key
         if self.ENCRYPTION_KEY == "0" * 64:
-            errors.append(
-                "ENCRYPTION_KEY: Using default null key. "
-                "Generate a secure 64-character hex key for production."
-            )
+            errors.append("ENCRYPTION_KEY: Using default. Generate with: openssl rand -hex 32")
 
-        # Database URL - Must not use default localhost
+        # Database URL
         if "localhost" in self.DATABASE_URL or "password" in self.DATABASE_URL:
-            errors.append(
-                "DATABASE_URL: Contains localhost or default credentials. "
-                "Use proper cloud database URL for production."
-            )
+            errors.append("DATABASE_URL: Contains localhost or default credentials.")
 
-        # =================================================================
-        # THREE-DATABASE ARCHITECTURE VALIDATION (Production Only)
-        # =================================================================
+        # Production-only validations
         if self.is_production:
-            # Supabase (Primary Database) - Required
+            # Supabase
             if not self.SUPABASE_URL:
-                errors.append(
-                    "SUPABASE_URL: Not configured. "
-                    "Required for production (primary database)."
-                )
+                errors.append("SUPABASE_URL: Required for production.")
             if not self.SUPABASE_SERVICE_KEY:
-                errors.append(
-                    "SUPABASE_SERVICE_KEY: Not configured. "
-                    "Required for production (admin operations)."
-                )
+                errors.append("SUPABASE_SERVICE_KEY: Required for production.")
             if not self.SUPABASE_JWT_SECRET:
-                errors.append(
-                    "SUPABASE_JWT_SECRET: Not configured. "
-                    "Required for production (JWT verification)."
-                )
+                errors.append("SUPABASE_JWT_SECRET: Required for production.")
 
-            # CloudSQL HIPAA Database - Required
+            # CloudSQL HIPAA
             if not self.DATABASE_HIPAA_URL:
-                errors.append(
-                    "DATABASE_HIPAA_URL: Not configured. "
-                    "Required for production (HIPAA-compliant health data)."
-                )
+                errors.append("DATABASE_HIPAA_URL: Required for production.")
             elif "localhost" in self.DATABASE_HIPAA_URL:
-                errors.append(
-                    "DATABASE_HIPAA_URL: Contains localhost. "
-                    "Must use CloudSQL private IP for production."
-                )
+                errors.append("DATABASE_HIPAA_URL: Must use CloudSQL private IP.")
 
-            # CloudSQL Financial Database - Required
+            # CloudSQL Financial
             if not self.DATABASE_FINANCIAL_URL:
-                errors.append(
-                    "DATABASE_FINANCIAL_URL: Not configured. "
-                    "Required for production (PCI-DSS compliant financial data)."
-                )
+                errors.append("DATABASE_FINANCIAL_URL: Required for production.")
             elif "localhost" in self.DATABASE_FINANCIAL_URL:
-                errors.append(
-                    "DATABASE_FINANCIAL_URL: Contains localhost. "
-                    "Must use CloudSQL private IP for production."
-                )
+                errors.append("DATABASE_FINANCIAL_URL: Must use CloudSQL private IP.")
 
-        # Redis URL - Must not use default localhost in prod
-        if self.is_production and "localhost" in self.REDIS_URL:
-            errors.append(
-                "REDIS_URL: Contains localhost. "
-                "Use proper cloud Redis URL for production."
-            )
+            # Redis
+            if "localhost" in self.REDIS_URL:
+                errors.append("REDIS_URL: Must use cloud Redis in production.")
 
-        # =================================================================
-        # WARNING: These are recommended but not strictly required
-        # =================================================================
+            # CORS
+            if "*" in self.cors_origins_list:
+                errors.append("CORS_ORIGINS: Wildcard (*) not allowed in production.")
 
-        warnings: list[str] = []
+            # Debug mode
+            if self.DEBUG:
+                errors.append("DEBUG: Must be false in production.")
 
-        # Sentry DSN - Highly recommended for production monitoring
-        if self.is_production and not self.SENTRY_DSN:
-            warnings.append(
-                "SENTRY_DSN: Not configured. "
-                "Sentry is highly recommended for production error tracking."
-            )
-
-        # CORS Origins - Should not be wildcard in production
-        if self.is_production and "*" in self.cors_origins_list:
-            errors.append(
-                "CORS_ORIGINS: Contains wildcard (*). "
-                "Specify explicit origins for production security."
-            )
-
-        # Debug mode - Must be disabled in production
-        if self.is_production and self.DEBUG:
-            errors.append(
-                "DEBUG: Enabled in production. "
-                "Set DEBUG=false for production security."
-            )
-
-        # Email provider - Recommended for production
-        if self.is_production and not self.RESEND_API_KEY:
-            warnings.append(
-                "RESEND_API_KEY: Not configured. "
-                "Email notifications will not work."
-            )
-
-        # Log warnings (these don't prevent startup)
-        if warnings:
-            import logging
-            logger = logging.getLogger(__name__)
-            for warning in warnings:
-                logger.warning(f"[CONFIG WARNING] {warning}")
-
-        # Fail fast on critical errors
+        # Fail fast
         if errors:
             error_msg = (
-                f"\n{'='*60}\n"
-                f"CONFIGURATION ERROR: Production environment detected\n"
-                f"The following critical settings must be fixed:\n"
-                f"{'='*60}\n"
-                + "\n".join(f"  - {e}" for e in errors)
-                + f"\n{'='*60}\n"
+                f"\n{'='*70}\n"
+                f"CONFIGURATION ERROR: {self.ENVIRONMENT} environment detected\n"
+                f"{'='*70}\n"
+                + "\n".join(f"  ❌ {e}" for e in errors)
+                + f"\n{'='*70}\n"
                 f"Application startup BLOCKED for security.\n"
-                f"{'='*60}"
+                f"{'='*70}\n"
             )
             raise ConfigurationError(error_msg)
+
+        return self
+
+    @model_validator(mode="after")
+    def fetch_gcp_secrets(self) -> "Settings":
+        """
+        Optionally fetch secrets from GCP Secret Manager.
+
+        Only runs if USE_GCP_SECRET_MANAGER=true.
+        Local development should NOT use this.
+        """
+        if not self.USE_GCP_SECRET_MANAGER or self.is_development:
+            return self
+
+        adapter = GCPSecretManagerAdapter()
+
+        # Fetch critical secrets from GCP SM if not already set
+        secret_mappings = {
+            "SECRET_KEY": "SECRET_KEY",
+            "ENCRYPTION_KEY": "ENCRYPTION_KEY",
+            "DATABASE_HIPAA_URL": "DATABASE_HIPAA_URL",
+            "DATABASE_FINANCIAL_URL": "DATABASE_FINANCIAL_URL",
+            "SUPABASE_SERVICE_KEY": "SUPABASE_SERVICE_KEY",
+            "SUPABASE_JWT_SECRET": "SUPABASE_JWT_SECRET",
+            "PLAID_SECRET": "PLAID_SECRET",
+            "STRIPE_API_KEY": "STRIPE_API_KEY",
+        }
+
+        for attr_name, secret_name in secret_mappings.items():
+            current_value = getattr(self, attr_name, None)
+            # Only fetch if not already set via environment variable
+            if not current_value or current_value in ["INSECURE-CHANGE-IN-PRODUCTION", "0" * 64]:
+                secret_value = adapter.get_secret(secret_name)
+                if secret_value:
+                    setattr(self, attr_name, secret_value)
 
         return self
 
@@ -475,7 +476,8 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """
     Get cached settings instance.
-    Uses lru_cache to ensure single instance across app.
+
+    Validates configuration and fails fast on startup if invalid.
     """
     return Settings()
 

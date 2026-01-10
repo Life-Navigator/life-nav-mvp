@@ -1,19 +1,18 @@
 """
-Embedding Generation Service.
+Embedding Generation Service (OpenAI-free).
 
-Generates vector embeddings for text using:
-- OpenAI text-embedding-3-small (primary)
-- Fallback to local sentence-transformers if API fails
-- Batch processing for efficiency
-- Caching to reduce costs
+Generates vector embeddings for text using internal providers.
+NO external LLM APIs (OpenAI, Cohere, etc.) in production.
 """
 
 from typing import Optional
 
 import structlog
-from openai import AsyncOpenAI, OpenAIError
 
 from app.core.config import settings
+from app.services.embeddings.provider import EmbeddingProvider
+from app.services.embeddings.graphrag_provider import GraphRAGEmbeddingProvider
+from app.services.embeddings.null_provider import NullEmbeddingProvider
 
 logger = structlog.get_logger()
 
@@ -23,31 +22,48 @@ class EmbeddingService:
     Service for generating text embeddings.
 
     Features:
-    - OpenAI API integration (text-embedding-3-small)
+    - Provider pattern (GraphRAG, Null)
     - Batch processing
-    - Error handling with retry
-    - Cost optimization through caching
-    - Fallback to local models
+    - Error handling
+    - NO external LLM dependencies
     """
 
-    def __init__(self):
-        # Check if OpenAI API key is configured
-        openai_key = getattr(settings, "OPENAI_API_KEY", None)
+    def __init__(self, provider: Optional[EmbeddingProvider] = None):
+        """
+        Initialize embedding service.
 
-        if openai_key:
-            self.client = AsyncOpenAI(api_key=openai_key)
-            self.model = "text-embedding-3-small"  # 1536 dimensions, cheaper than ada-002
-            self.dimension = 1536
-            self.use_openai = True
-            logger.info("embedding_service_initialized", provider="openai", model=self.model)
+        Args:
+            provider: Embedding provider (auto-selected from config if None)
+        """
+        if provider is None:
+            provider = self._create_provider()
+
+        self.provider = provider
+        self.dimension = provider.get_dimension()
+
+        logger.info(
+            "embedding_service_initialized",
+            provider=provider.__class__.__name__,
+            dimension=self.dimension,
+        )
+
+    def _create_provider(self) -> EmbeddingProvider:
+        """
+        Create embedding provider based on configuration.
+
+        Returns:
+            EmbeddingProvider instance
+        """
+        provider_type = settings.EMBEDDINGS_PROVIDER
+
+        if provider_type == "graphrag":
+            return GraphRAGEmbeddingProvider()
+        elif provider_type == "null":
+            return NullEmbeddingProvider()
         else:
-            # Fallback to local model
-            self.use_openai = False
-            self.dimension = 384  # sentence-transformers default
-            logger.warning(
-                "embedding_service_fallback",
-                provider="sentence-transformers",
-                reason="No OPENAI_API_KEY configured",
+            raise ValueError(
+                f"Unknown EMBEDDINGS_PROVIDER: {provider_type}. "
+                f"Valid options: graphrag, null"
             )
 
     async def generate_embedding(self, text: str) -> list[float]:
@@ -58,20 +74,16 @@ class EmbeddingService:
             text: Text to embed
 
         Returns:
-            Embedding vector (1536 dimensions for OpenAI)
+            Embedding vector
         """
         if not text or not text.strip():
-            # Return zero vector for empty text
             return [0.0] * self.dimension
 
-        # Truncate very long text (OpenAI limit is 8191 tokens)
+        # Truncate very long text
         if len(text) > 8000:
             text = text[:8000]
 
-        if self.use_openai:
-            return await self._generate_openai_embedding(text)
-        else:
-            return await self._generate_local_embedding(text)
+        return await self.provider.generate_embedding(text)
 
     async def generate_embeddings_batch(
         self, texts: list[str], batch_size: int = 100
@@ -89,118 +101,7 @@ class EmbeddingService:
         if not texts:
             return []
 
-        embeddings = []
-
-        # Process in batches
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-
-            if self.use_openai:
-                batch_embeddings = await self._generate_openai_embeddings_batch(batch)
-            else:
-                batch_embeddings = await self._generate_local_embeddings_batch(batch)
-
-            embeddings.extend(batch_embeddings)
-
-            logger.info(
-                "embedding_batch_generated",
-                batch_num=i // batch_size + 1,
-                batch_size=len(batch),
-                total_processed=len(embeddings),
-            )
-
-        return embeddings
-
-    async def _generate_openai_embedding(self, text: str) -> list[float]:
-        """Generate embedding using OpenAI API."""
-        try:
-            response = await self.client.embeddings.create(
-                model=self.model,
-                input=text,
-                encoding_format="float",
-            )
-
-            embedding = response.data[0].embedding
-
-            logger.debug(
-                "openai_embedding_generated",
-                text_length=len(text),
-                embedding_dimension=len(embedding),
-            )
-
-            return embedding
-
-        except OpenAIError as e:
-            logger.error(
-                "openai_embedding_failed",
-                error=str(e),
-                text_length=len(text),
-            )
-
-            # Return zero vector on error
-            return [0.0] * self.dimension
-
-    async def _generate_openai_embeddings_batch(
-        self, texts: list[str]
-    ) -> list[list[float]]:
-        """Generate embeddings in batch using OpenAI API."""
-        try:
-            # Filter out empty texts
-            non_empty_texts = [t if t.strip() else " " for t in texts]
-
-            response = await self.client.embeddings.create(
-                model=self.model,
-                input=non_empty_texts,
-                encoding_format="float",
-            )
-
-            embeddings = [item.embedding for item in response.data]
-
-            logger.info(
-                "openai_batch_embeddings_generated",
-                batch_size=len(texts),
-                total_tokens=response.usage.total_tokens,
-            )
-
-            return embeddings
-
-        except OpenAIError as e:
-            logger.error(
-                "openai_batch_embedding_failed",
-                error=str(e),
-                batch_size=len(texts),
-            )
-
-            # Return zero vectors on error
-            return [[0.0] * self.dimension for _ in texts]
-
-    async def _generate_local_embedding(self, text: str) -> list[float]:
-        """
-        Generate embedding using local sentence-transformers.
-
-        This is a fallback when OpenAI API is not available.
-        """
-        try:
-            # TODO: Implement sentence-transformers integration
-            # For now, return a placeholder zero vector
-            logger.warning(
-                "local_embedding_not_implemented",
-                message="Using zero vector as placeholder. "
-                "Install sentence-transformers for local embeddings.",
-            )
-
-            return [0.0] * self.dimension
-
-        except Exception as e:
-            logger.error("local_embedding_failed", error=str(e))
-            return [0.0] * self.dimension
-
-    async def _generate_local_embeddings_batch(
-        self, texts: list[str]
-    ) -> list[list[float]]:
-        """Generate embeddings in batch using local model."""
-        # TODO: Implement batch processing with sentence-transformers
-        return [[0.0] * self.dimension for _ in texts]
+        return await self.provider.generate_embeddings_batch(texts, batch_size)
 
     def create_entity_text(self, entity: dict) -> str:
         """
@@ -250,7 +151,16 @@ _embedding_service: Optional[EmbeddingService] = None
 
 
 def get_embedding_service() -> EmbeddingService:
-    """Get or create global embedding service instance."""
+    """
+    Get or create global embedding service instance.
+
+    The provider is selected based on EMBEDDINGS_PROVIDER config:
+    - graphrag (production): Internal gRPC service
+    - null (testing): Zero vectors
+
+    Returns:
+        EmbeddingService instance
+    """
     global _embedding_service
     if _embedding_service is None:
         _embedding_service = EmbeddingService()

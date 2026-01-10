@@ -25,6 +25,15 @@ target/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*
+!.env.example
+!.env.*.example
+# Specific patterns to prevent accidental commits
+**/.env
+**/.env.local
+**/.env.*.local
+**/env-values/*.env
+!**/env-values/*.env.example
 
 # Python
 __pycache__/

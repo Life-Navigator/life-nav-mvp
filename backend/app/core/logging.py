@@ -13,6 +13,51 @@ from structlog.types import EventDict, Processor
 from app.core.config import settings
 
 
+# Sensitive headers that should be redacted from logs
+REDACTED_HEADERS = {
+    "authorization",
+    "cookie",
+    "set-cookie",
+    "x-api-key",
+    "x-stripe-signature",
+    "x-plaid-secret",
+    "x-plaid-client-id",
+    "x-twilio-signature",
+    "proxy-authorization",
+}
+
+
+def redact_sensitive_data(logger: Any, method_name: str, event_dict: EventDict) -> EventDict:
+    """
+    Redact sensitive data from log events.
+
+    Prevents accidental leakage of:
+    - Authentication headers
+    - API keys
+    - Request bodies (which may contain PHI/PCI)
+    - Sensitive header values
+    """
+    # Redact headers
+    if "headers" in event_dict and isinstance(event_dict["headers"], dict):
+        event_dict["headers"] = {
+            k: "***REDACTED***" if k.lower() in REDACTED_HEADERS else v
+            for k, v in event_dict["headers"].items()
+        }
+
+    # Never log request bodies on errors (might contain PHI/PCI)
+    if "request_body" in event_dict:
+        event_dict["request_body"] = "***REDACTED***"
+
+    if "body" in event_dict:
+        event_dict["body"] = "***REDACTED***"
+
+    # Redact password fields
+    if "password" in event_dict:
+        event_dict["password"] = "***REDACTED***"
+
+    return event_dict
+
+
 def add_app_context(logger: Any, method_name: str, event_dict: EventDict) -> EventDict:
     """Add application context to log events."""
     event_dict["app"] = settings.PROJECT_NAME
@@ -48,6 +93,7 @@ def configure_logging() -> None:
         structlog.stdlib.PositionalArgumentsFormatter(),
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.StackInfoRenderer(),
+        redact_sensitive_data,  # SECURITY: Redact sensitive data before logging
         add_app_context,
     ]
 

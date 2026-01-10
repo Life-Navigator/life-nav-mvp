@@ -57,7 +57,7 @@ python-magic = "^0.4.27"
 # Knowledge Graph and Vector Storage
 neo4j = "^5.14.0"  # Neo4j async driver for graph database
 qdrant-client = "^1.7.0"  # Qdrant vector database client
-openai = "^1.6.0"  # OpenAI API for embeddings and LLM
+# openai removed - use internal GraphRAG for embeddings
 
 # Supabase - Primary Database Client
 supabase = "^2.0.0"  # Supabase Python client for auth and database operations
@@ -73,6 +73,7 @@ ruff = "^0.1.13"
 mypy = "^1.8.0"
 pre-commit = "^3.6.0"
 faker = "^22.5.1"
+openai = "^1.6.0"  # Dev only - for local experiments, NOT production
 
 [build-system]
 requires = ["poetry-core"]
@@ -117,7 +118,6 @@ module = [
     "celery.*",
     "neo4j.*",
     "qdrant_client.*",
-    "openai.*",
 ]
 ignore_missing_imports = true
 
