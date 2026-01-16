@@ -1,7 +1,7 @@
 /**
  * Stripe Checkout API Route
  *
- * Creates a Stripe checkout session for subscription purchases.
+ * Creates a Stripe checkout session for subscription purchases and one-time purchases.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -10,7 +10,7 @@ import { cookies } from 'next/headers';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { priceId, successUrl, cancelUrl } = body;
+    const { priceId, successUrl, cancelUrl, mode = 'subscription', productType, quantity = 1 } = body;
 
     if (!priceId || !successUrl || !cancelUrl) {
       return NextResponse.json(
@@ -42,6 +42,9 @@ export async function POST(request: NextRequest) {
         price_id: priceId,
         success_url: successUrl,
         cancel_url: cancelUrl,
+        mode, // 'subscription' or 'payment' for one-time purchases
+        product_type: productType, // 'chat_queries', 'scenario_runs', 'subscription'
+        quantity,
       }),
     });
 

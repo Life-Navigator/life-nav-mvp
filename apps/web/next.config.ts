@@ -5,8 +5,8 @@ const cspConnectSrc = process.env.CSP_CONNECT_SRC || `'self'`;
 const cspDefaultSrc = process.env.CSP_DEFAULT_SRC || `'self'`;
 const cspFontSrc = process.env.CSP_FONT_SRC || `'self' https://fonts.gstatic.com`;
 const cspImgSrc = process.env.CSP_IMG_SRC || `'self' data: https: blob:`;
-const cspScriptSrc = process.env.CSP_SCRIPT_SRC || `'self' 'unsafe-inline' 'unsafe-eval'`;
-const cspStyleSrc = process.env.CSP_STYLE_SRC || `'self' 'unsafe-inline' https://fonts.googleapis.com`;
+const cspScriptSrc = process.env.CSP_SCRIPT_SRC || `'self'`;
+const cspStyleSrc = process.env.CSP_STYLE_SRC || `'self' https://fonts.googleapis.com`;
 const cspFrameSrc = process.env.CSP_FRAME_SRC || `'self'`;
 
 // Define security headers

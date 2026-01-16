@@ -57,6 +57,10 @@ kaleido = "0.2.1"
 cryptography = "43.0.1"
 pyjwt = "2.9.0"
 
+# Vertex AI for Gemini
+google-cloud-aiplatform = "^1.71.0"
+vertexai = "^1.71.0"
+
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3,<9"
 pytest-asyncio = "0.24.0"

@@ -46,6 +46,30 @@ model User {
   invitedBy             String?                 // User ID who referred them
   pilotNotes            String?                 // Admin notes about pilot user
 
+  // Stripe Billing & Subscriptions
+  stripeCustomerId      String?                 @unique
+  stripeSubscriptionId  String?                 @unique
+  subscriptionTier      String                  @default("freemium") // freemium, pro, enterprise
+  subscriptionStatus    String?                 // active, canceled, past_due, etc.
+  subscriptionStartedAt DateTime?
+  subscriptionEndsAt    DateTime?
+  premiumSpecialists    String[]                @default([]) // Array of specialist agent IDs
+
+  // Query Tracking & Usage
+  dailyChatQueries      Int                     @default(5)  // Free queries per day
+  dailyScenarioRuns     Int                     @default(5)  // Free scenario runs per day
+  purchasedChatQueries  Int                     @default(0)  // Purchased credits (never expire)
+  purchasedScenarioRuns Int                     @default(0)  // Purchased scenario credits
+  queriesUsedToday      Int                     @default(0)  // Chat queries used today
+  scenariosUsedToday    Int                     @default(0)  // Scenario runs used today
+  lastQueryReset        DateTime                @default(now()) // Last time daily counters reset
+
+  // Onboarding & Waitlist
+  onboardingCompleted   Boolean                 @default(false)
+  onboardingQueriesUsed Int                     @default(0)  // Track onboarding usage (doesn't count toward limits)
+  proWaitlist           Boolean                 @default(false)
+  enterpriseWaitlist    Boolean                 @default(false)
+
   // Relations
   accounts              Account[]
   sessions              Session[]
@@ -95,6 +119,8 @@ model User {
   degreeAnalyses        DegreeAnalysis[]
   degreeComparisons     DegreeComparison[]
   educationDocuments    EducationDocument[]
+  purchases             Purchase[]
+  queryLogs             QueryLog[]
 
   @@index([email])
   @@index([createdAt])
@@ -216,6 +242,49 @@ model UserDevice {
   @@index([userId])
   @@index([deviceId])
   @@map("user_devices")
+}
+
+//=====================
+// BILLING & USAGE TRACKING
+//=====================
+
+model Purchase {
+  id                  String   @id @default(cuid())
+  userId              String
+  stripePaymentId     String   @unique
+  stripeCheckoutId    String?
+  productType         String   // chat_queries, scenario_runs, specialist_addon, subscription
+  amount              Int      // Amount in cents
+  currency            String   @default("usd")
+  quantity            Int      // Number of credits/items purchased
+  status              String   // completed, pending, failed, refunded
+  purchasedAt         DateTime @default(now())
+  fulfilledAt         DateTime?
+  metadata            Json?    // Additional purchase details
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([stripePaymentId])
+  @@index([purchasedAt])
+  @@map("purchases")
+}
+
+model QueryLog {
+  id              String   @id @default(cuid())
+  userId          String
+  queryType       String   // chat, scenario, onboarding
+  agentId         String?  // Which agent was used
+  creditsConsumed Int      @default(1)
+  wasOnboarding   Boolean  @default(false)
+  wasPurchased    Boolean  @default(false) // True if purchased credits were used
+  createdAt       DateTime @default(now())
+  metadata        Json?    // Query details for analytics
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([queryType])
+  @@index([createdAt])
+  @@map("query_logs")
 }
 
 model BenefitRanking {
