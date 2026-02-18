@@ -34,7 +34,7 @@ SELECT
   privilege_type
 FROM information_schema.role_table_grants
 WHERE table_schema = 'core'
-  AND table_name IN ('ingestion_jobs', 'ingestion_results')
+  AND table_name IN ('ingestion_jobs', 'ingestion_results', 'integration_tokens', 'internal_requests')
   AND grantee = 'authenticated'
   AND privilege_type IN ('INSERT', 'UPDATE', 'DELETE')
 ORDER BY 1, 2, 3, 4;
@@ -52,7 +52,10 @@ FROM (
   VALUES
     ('claim_ingestion_jobs', 'core.claim_ingestion_jobs(integer,text,integer)'),
     ('complete_ingestion_job', 'core.complete_ingestion_job(uuid,jsonb)'),
-    ('fail_ingestion_job', 'core.fail_ingestion_job(uuid,text,integer)')
+    ('fail_ingestion_job', 'core.fail_ingestion_job(uuid,text,integer)'),
+    ('register_internal_request', 'core.register_internal_request(text,text,text,integer)'),
+    ('upsert_integration_token', 'core.upsert_integration_token(uuid,text,text,text,timestamp with time zone,text,text,text,jsonb,text)'),
+    ('disconnect_integration', 'core.disconnect_integration(uuid,text)')
 ) AS f(function_name, function_signature);
 
 -- 5) Storage bucket posture check for private buckets.

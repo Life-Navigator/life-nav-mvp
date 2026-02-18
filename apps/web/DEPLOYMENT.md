@@ -90,6 +90,7 @@
 1. Run ingestion migrations:
    - `apps/web/supabase/migrations/009_mvp_ingestion_pipeline.sql`
    - `apps/web/supabase/migrations/010_mvp_ingestion_hardening.sql`
+   - `apps/web/supabase/migrations/011_mvp_integrations_auth.sql`
 2. Create private storage buckets:
    - `documents` (`public = false`)
    - `insurance-cards` (`public = false`)
@@ -97,6 +98,8 @@
    - `SUPABASE_URL`
    - `SUPABASE_SERVICE_ROLE_KEY`
    - `INGESTION_WORKER_SECRET`
+   - `INTERNAL_AGENT_WEBHOOK_URL`
+   - `INTERNAL_AGENT_WEBHOOK_SECRET`
 4. Deploy worker:
    ```bash
    supabase functions deploy process-ingestion
@@ -157,6 +160,16 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 # Internal webhook auth (server-only)
 INTERNAL_AGENT_WEBHOOK_SECRET=your-internal-webhook-secret
 
+# OAuth Integrations
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=https://your-app.vercel.app/api/integrations/oauth/callback/google
+MICROSOFT_CLIENT_ID=...
+MICROSOFT_CLIENT_SECRET=...
+MICROSOFT_TENANT_ID=common
+MICROSOFT_REDIRECT_URI=https://your-app.vercel.app/api/integrations/oauth/callback/microsoft
+INTEGRATION_ENCRYPTION_KEY=<32+ char random secret>
+
 # DGX Backend (requires VPN or Cloudflare Tunnel)
 NEXT_PUBLIC_API_URL=https://dgx.your-domain.com
 NEXT_PUBLIC_API_BASE_URL=https://dgx.your-domain.com/api/v1
@@ -184,6 +197,12 @@ Important:
 - Do not set `INGESTION_WORKER_SECRET` in Vercel for normal MVP operation.
 - `SUPABASE_SERVICE_ROLE_KEY` in Vercel should be avoided unless a server-only endpoint must bypass RLS.
 - Client bundles must only use public Supabase values.
+
+OAuth routes:
+- Google start: `/api/integrations/oauth/google`
+- Google callback: `/api/integrations/oauth/callback/google`
+- Microsoft start: `/api/integrations/oauth/microsoft`
+- Microsoft callback: `/api/integrations/oauth/callback/microsoft`
 
 ## Step 4: Connect DGX to Internet
 

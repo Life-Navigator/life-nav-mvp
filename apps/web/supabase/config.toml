@@ -12,7 +12,7 @@ project_id = "life-navigator"
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage", "graphql_public"]
+schemas = ["public", "core", "finance", "health_meta", "storage", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
@@ -62,6 +62,12 @@ enabled = false
 [auth.external.github]
 enabled = false
 
+[auth.external.azure]
+enabled = true
+client_id = "env(SUPABASE_AZURE_CLIENT_ID)"
+secret = "env(SUPABASE_AZURE_CLIENT_SECRET)"
+url = "env(SUPABASE_AZURE_URL)"
+
 # ============================================================================
 # Storage Configuration (Blob Storage)
 # ============================================================================
@@ -81,3 +87,9 @@ ip_version = "IPv4"
 # ============================================================================
 [analytics]
 enabled = true
+
+[functions.process-ingestion]
+verify_jwt = false
+
+[functions.sync-user-to-backend]
+verify_jwt = false
