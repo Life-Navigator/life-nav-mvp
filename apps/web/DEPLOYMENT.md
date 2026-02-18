@@ -151,13 +151,20 @@ In Vercel Dashboard > Settings > Environment Variables:
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
-# Supabase (server-only secrets; never expose to browser)
+# Supabase server-only (only if a server route explicitly requires admin Supabase access)
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-INGESTION_WORKER_SECRET=your-worker-shared-secret
+
+# Internal webhook auth (server-only)
+INTERNAL_AGENT_WEBHOOK_SECRET=your-internal-webhook-secret
 
 # DGX Backend (requires VPN or Cloudflare Tunnel)
 NEXT_PUBLIC_API_URL=https://dgx.your-domain.com
 NEXT_PUBLIC_API_BASE_URL=https://dgx.your-domain.com/api/v1
+
+# Optional agent forwarding
+AGENT_API_URL=https://your-agent-service.internal
+AGENT_INTERNAL_API_KEY=your-agent-internal-key
+ENABLE_AGENT_FORWARDING=false
 
 # NextAuth
 NEXTAUTH_URL=https://your-app.vercel.app
@@ -174,7 +181,8 @@ PLAID_ENVIRONMENT=production
 
 Important:
 - Never create `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`.
-- `SUPABASE_SERVICE_ROLE_KEY` may be configured in Vercel only as a server-side env var for Route Handlers/Server Actions.
+- Do not set `INGESTION_WORKER_SECRET` in Vercel for normal MVP operation.
+- `SUPABASE_SERVICE_ROLE_KEY` in Vercel should be avoided unless a server-only endpoint must bypass RLS.
 - Client bundles must only use public Supabase values.
 
 ## Step 4: Connect DGX to Internet

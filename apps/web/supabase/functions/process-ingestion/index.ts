@@ -17,6 +17,7 @@ type UploadDocument = {
   domain: 'financial' | 'health' | 'career' | 'education' | 'other';
   bucket_id: string;
   storage_path: string;
+  checksum_sha256?: string | null;
   original_filename: string;
   detected_file_type: string;
   mime_type: string;
@@ -49,6 +50,19 @@ const XLSX_MAX_ROWS_TOTAL = 25_000;
 const CSV_MAX_ROWS = 100_000;
 const DOCX_MAX_TEXT_BYTES = 2 * 1024 * 1024;
 const JOB_TIME_BUDGET_MS = 20_000;
+const MAX_CLAIM_LIMIT = 25;
+
+function constantTimeEqual(a: string, b: string): boolean {
+  const aBytes = new TextEncoder().encode(a);
+  const bBytes = new TextEncoder().encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) {
+    diff |= aBytes[i] ^ bBytes[i];
+  }
+  return diff === 0;
+}
 
 function normalizeHeader(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
@@ -382,16 +396,60 @@ async function processOneJob(
   return processCareerOrEducationDocument(supabase, job, doc, fileBytes);
 }
 
+async function invokeInternalAgentWebhook(job: IngestionJob, doc: UploadDocument): Promise<void> {
+  const webhookUrl = Deno.env.get('INTERNAL_AGENT_WEBHOOK_URL');
+  const webhookSecret = Deno.env.get('INTERNAL_AGENT_WEBHOOK_SECRET');
+  if (!webhookUrl || !webhookSecret) {
+    return;
+  }
+
+  const response = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-worker-secret': webhookSecret,
+      'x-worker-id': 'process-ingestion',
+      // Stable UUID to support replay detection on downstream endpoint.
+      'x-request-id': job.id,
+    },
+    body: JSON.stringify({
+      job_id: job.id,
+      user_id: job.user_id,
+      document_id: job.document_id,
+      domain: doc.domain,
+      task: 'extract_and_route',
+      input: {
+        bucket_id: doc.bucket_id,
+        storage_path: doc.storage_path,
+        detected_file_type: doc.detected_file_type?.toUpperCase(),
+        checksum_sha256: doc.checksum_sha256 || null,
+      },
+      attempt: job.attempts,
+    }),
+  });
+
+  if (!response.ok) {
+    const bodyText = await response.text().catch(() => '');
+    throw new Error(`Internal agent webhook failed (${response.status}): ${bodyText}`);
+  }
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 405,
+    });
   }
 
   try {
     const workerSecret = Deno.env.get('INGESTION_WORKER_SECRET');
     if (workerSecret) {
       const provided = req.headers.get('x-worker-secret');
-      if (provided !== workerSecret) {
+      if (!provided || !constantTimeEqual(provided, workerSecret)) {
         return new Response(JSON.stringify({ error: 'Unauthorized worker secret' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
@@ -411,7 +469,7 @@ serve(async (req: Request) => {
 
     const body = await req.json().catch(() => ({}));
     const requestedLimit = Number(body?.limit ?? 10);
-    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 100) : 10;
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), MAX_CLAIM_LIMIT) : 10;
     const workerId = body?.worker_id || `edge-${crypto.randomUUID()}`;
 
     const { data: claimed, error: claimError } = await supabase.rpc('claim_ingestion_jobs', {
@@ -436,6 +494,12 @@ serve(async (req: Request) => {
     for (const job of jobs) {
       try {
         const result = await processOneJob(supabase, job);
+        const { data: doc } = await supabase
+          .schema('core')
+          .from('upload_documents')
+          .select('domain,bucket_id,storage_path,detected_file_type,checksum_sha256')
+          .eq('id', job.document_id)
+          .single<Pick<UploadDocument, 'domain' | 'bucket_id' | 'storage_path' | 'detected_file_type' | 'checksum_sha256'>>();
 
         const { data: resultInsert, error: resultError } = await supabase
           .schema('core')
@@ -462,6 +526,25 @@ serve(async (req: Request) => {
 
         if (completeError) {
           throw new Error(`Failed to complete job ${job.id}: ${completeError.message}`);
+        }
+
+        if (doc) {
+          try {
+            await invokeInternalAgentWebhook(job, {
+              id: job.document_id,
+              user_id: job.user_id,
+              domain: doc.domain,
+              bucket_id: doc.bucket_id,
+              storage_path: doc.storage_path,
+              detected_file_type: doc.detected_file_type,
+              checksum_sha256: doc.checksum_sha256,
+              original_filename: '',
+              mime_type: '',
+              file_size_bytes: 0,
+            });
+          } catch (webhookError) {
+            console.error(`Webhook notify failed for job ${job.id}:`, safeError(webhookError));
+          }
         }
 
         summary.completed += 1;

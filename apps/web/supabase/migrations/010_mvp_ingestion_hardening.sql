@@ -426,3 +426,63 @@ REVOKE ALL ON FUNCTION core.fail_ingestion_job(UUID, TEXT, INT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION core.claim_ingestion_jobs(INT, TEXT, INT) TO service_role;
 GRANT EXECUTE ON FUNCTION core.complete_ingestion_job(UUID, JSONB) TO service_role;
 GRANT EXECUTE ON FUNCTION core.fail_ingestion_job(UUID, TEXT, INT) TO service_role;
+
+-- --------------------------------------------------------------------------
+-- Internal request replay protection (for private worker webhooks)
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS core.internal_requests (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_id UUID NOT NULL UNIQUE,
+  source TEXT NOT NULL,
+  payload_hash TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_internal_requests_expires_at
+  ON core.internal_requests(expires_at);
+
+ALTER TABLE core.internal_requests ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "mvp_internal_requests_service_role" ON core.internal_requests;
+CREATE POLICY "mvp_internal_requests_service_role" ON core.internal_requests
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+CREATE OR REPLACE FUNCTION core.register_internal_request(
+  p_request_id TEXT,
+  p_source TEXT,
+  p_payload_hash TEXT DEFAULT NULL,
+  p_ttl_seconds INT DEFAULT 900
+)
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = core, public
+AS $$
+DECLARE
+  v_request_uuid UUID;
+BEGIN
+  DELETE FROM core.internal_requests WHERE expires_at <= now();
+
+  BEGIN
+    v_request_uuid := p_request_id::uuid;
+  EXCEPTION
+    WHEN others THEN
+      RAISE EXCEPTION 'Invalid request_id UUID: %', p_request_id;
+  END;
+
+  INSERT INTO core.internal_requests (request_id, source, payload_hash, expires_at)
+  VALUES (
+    v_request_uuid,
+    COALESCE(NULLIF(p_source, ''), 'unknown'),
+    p_payload_hash,
+    now() + make_interval(secs => GREATEST(COALESCE(p_ttl_seconds, 900), 60))
+  )
+  ON CONFLICT (request_id) DO NOTHING;
+
+  RETURN FOUND;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION core.register_internal_request(TEXT, TEXT, TEXT, INT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION core.register_internal_request(TEXT, TEXT, TEXT, INT) TO service_role;

@@ -23,6 +23,8 @@ It writes normalized outputs to:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `INGESTION_WORKER_SECRET`
+- `INTERNAL_AGENT_WEBHOOK_URL` (optional)
+- `INTERNAL_AGENT_WEBHOOK_SECRET` (required if webhook URL is set)
 
 ## Resource Guardrails
 
@@ -31,6 +33,7 @@ It writes normalized outputs to:
 - XLSX: max 5 sheets and 25,000 total rows
 - DOCX: max 2MB extracted text
 - Per-job processing budget: 20 seconds (fast-fail)
+- Max claim limit per invocation: 25 jobs
 
 ## Retry and Leasing
 
