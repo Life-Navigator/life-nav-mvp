@@ -60,6 +60,8 @@ pyjwt = "2.9.0"
 # Vertex AI for Gemini
 google-cloud-aiplatform = "^1.71.0"
 vertexai = "^1.71.0"
+structlog = "^25.5.0"
+python-multipart = "^0.0.22"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=8.3,<9"

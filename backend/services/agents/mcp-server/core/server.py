@@ -5,8 +5,9 @@ from typing import List, Optional
 import time
 from pathlib import Path
 import shutil
+import secrets
 
-from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -173,6 +174,30 @@ async def _load_plugins(
         })
 
 
+def verify_api_key(x_api_key: str = Header(..., alias="X-API-Key")) -> bool:
+    """
+    Verify internal service API key.
+
+    This ensures only authenticated internal services (like Next.js backend)
+    can access the agent endpoints.
+    """
+    settings = get_settings()
+    expected_key = getattr(settings, 'internal_api_key', None)
+
+    # If no key is configured, allow access (dev mode fallback)
+    if not expected_key:
+        logger.warning("internal_api_key_not_configured", message="Agent service is running without API key protection!")
+        return True
+
+    if not secrets.compare_digest(x_api_key, expected_key):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid API key"
+        )
+
+    return True
+
+
 def create_app() -> FastAPI:
     """Create and configure FastAPI application"""
     settings = get_settings()
@@ -183,14 +208,16 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS middleware - Allow frontend to connect
+    # CORS middleware - Only allow specific internal services
+    # Agent service should NOT be publicly accessible - only via backend proxy
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "http://localhost:3000",      # Your frontend
+            "http://localhost:3000",      # Next.js dev server (for local dev only)
             "http://127.0.0.1:3000",
-            "http://localhost:8501",      # Admin dashboard
-            "*",                          # Allow all for development (remove in production)
+            "http://localhost:8000",      # FastAPI backend
+            "http://backend:8000",        # Docker internal backend
+            "http://ln-backend:8000",     # Docker Compose backend service
         ],
         allow_credentials=True,
         allow_methods=["*"],
@@ -261,7 +288,10 @@ def create_app() -> FastAPI:
             )
 
     @app.post("/mcp/context", response_model=ContextResponse)
-    async def request_context(request: ContextRequest) -> ContextResponse:
+    async def request_context(
+        request: ContextRequest,
+        authenticated: bool = Depends(verify_api_key)
+    ) -> ContextResponse:
         """
         Request context aggregation from plugins.
 
@@ -327,7 +357,10 @@ def create_app() -> FastAPI:
             )
 
     @app.post("/mcp/tool/invoke", response_model=ToolInvocationResponse)
-    async def invoke_tool(request: ToolInvocationRequest) -> ToolInvocationResponse:
+    async def invoke_tool(
+        request: ToolInvocationRequest,
+        authenticated: bool = Depends(verify_api_key)
+    ) -> ToolInvocationResponse:
         """
         Invoke a registered tool.
 
@@ -781,8 +814,12 @@ def create_app() -> FastAPI:
     tasks_storage = {}
 
     @app.post("/tasks", response_model=TaskResp)
-    async def execute_task(request: TaskReq, user_id: str = "default_user"):
-        """Execute a task with an agent"""
+    async def execute_task(
+        request: TaskReq,
+        user_id: str = "default_user",
+        authenticated: bool = Depends(verify_api_key)
+    ):
+        """Execute a task with an agent (requires API key authentication)"""
         try:
             import uuid
             from datetime import datetime
@@ -886,8 +923,12 @@ def create_app() -> FastAPI:
         )
 
     @app.post("/chat", response_model=ChatResponse)
-    async def chat_with_agent(request: ChatRequest, user_id: str = "default_user"):
-        """Chat with an agent using Maverick model"""
+    async def chat_with_agent(
+        request: ChatRequest,
+        user_id: str = "default_user",
+        authenticated: bool = Depends(verify_api_key)
+    ):
+        """Chat with an agent using Maverick model (requires API key authentication)"""
         try:
             import uuid
             import requests as req
