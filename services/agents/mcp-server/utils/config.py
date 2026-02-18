@@ -52,11 +52,6 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiration_minutes: int = 60
 
-    # Internal Service Authentication
-    # API key for backend-to-agent service communication
-    # This prevents public access to the agent service
-    internal_api_key: Optional[str] = None
-
     # Plugins
     enable_graphrag_plugin: bool = True
     enable_memory_plugin: bool = True

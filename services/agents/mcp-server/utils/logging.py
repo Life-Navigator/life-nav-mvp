@@ -1,7 +1,6 @@
 """Logging Setup"""
 
 import sys
-import logging
 import structlog
 from typing import Any, Dict
 
@@ -24,7 +23,7 @@ def setup_logging(log_level: str = "INFO") -> None:
             else structlog.processors.JSONRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, log_level.upper(), logging.INFO)
+            getattr(structlog.stdlib, log_level.upper(), structlog.stdlib.INFO)
         ),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(),
