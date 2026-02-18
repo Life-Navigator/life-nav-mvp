@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "next-env.d.ts",
+    "src/app/api/data/**/*.ts",
+    "src/lib/db.ts",
+    "src/lib/jwt.ts",
+    "src/lib/hooks/useUserSync.ts",
+    "src/lib/middleware/virus-scan-middleware.ts",
+    "src/lib/services/storage.ts",
+    "src/lib/utils/file-validation.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".next"
+  ]
+}

@@ -76,7 +76,7 @@
 2. Copy these values to your environment:
    - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
    - `anon public` key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY`
+   - `service_role` key → `SUPABASE_SERVICE_ROLE_KEY` (**server/edge only, never client**)
 
 ### Run Migrations
 1. Go to SQL Editor
@@ -84,6 +84,29 @@
 3. Run the query
 4. Paste contents of `supabase/migrations/002_storage_buckets.sql`
 5. Run the query
+
+### Supabase-First MVP Ingestion Setup (Required)
+
+1. Run ingestion migrations:
+   - `apps/web/supabase/migrations/009_mvp_ingestion_pipeline.sql`
+   - `apps/web/supabase/migrations/010_mvp_ingestion_hardening.sql`
+2. Create private storage buckets:
+   - `documents` (`public = false`)
+   - `insurance-cards` (`public = false`)
+3. Set Edge Function secrets:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `INGESTION_WORKER_SECRET`
+4. Deploy worker:
+   ```bash
+   supabase functions deploy process-ingestion
+   ```
+5. Configure cron (every 1-2 min) to POST:
+   - URL: `https://<project-ref>.supabase.co/functions/v1/process-ingestion`
+   - Header: `x-worker-secret: <INGESTION_WORKER_SECRET>`
+   - Body: `{"limit":25,"worker_id":"cron"}`
+6. Run RLS verification script:
+   - `apps/web/supabase/sql/rls_self_test.sql`
 
 ### Configure Auth
 1. Go to Authentication > Providers
@@ -124,10 +147,13 @@ vercel
 In Vercel Dashboard > Settings > Environment Variables:
 
 ```env
-# Supabase
+# Supabase (public client config)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# Supabase (server-only secrets; never expose to browser)
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+INGESTION_WORKER_SECRET=your-worker-shared-secret
 
 # DGX Backend (requires VPN or Cloudflare Tunnel)
 NEXT_PUBLIC_API_URL=https://dgx.your-domain.com
@@ -145,6 +171,11 @@ PLAID_CLIENT_ID=your-production-client-id
 PLAID_SECRET=your-production-secret
 PLAID_ENVIRONMENT=production
 ```
+
+Important:
+- Never create `NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY`.
+- `SUPABASE_SERVICE_ROLE_KEY` may be configured in Vercel only as a server-side env var for Route Handlers/Server Actions.
+- Client bundles must only use public Supabase values.
 
 ## Step 4: Connect DGX to Internet
 

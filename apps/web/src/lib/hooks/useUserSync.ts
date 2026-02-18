@@ -13,7 +13,7 @@
  * 4. Handles sync failures gracefully
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createBrowserClient } from '@supabase/ssr';
 
@@ -235,5 +235,5 @@ export function UserSyncProvider({ children }: { children: React.ReactNode }) {
   // You could show a loading state here if needed
   // For now, we just render children
 
-  return <>{children}</>;
+  return React.createElement(React.Fragment, null, children);
 }

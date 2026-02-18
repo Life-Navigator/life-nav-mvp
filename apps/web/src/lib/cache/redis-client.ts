@@ -274,7 +274,7 @@ export const redisHelper = {
 // Create a lazy-loaded Redis instance
 class LazyRedis {
   private static instance: Awaited<ReturnType<typeof initRedis>> | null = null;
-  private static initPromise: Promise<ReturnType<typeof initRedis>> | null = null;
+  private static initPromise: ReturnType<typeof initRedis> | null = null;
 
   static async getInstance() {
     if (this.instance) {

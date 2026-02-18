@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 import { getUserIdFromJWT } from '@/lib/jwt';
-import { uploadFile, generateFileId } from '@/lib/services/storage';
-import { validateFile, type SupportedFileType } from '@/lib/utils/file-validation';
+import { uploadFile as uploadLegacyFile, generateFileId } from '@/lib/services/storage';
+import { validateFile, validateFileType, type SupportedFileType } from '@/lib/utils/file-validation';
 import { db as prisma } from '@/lib/db';
+import { createClient } from '@supabase/supabase-js';
 import {
   scanFileBeforeStorage,
   queueAsyncScan,
@@ -11,6 +13,124 @@ import {
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // Allow up to 120 seconds for OCR processing
+
+type UploadResult = {
+  success: boolean;
+  fileId: string;
+  fileUrl: string;
+  provider: string;
+  size: number;
+  bucketId?: string;
+  storagePath?: string;
+  checksumSha256?: string;
+  error?: string;
+};
+
+function isSupabaseMvpUploadsEnabled(): boolean {
+  return (process.env.MVP_SUPABASE_UPLOADS || 'true').toLowerCase() === 'true';
+}
+
+function getSupabaseServiceClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) {
+    return null;
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
+function getSupabaseBucket(domain: string, documentType: string): string {
+  if (domain === 'health' && documentType === 'insurance_card') {
+    return 'insurance-cards';
+  }
+  return 'documents';
+}
+
+function sanitizeFilename(filename: string): string {
+  return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+async function uploadFileToSupabase(params: {
+  file: File;
+  domain: string;
+  userId: string;
+  documentType: string;
+}): Promise<UploadResult> {
+  const { file, domain, userId, documentType } = params;
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) {
+    return {
+      success: false,
+      fileId: '',
+      fileUrl: '',
+      provider: 'supabase',
+      size: 0,
+      error: 'Supabase service role client is not configured',
+    };
+  }
+
+  const bucketId = getSupabaseBucket(domain, documentType);
+  const safeName = sanitizeFilename(file.name);
+  const storagePath = `${userId}/${domain}/${Date.now()}_${safeName}`;
+
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+  const checksumSha256 = createHash('sha256').update(fileBuffer).digest('hex');
+  const { error: uploadError } = await supabase.storage
+    .from(bucketId)
+    .upload(storagePath, fileBuffer, {
+      contentType: file.type || 'application/octet-stream',
+      upsert: false,
+      metadata: {
+        originalName: file.name,
+        domain,
+        userId,
+        checksumSha256,
+      },
+    });
+
+  if (uploadError) {
+    return {
+      success: false,
+      fileId: '',
+      fileUrl: '',
+      provider: 'supabase',
+      size: 0,
+      error: uploadError.message,
+    };
+  }
+
+  const { data: signedData, error: signedError } = await supabase.storage
+    .from(bucketId)
+    .createSignedUrl(storagePath, 3600);
+
+  if (signedError || !signedData?.signedUrl) {
+    return {
+      success: false,
+      fileId: '',
+      fileUrl: '',
+      provider: 'supabase',
+      size: 0,
+      error: signedError?.message || 'Failed to create signed URL',
+    };
+  }
+
+  return {
+    success: true,
+    fileId: `supabase://${bucketId}/${storagePath}`,
+    fileUrl: signedData.signedUrl,
+    provider: 'supabase',
+    size: fileBuffer.length,
+    bucketId,
+    storagePath,
+    checksumSha256,
+  };
+}
 
 /**
  * Domain-specific upload configurations with OCR document type mapping
@@ -21,17 +141,17 @@ const DOMAIN_CONFIGS: Record<string, {
   tableName?: string;
   ocrDocumentTypes: string[];
   enableOcr: boolean;
-}> = {
+  }> = {
   financial: {
-    allowedTypes: ['PDF', 'XLSX', 'ZIP'],
-    maxSizeBytes: 25 * 1024 * 1024, // 25MB
+    allowedTypes: ['PDF', 'CSV', 'XLSX', 'DOCX'],
+    maxSizeBytes: 10 * 1024 * 1024, // 10MB MVP guardrail
     tableName: 'FinancialDocument',
     ocrDocumentTypes: ['bank_statement', 'receipt', 'invoice', 'tax_form'],
     enableOcr: true,
   },
   health: {
     allowedTypes: ['PDF', 'PNG', 'JPEG'],
-    maxSizeBytes: 50 * 1024 * 1024, // 50MB
+    maxSizeBytes: 10 * 1024 * 1024, // 10MB MVP guardrail
     tableName: 'HealthDocument',
     ocrDocumentTypes: ['lab_result', 'prescription', 'insurance_card', 'medical_record'],
     enableOcr: true,
@@ -44,8 +164,8 @@ const DOMAIN_CONFIGS: Record<string, {
     enableOcr: true,
   },
   education: {
-    allowedTypes: ['PDF', 'PNG', 'JPEG'],
-    maxSizeBytes: 25 * 1024 * 1024, // 25MB
+    allowedTypes: ['PDF', 'PNG', 'JPEG', 'DOCX', 'XLSX', 'CSV'],
+    maxSizeBytes: 10 * 1024 * 1024, // 10MB MVP guardrail
     tableName: 'EducationDocument',
     ocrDocumentTypes: ['transcript', 'diploma', 'certificate'],
     enableOcr: true,
@@ -83,7 +203,11 @@ function detectDocumentType(filename: string, domain: string, allowedTypes: stri
 /**
  * Check if file type should be processed with OCR
  */
-function shouldProcessWithOcr(mimeType: string): boolean {
+function shouldProcessWithOcr(mimeType: string, detectedType: SupportedFileType): boolean {
+  if (detectedType === 'DOCX' || detectedType === 'XLSX' || detectedType === 'CSV') {
+    return false;
+  }
+
   const ocrMimeTypes = [
     'application/pdf',
     'image/png',
@@ -245,6 +369,19 @@ export async function POST(
       );
     }
 
+    const fileTypeValidation = await validateFileType(file, domainConfig.allowedTypes);
+    if (!fileTypeValidation.valid || !fileTypeValidation.detectedType) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: fileTypeValidation.error || 'Invalid file type',
+        },
+        { status: 400 }
+      );
+    }
+
+    const detectedFileType = fileTypeValidation.detectedType;
+
     // Virus scan before storage (sync mode for small files)
     const scanConfig = getDomainScanConfig(domain);
     let virusScanResult: {
@@ -277,11 +414,23 @@ export async function POST(
       console.error('[Upload] Virus scan error:', scanError);
     }
 
+    // Get document type from form data or detect from filename
+    const documentType = formData.get('documentType') as string ||
+      detectDocumentType(file.name, domain, domainConfig.ocrDocumentTypes);
+
     // Upload to storage
-    const result = await uploadFile(file, domain, userId, {
-      originalFilename: file.name,
-      domain,
-    });
+    const supabaseMode = isSupabaseMvpUploadsEnabled();
+    const result = supabaseMode
+      ? await uploadFileToSupabase({
+        file,
+        domain,
+        userId,
+        documentType,
+      })
+      : await uploadLegacyFile(file, domain, userId, {
+        originalFilename: file.name,
+        domain,
+      });
 
     if (!result.success) {
       console.error(`Upload failed for domain=${domain}, user=${userId}:`, result.error);
@@ -309,15 +458,15 @@ export async function POST(
       }
     }
 
-    // Get document type from form data or detect from filename
-    const documentType = formData.get('documentType') as string ||
-      detectDocumentType(file.name, domain, domainConfig.ocrDocumentTypes);
-
     // Process with OCR if enabled and applicable
     let ocrResult: any = null;
     let extractedData: any = null;
 
-    if (domainConfig.enableOcr && shouldProcessWithOcr(file.type)) {
+    if (
+      !isSupabaseMvpUploadsEnabled()
+      && domainConfig.enableOcr
+      && shouldProcessWithOcr(file.type, detectedFileType)
+    ) {
       try {
         // Call backend OCR service
         const ocrResponse = await fetch(`${process.env.BACKEND_URL || 'http://localhost:8000'}/api/v1/ocr/process`, {
@@ -353,7 +502,80 @@ export async function POST(
     const virusScanStatus = virusScanResult?.scanResult?.status ||
       (asyncScanJobId ? 'pending' : 'skipped');
 
-    // Record upload in database (if table exists)
+    // Record upload in Supabase ingestion table (MVP path)
+    if (supabaseMode) {
+      try {
+        const supabaseResult = result as UploadResult;
+        const supabase = getSupabaseServiceClient();
+        if (!supabase || !supabaseResult.bucketId || !supabaseResult.storagePath) {
+          throw new Error('Supabase upload metadata missing');
+        }
+
+        const { data: uploadDoc, error: uploadDocError } = await supabase
+          .schema('core')
+          .from('upload_documents')
+          .upsert({
+            user_id: userId,
+            domain,
+            bucket_id: supabaseResult.bucketId,
+            storage_path: supabaseResult.storagePath,
+            original_filename: file.name,
+            detected_file_type: detectedFileType,
+            mime_type: file.type || 'application/octet-stream',
+            file_size_bytes: result.size,
+            checksum_sha256: supabaseResult.checksumSha256 || null,
+            ingest_status: 'pending',
+            ocr_status: shouldProcessWithOcr(file.type, detectedFileType) ? 'queued' : 'not_required',
+            metadata: {
+              document_type: documentType,
+              source: 'api.data.upload',
+            },
+          }, {
+            onConflict: 'bucket_id,storage_path',
+            ignoreDuplicates: false,
+          })
+          .select('id, ingest_status')
+          .single();
+
+        if (uploadDocError) {
+          throw new Error(uploadDocError.message);
+        }
+
+        const processingTime = Date.now() - startTime;
+        return NextResponse.json({
+          success: true,
+          fileId: result.fileId,
+          fileUrl: result.fileUrl,
+          documentId: uploadDoc?.id,
+          size: result.size,
+          provider: result.provider,
+          detectedFileType,
+          documentType,
+          ingestStatus: uploadDoc?.ingest_status || 'queued',
+          ocrProcessed: false,
+          extractedData: null,
+          virusScan: {
+            status: virusScanStatus,
+            scannedAt: virusScanResult?.scanResult?.scannedAt,
+            asyncJobId: asyncScanJobId,
+          },
+          processingTime,
+          message: 'File uploaded successfully and queued for ingestion',
+        });
+      } catch (supabaseQueueError) {
+        console.error('[Upload] Failed to enqueue Supabase ingestion:', supabaseQueueError);
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Upload succeeded but ingestion queue failed',
+            details: supabaseQueueError instanceof Error ? supabaseQueueError.message : String(supabaseQueueError),
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Record upload in database (legacy path, if table exists)
     let documentId: string | undefined;
     try {
       // Generic document record - adapt based on your schema
@@ -393,6 +615,7 @@ export async function POST(
       documentId,
       size: result.size,
       provider: result.provider,
+      detectedFileType,
       documentType,
       ocrProcessed: ocrResult?.success ?? false,
       extractedData: extractedData ? {
@@ -488,8 +711,31 @@ export async function DELETE(
     }
 
     // Delete from storage
-    const { deleteFile } = await import('@/lib/services/storage');
-    const deleted = await deleteFile(fileId);
+    let deleted = false;
+    if (fileId.startsWith('supabase://')) {
+      try {
+        const supabase = getSupabaseServiceClient();
+        if (!supabase) throw new Error('Supabase service role not configured');
+
+        const withoutProtocol = fileId.replace('supabase://', '');
+        const firstSlash = withoutProtocol.indexOf('/');
+        const bucketId = withoutProtocol.substring(0, firstSlash);
+        const storagePath = withoutProtocol.substring(firstSlash + 1);
+
+        const { error: removeError } = await supabase.storage
+          .from(bucketId)
+          .remove([storagePath]);
+        if (removeError) {
+          throw new Error(removeError.message);
+        }
+        deleted = true;
+      } catch (removeSbError) {
+        console.warn(`Failed to delete Supabase file: ${fileId}`, removeSbError);
+      }
+    } else {
+      const { deleteFile } = await import('@/lib/services/storage');
+      deleted = await deleteFile(fileId);
+    }
 
     if (!deleted) {
       console.warn(`Failed to delete file from storage: ${fileId}`);

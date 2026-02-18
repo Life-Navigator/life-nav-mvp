@@ -4,7 +4,6 @@
  */
 
 import Bull, { Queue, Job, JobOptions } from 'bull';
-import { redisClient } from '../cache/redis-client';
 
 export interface QueueConfig {
   name: string;

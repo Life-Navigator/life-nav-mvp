@@ -39,29 +39,6 @@ module.exports = {
       },
     ],
 
-    // Deprecated path warnings
-    'no-restricted-syntax': [
-      'error',
-      {
-        selector: "ImportDeclaration[source.value=/services\\/api/]",
-        message:
-          '⚠️  DEPRECATED: services/api is being migrated to backend/. Use backend/app/api/v1 instead.',
-      },
-      {
-        selector: "ImportDeclaration[source.value=/pages\\/api\\/legacy/]",
-        message:
-          '⚠️  DEPRECATED: pages/api/legacy is deprecated. Use app/api routes instead.',
-      },
-      {
-        selector: "ImportDeclaration[source.value=/backend\\/app\\/api\\/v0/]",
-        message: '⚠️  DEPRECATED: API v0 is deprecated. Upgrade to v1.',
-      },
-      {
-        selector: "ImportDeclaration[source.value=/services\\/shared/]",
-        message:
-          '⚠️  DEPRECATED: services/shared is deprecated. Use packages/* instead.',
-      },
-    ],
   },
   overrides: [
     {

@@ -34,12 +34,39 @@ const FILE_SIGNATURES = {
   PPTX: { bytes: [0x50, 0x4B, 0x03, 0x04], offset: 0, mimeTypes: ['application/vnd.openxmlformats-officedocument.presentationml.presentation'] },
 } as const;
 
-export type SupportedFileType = keyof typeof FILE_SIGNATURES;
+type SignatureFileType = keyof typeof FILE_SIGNATURES;
+export type SupportedFileType = SignatureFileType | 'CSV';
+type OfficeContainerType = 'DOCX' | 'XLSX' | 'PPTX';
+type FileSignature = {
+  bytes: readonly number[];
+  offset: number;
+  mimeTypes: readonly string[];
+  extraCheck?: (buffer: Uint8Array) => boolean;
+};
+
+const OFFICE_MIME_TO_TYPE: Record<string, OfficeContainerType> = {
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'PPTX',
+};
+
+const OFFICE_EXTENSION_TO_TYPE: Record<string, OfficeContainerType> = {
+  docx: 'DOCX',
+  xlsx: 'XLSX',
+  pptx: 'PPTX',
+};
+
+const CSV_MIME_TYPES = new Set([
+  'text/csv',
+  'application/csv',
+  'text/x-csv',
+  'application/vnd.ms-excel', // Common browser MIME for CSV files.
+]);
 
 /**
  * Check if bytes match a signature
  */
-function matchesSignature(buffer: Uint8Array, signature: typeof FILE_SIGNATURES[SupportedFileType]): boolean {
+function matchesSignature(buffer: Uint8Array, signature: FileSignature): boolean {
   if (buffer.length < signature.offset + signature.bytes.length) {
     return false;
   }
@@ -51,7 +78,7 @@ function matchesSignature(buffer: Uint8Array, signature: typeof FILE_SIGNATURES[
   }
 
   // Check extra validation if provided
-  if (signature.extraCheck) {
+  if ('extraCheck' in signature && signature.extraCheck) {
     return signature.extraCheck(buffer);
   }
 
@@ -67,11 +94,57 @@ export function detectFileType(buffer: ArrayBuffer | Uint8Array): SupportedFileT
   // Check against all known signatures
   for (const [fileType, signature] of Object.entries(FILE_SIGNATURES)) {
     if (matchesSignature(bytes, signature)) {
-      return fileType as SupportedFileType;
+      return fileType as SignatureFileType;
     }
   }
 
   return null;
+}
+
+function getFileExtension(filename: string): string {
+  const parts = filename.toLowerCase().split('.');
+  return parts.length > 1 ? parts[parts.length - 1] : '';
+}
+
+function normalizeMimeType(mimeType: string): string {
+  return mimeType.trim().toLowerCase();
+}
+
+function isLikelyTextData(bytes: Uint8Array): boolean {
+  if (bytes.length === 0) return false;
+  let printable = 0;
+
+  for (const byte of bytes) {
+    const isWhitespace = byte === 9 || byte === 10 || byte === 13; // tab/newline/carriage return
+    const isAsciiPrintable = byte >= 32 && byte <= 126;
+    if (isWhitespace || isAsciiPrintable) {
+      printable++;
+    }
+  }
+
+  return printable / bytes.length > 0.9;
+}
+
+function looksLikeCsv(bytes: Uint8Array): boolean {
+  if (!isLikelyTextData(bytes)) return false;
+  const sample = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+  const lines = sample
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+
+  if (lines.length === 0) return false;
+  return lines.some((line) => line.includes(',') || line.includes(';') || line.includes('\t'));
+}
+
+function inferOfficeContainerType(
+  detectedType: SupportedFileType | null,
+  normalizedMimeType: string,
+  extension: string
+): SupportedFileType | null {
+  if (detectedType !== 'ZIP') return detectedType;
+  return OFFICE_MIME_TO_TYPE[normalizedMimeType] || OFFICE_EXTENSION_TO_TYPE[extension] || 'ZIP';
 }
 
 /**
@@ -82,10 +155,20 @@ export async function validateFileType(
   allowedTypes: SupportedFileType[]
 ): Promise<{ valid: boolean; detectedType: SupportedFileType | null; error?: string }> {
   try {
-    // Read first 32 bytes (enough for most signatures)
-    const slice = file.slice(0, 32);
+    const normalizedMimeType = normalizeMimeType(file.type || '');
+    const extension = getFileExtension(file.name || '');
+
+    // Read first 512 bytes to support text-based heuristics (CSV).
+    const slice = file.slice(0, 512);
     const buffer = await slice.arrayBuffer();
-    const detectedType = detectFileType(buffer);
+    const bytes = new Uint8Array(buffer);
+    let detectedType = detectFileType(bytes);
+    detectedType = inferOfficeContainerType(detectedType, normalizedMimeType, extension);
+
+    // CSV has no reliable magic number. Use MIME/extension + text heuristic.
+    if (!detectedType && (CSV_MIME_TYPES.has(normalizedMimeType) || extension === 'csv') && looksLikeCsv(bytes)) {
+      detectedType = 'CSV' as SupportedFileType;
+    }
 
     if (!detectedType) {
       return {
@@ -103,14 +186,31 @@ export async function validateFileType(
       };
     }
 
-    // Also verify MIME type matches detected type (defense in depth)
-    const signature = FILE_SIGNATURES[detectedType];
-    if (!signature.mimeTypes.includes(file.type)) {
-      return {
-        valid: false,
-        detectedType,
-        error: `File MIME type (${file.type}) does not match detected file type (${detectedType})`,
-      };
+    if (detectedType === 'CSV') {
+      if (!(CSV_MIME_TYPES.has(normalizedMimeType) || extension === 'csv')) {
+        return {
+          valid: false,
+          detectedType,
+          error: `File MIME type (${file.type}) does not match detected file type (${detectedType})`,
+        };
+      }
+    } else {
+      // Also verify MIME type matches detected type (defense in depth).
+      // For ZIP-based office files, allow extension fallback where browsers emit generic ZIP MIME.
+      const signature = FILE_SIGNATURES[detectedType as SignatureFileType];
+      const mimeMatches = (signature.mimeTypes as readonly string[]).includes(normalizedMimeType);
+      const officeTypeFromExtension = OFFICE_EXTENSION_TO_TYPE[extension];
+      const isOfficeFallback =
+        (detectedType === 'DOCX' || detectedType === 'XLSX' || detectedType === 'PPTX') &&
+        officeTypeFromExtension === detectedType;
+
+      if (!mimeMatches && !isOfficeFallback) {
+        return {
+          valid: false,
+          detectedType,
+          error: `File MIME type (${file.type}) does not match detected file type (${detectedType})`,
+        };
+      }
     }
 
     return {
@@ -182,6 +282,10 @@ export function getMimeTypes(fileTypes: SupportedFileType[]): string[] {
   const mimeTypes = new Set<string>();
 
   for (const fileType of fileTypes) {
+    if (fileType === 'CSV') {
+      CSV_MIME_TYPES.forEach((mime) => mimeTypes.add(mime));
+      continue;
+    }
     const signature = FILE_SIGNATURES[fileType];
     signature.mimeTypes.forEach(mime => mimeTypes.add(mime));
   }

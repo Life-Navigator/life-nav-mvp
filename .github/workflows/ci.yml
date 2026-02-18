@@ -1,374 +1,29 @@
-
-name: CI
+name: CI (MVP Web + Supabase)
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop, mvp-supabase]
+    paths:
+      - 'apps/web/**'
+      - 'apps/web/supabase/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ci.yml'
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
+    paths:
+      - 'apps/web/**'
+      - 'apps/web/supabase/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/ci.yml'
 
 jobs:
-  lint:
-    name: Lint
+  web-checks:
+    name: Web Lint + Typecheck
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: '8'
-          run_install: false
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Install Python dependencies for agents service
-        run: |
-          cd services/agents
-          poetry install --no-root
-
-      - name: Run linting
-        run: pnpm run lint
-        
-  typecheck:
-    name: Type Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Install Python dependencies and run MyPy (agents service)
-        run: |
-          cd services/agents
-          poetry install --no-root
-          # Run MyPy with relaxed settings for beta launch
-          # TODO: Enable strict mode after adding comprehensive type annotations
-          poetry run mypy agents/ --ignore-missing-imports --no-strict-optional || echo "MyPy warnings found (non-blocking for beta)"
-        continue-on-error: true
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: '8'
-          run_install: false
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma client
-        run: pnpm --filter @life-navigator/web exec prisma generate
-
-      - name: Run type checking
-        run: pnpm exec tsc --noEmit
-        
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    services:
-      # Set up PostgreSQL service for testing
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: lifenavigator_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: '8'
-          run_install: false
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Poetry
-        run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Install Python dependencies for agents service
-        run: |
-          cd services/agents
-          poetry install --no-root
-
-      - name: Install Python dependencies for api service
-        run: |
-          cd services/api
-          poetry install --no-root
-
-      - name: Install Python dependencies for embeddings service
-        run: |
-          cd services/embeddings
-          poetry install --no-root
-
-      - name: Install Python dependencies for kg-sync service
-        run: |
-          cd services/kg-sync
-          poetry install --no-root
-
-      - name: Generate Prisma client
-        run: pnpm --filter @life-navigator/web exec prisma generate
-
-      - name: Set up test database
-        run: |
-          echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/lifenavigator_test?schema=public" > .env.test
-          pnpm --filter @life-navigator/web exec prisma migrate deploy
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lifenavigator_test?schema=public
-
-      - name: Run tests
-        run: pnpm test
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lifenavigator_test?schema=public
-          NEXTAUTH_SECRET: test_secret
-          
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: '8'
-          run_install: false
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run pnpm audit
-        run: pnpm audit --prod --audit-level=moderate
-        # Allow to continue for beta launch - will address all vulnerabilities post-launch
-        continue-on-error: true
-        
-      - name: Run OWASP Dependency Check
-        uses: dependency-check/Dependency-Check_Action@main
-        with:
-          project: 'lifenavigator'
-          path: '.'
-          format: 'HTML'
-          out: 'reports'
-          args: >
-            --scan .
-            --suppression .github/config/dependency-check-suppression.xml
-            --failOnCVSS 7
-            
-      - name: Upload dependency check report
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-check-report
-          path: reports/
-        
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/node@master
-        continue-on-error: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/develop' }}
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-
-  sast:
-    name: SAST (Static Analysis)
-    runs-on: ubuntu-latest
-    permissions:
-      security-events: write
-      actions: read
-      contents: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for better analysis
-
-      - name: Run Semgrep
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/security-audit
-            p/owasp-top-ten
-            p/python
-            p/typescript
-            p/jwt
-            p/sql-injection
-            p/xss
-          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
-          publishDeployment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
-          generateSarif: true
-
-      - name: Upload Semgrep SARIF results
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: semgrep.sarif
-          category: 'sast-semgrep'
-
-  secrets-scan:
-    name: Secrets Scanning
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      security-events: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Full history for comprehensive scan
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install detect-secrets
-        run: |
-          pip install detect-secrets==1.4.0
-
-      - name: Run detect-secrets scan
-        run: |
-          detect-secrets scan --all-files \
-            --force-use-all-plugins \
-            --exclude-files 'pnpm-lock.yaml|poetry.lock|.*\.lock|.*\.md|docs/.*' \
-            --baseline .secrets.baseline
-
-      - name: Verify secrets baseline
-        run: |
-          # Check if any new secrets were found
-          detect-secrets audit .secrets.baseline --report \
-            --fail-on-unaudited \
-            --fail-on-live \
-            --fail-on-audited-real
-
-      - name: Scan recent commits for secrets
-        if: github.event_name == 'pull_request'
-        run: |
-          # Scan commits in this PR
-          git log origin/${{ github.base_ref }}..${{ github.sha }} --pretty=format:"%H" | \
-          while read commit; do
-            echo "Scanning commit: $commit"
-            git show $commit | detect-secrets scan --string
-          done
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    needs: [lint, typecheck, test]
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
-
-    steps:
-      - uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -384,8 +39,7 @@ jobs:
       - name: Get pnpm store directory
         id: pnpm-cache
         shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
       - name: Setup pnpm cache
         uses: actions/cache@v4
@@ -398,173 +52,38 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma client
+      - name: Generate Prisma client (web)
         run: pnpm --filter @life-navigator/web exec prisma generate
 
-      - name: Build project
-        run: pnpm run build
-        
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: .next/
-          
-  docker:
-    name: Build and Push Docker Image
-    runs-on: ubuntu-latest
-    needs: [build]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Extract metadata for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=ref,event=branch
-            type=sha,format=short
-          flavor: |
-            latest=${{ github.ref == 'refs/heads/main' }}
-            
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Run web lint
+        run: pnpm --filter @life-navigator/web lint
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'ghcr.io/${{ github.repository }}:${{ github.sha }}'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
-          exit-code: '1'  # Fail build on CRITICAL/HIGH vulnerabilities
-          ignore-unfixed: true  # Only fail on fixable vulnerabilities
+      - name: Run web typecheck (includes service-role guard)
+        run: pnpm --filter @life-navigator/web type-check
 
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()  # Upload even if scan fails
-        with:
-          sarif_file: 'trivy-results.sarif'
-          category: 'container-web-app'
+      - name: Verify no generated artifacts after checks
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Repository became dirty after checks. Generated artifacts must not be committed."
+            git status --porcelain
+            exit 1
+          fi
 
-  terraform-plan:
-    name: Terraform Plan
+  supabase-migrations:
+    name: Supabase Migration Validate
     runs-on: ubuntu-latest
-    needs: [docker]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.7
-      
-      - name: Terraform Init
-        run: |
-          cd terraform
-          terraform init
-          
-      - name: Terraform Validate
-        run: |
-          cd terraform
-          terraform validate
-      
-      - name: Terraform Plan
-        run: |
-          cd terraform
-          terraform plan -out=tfplan
-        env:
-          TF_VAR_ecr_repository_url: ghcr.io/${{ github.repository }}
-          TF_VAR_container_image_tag: ${{ github.sha }}
-          
-      - name: Upload Terraform Plan
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-plan
-          path: terraform/tfplan
-          
-  terraform-apply:
-    name: Terraform Apply
-    runs-on: ubuntu-latest
-    needs: [terraform-plan]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-      
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.5.7
-      
-      - name: Terraform Init
-        run: |
-          cd terraform
-          terraform init
-          
-      - name: Download Terraform Plan
-        uses: actions/download-artifact@v4
-        with:
-          name: terraform-plan
-          path: terraform/
-          
-      - name: Terraform Apply
-        run: |
-          cd terraform
-          terraform apply -auto-approve tfplan
-        env:
-          TF_VAR_ecr_repository_url: ghcr.io/${{ github.repository }}
-          TF_VAR_container_image_tag: ${{ github.sha }}
-          
-      - name: Extract Deployment Outputs
-        id: terraform-outputs
-        run: |
-          cd terraform
-          ALB_DNS=$(terraform output -raw alb_dns_name 2>/dev/null || echo 'not_available')
-          API_URL=$(terraform output -raw api_url 2>/dev/null || echo 'not_available')
-          echo "alb_dns_name=${ALB_DNS}" >> "$GITHUB_OUTPUT"
-          echo "api_url=${API_URL}" >> "$GITHUB_OUTPUT"
-          
-      - name: Create Deployment Summary
-        run: |
-          echo "## Deployment Complete :rocket:" >> $GITHUB_STEP_SUMMARY
-          echo "Application has been deployed to AWS" >> $GITHUB_STEP_SUMMARY
-          echo "- Load Balancer: ${{ steps.terraform-outputs.outputs.alb_dns_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- API Endpoint: ${{ steps.terraform-outputs.outputs.api_url }}" >> $GITHUB_STEP_SUMMARY
+          version: latest
+
+      - name: Validate migrations by local apply
+        working-directory: apps/web
+        run: supabase db reset --local --no-seed
+

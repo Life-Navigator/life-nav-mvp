@@ -14,6 +14,7 @@ htmlcov/
 dist/
 build/
 .next/
+*.tsbuildinfo
 out/
 *.whl
 *.egg-info/
