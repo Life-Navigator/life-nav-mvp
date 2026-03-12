@@ -1,175 +1,106 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
-import { safeParseJSON } from '@/lib/utils/validation';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
-// Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
-// Private environment variables (server-side only)
-// These are NOT exposed to the browser
-const AGENT_API_URL = process.env.AGENT_API_URL || 'http://localhost:8080';
-const AGENT_API_KEY = process.env.AGENT_INTERNAL_API_KEY;
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const GRAPHRAG_WORKER_SECRET = process.env.GRAPHRAG_WORKER_SECRET;
 
 interface ChatRequest {
-  agent_id: string;
   message: string;
   conversation_id?: string;
-  context?: Record<string, any>;
+  previous_messages?: Array<{ role: string; content: string }>;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserIdFromJWT(request);
-    if (!userId) {
+    // Authenticate via Supabase session
+    const supabase = await createServerSupabaseClient();
+    if (!supabase) {
+      return NextResponse.json({ error: 'Server not configured' }, { status: 503 });
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await safeParseJSON<ChatRequest>(request);
-    const { agent_id, message, conversation_id, context } = body;
+    const body: ChatRequest = await request.json();
+    const { message, conversation_id, previous_messages } = body;
 
-    if (!agent_id || !message) {
-      return NextResponse.json(
-        { error: 'agent_id and message are required' },
-        { status: 400 }
-      );
+    if (!message) {
+      return NextResponse.json({ error: 'message is required' }, { status: 400 });
     }
 
-    // Check if streaming is requested via query param
+    // Determine streaming mode
     const url = new URL(request.url);
     const shouldStream = url.searchParams.get('stream') === 'true';
 
-    if (shouldStream) {
-      // Return streaming response
-      return streamChatResponse(userId, agent_id, message, conversation_id, context);
-    }
-
-    // Call agent chat endpoint (non-streaming)
-    // Include API key for internal service authentication
+    // Call GraphRAG Query Edge Function
+    const edgeFunctionUrl = `${SUPABASE_URL}/functions/v1/graphrag-query`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
-    if (AGENT_API_KEY) {
-      headers['X-API-Key'] = AGENT_API_KEY;
+    // Use worker secret for service-to-service auth
+    if (GRAPHRAG_WORKER_SECRET) {
+      headers['x-worker-secret'] = GRAPHRAG_WORKER_SECRET;
     }
 
-    const chatApiResponse = await fetch(`${AGENT_API_URL}/chat`, {
+    const edgeResponse = await fetch(edgeFunctionUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        message,
-        user_id: userId,
-        agent_id,
+        query: message,
+        user_id: user.id,
+        stream: shouldStream,
         conversation_id,
-        context,
+        previous_messages,
       }),
     });
 
-    if (!chatApiResponse.ok) {
-      const errorText = await chatApiResponse.text();
-      console.error('Agent chat failed:', errorText);
+    if (!edgeResponse.ok) {
+      const errText = await edgeResponse.text();
+      console.error('GraphRAG query failed:', errText);
       return NextResponse.json(
-        { error: 'Agent chat failed', details: errorText },
-        { status: chatApiResponse.status }
+        { error: 'AI query failed', details: errText },
+        { status: edgeResponse.status },
       );
     }
 
-    const agentResponse = await chatApiResponse.json();
+    // Streaming: pipe SSE through
+    if (shouldStream && edgeResponse.body) {
+      return new Response(edgeResponse.body, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
+    }
 
-    // Transform response to expected chat format
-    const chatResponse = {
-      message: agentResponse.response || agentResponse.message || 'I processed your request.',
-      agent_id,
-      conversation_id: conversation_id || agentResponse.conversation_id || `conv_${Date.now()}`,
+    // Non-streaming: return JSON
+    const result = await edgeResponse.json();
+
+    return NextResponse.json({
+      message: result.message,
+      conversation_id: result.conversation_id || conversation_id || `conv_${Date.now()}`,
       timestamp: new Date().toISOString(),
-      context: agentResponse.context,
-    };
-
-    return NextResponse.json(chatResponse);
+      sources: result.sources,
+      metadata: result.metadata,
+    });
   } catch (error) {
-    console.error('Error in chat proxy:', error);
+    console.error('Chat route error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      {
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 },
     );
   }
-}
-
-async function streamChatResponse(
-  userId: string,
-  agentId: string,
-  message: string,
-  conversationId?: string,
-  context?: Record<string, any>
-) {
-  // First, get the full response from the agent
-  // Include API key for internal service authentication
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-
-  if (AGENT_API_KEY) {
-    headers['X-API-Key'] = AGENT_API_KEY;
-  }
-
-  const chatApiResponse = await fetch(`${AGENT_API_URL}/chat`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      message,
-      user_id: userId,
-      agent_id: agentId,
-      conversation_id: conversationId,
-      context,
-    }),
-  });
-
-  if (!chatApiResponse.ok) {
-    throw new Error(`Agent chat failed: ${chatApiResponse.statusText}`);
-  }
-
-  const agentResponse = await chatApiResponse.json();
-  const fullMessage = agentResponse.response || agentResponse.message || 'I processed your request.';
-
-  // Create a streaming response
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        // Split message into words for streaming effect
-        const words = fullMessage.split(' ');
-
-        for (let i = 0; i < words.length; i++) {
-          const word = words[i];
-          const chunk = i === 0 ? word : ' ' + word;
-
-          // Send the word
-          controller.enqueue(encoder.encode(chunk));
-
-          // Add delay between words for typing effect (adjust speed here)
-          await new Promise(resolve => setTimeout(resolve, 30));
-        }
-
-        // Send metadata at the end
-        controller.enqueue(encoder.encode('\n\n__METADATA__\n'));
-        controller.enqueue(encoder.encode(JSON.stringify({
-          agent_id: agentId,
-          conversation_id: conversationId || agentResponse.conversation_id || `conv_${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          context: agentResponse.context,
-        })));
-
-        controller.close();
-      } catch (error) {
-        controller.error(error);
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/plain; charset=utf-8',
-      'Transfer-Encoding': 'chunked',
-    },
-  });
 }
