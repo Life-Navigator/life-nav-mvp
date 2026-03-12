@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "prisma generate && next build",
+  "buildCommand": "next build",
   "framework": "nextjs",
   "installCommand": "pnpm install",
   "devCommand": "next dev",
@@ -53,14 +53,6 @@
     {
       "source": "/health",
       "destination": "/api/health"
-    },
-    {
-      "source": "/dgx-api/:path*",
-      "destination": "${DGX_API_URL}/:path*"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production",
-    "NEXT_PUBLIC_APP_ENV": "production"
-  }
+  ]
 }
