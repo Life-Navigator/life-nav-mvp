@@ -39,6 +39,9 @@ Thumbs.db
 # Turbo
 .turbo
 
+# Claude Code
+.claude/
+
 # Testing
 coverage/
 .nyc_output
