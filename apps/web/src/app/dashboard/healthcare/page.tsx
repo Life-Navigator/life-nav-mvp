@@ -9,6 +9,22 @@ import {
 import { LockClosedIcon, DocumentIcon, CloudArrowUpIcon } from '@heroicons/react/24/outline';
 
 const HealthcareDashboard = () => {
+  const lockFutureFeatures = true;
+  const LockedBadge = () => (
+    <span className="ml-2 inline-flex items-center rounded-full bg-gray-200 text-gray-700 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide">
+      Locked
+    </span>
+  );
+  const LockedOverlay = ({ label = "Locked for launch" }: { label?: string }) => (
+    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-white/70 dark:bg-gray-900/70 backdrop-blur-[2px]">
+      <div className="flex items-center gap-2 rounded-full bg-gray-900/90 px-4 py-2 text-sm font-semibold text-white">
+        <LockClosedIcon className="h-4 w-4" />
+        {label}
+      </div>
+    </div>
+  );
+  const lockedClass = lockFutureFeatures ? "relative overflow-hidden" : "";
+  const lockedContentClass = lockFutureFeatures ? "pointer-events-none opacity-60" : "";
   // State for health data
   const [healthData, setHealthData] = useState({
     healthScoreHistory: [] as { date: string; score: number }[],
@@ -90,9 +106,14 @@ const HealthcareDashboard = () => {
       
       {/* Health summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Health Score</h2>
-          <div className="flex items-center">
+        <div className={`bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md ${lockedClass}`}>
+          {lockFutureFeatures && <LockedOverlay />}
+          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            Health Score
+            {lockFutureFeatures && <LockedBadge />}
+          </h2>
+          <div className={lockedContentClass}>
+            <div className="flex items-center">
             <div className="relative w-16 h-16">
               <svg className="w-full h-full" viewBox="0 0 36 36">
                 <path
@@ -129,7 +150,7 @@ const HealthcareDashboard = () => {
               </div>
             </div>
           </div>
-          <div className="mt-2 text-sm text-green-600 dark:text-green-400">
+            <div className="mt-2 text-sm text-green-600 dark:text-green-400">
             {(() => {
               if (healthData.healthScoreHistory.length < 2) return 'Add more data to track progress';
               const currentScore = healthData.healthScoreHistory[healthData.healthScoreHistory.length - 1].score;
@@ -144,12 +165,18 @@ const HealthcareDashboard = () => {
               }
               return 'No change this month';
             })()}
+            </div>
           </div>
         </div>
         
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Vital Signs</h2>
-          <div className="space-y-2">
+        <div className={`bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md ${lockedClass}`}>
+          {lockFutureFeatures && <LockedOverlay />}
+          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            Vital Signs
+            {lockFutureFeatures && <LockedBadge />}
+          </h2>
+          <div className={lockedContentClass}>
+            <div className="space-y-2">
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-500 dark:text-gray-400">Blood Pressure</span>
               <span className="font-medium text-gray-900 dark:text-white">
@@ -169,14 +196,20 @@ const HealthcareDashboard = () => {
               </span>
             </div>
           </div>
-          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             Last updated: {healthData.vitalSigns.bloodPressure.date ? new Date(healthData.vitalSigns.bloodPressure.date).toLocaleDateString() : 'No data yet'}
+            </div>
           </div>
         </div>
         
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Medication Adherence</h2>
-          <div className="flex items-center">
+        <div className={`bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md ${lockedClass}`}>
+          {lockFutureFeatures && <LockedOverlay />}
+          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">
+            Medication Adherence
+            {lockFutureFeatures && <LockedBadge />}
+          </h2>
+          <div className={lockedContentClass}>
+            <div className="flex items-center">
             <div className="relative w-16 h-16">
               <svg className="w-full h-full" viewBox="0 0 36 36">
                 <path
@@ -206,14 +239,20 @@ const HealthcareDashboard = () => {
                 </div>
               ))}
             </div>
+            </div>
           </div>
         </div>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Health score trend */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Health Score Trend</h2>
+        <div className={`bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md ${lockedClass}`}>
+          {lockFutureFeatures && <LockedOverlay />}
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+            Health Score Trend
+            {lockFutureFeatures && <LockedBadge />}
+          </h2>
+          <div className={lockedContentClass}>
           {healthData.healthScoreHistory.length > 0 ? (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -254,11 +293,17 @@ const HealthcareDashboard = () => {
               </button>
             </div>
           )}
+          </div>
         </div>
         
         {/* Activity data */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Weekly Activity</h2>
+        <div className={`bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md ${lockedClass}`}>
+          {lockFutureFeatures && <LockedOverlay />}
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+            Weekly Activity
+            {lockFutureFeatures && <LockedBadge />}
+          </h2>
+          <div className={lockedContentClass}>
           {healthData.activityData.length > 0 ? (
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
@@ -289,13 +334,19 @@ const HealthcareDashboard = () => {
               </button>
             </div>
           )}
+          </div>
         </div>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Sleep data */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Sleep Quality</h2>
+        <div className={`bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md ${lockedClass}`}>
+          {lockFutureFeatures && <LockedOverlay />}
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+            Sleep Quality
+            {lockFutureFeatures && <LockedBadge />}
+          </h2>
+          <div className={lockedContentClass}>
           {healthData.sleepData.length > 0 ? (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -326,6 +377,7 @@ const HealthcareDashboard = () => {
               </button>
             </div>
           )}
+          </div>
         </div>
         
         {/* Upcoming appointments */}
@@ -350,9 +402,12 @@ const HealthcareDashboard = () => {
                 </div>
               ))}
               <div className="mt-4 text-center">
-                <button className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium">
+                <Link
+                  href="/dashboard/healthcare/appointments"
+                  className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
+                >
                   Schedule New Appointment
-                </button>
+                </Link>
               </div>
             </div>
           ) : (
@@ -362,9 +417,12 @@ const HealthcareDashboard = () => {
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                 Schedule your health checkups and specialist visits
               </p>
-              <button className="px-6 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg transition-colors">
+              <Link
+                href="/dashboard/healthcare/appointments"
+                className="px-6 py-2 bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white rounded-lg transition-colors"
+              >
                 Schedule Appointment
-              </button>
+              </Link>
             </div>
           )}
         </div>
@@ -444,7 +502,7 @@ const HealthcareDashboard = () => {
           <div>
             <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Secure Document Vault</h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Store and manage your sensitive medical documents with end-to-end encryption
+              Insurance cards available now. Medical records and lab documents coming soon.
             </p>
           </div>
           <Link
@@ -463,7 +521,7 @@ const HealthcareDashboard = () => {
             <div>
               <h3 className="font-medium text-gray-900 dark:text-white">Ultra Secure Document Vault</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Your insurance cards, medical records, and important documents - securely encrypted and available when you need them.
+                Store your insurance cards securely. Medical records and other documents are coming soon.
               </p>
               <div className="mt-3 flex space-x-4">
                 <Link
@@ -509,9 +567,14 @@ const HealthcareDashboard = () => {
       </div>
 
       {/* Health insights and recommendations */}
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Health Insights</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className={`bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md ${lockedClass}`}>
+        {lockFutureFeatures && <LockedOverlay />}
+        <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
+          Health Insights
+          {lockFutureFeatures && <LockedBadge />}
+        </h2>
+        <div className={lockedContentClass}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {(() => {
             const insights = [];
 
@@ -636,6 +699,7 @@ const HealthcareDashboard = () => {
 
             return insights.slice(0, 3);
           })()}
+          </div>
         </div>
       </div>
     </div>

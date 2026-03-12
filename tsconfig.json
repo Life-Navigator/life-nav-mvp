@@ -1,49 +1,39 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Default",
   "compilerOptions": {
     "composite": false,
     "declaration": true,
     "declarationMap": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "inlineSources": false,
     "isolatedModules": true,
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "preserveWatchOutput": true,
     "skipLibCheck": true,
     "strict": true,
     "strictNullChecks": true,
-    "target": "ES2020",
+    "target": "ES2022",
     "module": "ESNext",
-    "lib": ["ES2020"],
+    "lib": ["ES2022"],
     "jsx": "react-jsx",
     "resolveJsonModule": true,
     "allowJs": true,
     "incremental": true,
     "paths": {
       "@life-navigator/ui-components": ["./packages/ui-components/src"],
-      "@life-navigator/api-client": ["./packages/api-client/src"],
-      "@life-navigator/ontology-sdk": ["./packages/ontology-sdk/typescript"],
-      "@life-navigator/provenance": ["./packages/provenance/src"]
+      "@life-navigator/supabase": ["./packages/supabase/src"],
+      "@life-navigator/risk-client": ["./packages/risk-client/src"]
     }
   },
-  "files": [],
-  "include": [],
   "exclude": [
     "node_modules",
     "dist",
     "build",
     ".next",
     "coverage",
-    "apps/mobile",
     "**/node_modules",
     "**/.next",
-    "**/dist",
-    "**/build",
-    "**/*.config.js",
-    "**/*.config.ts"
+    "**/dist"
   ]
 }

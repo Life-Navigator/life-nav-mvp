@@ -74,7 +74,7 @@ export class RiskClient {
     const data = await response.json();
 
     // Validate response
-    return RiskResponseSchema.parse(data);
+    return RiskResponseSchema.parse(data) as RiskResponse;
   }
 
   /**

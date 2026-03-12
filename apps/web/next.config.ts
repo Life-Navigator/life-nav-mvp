@@ -62,10 +62,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // Standalone output for Docker/Cloud Run deployment
-  output: 'standalone',
   reactStrictMode: true,
-  swcMinify: true, // Use SWC minification for better performance
   images: {
     remotePatterns: [
       {
@@ -102,14 +99,7 @@ const nextConfig: NextConfig = {
     styledComponents: true
   },
   // Ensure client components are built correctly
-  experimental: {
-    // External packages that should be processed by webpack
-    serverComponentsExternalPackages: [
-      'bcrypt',
-      'crypto',
-      '@prisma/client'
-    ]
-  }
+  experimental: {}
 };
 
 export default nextConfig;

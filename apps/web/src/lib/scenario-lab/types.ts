@@ -545,3 +545,132 @@ export interface RateLimitCheck {
   limit: number;
   reset_at: string;
 }
+
+// ============================================================================
+// TIMELINE PLAYBACK TYPES
+// ============================================================================
+
+export type PlaybackSpeed = 'slow' | 'normal' | 'fast' | 'instant';
+export type TimeStep = 'month' | 'quarter' | 'year';
+export type PlaybackState = 'idle' | 'playing' | 'paused' | 'completed';
+export type PathType = 'best' | 'likely' | 'worst';
+export type LifeEventType = 'marriage' | 'child_birth' | 'home_purchase' | 'education' | 'career_change' | 'health' | 'retirement' | 'other';
+export type EventSeverity = 'positive' | 'neutral' | 'negative';
+
+export interface TimelinePlaybackConfig {
+  startDate: Date;
+  endDate: Date;
+  playbackSpeed: PlaybackSpeed;
+  pauseOnEvents: boolean;
+  stepSize: TimeStep;
+  showMultiplePaths: boolean;
+  enableNotifications: boolean;
+  autoAdvance: boolean;
+}
+
+export interface TimelineState {
+  currentDate: Date;
+  progress: number; // 0-100
+  playbackState: PlaybackState;
+  elapsedMonths: number;
+  totalMonths: number;
+}
+
+export interface TimePoint {
+  date: Date;
+  age: number;
+  netWorth: number;
+  income: number;
+  expenses: number;
+  investments: number;
+  debts: number;
+  goalProgress: Record<string, number>; // goal_id -> progress (0-100)
+}
+
+export interface PathData {
+  type: PathType;
+  color: string;
+  timePoints: TimePoint[];
+  successProbability: number;
+}
+
+export interface LifeEvent {
+  id: string;
+  date: Date;
+  type: LifeEventType;
+  title: string;
+  description: string;
+  severity: EventSeverity;
+  icon: string;
+  impactSummary?: {
+    netWorthChange?: number;
+    incomeChange?: number;
+    expenseChange?: number;
+  };
+}
+
+export interface Milestone {
+  id: string;
+  date: Date;
+  title: string;
+  description: string;
+  type: 'financial' | 'career' | 'education' | 'health' | 'personal';
+  goalId?: string;
+  achieved: boolean;
+  celebration?: {
+    icon: string;
+    message: string;
+    points: number;
+  };
+}
+
+export interface TimelineNotification {
+  id: string;
+  timestamp: Date;
+  type: 'event' | 'milestone' | 'warning' | 'achievement';
+  severity: EventSeverity;
+  title: string;
+  message: string;
+  icon: string;
+  autoClose?: boolean;
+  duration?: number; // ms
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+}
+
+export interface DecisionPoint {
+  id: string;
+  date: Date;
+  title: string;
+  description: string;
+  options: DecisionOption[];
+  defaultOption?: string;
+  timeoutSeconds?: number;
+}
+
+export interface DecisionOption {
+  id: string;
+  label: string;
+  description: string;
+  impacts: {
+    netWorth?: number;
+    income?: number;
+    risk?: number;
+    goalProgress?: Record<string, number>;
+  };
+  consequences: string[];
+}
+
+export interface TimelineSimulationResult {
+  paths: PathData[];
+  events: LifeEvent[];
+  milestones: Milestone[];
+  decisionPoints?: DecisionPoint[];
+  finalOutcome: {
+    bestCase: TimePoint;
+    likelyCase: TimePoint;
+    worstCase: TimePoint;
+  };
+}

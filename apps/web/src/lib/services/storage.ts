@@ -506,14 +506,14 @@ export async function quarantineFile(
       const sourceFile = files[0];
       const quarantinePath = `quarantine/${fileId}`;
 
-      await sourceFile.copy(quarantineBucket.file(quarantinePath), {
+      const destinationFile = quarantineBucket.file(quarantinePath);
+      await sourceFile.copy(destinationFile);
+      await destinationFile.setMetadata({
         metadata: {
-          metadata: {
-            virusName,
-            quarantinedAt: new Date().toISOString(),
-            originalPath,
-            ...metadata,
-          },
+          virusName,
+          quarantinedAt: new Date().toISOString(),
+          originalPath,
+          ...metadata,
         },
       });
 

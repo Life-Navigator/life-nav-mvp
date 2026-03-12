@@ -1,89 +1,64 @@
-name: CI (MVP Web + Supabase)
+name: CI
 
 on:
   push:
-    branches: [main, develop, mvp-supabase]
-    paths:
-      - 'apps/web/**'
-      - 'apps/web/supabase/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/ci.yml'
+    branches: [main, mvp]
   pull_request:
-    branches: [main, develop]
-    paths:
-      - 'apps/web/**'
-      - 'apps/web/supabase/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/ci.yml'
+    branches: [main]
 
 jobs:
-  web-checks:
-    name: Web Lint + Typecheck
+  lint-typecheck:
+    name: Lint & Type Check
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
+      - uses: pnpm/action-setup@v4
         with:
-          version: '8'
+          version: '9'
           run_install: false
 
-      - name: Get pnpm store directory
+      - name: Get pnpm store
         id: pnpm-cache
         shell: bash
         run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma client (web)
-        run: pnpm --filter @life-navigator/web exec prisma generate
-
-      - name: Run web lint
-        run: pnpm --filter @life-navigator/web lint
-
-      - name: Run web typecheck (includes service-role guard)
-        run: pnpm --filter @life-navigator/web type-check
-
-      - name: Verify no generated artifacts after checks
-        shell: bash
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "Repository became dirty after checks. Generated artifacts must not be committed."
-            git status --porcelain
-            exit 1
-          fi
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm type-check
 
   supabase-migrations:
-    name: Supabase Migration Validate
+    name: Validate Migrations
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Validate migrations by local apply
-        working-directory: apps/web
-        run: supabase db reset --local --no-seed
+      - name: Start Supabase locally and apply migrations
+        run: |
+          supabase init --workdir . 2>/dev/null || true
+          supabase start
+          supabase db reset --no-seed
+        working-directory: .
 
+  secrets-hygiene:
+    name: Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified

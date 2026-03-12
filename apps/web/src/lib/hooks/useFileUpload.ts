@@ -321,10 +321,10 @@ export function useFileUpload(config: UploadConfig) {
  */
 export const UPLOAD_CONFIGS = {
   financial: {
-    allowedTypes: ['PDF', 'XLSX', 'ZIP'] as SupportedFileType[],
+    allowedTypes: ['PDF', 'CSV', 'XLSX', 'DOCX'] as SupportedFileType[],
     maxSizeBytes: 25 * 1024 * 1024, // 25MB for financial documents
     endpoint: '/api/data/financial/upload',
-    formats: ['CSV', 'Excel', 'PDF', 'QFX', 'OFX'],
+    formats: ['CSV', 'Excel', 'Word', 'PDF'],
   },
   health: {
     allowedTypes: ['PDF', 'PNG', 'JPEG'] as SupportedFileType[],
@@ -339,10 +339,10 @@ export const UPLOAD_CONFIGS = {
     formats: ['PDF', 'Word', 'JSON'],
   },
   education: {
-    allowedTypes: ['PDF', 'PNG', 'JPEG'] as SupportedFileType[],
+    allowedTypes: ['PDF', 'PNG', 'JPEG', 'DOCX', 'XLSX', 'CSV'] as SupportedFileType[],
     maxSizeBytes: 25 * 1024 * 1024, // 25MB for transcripts
     endpoint: '/api/data/education/upload',
-    formats: ['PDF', 'CSV', 'JSON'],
+    formats: ['PDF', 'CSV', 'Excel', 'Word'],
   },
 } as const;
 

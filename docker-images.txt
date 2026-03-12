@@ -1,6 +1,0 @@
-# Docker Image Versions and Digests
-# Update these only after security review
-
-python:3.12.0-slim-bookworm@sha256:abc123...  # Updated 2024-11-11
-node:20.10.0-alpine@sha256:def456...          # Updated 2024-11-11
-rust:1.75.0@sha256:ghi789...                  # Already pinned

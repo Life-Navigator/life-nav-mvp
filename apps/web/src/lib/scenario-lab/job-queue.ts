@@ -71,7 +71,17 @@ export async function getJob(jobId: string): Promise<ScenarioJob | null> {
  */
 export async function updateJobStatus(
   jobId: string,
-  status: JobStatus,
+  status: JobStatus | 'processing' | {
+    status: JobStatus | 'processing';
+    output_json?: any;
+    result_json?: any;
+    error_text?: string;
+    error?: string;
+    progress?: number;
+    started_at?: string;
+    completed_at?: string;
+    attempts?: number;
+  },
   updates: Partial<{
     output_json: any;
     error_text: string;
@@ -80,17 +90,47 @@ export async function updateJobStatus(
     attempts: number;
   }> = {}
 ): Promise<void> {
+  const updateInput = typeof status === 'string'
+    ? { status, ...updates }
+    : status;
+
+  const normalizedStatus = updateInput.status === 'processing'
+    ? 'running'
+    : updateInput.status;
+
   const payload: any = {
-    status,
+    status: normalizedStatus,
     updated_at: new Date().toISOString(),
-    ...updates,
   };
 
+  if (typeof updateInput.attempts === 'number') payload.attempts = updateInput.attempts;
+  if (updateInput.started_at) payload.started_at = updateInput.started_at;
+  if (updateInput.completed_at) payload.completed_at = updateInput.completed_at;
+
+  if (updateInput.output_json !== undefined) {
+    payload.output_json = updateInput.output_json;
+  } else if (updateInput.result_json !== undefined) {
+    payload.output_json = updateInput.result_json;
+  }
+
+  if (updateInput.error_text !== undefined) {
+    payload.error_text = updateInput.error_text;
+  } else if (updateInput.error !== undefined) {
+    payload.error_text = updateInput.error;
+  }
+
+  if (typeof updateInput.progress === 'number') {
+    payload.output_json = {
+      ...(payload.output_json && typeof payload.output_json === 'object' ? payload.output_json : {}),
+      progress: updateInput.progress,
+    };
+  }
+
   // Auto-set timestamps based on status
-  if (status === 'running' && !updates.started_at) {
+  if (normalizedStatus === 'running' && !updateInput.started_at) {
     payload.started_at = new Date().toISOString();
   }
-  if ((status === 'completed' || status === 'failed') && !updates.completed_at) {
+  if ((normalizedStatus === 'completed' || normalizedStatus === 'failed') && !updateInput.completed_at) {
     payload.completed_at = new Date().toISOString();
   }
 
@@ -109,9 +149,8 @@ export async function getNextQueuedJob(jobType?: JobType): Promise<ScenarioJob |
     .from('scenario_jobs')
     .select('*')
     .eq('status', 'queued')
-    .lt('attempts', supabaseAdmin.raw('max_attempts'))
     .order('created_at', { ascending: true })
-    .limit(1);
+    .limit(20);
 
   if (jobType) {
     query = query.eq('job_type', jobType);
@@ -121,7 +160,8 @@ export async function getNextQueuedJob(jobType?: JobType): Promise<ScenarioJob |
 
   if (error || !data || data.length === 0) return null;
 
-  const job = data[0] as ScenarioJob;
+  const job = (data as ScenarioJob[]).find((item) => item.attempts < item.max_attempts);
+  if (!job) return null;
 
   // Mark as running immediately to prevent concurrent processing
   await updateJobStatus(job.id, 'running', {

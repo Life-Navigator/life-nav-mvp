@@ -2,21 +2,12 @@
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": [
     "**/.env.*local",
-    "ontology/**/*.ttl",
     "tsconfig.json"
   ],
-  "pipeline": {
+  "tasks": {
     "build": {
-      "dependsOn": ["^build", "lint", "type-check", "test:unit"],
-      "outputs": [
-        "dist/**",
-        ".next/**",
-        "!.next/cache/**",
-        "build/**",
-        "*.whl",
-        "*.egg-info/**",
-        "target/**"
-      ],
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
       "cache": true
     },
     "lint": {
@@ -30,71 +21,12 @@
     },
     "test": {
       "dependsOn": ["build"],
-      "outputs": [
-        "coverage/**",
-        ".coverage",
-        "htmlcov/**"
-      ],
+      "outputs": ["coverage/**"],
       "cache": true
-    },
-    "test:unit": {
-      "cache": true,
-      "outputs": [
-        "coverage/**",
-        ".coverage",
-        "htmlcov/**"
-      ]
-    },
-    "test:contract": {
-      "dependsOn": ["build"],
-      "cache": false,
-      "outputs": []
-    },
-    "test:e2e": {
-      "dependsOn": ["build"],
-      "cache": false,
-      "outputs": []
-    },
-    "security:scan": {
-      "cache": false,
-      "outputs": []
-    },
-    "security:secrets": {
-      "cache": false,
-      "outputs": []
-    },
-    "db:migrate:check": {
-      "cache": false,
-      "outputs": []
     },
     "dev": {
       "cache": false,
       "persistent": true
-    },
-    "deploy": {
-      "dependsOn": [
-        "build",
-        "test",
-        "test:contract",
-        "security:scan",
-        "security:secrets",
-        "db:migrate:check"
-      ],
-      "cache": false,
-      "outputs": []
-    },
-    "release-gate": {
-      "dependsOn": [
-        "lint",
-        "type-check",
-        "test:unit",
-        "test:contract",
-        "security:scan",
-        "security:secrets",
-        "db:migrate:check"
-      ],
-      "cache": false,
-      "outputs": []
     },
     "clean": {
       "cache": false

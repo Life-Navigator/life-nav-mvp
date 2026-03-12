@@ -3,62 +3,23 @@ node_modules/
 .pnp
 .pnp.js
 
-# Testing
-coverage/
-.coverage
-htmlcov/
-.pytest_cache/
-.nyc_output
-
 # Production builds
 dist/
 build/
 .next/
 *.tsbuildinfo
 out/
-*.whl
-*.egg-info/
-target/
 
 # Environment variables
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.*
-!.env.example
-!.env.*.example
-# Specific patterns to prevent accidental commits
+.env.*.local
 **/.env
 **/.env.local
-**/.env.*.local
-**/env-values/*.env
-!**/env-values/*.env.example
+!.env.example
+!.env.*.example
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-.venv/
-*.egg
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-.hypothesis/
-.pytest_cache/
-
-# IDEs
+# IDE
 .idea/
 .vscode/
 *.swp
@@ -67,13 +28,9 @@ coverage.xml
 .DS_Store
 
 # Logs
-logs/
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
 # OS
 .DS_Store
@@ -82,27 +39,12 @@ Thumbs.db
 # Turbo
 .turbo
 
-# Terraform
-*.tfstate
-*.tfstate.*
-.terraform/
-.terraform.lock.hcl
-crash.log
-crash.*.log
-override.tf
-override.tf.json
-*_override.tf
-*_override.tf.json
+# Testing
+coverage/
+.nyc_output
 
-# Rust
-target/
-# Include Cargo.lock for binary services (but not libraries)
-!services/graphrag-rs/Cargo.lock
-
-# Temporary files
-tmp/
-temp/
-*.tmp
+# Supabase
+.supabase/
 
 # Mobile
 ios/Pods/
@@ -111,11 +53,6 @@ android/build/
 android/app/build/
 *.apk
 *.ipa
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
 
 # Secrets
 *.pem

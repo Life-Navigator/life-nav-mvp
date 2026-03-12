@@ -5,7 +5,10 @@ import { safeParseJSON } from '@/lib/utils/validation';
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
-const AGENT_API_URL = process.env.NEXT_PUBLIC_AGENT_API_URL || 'http://localhost:8081';
+// Private environment variables (server-side only)
+// These are NOT exposed to the browser
+const AGENT_API_URL = process.env.AGENT_API_URL || 'http://localhost:8080';
+const AGENT_API_KEY = process.env.AGENT_INTERNAL_API_KEY;
 
 interface ChatRequest {
   agent_id: string;
@@ -41,11 +44,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Call agent chat endpoint (non-streaming)
+    // Include API key for internal service authentication
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+
+    if (AGENT_API_KEY) {
+      headers['X-API-Key'] = AGENT_API_KEY;
+    }
+
     const chatApiResponse = await fetch(`${AGENT_API_URL}/chat`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: JSON.stringify({
         message,
         user_id: userId,
@@ -93,11 +103,18 @@ async function streamChatResponse(
   context?: Record<string, any>
 ) {
   // First, get the full response from the agent
+  // Include API key for internal service authentication
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (AGENT_API_KEY) {
+    headers['X-API-Key'] = AGENT_API_KEY;
+  }
+
   const chatApiResponse = await fetch(`${AGENT_API_URL}/chat`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({
       message,
       user_id: userId,
