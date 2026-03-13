@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # ==========================================================================
 # Qdrant Cloud — One-time collection initialization
+# Expanded with payload indexes for all 16 entity types.
 # Usage: QDRANT_URL=https://xxx.qdrant.io:6333 QDRANT_API_KEY=xxx ./init-qdrant.sh
 # ==========================================================================
 set -euo pipefail
@@ -20,22 +21,13 @@ curl -sf -X PUT "${QDRANT_URL}/collections/${COLLECTION}" \
     "replication_factor": 1
   }' && echo " OK" || echo " (may already exist)"
 
-echo "Creating payload index: tenant_id..."
-curl -sf -X PUT "${QDRANT_URL}/collections/${COLLECTION}/index" \
-  -H "api-key: ${QDRANT_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{ "field_name": "tenant_id", "field_schema": "keyword" }' && echo " OK"
+# --- Payload indexes ---
+for field in tenant_id entity_type domain category status institution; do
+  echo "Creating payload index: ${field}..."
+  curl -sf -X PUT "${QDRANT_URL}/collections/${COLLECTION}/index" \
+    -H "api-key: ${QDRANT_API_KEY}" \
+    -H "Content-Type: application/json" \
+    -d "{ \"field_name\": \"${field}\", \"field_schema\": \"keyword\" }" && echo " OK"
+done
 
-echo "Creating payload index: entity_type..."
-curl -sf -X PUT "${QDRANT_URL}/collections/${COLLECTION}/index" \
-  -H "api-key: ${QDRANT_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{ "field_name": "entity_type", "field_schema": "keyword" }' && echo " OK"
-
-echo "Creating payload index: domain..."
-curl -sf -X PUT "${QDRANT_URL}/collections/${COLLECTION}/index" \
-  -H "api-key: ${QDRANT_API_KEY}" \
-  -H "Content-Type: application/json" \
-  -d '{ "field_name": "domain", "field_schema": "keyword" }' && echo " OK"
-
-echo "Qdrant collection '${COLLECTION}' initialized."
+echo "Qdrant collection '${COLLECTION}' initialized with all payload indexes."

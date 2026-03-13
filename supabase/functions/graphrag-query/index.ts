@@ -3,6 +3,10 @@
 // Accepts a user question, runs hybrid search (Qdrant vector + Neo4j graph),
 // fuses results with Reciprocal Rank Fusion, and generates a personalized
 // answer via Gemini Flash — streamed back as SSE.
+//
+// PIPELINE PROXY: If GRAPHRAG_PIPELINE_URL is set, queries are proxied to
+// the Python GraphRAG pipeline for richer results. Falls back to inline
+// logic if the pipeline is unavailable.
 // ==========================================================================
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -584,7 +588,45 @@ serve(async (req: Request) => {
       });
     }
 
-    // --- Hybrid search ---
+    // --- Try Python pipeline proxy first ---
+    const pipelineUrl = Deno.env.get('GRAPHRAG_PIPELINE_URL');
+    if (pipelineUrl) {
+      try {
+        const pipelineResp = await fetch(`${pipelineUrl}/api/query`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-worker-secret': Deno.env.get('GRAPHRAG_WORKER_SECRET') || '',
+          },
+          body: JSON.stringify({
+            query,
+            user_id: userId,
+            stream,
+            conversation_id,
+            previous_messages,
+          }),
+          signal: AbortSignal.timeout(55_000),
+        });
+
+        if (pipelineResp.ok) {
+          const pipelineBody = await pipelineResp.text();
+          return new Response(pipelineBody, {
+            headers: {
+              ...CORS_HEADERS,
+              'Content-Type': pipelineResp.headers.get('Content-Type') || 'application/json',
+            },
+            status: 200,
+          });
+        }
+        // Pipeline returned non-200 — fall through to inline logic
+        console.warn(`Pipeline returned ${pipelineResp.status}, falling back to inline`);
+      } catch (pipelineErr) {
+        // Pipeline unreachable — fall through to inline logic
+        console.warn(`Pipeline proxy failed: ${safeError(pipelineErr)}, falling back to inline`);
+      }
+    }
+
+    // --- Hybrid search (inline fallback) ---
     const startMs = Date.now();
 
     // Embed query

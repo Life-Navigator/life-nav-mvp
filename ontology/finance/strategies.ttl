@@ -426,16 +426,10 @@ ln:paysOff a owl:ObjectProperty ;
     rdfs:label "pays off"@en ;
     rdfs:comment "Loan account targeted by payoff plan"@en .
 
-# Multi-tenancy
-ln:tenantId a owl:DatatypeProperty ;
-    rdfs:domain ln:FinancialStrategy ;
-    rdfs:range xsd:string ;
-    rdfs:label "tenant ID"@en ;
-    rdfs:comment "Multi-tenant isolation identifier (HIPAA compliant)"@en .
-
 # Metadata
 <https://ln.life/ontology/finance/strategies> a owl:Ontology ;
     dc:title "Life Navigator Finance Strategies Ontology"@en ;
     dc:description "Ontology for investment strategies, budget plans, savings goals, and debt payoff"@en ;
     dc:creator "Life Navigator"@en ;
-    owl:versionInfo "1.0.0" .
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

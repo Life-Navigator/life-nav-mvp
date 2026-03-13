@@ -381,4 +381,5 @@ ln:averageVolume a owl:DatatypeProperty ;
     dc:title "Life Navigator Finance Instruments Ontology"@en ;
     dc:description "Ontology for investment instruments: stocks, bonds, funds, crypto, real estate"@en ;
     dc:creator "Life Navigator"@en ;
-    owl:versionInfo "1.0.0" .
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

@@ -12,18 +12,35 @@
     "type-check": "turbo run type-check",
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "clean": "turbo run clean && rm -rf node_modules",
-    "db:gen-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > packages/supabase/src/database.types.ts"
+    "db:gen-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > packages/supabase/src/database.types.ts",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@turbo/gen": "^2.0.0",
-    "turbo": "^2.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.3",
     "prettier": "^3.1.0",
-    "typescript": "^5.5.0",
-    "supabase": "^1.200.0"
+    "supabase": "^1.200.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0"
   },
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@9.15.0"
+  "pnpm": {
+    "overrides": {
+      "tinyexec": "1.0.4"
+    }
+  },
+  "packageManager": "pnpm@9.15.0",
+  "lint-staged": {
+    "apps/web/src/**/*.{ts,tsx}": [
+      "eslint --fix --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
 }

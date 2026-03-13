@@ -6,77 +6,168 @@ on:
   pull_request:
     branches: [main]
 
+# Cancel in-progress runs for the same branch/PR
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '9'
 
 jobs:
-  lint-typecheck:
-    name: Lint & Type Check
+  # ── Quality Gates (parallel) ────────────────────────────────────────
+  lint:
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-          run_install: false
-
-      - name: Get pnpm store
-        id: pnpm-cache
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-
-
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-node-pnpm
       - run: pnpm lint
+
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-pnpm
       - run: pnpm type-check
 
-  build:
-    name: Build Web App
+  # ── Unit Tests ──────────────────────────────────────────────────────
+  unit-tests:
+    name: Unit Tests
     runs-on: ubuntu-latest
-    needs: lint-typecheck
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-pnpm
 
-      - uses: actions/setup-node@v4
+      - name: Run unit tests with coverage
+        run: pnpm turbo test --filter=@life-navigator/web -- --ci --coverage --reporters=default --reporters=jest-junit
+        env:
+          JEST_JUNIT_OUTPUT_DIR: ./apps/web/test-results
+          JEST_JUNIT_OUTPUT_NAME: junit.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          name: coverage-report
+          path: apps/web/coverage/
+          retention-days: 14
 
-      - uses: pnpm/action-setup@v4
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          version: ${{ env.PNPM_VERSION }}
-          run_install: false
+          name: unit-test-results
+          path: apps/web/test-results/
+          retention-days: 14
 
-      - name: Get pnpm store
-        id: pnpm-cache
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: ${{ runner.os }}-pnpm-
-
-      - run: pnpm install --frozen-lockfile
+  # ── Build ───────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-pnpm
 
       - name: Build web app
         run: pnpm turbo build --filter=@life-navigator/web
         env:
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder' }}
 
-  secrets-hygiene:
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: apps/web/.next/
+          retention-days: 7
+
+      - name: Report bundle size
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "## Bundle Size Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f apps/web/.next/build-manifest.json ]; then
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            du -sh apps/web/.next/ | awk '{print "Total build: " $1}'  >> $GITHUB_STEP_SUMMARY
+            du -sh apps/web/.next/static/ 2>/dev/null | awk '{print "Static assets: " $1}' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ── E2E Tests ───────────────────────────────────────────────────────
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: build
+    # Only run on PRs to main or pushes to main (skip on mvp to save CI minutes)
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-build
+          path: apps/web/.next/
+
+      - name: Run E2E tests
+        run: pnpm exec playwright test --project=chromium
+        working-directory: apps/web
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder' }}
+
+      - name: Upload E2E results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          retention-days: 14
+
+  # ── Python Pipeline Validation ─────────────────────────────────────
+  python-validate:
+    name: Validate Python Pipeline
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/graphrag-pipeline
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: apps/graphrag-pipeline/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check syntax (compile all .py files)
+        run: python -m py_compile api/sync.py api/query.py api/health.py api/reindex.py api/ontology.py lib/config.py lib/supabase_client.py lib/neo4j_client.py lib/qdrant_client.py lib/gemini_client.py lib/entity_mapper.py lib/graph_schema.py lib/embedding_builder.py lib/rrf.py
+
+      - name: Verify ontology files exist
+        run: |
+          for f in core/person.ttl core/document.ttl core/cross-domain.ttl health/condition.ttl career/profile.ttl career/job.ttl education/credentials.ttl education/institutions.ttl finance/accounts.ttl finance/instruments.ttl finance/strategies.ttl goals/goal.ttl; do
+            if [ ! -f "../../ontology/$f" ]; then
+              echo "::error::Missing ontology file: ontology/$f"
+              exit 1
+            fi
+          done
+          echo "All 12 ontology files present"
+
+  # ── Security ────────────────────────────────────────────────────────
+  secrets-scan:
     name: Secrets Scan
     runs-on: ubuntu-latest
     steps:
@@ -87,11 +178,63 @@ jobs:
         with:
           extra_args: --only-verified
 
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Audit for known vulnerabilities
+        run: pnpm audit --prod --audit-level=high || true
+        # "|| true" allows CI to continue — vulnerability counts are reported
+        # but won't block deploys for dev-only deps. Critical vulns in prod
+        # deps should be addressed in the security-audit scheduled workflow.
+
+      - name: Check for outdated dependencies
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "## Dependency Health" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          pnpm outdated 2>&1 | head -40 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  # ── Database Migration Validation ──────────────────────────────────
+  validate-migrations:
+    name: Validate Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate SQL migration files
+        run: |
+          echo "## Migration Validation" >> $GITHUB_STEP_SUMMARY
+          MIGRATION_DIR="supabase/migrations"
+          if [ -d "$MIGRATION_DIR" ]; then
+            FILE_COUNT=$(ls -1 "$MIGRATION_DIR"/*.sql 2>/dev/null | wc -l)
+            echo "Found $FILE_COUNT migration files" >> $GITHUB_STEP_SUMMARY
+            # Check for syntax issues in SQL files (basic validation)
+            for f in "$MIGRATION_DIR"/*.sql; do
+              if [ -f "$f" ]; then
+                # Check for common SQL issues
+                if grep -qiP '(DROP\s+DATABASE|DROP\s+SCHEMA\s+public)' "$f"; then
+                  echo "::error file=$f::Dangerous SQL detected: DROP DATABASE or DROP SCHEMA public"
+                  exit 1
+                fi
+              fi
+            done
+            echo "All migrations passed basic validation" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "No migrations directory found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ── Deploy (main branch only) ──────────────────────────────────────
   deploy-edge-functions:
     name: Deploy Edge Functions
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [build]
+    needs: [build, unit-tests, secrets-scan, python-validate]
+    environment: production
     steps:
       - uses: actions/checkout@v4
 

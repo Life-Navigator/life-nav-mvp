@@ -30,10 +30,10 @@ ln:OnlineLearningPlatform a owl:Class ;
     rdfs:label "Online Learning Platform"@en ;
     rdfs:comment "Platform offering online courses (Coursera, Udemy, edX, etc.)"@en .
 
-ln:Bootcamp a owl:Class ;
+ln:BootcampInstitution a owl:Class ;
     rdfs:subClassOf ln:EducationalInstitution ;
-    rdfs:label "Bootcamp"@en ;
-    rdfs:comment "Intensive coding or skills bootcamp organization"@en .
+    rdfs:label "Bootcamp Institution"@en ;
+    rdfs:comment "Intensive coding or skills bootcamp organization (the institution, not the course)"@en .
 
 ln:TrainingCenter a owl:Class ;
     rdfs:subClassOf ln:EducationalInstitution ;
@@ -256,43 +256,43 @@ ln:partnerInstitutions a owl:DatatypeProperty ;
     rdfs:label "partner institutions"@en ;
     rdfs:comment "Comma-separated list of university partners"@en .
 
-# Bootcamp Properties
+# Bootcamp Institution Properties
 ln:bootcampDuration a owl:DatatypeProperty ;
-    rdfs:domain ln:Bootcamp ;
+    rdfs:domain ln:BootcampInstitution ;
     rdfs:range xsd:integer ;
     rdfs:label "bootcamp duration"@en ;
     rdfs:comment "Duration in weeks"@en .
 
 ln:bootcampCost a owl:DatatypeProperty ;
-    rdfs:domain ln:Bootcamp ;
+    rdfs:domain ln:BootcampInstitution ;
     rdfs:range xsd:decimal ;
     rdfs:label "bootcamp cost"@en .
 
 ln:bootcampFormat a owl:DatatypeProperty ;
-    rdfs:domain ln:Bootcamp ;
+    rdfs:domain ln:BootcampInstitution ;
     rdfs:range xsd:string ;
     rdfs:label "bootcamp format"@en ;
     rdfs:comment "FULL_TIME, PART_TIME, ONLINE, HYBRID"@en .
 
 ln:jobPlacementRate a owl:DatatypeProperty ;
-    rdfs:domain ln:Bootcamp ;
+    rdfs:domain ln:BootcampInstitution ;
     rdfs:range xsd:decimal ;
     rdfs:label "job placement rate"@en ;
     rdfs:comment "Graduate job placement rate (0.0-1.0)"@en .
 
 ln:averageStartingSalary a owl:DatatypeProperty ;
-    rdfs:domain ln:Bootcamp ;
+    rdfs:domain ln:BootcampInstitution ;
     rdfs:range xsd:decimal ;
     rdfs:label "average starting salary"@en ;
     rdfs:comment "Average salary for graduates"@en .
 
 ln:hasJobGuarantee a owl:DatatypeProperty ;
-    rdfs:domain ln:Bootcamp ;
+    rdfs:domain ln:BootcampInstitution ;
     rdfs:range xsd:boolean ;
     rdfs:label "has job guarantee"@en .
 
 ln:specialization a owl:DatatypeProperty ;
-    rdfs:domain ln:Bootcamp ;
+    rdfs:domain ln:BootcampInstitution ;
     rdfs:range xsd:string ;
     rdfs:label "specialization"@en ;
     rdfs:comment "Coding, Data Science, UX Design, Cybersecurity, etc."@en .
@@ -452,4 +452,5 @@ ln:accreditedBy a owl:ObjectProperty ;
     dc:title "Life Navigator Education Institutions Ontology"@en ;
     dc:description "Ontology for educational institutions, universities, online platforms, bootcamps, and certification bodies"@en ;
     dc:creator "Life Navigator"@en ;
-    owl:versionInfo "1.0.0" .
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

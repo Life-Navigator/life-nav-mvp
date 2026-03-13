@@ -64,10 +64,9 @@ ln:Patent a owl:Class ;
     rdfs:subClassOf ln:Achievement ;
     rdfs:label "Patent"@en .
 
-ln:Certification a owl:Class ;
-    rdfs:subClassOf ln:Achievement ;
-    rdfs:label "Certification"@en ;
-    rdfs:comment "Professional certification or credential"@en .
+# Note: ln:Certification is intentionally omitted here to avoid conflict with
+# ln:ProfessionalCertification in education/credentials.ttl. Use
+# ln:ProfessionalCertification for the canonical certification class.
 
 # Project Classes
 ln:Project a owl:Class ;
@@ -523,16 +522,10 @@ ln:employedBy a owl:ObjectProperty ;
     rdfs:range schema:Organization ;
     rdfs:label "employed by"@en .
 
-# Multi-tenancy
-ln:tenantId a owl:DatatypeProperty ;
-    rdfs:domain ln:CareerProfile ;
-    rdfs:range xsd:string ;
-    rdfs:label "tenant ID"@en ;
-    rdfs:comment "Multi-tenant isolation identifier (HIPAA compliant)"@en .
-
 # Metadata
 <https://ln.life/ontology/career/profile> a owl:Ontology ;
     dc:title "Life Navigator Career Profile Ontology"@en ;
     dc:description "Ontology for career profiles, job experience, skills, achievements, and projects"@en ;
     dc:creator "Life Navigator"@en ;
-    owl:versionInfo "1.0.0" .
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

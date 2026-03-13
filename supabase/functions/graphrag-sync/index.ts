@@ -1,8 +1,16 @@
 // ==========================================================================
-// GraphRAG Sync Worker
-// Claims pending sync jobs from graphrag.sync_queue, generates Gemini
-// embeddings, and upserts/deletes from Neo4j Aura + Qdrant Cloud.
-// Triggered by cron or webhook after data changes.
+// GraphRAG Sync Worker (DEPRECATED — use Python pipeline instead)
+//
+// This Edge Function is replaced by the Python GraphRAG pipeline at
+// apps/graphrag-pipeline/api/sync.py, which handles all 16 entity types
+// (vs. 4 here), generates richer embeddings, and creates cross-entity
+// relationships.
+//
+// This function is kept as a fallback. The cron job should call the Python
+// pipeline's POST /api/sync endpoint at GRAPHRAG_PIPELINE_URL instead.
+//
+// Original: Claims pending sync jobs from graphrag.sync_queue, generates
+// Gemini embeddings, and upserts/deletes from Neo4j Aura + Qdrant Cloud.
 // ==========================================================================
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';

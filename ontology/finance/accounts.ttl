@@ -229,16 +229,10 @@ ln:routingNumber a owl:DatatypeProperty ;
     rdfs:label "routing number"@en ;
     rdfs:comment "Bank routing number (ABA number in the US)"@en .
 
-# Properties - Multi-tenancy
-ln:tenantId a owl:DatatypeProperty ;
-    rdfs:domain ln:FinancialAccount ;
-    rdfs:range xsd:string ;
-    rdfs:label "tenant ID"@en ;
-    rdfs:comment "Multi-tenant isolation identifier (HIPAA compliant)"@en .
-
 # Metadata
 <https://ln.life/ontology/finance/accounts> a owl:Ontology ;
     dc:title "Life Navigator Finance Accounts Ontology"@en ;
     dc:description "Ontology for financial accounts, transactions, and investments"@en ;
     dc:creator "Life Navigator"@en ;
-    owl:versionInfo "1.0.0" .
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .
