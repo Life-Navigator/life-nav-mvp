@@ -175,6 +175,7 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
 
     // Update job progress
     await updateJobStatus(job.id, {
+      status: 'processing',
       progress: 25,
     });
 
@@ -191,6 +192,7 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
 
     // Update job progress
     await updateJobStatus(job.id, {
+      status: 'processing',
       progress: 75,
     });
 

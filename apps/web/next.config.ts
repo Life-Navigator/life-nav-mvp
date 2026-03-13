@@ -79,10 +79,6 @@ const nextConfig: NextConfig = {
     // Type checking handled in CI/CD pipeline
     ignoreBuildErrors: process.env.NODE_ENV === 'production',
   },
-  eslint: {
-    // Linting handled in CI/CD pipeline
-    ignoreDuringBuilds: process.env.NODE_ENV === 'production',
-  },
   // Add security headers to all responses
   async headers() {
     return [

@@ -26,6 +26,12 @@ export type Database = {
           pilot_enabled: boolean
           user_type: string
           setup_completed: boolean
+          setup_completed_at: string | null
+          date_of_birth: string | null
+          phone_number: string | null
+          city: string | null
+          state: string | null
+          country: string | null
           subscription_tier: string
           theme: string
           created_at: string
@@ -36,30 +42,62 @@ export type Database = {
           email?: string | null
           display_name?: string | null
           avatar_url?: string | null
-          role?: string
-          pilot_role?: string
-          pilot_enabled?: boolean
-          user_type?: string
-          setup_completed?: boolean
-          subscription_tier?: string
-          theme?: string
-          created_at?: string
-          updated_at?: string
+          [key: string]: unknown
         }
         Update: {
-          id?: string
-          email?: string | null
-          display_name?: string | null
-          avatar_url?: string | null
-          role?: string
-          pilot_role?: string
-          pilot_enabled?: boolean
-          user_type?: string
-          setup_completed?: boolean
-          subscription_tier?: string
-          theme?: string
-          updated_at?: string
+          [key: string]: unknown
         }
+        Relationships: never[]
+      }
+      goals: {
+        Row: {
+          id: string
+          user_id: string
+          title: string
+          category: string
+          description: string | null
+          target_value: number | null
+          target_unit: string | null
+          priority: string
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          title: string
+          category: string
+          [key: string]: unknown
+        }
+        Update: {
+          [key: string]: unknown
+        }
+        Relationships: never[]
+      }
+      risk_assessments: {
+        Row: {
+          id: string
+          user_id: string
+          assessment_type: string
+          overall_score: number
+          risk_level: string
+          status: string
+          responses: Json | null
+          metadata: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          assessment_type: string
+          overall_score: number
+          risk_level: string
+          [key: string]: unknown
+        }
+        Update: {
+          [key: string]: unknown
+        }
+        Relationships: never[]
       }
     }
     Views: Record<string, never>

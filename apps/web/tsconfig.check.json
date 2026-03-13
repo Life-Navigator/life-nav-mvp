@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/app/page.tsx",
+    "src/app/layout.tsx",
+    "src/app/features/**/*.ts",
+    "src/app/features/**/*.tsx",
+    "src/app/security/**/*.ts",
+    "src/app/security/**/*.tsx",
+    "src/app/api/agent/**/*.ts",
+    "src/components/FeatureGate.tsx",
+    "src/components/scenario-lab/**/*.ts",
+    "src/components/scenario-lab/**/*.tsx",
+    "src/lib/supabase/**/*.ts",
+    "src/lib/scenario-lab/types.ts",
+    "src/lib/scenario-lab/job-queue.ts",
+    "src/lib/scenario-lab/supabase-client.ts",
+    "src/lib/hooks/useFileUpload.ts",
+    "src/middleware.ts",
+    "src/providers.tsx",
+    "next.config.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

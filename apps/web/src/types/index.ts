@@ -7,7 +7,6 @@ export * from './auth';
 export * from './calculator';
 export * from './calendar';
 export * from './career';
-export * from './common';
 export * from './education';
 export * from './email';
 export * from './financial';

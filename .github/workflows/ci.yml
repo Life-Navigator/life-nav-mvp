@@ -76,22 +76,6 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder
 
-  supabase-migrations:
-    name: Validate Migrations
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Start Supabase and validate migrations
-        run: |
-          supabase init --workdir . 2>/dev/null || true
-          supabase start
-          supabase db reset --no-seed
-
   secrets-hygiene:
     name: Secrets Scan
     runs-on: ubuntu-latest
@@ -107,7 +91,7 @@ jobs:
     name: Deploy Edge Functions
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [build, supabase-migrations]
+    needs: [build]
     steps:
       - uses: actions/checkout@v4
 

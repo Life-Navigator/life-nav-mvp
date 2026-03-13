@@ -430,10 +430,9 @@ export class AgentProxy {
   /**
    * Get current environment
    */
-  private getEnvironment(): 'development' | 'staging' | 'production' {
+  private getEnvironment(): 'development' | 'production' {
     const env = process.env.NODE_ENV || 'development';
     if (env === 'production') return 'production';
-    if (env === 'staging') return 'staging';
     return 'development';
   }
 
