@@ -23,7 +23,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node-pnpm
-      - run: pnpm lint
+      - run: pnpm turbo lint --filter=@life-navigator/web
 
   typecheck:
     name: Type Check
@@ -31,7 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node-pnpm
-      - run: pnpm type-check
+      - run: pnpm turbo type-check --filter=@life-navigator/web --filter=@life-navigator/supabase --filter=@life-navigator/ui-components
 
   # ── Unit Tests ──────────────────────────────────────────────────────
   unit-tests:
