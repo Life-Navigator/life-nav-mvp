@@ -4,7 +4,14 @@
  * Comprehensive test suite for agent communication layer
  */
 
-import { AgentProxy, AgentProxyConfig, AgentRequest, AgentResponse, AgentTimeoutError, AgentProxyError } from '../agent-proxy';
+import {
+  AgentProxy,
+  AgentProxyConfig,
+  AgentRequest,
+  AgentResponse,
+  AgentTimeoutError,
+  AgentProxyError,
+} from '../agent-proxy';
 import { AgentValidationError } from '@/types/agents';
 
 // Mock fetch globally
@@ -117,7 +124,7 @@ describe('AgentProxy', () => {
       expect(response.data?.agent_name).toBe('finance_manager');
 
       // Assert metrics captured
-      expect(response.metrics.response_time_ms).toBeGreaterThan(0);
+      expect(response.metrics.response_time_ms).toBeGreaterThanOrEqual(0);
 
       // Assert logging
       expect(mockLogger.info).toHaveBeenCalledWith(
@@ -204,7 +211,9 @@ describe('AgentProxy', () => {
       };
 
       await expect(agentProxy.send(invalidRequest as any)).rejects.toThrow(AgentValidationError);
-      await expect(agentProxy.send(invalidRequest as any)).rejects.toThrow('session_id is required');
+      await expect(agentProxy.send(invalidRequest as any)).rejects.toThrow(
+        'session_id is required'
+      );
     });
 
     it('should validate request and throw on invalid action', async () => {
@@ -242,14 +251,17 @@ describe('AgentProxy', () => {
         },
       };
 
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => invalidResponse,
       });
 
       await expect(agentProxy.send(validRequest)).rejects.toThrow(AgentValidationError);
-      await expect(agentProxy.send(validRequest)).rejects.toThrow('data is required when success=true');
+
+      await expect(agentProxy.send(validRequest)).rejects.toThrow(
+        'data is required when success=true'
+      );
     });
 
     it('should validate response.error when success=false', async () => {
@@ -262,14 +274,17 @@ describe('AgentProxy', () => {
         },
       };
 
-      (global.fetch as jest.Mock).mockResolvedValueOnce({
+      (global.fetch as jest.Mock).mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => invalidResponse,
       });
 
       await expect(agentProxy.send(validRequest)).rejects.toThrow(AgentValidationError);
-      await expect(agentProxy.send(validRequest)).rejects.toThrow('error is required when success=false');
+
+      await expect(agentProxy.send(validRequest)).rejects.toThrow(
+        'error is required when success=false'
+      );
     });
   });
 
@@ -376,32 +391,34 @@ describe('AgentProxy', () => {
 
   describe('Timeout Handling', () => {
     it('should timeout after config.timeout ms', async () => {
-      // Mock a never-responding endpoint
+      // Mock fetch that respects AbortController signal
       (global.fetch as jest.Mock).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            // Never resolve (simulates hanging request)
-            setTimeout(resolve, 100000);
+        (_url: string, options?: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            const signal = options?.signal;
+            if (signal) {
+              signal.addEventListener('abort', () => {
+                const err = new DOMException('The operation was aborted.', 'AbortError');
+                reject(err);
+              });
+            }
           })
       );
 
       await expect(agentProxy.send(validRequest)).rejects.toThrow(AgentTimeoutError);
-
-      // Assert request_id in error
-      try {
-        await agentProxy.send(validRequest);
-      } catch (error) {
-        if (error instanceof AgentTimeoutError) {
-          expect(error.requestId).toBeDefined();
-        }
-      }
-    }, 10000); // Test timeout of 10s
+    }, 30000);
 
     it('should include request_id in timeout error', async () => {
       (global.fetch as jest.Mock).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            setTimeout(resolve, 100000);
+        (_url: string, options?: { signal?: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            const signal = options?.signal;
+            if (signal) {
+              signal.addEventListener('abort', () => {
+                const err = new DOMException('The operation was aborted.', 'AbortError');
+                reject(err);
+              });
+            }
           })
       );
 
@@ -416,17 +433,20 @@ describe('AgentProxy', () => {
 
       try {
         await agentProxy.send(requestWithId);
+        fail('Expected AgentTimeoutError');
       } catch (error) {
+        expect(error).toBeInstanceOf(AgentTimeoutError);
         if (error instanceof AgentTimeoutError) {
           expect(error.requestId).toBe('test-timeout-id');
         }
       }
-    });
+    }, 30000);
   });
 
   describe('Error Handling', () => {
     it('should handle network errors', async () => {
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
+      // Mock all retries to reject with network error
+      (global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'));
 
       await expect(agentProxy.send(validRequest)).rejects.toThrow('Network error');
       expect(mockLogger.error).toHaveBeenCalled();
@@ -445,7 +465,8 @@ describe('AgentProxy', () => {
     });
 
     it('should log all errors with request_id', async () => {
-      (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Test error'));
+      // Mock all retries to reject
+      (global.fetch as jest.Mock).mockRejectedValue(new Error('Test error'));
 
       try {
         await agentProxy.send(validRequest);

@@ -36,7 +36,7 @@
   "packageManager": "pnpm@9.15.0",
   "lint-staged": {
     "apps/web/src/**/*.{ts,tsx}": [
-      "eslint --fix --no-warn-ignored",
+      "eslint --fix",
       "prettier --write"
     ],
     "*.{json,md,yml,yaml}": [

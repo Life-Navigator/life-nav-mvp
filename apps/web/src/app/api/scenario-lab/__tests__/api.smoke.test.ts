@@ -8,17 +8,7 @@
  * - Audit logs are written
  */
 
-import { NextRequest } from 'next/server';
-
 // Mock dependencies
-jest.mock('@/lib/db', () => ({
-  db: {
-    user: {
-      findUnique: jest.fn(),
-    },
-  },
-}));
-
 jest.mock('@/lib/scenario-lab/supabase-client', () => ({
   supabaseAdmin: {
     from: jest.fn(() => ({
@@ -64,7 +54,7 @@ describe('Scenario Lab API Smoke Tests', () => {
         '/api/scenario-lab/reports/generate',
       ];
 
-      protectedEndpoints.forEach(endpoint => {
+      protectedEndpoints.forEach((endpoint) => {
         // In production, call without auth and expect 401
         expect(endpoint).toContain('/api/scenario-lab/');
       });
@@ -201,7 +191,7 @@ describe('Scenario Lab API Smoke Tests', () => {
       // Verify X-RateLimit-Remaining header is present
       const expectedHeaders = ['X-RateLimit-Remaining', 'X-RateLimit-Limit'];
 
-      expectedHeaders.forEach(header => {
+      expectedHeaders.forEach((header) => {
         expect(header).toBeTruthy();
       });
       // In production, verify actual response headers
@@ -245,7 +235,7 @@ describe('Scenario Lab API Smoke Tests', () => {
       // Expect: 400 Bad Request
 
       const invalidConfidences = [-0.1, 1.5, 2.0];
-      invalidConfidences.forEach(c => {
+      invalidConfidences.forEach((c) => {
         expect(c < 0 || c > 1).toBe(true);
       });
       // In production, verify Zod validation catches this
@@ -297,7 +287,7 @@ describe('Scenario Lab API Smoke Tests', () => {
       // Verify audit logs contain: user_id, action, resource_type, resource_id, metadata
       const auditLogFields = ['user_id', 'action', 'resource_type', 'resource_id', 'metadata'];
 
-      auditLogFields.forEach(field => {
+      auditLogFields.forEach((field) => {
         expect(field).toBeTruthy();
       });
       // In production, verify actual audit log schema

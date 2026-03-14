@@ -1,189 +1,204 @@
-import { db as prisma } from "@/lib/db";
+type SB = any;
 
-// Education record types
-export interface CreateEducationRecordInput {
-  userId: string;
-  highestDegree?: string;
-  fieldOfStudy?: string;
-  institution?: string;
+// ── Education Records ───────────────────────────────────────────────────
+
+export async function listRecords(supabase: SB, userId: string) {
+  const { data, error } = await supabase
+    .from('education_records')
+    .select('*')
+    .eq('user_id', userId)
+    .order('start_date', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
 }
 
-export interface UpdateEducationRecordInput {
-  highestDegree?: string;
-  fieldOfStudy?: string;
-  institution?: string;
+export async function getRecord(supabase: SB, userId: string, id: string) {
+  const { data, error } = await supabase
+    .from('education_records')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
-// Course types
-export interface CreateCourseInput {
-  educationRecordId: string;
-  name: string;
-  provider: string;
-  startDate: Date;
-  endDate?: Date;
-  status: string;
-  grade?: string;
-  credits?: number;
-  notes?: string;
+export async function createRecord(supabase: SB, userId: string, record: Record<string, unknown>) {
+  const { data, error } = await supabase
+    .from('education_records')
+    .insert({ ...record, user_id: userId })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
-export interface UpdateCourseInput {
-  name?: string;
-  provider?: string;
-  startDate?: Date;
-  endDate?: Date;
-  status?: string;
-  grade?: string;
-  credits?: number;
-  notes?: string;
+export async function updateRecord(
+  supabase: SB,
+  userId: string,
+  id: string,
+  updates: Record<string, unknown>
+) {
+  const { data, error } = await supabase
+    .from('education_records')
+    .update(updates)
+    .eq('user_id', userId)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
-// Certification types
-export interface CreateCertificationInput {
-  educationRecordId: string;
-  name: string;
-  issuer: string;
-  issueDate: Date;
-  expirationDate?: Date;
-  credentialId?: string;
-  credentialUrl?: string;
+export async function deleteRecord(supabase: SB, userId: string, id: string) {
+  const { error } = await supabase
+    .from('education_records')
+    .delete()
+    .eq('user_id', userId)
+    .eq('id', id);
+
+  if (error) throw error;
 }
 
-export interface UpdateCertificationInput {
-  name?: string;
-  issuer?: string;
-  issueDate?: Date;
-  expirationDate?: Date;
-  credentialId?: string;
-  credentialUrl?: string;
+// ── Courses ─────────────────────────────────────────────────────────────
+
+export async function listCourses(supabase: SB, userId: string) {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
 }
 
-export const educationService = {
-  // Education Records
-  async getEducationRecord(userId: string) {
-    const record = await prisma.educationRecord.findFirst({
-      where: { userId },
-      include: {
-        courses: {
-          orderBy: { startDate: 'desc' },
-        },
-        certifications: {
-          orderBy: { issueDate: 'desc' },
-        },
-      },
-    });
-    
-    return record;
-  },
-  
-  async createEducationRecord(data: CreateEducationRecordInput) {
-    const record = await prisma.educationRecord.create({
-      data,
-      include: {
-        courses: true,
-        certifications: true,
-      },
-    });
-    
-    return record;
-  },
-  
-  async updateEducationRecord(id: string, data: UpdateEducationRecordInput) {
-    const record = await prisma.educationRecord.update({
-      where: { id },
-      data,
-      include: {
-        courses: true,
-        certifications: true,
-      },
-    });
-    
-    return record;
-  },
-  
-  // Courses
-  async getCourses(educationRecordId: string) {
-    const courses = await prisma.course.findMany({
-      where: { educationRecordId },
-      orderBy: { startDate: 'desc' },
-    });
-    
-    return courses;
-  },
-  
-  async getCourseById(id: string) {
-    const course = await prisma.course.findUnique({
-      where: { id },
-    });
-    
-    return course;
-  },
-  
-  async createCourse(data: CreateCourseInput) {
-    const course = await prisma.course.create({
-      data,
-    });
-    
-    return course;
-  },
-  
-  async updateCourse(id: string, data: UpdateCourseInput) {
-    const course = await prisma.course.update({
-      where: { id },
-      data,
-    });
-    
-    return course;
-  },
-  
-  async deleteCourse(id: string) {
-    await prisma.course.delete({
-      where: { id },
-    });
-    
-    return true;
-  },
-  
-  // Certifications
-  async getCertifications(educationRecordId: string) {
-    const certifications = await prisma.certification.findMany({
-      where: { educationRecordId },
-      orderBy: { issueDate: 'desc' },
-    });
-    
-    return certifications;
-  },
-  
-  async getCertificationById(id: string) {
-    const certification = await prisma.certification.findUnique({
-      where: { id },
-    });
-    
-    return certification;
-  },
-  
-  async createCertification(data: CreateCertificationInput) {
-    const certification = await prisma.certification.create({
-      data,
-    });
-    
-    return certification;
-  },
-  
-  async updateCertification(id: string, data: UpdateCertificationInput) {
-    const certification = await prisma.certification.update({
-      where: { id },
-      data,
-    });
-    
-    return certification;
-  },
-  
-  async deleteCertification(id: string) {
-    await prisma.certification.delete({
-      where: { id },
-    });
-    
-    return true;
-  },
-};
+export async function getCourse(supabase: SB, userId: string, id: string) {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function createCourse(supabase: SB, userId: string, course: Record<string, unknown>) {
+  const { data, error } = await supabase
+    .from('courses')
+    .insert({ ...course, user_id: userId })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCourse(
+  supabase: SB,
+  userId: string,
+  id: string,
+  updates: Record<string, unknown>
+) {
+  const { data, error } = await supabase
+    .from('courses')
+    .update(updates)
+    .eq('user_id', userId)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteCourse(supabase: SB, userId: string, id: string) {
+  const { error } = await supabase.from('courses').delete().eq('user_id', userId).eq('id', id);
+
+  if (error) throw error;
+}
+
+// ── Certifications (completed courses with certificate_url) ─────────────
+
+export async function listCertifications(supabase: SB, userId: string) {
+  const { data, error } = await supabase
+    .from('courses')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .not('certificate_url', 'is', null)
+    .order('completed_at', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export function mapCourseToCertification(course: Record<string, any>) {
+  return {
+    id: course.id,
+    title: course.title,
+    provider: course.provider || 'Unknown',
+    platform: course.platform || null,
+    certificateUrl: course.certificate_url || null,
+    certificateDate: course.completed_at || course.created_at,
+    skills: course.skills_learned || [],
+    status: course.status,
+    completedAt: course.completed_at,
+    isStandalone: false,
+    source: course.provider || 'manual',
+  };
+}
+
+export function computeCertificationStats(certifications: Record<string, any>[]) {
+  const currentYear = new Date().getFullYear();
+  const allSkills = new Set<string>();
+  const providers = new Set<string>();
+
+  for (const cert of certifications) {
+    providers.add(cert.provider || 'Unknown');
+    const skills = cert.skills_learned || cert.skills || [];
+    for (const s of skills) allSkills.add(s);
+  }
+
+  const thisYear = certifications.filter((c) => {
+    const d = c.completed_at || c.created_at;
+    return d && new Date(d).getFullYear() === currentYear;
+  }).length;
+
+  return {
+    total: certifications.length,
+    thisYear,
+    providers: providers.size,
+    skills: allSkills.size,
+  };
+}
+
+// ── Study Logs ──────────────────────────────────────────────────────────
+
+export async function listStudyLogs(supabase: SB, userId: string) {
+  const { data, error } = await supabase
+    .from('study_logs')
+    .select('*, courses(title)')
+    .eq('user_id', userId)
+    .order('study_date', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createStudyLog(supabase: SB, userId: string, log: Record<string, unknown>) {
+  const { data, error } = await supabase
+    .from('study_logs')
+    .insert({ ...log, user_id: userId })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}

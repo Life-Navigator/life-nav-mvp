@@ -1,124 +1,129 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { middleware } from '../middleware';
 
-// Mock NextResponse
-jest.mock('next/server', () => {
-  const originalModule = jest.requireActual('next/server');
-  return {
-    ...originalModule,
-    NextResponse: {
-      next: jest.fn(() => 'next_response'),
-      redirect: jest.fn((url) => ({ url, type: 'redirect' })),
+// Mock next/server without requireActual (avoids needing Web Request/Response globals)
+jest.mock('next/server', () => ({
+  NextRequest: jest.fn(),
+  NextResponse: {
+    next: jest.fn((_opts?: unknown) => ({ type: 'next' })),
+    redirect: jest.fn((url: unknown) => ({ url, type: 'redirect' })),
+  },
+}));
+
+// Mock Supabase SSR client
+const mockGetUser = jest.fn();
+const mockFrom = jest.fn();
+
+jest.mock('@supabase/ssr', () => ({
+  createServerClient: jest.fn(() => ({
+    auth: {
+      getUser: mockGetUser,
     },
-  };
-});
+    from: mockFrom,
+  })),
+}));
+
+// Set env vars for Supabase
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+
+function createMockRequest(pathname: string): NextRequest {
+  return {
+    nextUrl: {
+      pathname,
+      href: `http://localhost:3000${pathname}`,
+      clone: jest.fn().mockReturnThis(),
+    },
+    url: `http://localhost:3000${pathname}`,
+    cookies: {
+      get: jest.fn(),
+      getAll: jest.fn().mockReturnValue([]),
+      set: jest.fn(),
+    },
+  } as unknown as NextRequest;
+}
 
 describe('Middleware', () => {
-  let mockRequest: NextRequest;
-
   beforeEach(() => {
     jest.clearAllMocks();
-
-    // Set up a mock request
-    mockRequest = {
-      nextUrl: {
-        pathname: '/',
-        href: 'http://localhost:3000/',
-        clone: jest.fn().mockReturnThis(),
-      },
-      url: 'http://localhost:3000/',
-      cookies: {
-        get: jest.fn(),
-      },
-    } as unknown as NextRequest;
-  });
-  
-  it('redirects unauthenticated users to login page', async () => {
-    // Mock unauthenticated user (no access_token cookie)
-    (mockRequest.cookies.get as jest.Mock).mockReturnValue(undefined);
-
-    await middleware(mockRequest);
-
-    expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({ href: 'http://localhost:3000/auth/login' })
-    );
-  });
-
-  it('redirects authenticated users with completed setup to dashboard', async () => {
-    // Mock authenticated user with completed setup
-    const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InVzZXItaWQiLCJzZXR1cENvbXBsZXRlZCI6dHJ1ZX0.test';
-    (mockRequest.cookies.get as jest.Mock).mockReturnValue({ value: mockToken });
-
-    mockRequest.nextUrl.pathname = '/';
-
-    await middleware(mockRequest);
-
-    expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({ href: 'http://localhost:3000/dashboard' })
-    );
-  });
-
-  it('redirects authenticated users without completed setup to onboarding', async () => {
-    // Mock authenticated user without completed setup
-    const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InVzZXItaWQiLCJzZXR1cENvbXBsZXRlZCI6ZmFsc2V9.test';
-    (mockRequest.cookies.get as jest.Mock).mockReturnValue({ value: mockToken });
-
-    mockRequest.nextUrl.pathname = '/';
-
-    await middleware(mockRequest);
-
-    expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({ href: expect.stringContaining('/onboarding/questionnaire?userId=user-id') })
-    );
-  });
-
-  it('redirects from dashboard to onboarding if setup not completed', async () => {
-    // Mock authenticated user without completed setup
-    const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InVzZXItaWQiLCJzZXR1cENvbXBsZXRlZCI6ZmFsc2V9.test';
-    (mockRequest.cookies.get as jest.Mock).mockReturnValue({ value: mockToken });
-
-    mockRequest.nextUrl.pathname = '/dashboard';
-
-    await middleware(mockRequest);
-
-    expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({ href: expect.stringContaining('/onboarding/questionnaire?userId=user-id') })
-    );
-  });
-
-  it('redirects from protected route to login if not authenticated', async () => {
-    // Mock unauthenticated user (no access_token cookie)
-    (mockRequest.cookies.get as jest.Mock).mockReturnValue(undefined);
-
-    mockRequest.nextUrl.pathname = '/dashboard';
-
-    await middleware(mockRequest);
-
-    expect(NextResponse.redirect).toHaveBeenCalledWith(
-      expect.objectContaining({ href: 'http://localhost:3000/auth/login' })
-    );
-  });
-
-  it('allows authenticated users to access protected routes if setup completed', async () => {
-    // Mock authenticated user with completed setup
-    const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InVzZXItaWQiLCJzZXR1cENvbXBsZXRlZCI6dHJ1ZX0.test';
-    (mockRequest.cookies.get as jest.Mock).mockReturnValue({ value: mockToken });
-
-    mockRequest.nextUrl.pathname = '/dashboard';
-
-    await middleware(mockRequest);
-
-    expect(NextResponse.next).toHaveBeenCalled();
   });
 
   it('allows public routes without authentication', async () => {
-    // Mock unauthenticated user (no access_token cookie)
-    (mockRequest.cookies.get as jest.Mock).mockReturnValue(undefined);
+    mockGetUser.mockResolvedValue({ data: { user: null } });
 
-    mockRequest.nextUrl.pathname = '/auth/login';
+    const req = createMockRequest('/auth/login');
+    await middleware(req);
 
-    await middleware(mockRequest);
+    expect(NextResponse.redirect).not.toHaveBeenCalled();
+  });
 
-    expect(NextResponse.next).toHaveBeenCalled();
+  it('redirects unauthenticated users from protected routes to login', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+
+    const req = createMockRequest('/dashboard');
+    await middleware(req);
+
+    expect(NextResponse.redirect).toHaveBeenCalled();
+    const redirectUrl = (NextResponse.redirect as jest.Mock).mock.calls[0][0];
+    expect(redirectUrl.pathname).toBe('/auth/login');
+  });
+
+  it('allows authenticated users with completed setup to access dashboard', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'user-id' } },
+    });
+    mockFrom.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({
+        data: { setup_completed: true },
+      }),
+    });
+
+    const req = createMockRequest('/dashboard');
+    await middleware(req);
+
+    // Should not redirect away from dashboard
+    const redirectCalls = (NextResponse.redirect as jest.Mock).mock.calls;
+    const dashboardRedirect = redirectCalls.find(
+      (call: unknown[]) => (call[0] as URL)?.pathname === '/onboarding/questionnaire'
+    );
+    expect(dashboardRedirect).toBeUndefined();
+  });
+
+  it('redirects authenticated users without completed setup to onboarding', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'user-id' } },
+    });
+    mockFrom.mockReturnValue({
+      select: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({
+        data: { setup_completed: false },
+      }),
+    });
+
+    const req = createMockRequest('/dashboard');
+    await middleware(req);
+
+    expect(NextResponse.redirect).toHaveBeenCalled();
+    const redirectUrl = (NextResponse.redirect as jest.Mock).mock.calls.find(
+      (call: unknown[]) => (call[0] as URL)?.pathname === '/onboarding/questionnaire'
+    );
+    expect(redirectUrl).toBeDefined();
+  });
+
+  it('redirects authenticated users from auth pages to dashboard', async () => {
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'user-id' } },
+    });
+
+    const req = createMockRequest('/auth/login');
+    await middleware(req);
+
+    expect(NextResponse.redirect).toHaveBeenCalled();
+    const redirectUrl = (NextResponse.redirect as jest.Mock).mock.calls[0][0];
+    expect(redirectUrl.pathname).toBe('/dashboard');
   });
 });
