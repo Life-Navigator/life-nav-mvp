@@ -109,7 +109,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm --filter @life-navigator/web exec playwright install --with-deps chromium
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -118,7 +118,7 @@ jobs:
           path: apps/web/.next/
 
       - name: Run E2E tests
-        run: pnpm exec playwright test --project=chromium
+        run: pnpm --filter @life-navigator/web exec playwright test --project=chromium
         working-directory: apps/web
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co' }}
@@ -232,7 +232,7 @@ jobs:
   deploy-edge-functions:
     name: Deploy Edge Functions
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && secrets.SUPABASE_PROJECT_REF != ''
     needs: [build, unit-tests, secrets-scan, python-validate]
     environment: production
     steps:
