@@ -18,9 +18,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your financial account information',
       'View your transactions and balances',
-      'View your investment holdings and returns'
+      'View your investment holdings and returns',
     ],
-    modalDescription: 'Plaid lets you securely connect your financial accounts to Life Navigator. We use bank-level encryption and never store your credentials.'
+    modalDescription:
+      'Plaid lets you securely connect your financial accounts to Life Navigator. We use bank-level encryption and never store your credentials.',
   },
 
   // Personal Finance Tools
@@ -35,9 +36,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your net worth tracking',
       'View your custom budgets',
-      'Access collaborative finance features'
+      'Access collaborative finance features',
     ],
-    modalDescription: 'Monarch Money is a modern personal finance platform with powerful budgeting tools and collaborative features for couples and families.'
+    modalDescription:
+      'Monarch Money is a modern personal finance platform with powerful budgeting tools and collaborative features for couples and families.',
   },
   {
     id: 'ynab',
@@ -50,9 +52,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your budget categories and allocations',
       'View your transaction history',
-      'Read-only access to your budget goals'
+      'Read-only access to your budget goals',
     ],
-    modalDescription: 'You Need A Budget (YNAB) helps you take control of your money with zero-based budgeting, where every dollar has a purpose.'
+    modalDescription:
+      'You Need A Budget (YNAB) helps you take control of your money with zero-based budgeting, where every dollar has a purpose.',
   },
   {
     id: 'personal-capital',
@@ -65,9 +68,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View portfolio analysis',
       'Access retirement planning tools',
-      'View investment checkup reports'
+      'View investment checkup reports',
     ],
-    modalDescription: 'Personal Capital combines wealth management with powerful investment tracking and retirement planning tools.'
+    modalDescription:
+      'Personal Capital combines wealth management with powerful investment tracking and retirement planning tools.',
   },
   {
     id: 'quicken',
@@ -80,9 +84,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View bill management',
       'View investment tracking',
-      'Access tax planning features'
+      'Access tax planning features',
     ],
-    modalDescription: 'Quicken is a comprehensive personal finance platform for managing your bills, investments, and tax planning.'
+    modalDescription:
+      'Quicken is a comprehensive personal finance platform for managing your bills, investments, and tax planning.',
   },
 
   // Investment Platforms
@@ -97,9 +102,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your stock holdings',
       'View cryptocurrency balances',
-      'Access fractional shares data'
+      'Access fractional shares data',
     ],
-    modalDescription: 'Robinhood offers commission-free stock and cryptocurrency trading with support for fractional shares.'
+    modalDescription:
+      'Robinhood offers commission-free stock and cryptocurrency trading with support for fractional shares.',
   },
   {
     id: 'coinbase',
@@ -112,9 +118,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your cryptocurrency balances',
       'View your transaction history',
-      'Access wallet information and staking rewards'
+      'Access wallet information and staking rewards',
     ],
-    modalDescription: 'Coinbase is a leading cryptocurrency platform with secure wallet storage, staking rewards, and insurance protection.'
+    modalDescription:
+      'Coinbase is a leading cryptocurrency platform with secure wallet storage, staking rewards, and insurance protection.',
   },
   {
     id: 'wealthfront',
@@ -127,9 +134,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View automated investment portfolios',
       'Access tax-loss harvesting data',
-      'View financial planning recommendations'
+      'View financial planning recommendations',
     ],
-    modalDescription: 'Wealthfront provides automated investing with sophisticated tax-loss harvesting and comprehensive financial planning tools.'
+    modalDescription:
+      'Wealthfront provides automated investing with sophisticated tax-loss harvesting and comprehensive financial planning tools.',
   },
   {
     id: 'betterment',
@@ -142,9 +150,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View goal-based investing portfolios',
       'Access auto-rebalancing data',
-      'View tax coordination features'
+      'View tax coordination features',
     ],
-    modalDescription: 'Betterment is a robo-advisor that creates personalized portfolios based on your goals with automatic rebalancing and tax optimization.'
+    modalDescription:
+      'Betterment is a robo-advisor that creates personalized portfolios based on your goals with automatic rebalancing and tax optimization.',
   },
 
   // Payment Platforms
@@ -159,9 +168,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View payment processing data',
       'Access subscription billing information',
-      'View financial reporting'
+      'View financial reporting',
     ],
-    modalDescription: 'Stripe provides payment processing and financial infrastructure for businesses with advanced fraud detection and reporting.'
+    modalDescription:
+      'Stripe provides payment processing and financial infrastructure for businesses with advanced fraud detection and reporting.',
   },
   {
     id: 'paypal',
@@ -174,9 +184,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View digital wallet balance',
       'Access transaction history',
-      'View invoices and international payments'
+      'View invoices and international payments',
     ],
-    modalDescription: 'PayPal is a trusted digital payment platform with buyer protection and international payment capabilities.'
+    modalDescription:
+      'PayPal is a trusted digital payment platform with buyer protection and international payment capabilities.',
   },
   {
     id: 'venmo',
@@ -189,9 +200,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View P2P payment history',
       'Access social feed data',
-      'View bill splitting transactions'
+      'View bill splitting transactions',
     ],
-    modalDescription: 'Venmo makes it easy to send and receive money with friends and family, with fun social features and bill splitting.'
+    modalDescription:
+      'Venmo makes it easy to send and receive money with friends and family, with fun social features and bill splitting.',
   },
   {
     id: 'cashapp',
@@ -204,9 +216,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View mobile payment history',
       'Access Bitcoin trading data',
-      'View direct deposit information'
+      'View direct deposit information',
     ],
-    modalDescription: 'Cash App combines mobile payments with Bitcoin trading and direct deposit banking features.'
+    modalDescription:
+      'Cash App combines mobile payments with Bitcoin trading and direct deposit banking features.',
   },
 
   // Business Finance
@@ -218,12 +231,9 @@ export const PROVIDER_CONFIG: Provider[] = [
     logo: '/images/integrations/quickbooks.png',
     connected: false,
     comingSoon: true,
-    permissions: [
-      'View invoicing data',
-      'Access expense tracking',
-      'View payroll management'
-    ],
-    modalDescription: 'QuickBooks is a comprehensive business accounting platform for managing invoices, expenses, and payroll.'
+    permissions: ['View invoicing data', 'Access expense tracking', 'View payroll management'],
+    modalDescription:
+      'QuickBooks is a comprehensive business accounting platform for managing invoices, expenses, and payroll.',
   },
   {
     id: 'freshbooks',
@@ -236,9 +246,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View professional invoicing',
       'Access time tracking data',
-      'View expense management'
+      'View expense management',
     ],
-    modalDescription: 'FreshBooks is designed for small businesses and freelancers with professional invoicing and time tracking features.'
+    modalDescription:
+      'FreshBooks is designed for small businesses and freelancers with professional invoicing and time tracking features.',
   },
   {
     id: 'wave',
@@ -248,12 +259,9 @@ export const PROVIDER_CONFIG: Provider[] = [
     logo: '/images/integrations/wave.png',
     connected: false,
     comingSoon: true,
-    permissions: [
-      'View accounting data',
-      'Access receipt scanning',
-      'View invoice creation'
-    ],
-    modalDescription: 'Wave provides free accounting software with professional invoicing and receipt scanning capabilities.'
+    permissions: ['View accounting data', 'Access receipt scanning', 'View invoice creation'],
+    modalDescription:
+      'Wave provides free accounting software with professional invoicing and receipt scanning capabilities.',
   },
 
   // ============================================================================
@@ -271,9 +279,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your learning progress',
       'Access AI tutor sessions',
-      'View skill assessments and recommendations'
+      'View skill assessments and recommendations',
     ],
-    modalDescription: 'Icarus.AI uses artificial intelligence to create personalized learning paths and provide adaptive tutoring tailored to your learning style.'
+    modalDescription:
+      'Icarus.AI uses artificial intelligence to create personalized learning paths and provide adaptive tutoring tailored to your learning style.',
   },
   {
     id: 'udemy',
@@ -286,9 +295,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your enrolled courses',
       'Access course progress and completion',
-      'View certificates earned'
+      'View certificates earned',
     ],
-    modalDescription: 'Udemy is a global learning marketplace offering courses in business, technology, design, and personal development.'
+    modalDescription:
+      'Udemy is a global learning marketplace offering courses in business, technology, design, and personal development.',
   },
   {
     id: 'coursera',
@@ -301,9 +311,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your enrolled courses and specializations',
       'Access course progress and grades',
-      'View professional certificates and degrees'
+      'View professional certificates and degrees',
     ],
-    modalDescription: 'Coursera partners with top universities and companies to offer world-class online courses, specializations, and degrees.'
+    modalDescription:
+      'Coursera partners with top universities and companies to offer world-class online courses, specializations, and degrees.',
   },
   {
     id: 'edx',
@@ -316,9 +327,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your course enrollments',
       'Access MicroMasters and Professional Certificates',
-      'View verified certificates'
+      'View verified certificates',
     ],
-    modalDescription: 'edX offers high-quality courses from the world\'s best universities and institutions, including MIT, Harvard, and Berkeley.'
+    modalDescription:
+      "edX offers high-quality courses from the world's best universities and institutions, including MIT, Harvard, and Berkeley.",
   },
   {
     id: 'cfi',
@@ -331,9 +343,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View certification progress',
       'Access financial modeling courses',
-      'View professional certificates'
+      'View professional certificates',
     ],
-    modalDescription: 'CFI provides world-class financial analyst training and certifications recognized by leading financial institutions globally.'
+    modalDescription:
+      'CFI provides world-class financial analyst training and certifications recognized by leading financial institutions globally.',
   },
   {
     id: 'linkedin_learning',
@@ -346,9 +359,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your learning history',
       'Access course recommendations',
-      'View certificates and learning paths'
+      'View certificates and learning paths',
     ],
-    modalDescription: 'LinkedIn Learning offers thousands of courses in business, technology, and creative skills taught by industry experts.'
+    modalDescription:
+      'LinkedIn Learning offers thousands of courses in business, technology, and creative skills taught by industry experts.',
   },
   {
     id: 'canvas',
@@ -361,9 +375,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your courses and assignments',
       'View your grades and progress',
-      'Access your academic calendar'
+      'Access your academic calendar',
     ],
-    modalDescription: 'Canvas is a leading learning management system used by schools and universities worldwide.'
+    modalDescription:
+      'Canvas is a leading learning management system used by schools and universities worldwide.',
   },
   {
     id: 'google_classroom',
@@ -376,9 +391,26 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your enrolled courses',
       'View your assignments and due dates',
-      'Access your class materials'
+      'Access your class materials',
     ],
-    modalDescription: 'Google Classroom streamlines assignments, boosts collaboration, and fosters communication in educational settings.'
+    modalDescription:
+      'Google Classroom streamlines assignments, boosts collaboration, and fosters communication in educational settings.',
+  },
+  {
+    id: 'credly',
+    name: 'Credly',
+    description: 'Digital credentials and professional certifications',
+    category: 'education',
+    logo: '/images/integrations/credly.png',
+    connected: false,
+    comingSoon: false,
+    permissions: [
+      'View your earned badges and certifications',
+      'Access certification details and skills',
+      'Sync credentials to your education profile',
+    ],
+    modalDescription:
+      'Credly is the leading digital credential platform. Connect your Credly username to automatically import your verified badges and certifications.',
   },
 
   // ============================================================================
@@ -399,9 +431,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Access heart rate and sleep tracking',
       'View exercise logs and calorie data',
       'Monitor daily calories burned',
-      'Track workout sessions and zones'
+      'Track workout sessions and zones',
     ],
-    modalDescription: 'Fitbit provides comprehensive fitness tracking with activity monitoring, heart rate analysis, and sleep insights. Connect to automatically sync your health data.'
+    modalDescription:
+      'Fitbit provides comprehensive fitness tracking with activity monitoring, heart rate analysis, and sleep insights. Connect to automatically sync your health data.',
   },
   {
     id: 'apple_health',
@@ -414,9 +447,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View health data from HealthKit',
       'Access activity and workout data',
-      'View vital signs and medical records'
+      'View vital signs and medical records',
     ],
-    modalDescription: 'Apple Health aggregates health and fitness data from your iPhone, Apple Watch, and compatible third-party apps. Note: Requires mobile app for full integration.'
+    modalDescription:
+      'Apple Health aggregates health and fitness data from your iPhone, Apple Watch, and compatible third-party apps. Note: Requires mobile app for full integration.',
   },
   {
     id: 'google_fit',
@@ -431,9 +465,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Access heart points and workouts',
       'View health metrics and trends',
       'Track steps, distance, and calories',
-      'Monitor heart rate and sleep data'
+      'Monitor heart rate and sleep data',
     ],
-    modalDescription: 'Google Fit tracks your movement and health data from Android phones and Wear OS watches, providing insights to help you live a healthier, more active life.'
+    modalDescription:
+      'Google Fit tracks your movement and health data from Android phones and Wear OS watches, providing insights to help you live a healthier, more active life.',
   },
   {
     id: 'garmin',
@@ -446,9 +481,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View advanced activity tracking',
       'Access training metrics and VO2 max',
-      'View stress and recovery data'
+      'View stress and recovery data',
     ],
-    modalDescription: 'Garmin provides professional-grade fitness tracking with advanced metrics for serious athletes and fitness enthusiasts.'
+    modalDescription:
+      'Garmin provides professional-grade fitness tracking with advanced metrics for serious athletes and fitness enthusiasts.',
   },
   {
     id: 'whoop',
@@ -461,9 +497,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View recovery scores',
       'Access strain and sleep data',
-      'View HRV and respiratory rate'
+      'View HRV and respiratory rate',
     ],
-    modalDescription: 'Whoop focuses on recovery optimization with detailed strain, sleep, and recovery metrics for peak performance.'
+    modalDescription:
+      'Whoop focuses on recovery optimization with detailed strain, sleep, and recovery metrics for peak performance.',
   },
   {
     id: 'oura',
@@ -476,9 +513,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View sleep scores and stages',
       'Access readiness and activity data',
-      'View body temperature trends'
+      'View body temperature trends',
     ],
-    modalDescription: 'Oura Ring provides detailed sleep tracking and readiness scores to optimize your health and performance.'
+    modalDescription:
+      'Oura Ring provides detailed sleep tracking and readiness scores to optimize your health and performance.',
   },
 
   // Health & Wellness Apps
@@ -493,9 +531,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View calorie and macro tracking',
       'Access food diary and nutrition data',
-      'View weight and progress tracking'
+      'View weight and progress tracking',
     ],
-    modalDescription: 'MyFitnessPal is the world\'s largest food database for tracking calories, macros, and achieving your nutrition goals.'
+    modalDescription:
+      "MyFitnessPal is the world's largest food database for tracking calories, macros, and achieving your nutrition goals.",
   },
   {
     id: 'strava',
@@ -508,9 +547,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View activities and workouts',
       'Access performance metrics',
-      'View social fitness data and segments'
+      'View social fitness data and segments',
     ],
-    modalDescription: 'Strava is a social network for athletes, tracking runs and rides with detailed performance analytics and community features.'
+    modalDescription:
+      'Strava is a social network for athletes, tracking runs and rides with detailed performance analytics and community features.',
   },
   {
     id: 'peloton',
@@ -523,9 +563,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View workout history',
       'Access performance metrics',
-      'View class schedules and achievements'
+      'View class schedules and achievements',
     ],
-    modalDescription: 'Peloton offers connected fitness experiences with world-class instructors and comprehensive workout tracking.'
+    modalDescription:
+      'Peloton offers connected fitness experiences with world-class instructors and comprehensive workout tracking.',
   },
   {
     id: 'headspace',
@@ -538,9 +579,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View meditation session history',
       'Access mindfulness progress',
-      'View sleep and focus exercises'
+      'View sleep and focus exercises',
     ],
-    modalDescription: 'Headspace provides guided meditation and mindfulness exercises to reduce stress and improve mental wellness.'
+    modalDescription:
+      'Headspace provides guided meditation and mindfulness exercises to reduce stress and improve mental wellness.',
   },
 
   // Medical Records & Healthcare
@@ -555,9 +597,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your medical history',
       'View your upcoming appointments',
-      'Access your lab results and medications'
+      'Access your lab results and medications',
     ],
-    modalDescription: 'Epic MyChart provides secure access to your health information from participating healthcare providers. HIPAA compliant.'
+    modalDescription:
+      'Epic MyChart provides secure access to your health information from participating healthcare providers. HIPAA compliant.',
   },
   {
     id: 'cerner',
@@ -570,9 +613,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View electronic health records',
       'Access appointment scheduling',
-      'View prescriptions and test results'
+      'View prescriptions and test results',
     ],
-    modalDescription: 'Cerner\'s patient portal provides access to your health records, appointments, and communication with healthcare providers.'
+    modalDescription:
+      "Cerner's patient portal provides access to your health records, appointments, and communication with healthcare providers.",
   },
   {
     id: 'teladoc',
@@ -585,9 +629,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View telehealth visit history',
       'Access virtual consultation records',
-      'View prescriptions and treatment plans'
+      'View prescriptions and treatment plans',
     ],
-    modalDescription: 'Teladoc connects you with board-certified doctors via phone, video, or app for convenient virtual healthcare.'
+    modalDescription:
+      'Teladoc connects you with board-certified doctors via phone, video, or app for convenient virtual healthcare.',
   },
   {
     id: 'labcorp',
@@ -597,12 +642,9 @@ export const PROVIDER_CONFIG: Provider[] = [
     logo: '/images/integrations/labcorp.png',
     connected: false,
     comingSoon: true,
-    permissions: [
-      'View lab test results',
-      'Access diagnostic reports',
-      'View appointment history'
-    ],
-    modalDescription: 'LabCorp provides access to your lab test results and diagnostic services with secure, HIPAA-compliant access.'
+    permissions: ['View lab test results', 'Access diagnostic reports', 'View appointment history'],
+    modalDescription:
+      'LabCorp provides access to your lab test results and diagnostic services with secure, HIPAA-compliant access.',
   },
 
   // Nutrition
@@ -617,9 +659,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View nutrition tracking data',
       'Access micronutrient analysis',
-      'View dietary goals and progress'
+      'View dietary goals and progress',
     ],
-    modalDescription: 'Cronometer provides detailed nutrition tracking with comprehensive micronutrient analysis for optimal health.'
+    modalDescription:
+      'Cronometer provides detailed nutrition tracking with comprehensive micronutrient analysis for optimal health.',
   },
   {
     id: 'noom',
@@ -632,9 +675,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View weight loss progress',
       'Access food logging data',
-      'View coaching interactions'
+      'View coaching interactions',
     ],
-    modalDescription: 'Noom combines psychology, technology, and human coaching to help you build healthier habits and achieve sustainable weight loss.'
+    modalDescription:
+      'Noom combines psychology, technology, and human coaching to help you build healthier habits and achieve sustainable weight loss.',
   },
 
   // ============================================================================
@@ -649,14 +693,15 @@ export const PROVIDER_CONFIG: Provider[] = [
     category: 'career',
     logo: '/images/integrations/linkedin.png',
     connected: false,
-    comingSoon: true,
+    comingSoon: false,
     permissions: [
       'View your profile information',
       'View your connections and network',
       'Access your job history and skills',
-      'View job recommendations and applications'
+      'View job recommendations and applications',
     ],
-    modalDescription: 'LinkedIn is the world\'s largest professional network with 900+ million members. Connect with professionals, discover job opportunities, and build your career.'
+    modalDescription:
+      "LinkedIn is the world's largest professional network with 900+ million members. Connect with professionals, discover job opportunities, and build your career.",
   },
   {
     id: 'twitter',
@@ -669,9 +714,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your profile and tweets',
       'Access your followers and following',
-      'View professional conversations and trends'
+      'View professional conversations and trends',
     ],
-    modalDescription: 'Twitter (X) is a powerful platform for professional networking, thought leadership, and staying updated on industry trends and news.'
+    modalDescription:
+      'Twitter (X) is a powerful platform for professional networking, thought leadership, and staying updated on industry trends and news.',
   },
   {
     id: 'instagram',
@@ -684,9 +730,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your profile and posts',
       'Access your followers and engagement',
-      'View professional content and stories'
+      'View professional content and stories',
     ],
-    modalDescription: 'Instagram is ideal for visual professionals, creatives, and entrepreneurs to showcase their work and build their personal brand.'
+    modalDescription:
+      'Instagram is ideal for visual professionals, creatives, and entrepreneurs to showcase their work and build their personal brand.',
   },
   {
     id: 'tiktok',
@@ -699,9 +746,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View your profile and videos',
       'Access your followers and engagement',
-      'View professional content performance'
+      'View professional content performance',
     ],
-    modalDescription: 'TikTok is increasingly used for career content, industry insights, and professional brand building through engaging short-form videos.'
+    modalDescription:
+      'TikTok is increasingly used for career content, industry insights, and professional brand building through engaging short-form videos.',
   },
 
   // Job Search & Career Opportunities
@@ -716,9 +764,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View job search history',
       'Access saved jobs and applications',
-      'View application status and tracking'
+      'View application status and tracking',
     ],
-    modalDescription: 'Indeed is the world\'s #1 job site with millions of jobs from thousands of company websites and job boards.'
+    modalDescription:
+      "Indeed is the world's #1 job site with millions of jobs from thousands of company websites and job boards.",
   },
   {
     id: 'glassdoor',
@@ -731,9 +780,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View company reviews and ratings',
       'Access salary data and comparisons',
-      'View interview questions and insights'
+      'View interview questions and insights',
     ],
-    modalDescription: 'Glassdoor provides transparency into companies with employee reviews, salary data, and interview experiences to help you make informed career decisions.'
+    modalDescription:
+      'Glassdoor provides transparency into companies with employee reviews, salary data, and interview experiences to help you make informed career decisions.',
   },
   {
     id: 'upwork',
@@ -746,9 +796,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View freelance job proposals',
       'Access project history and earnings',
-      'View client reviews and ratings'
+      'View client reviews and ratings',
     ],
-    modalDescription: 'Upwork connects freelancers with clients worldwide, offering opportunities in development, design, writing, marketing, and more.'
+    modalDescription:
+      'Upwork connects freelancers with clients worldwide, offering opportunities in development, design, writing, marketing, and more.',
   },
   {
     id: 'fiverr',
@@ -761,9 +812,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View gig performance and orders',
       'Access earnings and reviews',
-      'View buyer requests and opportunities'
+      'View buyer requests and opportunities',
     ],
-    modalDescription: 'Fiverr is a global marketplace for freelance services, where you can offer your skills or find talented professionals for your projects.'
+    modalDescription:
+      'Fiverr is a global marketplace for freelance services, where you can offer your skills or find talented professionals for your projects.',
   },
   {
     id: 'freelancer',
@@ -776,9 +828,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View project bids and proposals',
       'Access earnings and milestones',
-      'View contest entries and rankings'
+      'View contest entries and rankings',
     ],
-    modalDescription: 'Freelancer.com is one of the world\'s largest freelancing and crowdsourcing marketplaces with millions of projects across hundreds of categories.'
+    modalDescription:
+      "Freelancer.com is one of the world's largest freelancing and crowdsourcing marketplaces with millions of projects across hundreds of categories.",
   },
 
   // Events & Networking
@@ -793,9 +846,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View registered events',
       'Access event recommendations',
-      'View professional networking opportunities'
+      'View professional networking opportunities',
     ],
-    modalDescription: 'Eventbrite helps you discover and attend professional conferences, workshops, seminars, and networking events in your industry and location.'
+    modalDescription:
+      'Eventbrite helps you discover and attend professional conferences, workshops, seminars, and networking events in your industry and location.',
   },
   {
     id: 'meetup',
@@ -808,9 +862,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View joined groups and RSVPs',
       'Access event history and attendance',
-      'View local networking opportunities'
+      'View local networking opportunities',
     ],
-    modalDescription: 'Meetup connects you with local professional groups, industry meetups, and skill-building events in your area for networking and career growth.'
+    modalDescription:
+      'Meetup connects you with local professional groups, industry meetups, and skill-building events in your area for networking and career growth.',
   },
   {
     id: 'chamber_commerce',
@@ -823,9 +878,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View local chamber events',
       'Access business networking opportunities',
-      'View member directory and connections'
+      'View member directory and connections',
     ],
-    modalDescription: 'Connect with your local Chamber of Commerce to discover business networking events, community gatherings, and professional development opportunities.'
+    modalDescription:
+      'Connect with your local Chamber of Commerce to discover business networking events, community gatherings, and professional development opportunities.',
   },
 
   // Professional Development
@@ -840,9 +896,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View repositories and contributions',
       'Access commit history and activity',
-      'View starred projects and followers'
+      'View starred projects and followers',
     ],
-    modalDescription: 'GitHub showcases your development work, open source contributions, and technical skills to potential employers and collaborators.'
+    modalDescription:
+      'GitHub showcases your development work, open source contributions, and technical skills to potential employers and collaborators.',
   },
   {
     id: 'behance',
@@ -855,9 +912,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View portfolio projects',
       'Access project views and appreciations',
-      'View followers and creative network'
+      'View followers and creative network',
     ],
-    modalDescription: 'Behance is Adobe\'s platform for showcasing and discovering creative work, perfect for designers, artists, and creative professionals.'
+    modalDescription:
+      "Behance is Adobe's platform for showcasing and discovering creative work, perfect for designers, artists, and creative professionals.",
   },
   {
     id: 'angellist',
@@ -870,9 +928,10 @@ export const PROVIDER_CONFIG: Provider[] = [
     permissions: [
       'View startup job opportunities',
       'Access company profiles and culture',
-      'View equity and compensation data'
+      'View equity and compensation data',
     ],
-    modalDescription: 'AngelList (now Wellfound) connects job seekers with startup opportunities, offering transparency into equity, culture, and funding stages.'
+    modalDescription:
+      'AngelList (now Wellfound) connects job seekers with startup opportunities, offering transparency into equity, culture, and funding stages.',
   },
 
   // ============================================================================
@@ -894,9 +953,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Access fuel/charge level and range',
       'View odometer and mileage',
       'Remote lock/unlock (if supported)',
-      'Access maintenance status'
+      'Access maintenance status',
     ],
-    modalDescription: 'Smartcar is a universal vehicle API that connects to 30+ car brands including GM, Ford, BMW, Mercedes, Audi, Honda, Toyota, Nissan, and more through a single integration. Get real-time vehicle data, location tracking, and remote control capabilities.'
+    modalDescription:
+      'Smartcar is a universal vehicle API that connects to 30+ car brands including GM, Ford, BMW, Mercedes, Audi, Honda, Toyota, Nissan, and more through a single integration. Get real-time vehicle data, location tracking, and remote control capabilities.',
   },
   {
     id: 'tesla',
@@ -912,9 +972,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'View charging history and statistics',
       'Remote climate control',
       'Lock/unlock and start/stop charging',
-      'View driving efficiency metrics'
+      'View driving efficiency metrics',
     ],
-    modalDescription: 'Direct integration with Tesla vehicles for comprehensive EV monitoring including charging data, battery health, driving statistics, and remote vehicle control.'
+    modalDescription:
+      'Direct integration with Tesla vehicles for comprehensive EV monitoring including charging data, battery health, driving statistics, and remote vehicle control.',
   },
   {
     id: 'gasbuddy',
@@ -928,9 +989,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'View local gas prices',
       'Access price history and trends',
       'Find nearby gas stations',
-      'Track fuel purchases and expenses'
+      'Track fuel purchases and expenses',
     ],
-    modalDescription: 'GasBuddy helps you find the cheapest gas prices near you and track your fuel expenses over time with detailed analytics.'
+    modalDescription:
+      'GasBuddy helps you find the cheapest gas prices near you and track your fuel expenses over time with detailed analytics.',
   },
   {
     id: 'manual_vehicle',
@@ -945,9 +1007,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Track maintenance records',
       'Log fuel purchases and expenses',
       'Record trip details',
-      'Set service reminders'
+      'Set service reminders',
     ],
-    modalDescription: 'Manually track all your vehicle data including maintenance records, fuel expenses, insurance, and service reminders - perfect for any vehicle regardless of connectivity.'
+    modalDescription:
+      'Manually track all your vehicle data including maintenance records, fuel expenses, insurance, and service reminders - perfect for any vehicle regardless of connectivity.',
   },
   {
     id: 'gps_trip_tracking',
@@ -962,9 +1025,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Track trips automatically',
       'Calculate mileage for business/personal',
       'Generate mileage reports',
-      'View trip history and routes'
+      'View trip history and routes',
     ],
-    modalDescription: 'Automatically track your trips using your phone\'s GPS. Perfect for mileage tracking, business expense reports, and understanding your driving patterns.'
+    modalDescription:
+      "Automatically track your trips using your phone's GPS. Perfect for mileage tracking, business expense reports, and understanding your driving patterns.",
   },
 
   // Coming Soon (Require Partnerships)
@@ -980,9 +1044,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'View vehicle history reports',
       'Access maintenance records',
       'View service reminders',
-      'Check accident history'
+      'Check accident history',
     ],
-    modalDescription: 'CARFAX integration coming soon! Get comprehensive vehicle history reports, maintenance records, and automated service reminders.'
+    modalDescription:
+      'CARFAX integration coming soon! Get comprehensive vehicle history reports, maintenance records, and automated service reminders.',
   },
   {
     id: 'onstar',
@@ -996,9 +1061,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'View vehicle diagnostics',
       'Remote start and control',
       'Access emergency assistance',
-      'View vehicle health reports'
+      'View vehicle health reports',
     ],
-    modalDescription: 'OnStar integration coming soon! Connect your GM vehicle for remote control, diagnostics, and emergency services.'
+    modalDescription:
+      'OnStar integration coming soon! Connect your GM vehicle for remote control, diagnostics, and emergency services.',
   },
   {
     id: 'fordpass',
@@ -1012,9 +1078,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'View vehicle status',
       'Remote start and lock',
       'Access vehicle health alerts',
-      'Track FordPass Rewards points'
+      'Track FordPass Rewards points',
     ],
-    modalDescription: 'FordPass integration coming soon! Manage your Ford vehicle, earn rewards, and access exclusive Ford owner benefits.'
+    modalDescription:
+      'FordPass integration coming soon! Manage your Ford vehicle, earn rewards, and access exclusive Ford owner benefits.',
   },
   {
     id: 'mybmw',
@@ -1028,9 +1095,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'View vehicle status',
       'Remote services and control',
       'Access ConnectedDrive features',
-      'View service history'
+      'View service history',
     ],
-    modalDescription: 'MyBMW integration coming soon! Connect your BMW for remote services, vehicle status, and ConnectedDrive features.'
+    modalDescription:
+      'MyBMW integration coming soon! Connect your BMW for remote services, vehicle status, and ConnectedDrive features.',
   },
   {
     id: 'mercedesme',
@@ -1044,9 +1112,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'View vehicle information',
       'Remote vehicle control',
       'Access service and maintenance data',
-      'View digital vehicle documents'
+      'View digital vehicle documents',
     ],
-    modalDescription: 'Mercedes Me integration coming soon! Access your Mercedes-Benz vehicle data, remote services, and maintenance information.'
+    modalDescription:
+      'Mercedes Me integration coming soon! Access your Mercedes-Benz vehicle data, remote services, and maintenance information.',
   },
   {
     id: 'audiconnect',
@@ -1060,9 +1129,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'View vehicle status',
       'Remote lock and climate control',
       'Access myAudi services',
-      'View service intervals'
+      'View service intervals',
     ],
-    modalDescription: 'Audi Connect integration coming soon! Connect your Audi for vehicle status, remote control, and myAudi services.'
+    modalDescription:
+      'Audi Connect integration coming soon! Connect your Audi for vehicle status, remote control, and myAudi services.',
   },
   {
     id: 'aaa',
@@ -1076,9 +1146,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'View membership status',
       'Request roadside assistance',
       'Access member discounts',
-      'View service call history'
+      'View service call history',
     ],
-    modalDescription: 'AAA integration coming soon! Quick access to roadside assistance, membership benefits, and service history.'
+    modalDescription:
+      'AAA integration coming soon! Quick access to roadside assistance, membership benefits, and service history.',
   },
 
   // ============================================================================
@@ -1099,9 +1170,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Control smart home devices',
       'View device status and history',
       'Access routines and automations',
-      'Manage rooms and zones'
+      'Manage rooms and zones',
     ],
-    modalDescription: 'Google Home integration with the Google Smart Home API lets you control and monitor all your Google-connected devices from Life Navigator.'
+    modalDescription:
+      'Google Home integration with the Google Smart Home API lets you control and monitor all your Google-connected devices from Life Navigator.',
   },
   {
     id: 'alexa',
@@ -1116,9 +1188,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Control smart home devices',
       'Access routines and automations',
       'View voice command history',
-      'Manage device groups'
+      'Manage device groups',
     ],
-    modalDescription: 'Amazon Alexa Smart Home Skill API provides full control of your Alexa-connected devices, routines, and automations through Life Navigator.'
+    modalDescription:
+      'Amazon Alexa Smart Home Skill API provides full control of your Alexa-connected devices, routines, and automations through Life Navigator.',
   },
   {
     id: 'smartthings',
@@ -1133,9 +1206,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Control devices and scenes',
       'Access automations and rules',
       'View energy monitoring',
-      'Manage locations and rooms'
+      'Manage locations and rooms',
     ],
-    modalDescription: 'SmartThings acts as a universal hub, connecting devices from 200+ brands. One integration for comprehensive smart home control.'
+    modalDescription:
+      'SmartThings acts as a universal hub, connecting devices from 200+ brands. One integration for comprehensive smart home control.',
   },
   {
     id: 'philips_hue',
@@ -1150,9 +1224,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Create and manage scenes',
       'Schedule lighting automations',
       'Access energy usage data',
-      'Manage rooms and zones'
+      'Manage rooms and zones',
     ],
-    modalDescription: 'Philips Hue API provides full control of your smart lighting including color changes, brightness, scenes, and scheduling.'
+    modalDescription:
+      'Philips Hue API provides full control of your smart lighting including color changes, brightness, scenes, and scheduling.',
   },
   {
     id: 'ecobee',
@@ -1167,9 +1242,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Control thermostat settings',
       'Access energy reports',
       'Manage schedules and comfort settings',
-      'View sensor data'
+      'View sensor data',
     ],
-    modalDescription: 'Ecobee API integration for smart climate control, energy monitoring, and automated temperature scheduling.'
+    modalDescription:
+      'Ecobee API integration for smart climate control, energy monitoring, and automated temperature scheduling.',
   },
   {
     id: 'august',
@@ -1184,9 +1260,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Lock and unlock remotely',
       'View access history',
       'Manage guest access',
-      'Receive security notifications'
+      'Receive security notifications',
     ],
-    modalDescription: 'August Smart Lock API provides remote lock control, access history tracking, and guest access management.'
+    modalDescription:
+      'August Smart Lock API provides remote lock control, access history tracking, and guest access management.',
   },
   {
     id: 'sonos',
@@ -1201,9 +1278,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Manage playback and volume',
       'Create and manage groups',
       'Access favorites and playlists',
-      'View system information'
+      'View system information',
     ],
-    modalDescription: 'Sonos Control API for managing multi-room audio, playback control, and speaker grouping across your home.'
+    modalDescription:
+      'Sonos Control API for managing multi-room audio, playback control, and speaker grouping across your home.',
   },
   {
     id: 'tplink_kasa',
@@ -1218,9 +1296,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Monitor energy usage',
       'Create schedules and timers',
       'Set up scenes and automations',
-      'Access device statistics'
+      'Access device statistics',
     ],
-    modalDescription: 'TP-Link Kasa API provides control of smart plugs, switches, and bulbs with energy monitoring capabilities.'
+    modalDescription:
+      'TP-Link Kasa API provides control of smart plugs, switches, and bulbs with energy monitoring capabilities.',
   },
   {
     id: 'ifttt',
@@ -1235,9 +1314,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Connect multiple services',
       'Set up custom automations',
       'Access webhook integrations',
-      'View automation history'
+      'View automation history',
     ],
-    modalDescription: 'IFTTT (If This Then That) connects 700+ services and devices, enabling powerful cross-platform automations for your smart home.'
+    modalDescription:
+      'IFTTT (If This Then That) connects 700+ services and devices, enabling powerful cross-platform automations for your smart home.',
   },
 
   // Coming Soon (Require Partnerships or Certifications)
@@ -1254,9 +1334,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Control devices via Siri',
       'Access scenes and automations',
       'View home status',
-      'Manage HomeKit secure video'
+      'Manage HomeKit secure video',
     ],
-    modalDescription: 'Apple HomeKit integration coming soon! Secure, private control of your smart home accessories through your Apple devices.'
+    modalDescription:
+      'Apple HomeKit integration coming soon! Secure, private control of your smart home accessories through your Apple devices.',
   },
   {
     id: 'nest',
@@ -1271,9 +1352,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Control temperature and schedules',
       'Access camera feeds',
       'View home/away status',
-      'Receive security alerts'
+      'Receive security alerts',
     ],
-    modalDescription: 'Google Nest integration coming soon! Intelligent climate control, home security cameras, and energy management.'
+    modalDescription:
+      'Google Nest integration coming soon! Intelligent climate control, home security cameras, and energy management.',
   },
   {
     id: 'ring',
@@ -1288,9 +1370,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Access recorded videos',
       'Receive motion alerts',
       'Control doorbell features',
-      'Manage device settings'
+      'Manage device settings',
     ],
-    modalDescription: 'Ring integration coming soon! Access your video doorbells, security cameras, and motion alerts.'
+    modalDescription:
+      'Ring integration coming soon! Access your video doorbells, security cameras, and motion alerts.',
   },
   {
     id: 'arlo',
@@ -1305,9 +1388,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Access recorded footage',
       'Receive motion notifications',
       'Control camera modes',
-      'Manage storage and plans'
+      'Manage storage and plans',
     ],
-    modalDescription: 'Arlo integration coming soon! Monitor your wireless security cameras and access recorded footage.'
+    modalDescription:
+      'Arlo integration coming soon! Monitor your wireless security cameras and access recorded footage.',
   },
   {
     id: 'lutron',
@@ -1322,9 +1406,10 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Manage motorized shades',
       'Create and run scenes',
       'Set up schedules',
-      'Access system status'
+      'Access system status',
     ],
-    modalDescription: 'Lutron integration coming soon! Professional-grade lighting and shade control for your smart home.'
+    modalDescription:
+      'Lutron integration coming soon! Professional-grade lighting and shade control for your smart home.',
   },
   {
     id: 'wyze',
@@ -1339,8 +1424,9 @@ export const PROVIDER_CONFIG: Provider[] = [
       'Access recorded clips',
       'Control smart devices',
       'Receive notifications',
-      'Manage device settings'
+      'Manage device settings',
     ],
-    modalDescription: 'Wyze integration coming soon! Access your affordable smart cameras, sensors, and home devices.'
-  }
+    modalDescription:
+      'Wyze integration coming soon! Access your affordable smart cameras, sensors, and home devices.',
+  },
 ];

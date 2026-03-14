@@ -4,30 +4,51 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+function getEnv() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !anonKey) {
+    throw new Error('Missing Supabase environment variables');
+  }
+  return { url, anonKey, serviceKey: serviceKey || anonKey };
 }
+
+let _admin: ReturnType<typeof createClient> | null = null;
+let _client: ReturnType<typeof createClient> | null = null;
 
 /**
  * Service role client - bypasses RLS, use with caution
- * Only use for server-side operations that require admin access
  */
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
+export function getSupabaseAdmin() {
+  if (!_admin) {
+    const { url, serviceKey } = getEnv();
+    _admin = createClient(url, serviceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return _admin;
+}
+
+// Lazy getter for backward compatibility
+export const supabaseAdmin = new Proxy({} as ReturnType<typeof createClient>, {
+  get(_, prop) {
+    return (getSupabaseAdmin() as any)[prop];
   },
 });
 
 /**
  * Standard client - enforces RLS
- * Use for user-scoped operations
  */
-export const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseClient = new Proxy({} as ReturnType<typeof createClient>, {
+  get(_, prop) {
+    if (!_client) {
+      const { url, anonKey } = getEnv();
+      _client = createClient(url, anonKey);
+    }
+    return (_client as any)[prop];
+  },
+});
 
 /**
  * Get Supabase client for server-side operations with user context
@@ -53,16 +74,14 @@ export async function createAuditLog(params: {
 }) {
   const { user_id, action, resource_type, resource_id, changes, metadata } = params;
 
-  await supabaseAdmin
-    .from('scenario_audit_log')
-    .insert({
-      user_id,
-      action,
-      resource_type,
-      resource_id,
-      changes,
-      metadata,
-    });
+  await (supabaseAdmin as any).from('scenario_audit_log').insert({
+    user_id,
+    action,
+    resource_type,
+    resource_id,
+    changes,
+    metadata,
+  });
 }
 
 /**
@@ -75,8 +94,7 @@ export async function getUploadUrl(params: {
 }): Promise<string> {
   const { bucket, path, expiresIn = 3600 } = params;
 
-  const { data, error } = await supabaseAdmin
-    .storage
+  const { data, error } = await (supabaseAdmin as any).storage
     .from(bucket)
     .createSignedUploadUrl(path);
 
@@ -94,8 +112,7 @@ export async function getDownloadUrl(params: {
 }): Promise<string> {
   const { bucket, path, expiresIn = 3600 } = params;
 
-  const { data, error } = await supabaseAdmin
-    .storage
+  const { data, error } = await (supabaseAdmin as any).storage
     .from(bucket)
     .createSignedUrl(path, expiresIn);
 
@@ -114,13 +131,10 @@ export async function uploadFile(params: {
 }): Promise<void> {
   const { bucket, path, file, contentType } = params;
 
-  const { error } = await supabaseAdmin
-    .storage
-    .from(bucket)
-    .upload(path, file, {
-      contentType,
-      upsert: false,
-    });
+  const { error } = await (supabaseAdmin as any).storage.from(bucket).upload(path, file, {
+    contentType,
+    upsert: false,
+  });
 
   if (error) throw error;
 }
@@ -134,10 +148,7 @@ export async function deleteFile(params: {
 }): Promise<void> {
   const { bucket, path } = params;
 
-  const { error } = await supabaseAdmin
-    .storage
-    .from(bucket)
-    .remove([path]);
+  const { error } = await (supabaseAdmin as any).storage.from(bucket).remove([path]);
 
   if (error) throw error;
 }

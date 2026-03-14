@@ -33,9 +33,9 @@ export interface ProviderConfig extends OAuthProviderConfig {
   category: 'finance' | 'education' | 'career' | 'healthcare' | 'automotive' | 'smarthome';
   strategy: ConnectionStrategy;
   logo: string;
-  syncSupported: boolean;  // Whether this provider supports automated data syncing
-  syncInterval?: number;   // Minutes between automatic syncs, if supported
-  docsUrl?: string;        // URL to developer documentation for this provider
+  syncSupported: boolean; // Whether this provider supports automated data syncing
+  syncInterval?: number; // Minutes between automatic syncs, if supported
+  docsUrl?: string; // URL to developer documentation for this provider
 }
 
 /**
@@ -63,7 +63,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     },
     docsUrl: 'https://plaid.com/docs/api/',
   },
-  
+
   ynab: {
     id: 'ynab',
     name: 'YNAB (You Need A Budget)',
@@ -86,7 +86,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     logo: '/images/integrations/ynab.png',
     docsUrl: 'https://api.youneedabudget.com/',
   },
-  
+
   mint: {
     id: 'mint',
     name: 'Mint',
@@ -108,7 +108,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     logo: '/images/integrations/mint.png',
     docsUrl: 'https://developer.intuit.com/app/developer/homepage',
   },
-  
+
   coinbase: {
     id: 'coinbase',
     name: 'Coinbase',
@@ -129,7 +129,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     logo: '/images/integrations/coinbase.png',
     docsUrl: 'https://developers.coinbase.com/api/v2',
   },
-  
+
   // Education providers
   canvas: {
     id: 'canvas',
@@ -151,7 +151,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     logo: '/images/integrations/canvas.png',
     docsUrl: 'https://canvas.instructure.com/doc/api/',
   },
-  
+
   google_classroom: {
     id: 'google_classroom',
     name: 'Google Classroom',
@@ -165,8 +165,8 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     apiBaseUrl: 'https://classroom.googleapis.com/v1',
     redirectUri: `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/google_classroom`,
     scopes: [
-      'https://www.googleapis.com/auth/classroom.courses.readonly', 
-      'https://www.googleapis.com/auth/classroom.coursework.me.readonly'
+      'https://www.googleapis.com/auth/classroom.courses.readonly',
+      'https://www.googleapis.com/auth/classroom.coursework.me.readonly',
     ],
     responseType: 'code',
     authorizationMethod: 'body',
@@ -175,7 +175,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     logo: '/images/integrations/google_classroom.png',
     docsUrl: 'https://developers.google.com/classroom/reference/rest',
   },
-  
+
   // Healthcare providers
   epic_mychart: {
     id: 'epic_mychart',
@@ -197,7 +197,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     logo: '/images/integrations/epic.png',
     docsUrl: 'https://fhir.epic.com/Documentation',
   },
-  
+
   docuscan: {
     id: 'docuscan',
     name: 'DocuScan',
@@ -212,7 +212,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     syncSupported: false, // Manual uploads only
     logo: '/images/integrations/docuscan.png',
   },
-  
+
   // Career providers
   linkedin: {
     id: 'linkedin',
@@ -225,7 +225,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     authorizationUrl: 'https://www.linkedin.com/oauth/v2/authorization',
     tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
     apiBaseUrl: 'https://api.linkedin.com/v2',
-    redirectUri: `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/linkedin`,
+    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/linkedin`,
     scopes: ['r_liteprofile', 'r_emailaddress'],
     responseType: 'code',
     authorizationMethod: 'query',
@@ -233,7 +233,24 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     logo: '/images/integrations/linkedin.png',
     docsUrl: 'https://docs.microsoft.com/en-us/linkedin/consumer/',
   },
-  
+
+  credly: {
+    id: 'credly',
+    name: 'Credly',
+    description: 'Import verified digital credentials and certifications',
+    category: 'education' as const,
+    strategy: 'api_key' as ConnectionStrategy,
+    clientId: '',
+    clientSecret: '',
+    authorizationUrl: '',
+    tokenUrl: '',
+    apiBaseUrl: 'https://www.credly.com',
+    syncSupported: true,
+    syncInterval: 1440,
+    logo: '/images/integrations/credly.png',
+    docsUrl: 'https://support.credly.com/',
+  },
+
   // Automotive providers
   smartcar: {
     id: 'smartcar',
@@ -255,7 +272,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     logo: '/images/integrations/smartcar.png',
     docsUrl: 'https://smartcar.com/docs/api',
   },
-  
+
   // Smart home providers
   google_home: {
     id: 'google_home',
@@ -276,7 +293,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     syncInterval: 720, // 12 hours
     logo: '/images/integrations/google_home.png',
     docsUrl: 'https://developers.google.com/assistant/smarthome/concepts/homegraph',
-  }
+  },
 };
 
 /**
@@ -297,55 +314,55 @@ export function getAllProviders(): ProviderConfig[] {
  * Get providers by category
  */
 export function getProvidersByCategory(category: string): ProviderConfig[] {
-  return Object.values(OAUTH_CONFIGS).filter(provider => provider.category === category);
+  return Object.values(OAUTH_CONFIGS).filter((provider) => provider.category === category);
 }
 
 /**
  * Build OAuth authorization URL with all necessary parameters
  */
 export function buildAuthorizationUrl(
-  providerId: string, 
-  state: string, 
+  providerId: string,
+  state: string,
   codeVerifier?: string
 ): string | null {
   const config = getOAuthProviderConfig(providerId);
   if (!config) return null;
-  
+
   const url = new URL(config.authorizationUrl);
-  
+
   // Add standard OAuth parameters
   url.searchParams.append('client_id', config.clientId);
-  url.searchParams.append('redirect_uri', config.redirectUri || `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback`);
+  url.searchParams.append(
+    'redirect_uri',
+    config.redirectUri || `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback`
+  );
   url.searchParams.append('response_type', config.responseType || 'code');
   url.searchParams.append('state', state);
-  
+
   // Add scopes if provided
   if (config.scopes && config.scopes.length > 0) {
     url.searchParams.append('scope', config.scopes.join(' '));
   }
-  
+
   // Add PKCE parameters if required
   if (config.pkce && codeVerifier) {
     const encoder = new TextEncoder();
     const data = encoder.encode(codeVerifier);
-    crypto.subtle.digest('SHA-256', data).then(arrayBuffer => {
+    crypto.subtle.digest('SHA-256', data).then((arrayBuffer) => {
       const hash = String.fromCharCode(...new Uint8Array(arrayBuffer));
-      const codeChallenge = btoa(hash)
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=+$/, '');
+      const codeChallenge = btoa(hash).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       url.searchParams.append('code_challenge', codeChallenge);
       url.searchParams.append('code_challenge_method', 'S256');
     });
   }
-  
+
   // Add any additional parameters specified in the config
   if (config.additionalParams) {
     Object.entries(config.additionalParams).forEach(([key, value]) => {
       url.searchParams.append(key, value);
     });
   }
-  
+
   return url.toString();
 }
 
@@ -354,7 +371,7 @@ export function buildAuthorizationUrl(
  */
 export function generateOAuthState(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(32)))
-    .map(b => b.toString(16).padStart(2, '0'))
+    .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
 

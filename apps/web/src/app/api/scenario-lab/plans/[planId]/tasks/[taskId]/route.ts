@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
 import { z } from 'zod';
 
@@ -23,7 +23,7 @@ const updateTaskSchema = z.object({
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { planId: string; taskId: string } }
+  { params }: { params: Promise<{ planId: string; taskId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -35,10 +35,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const { planId, taskId } = params;
+    const { planId, taskId } = await params;
 
     // Verify plan ownership
-    const { data: plan, error: planError } = await supabaseAdmin
+    const { data: plan, error: planError } = await (supabaseAdmin as any)
       .from('plans')
       .select('id, user_id, scenario_version_id')
       .eq('id', planId)
@@ -53,7 +53,7 @@ export async function PATCH(
     }
 
     // Verify task belongs to plan
-    const { data: task, error: taskError } = await supabaseAdmin
+    const { data: task, error: taskError } = await (supabaseAdmin as any)
       .from('plan_tasks')
       .select('*')
       .eq('id', taskId)
@@ -90,7 +90,7 @@ export async function PATCH(
     }
 
     // Update task
-    const { data: updatedTask, error: updateError } = await supabaseAdmin
+    const { data: updatedTask, error: updateError } = await (supabaseAdmin as any)
       .from('plan_tasks')
       .update({
         ...updates,

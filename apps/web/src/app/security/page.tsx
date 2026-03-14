@@ -1,31 +1,21 @@
 import Link from 'next/link';
+import Navbar from '@/components/marketing/Navbar';
+import Footer from '@/components/marketing/Footer';
 
 export const metadata = {
   title: 'Security & Privacy - Life Navigator',
-  description: 'Learn how Life Navigator protects your data with bank-grade encryption, GDPR compliance, and row-level security.',
+  description:
+    'Learn how Life Navigator protects your data with bank-grade encryption, GDPR compliance, and row-level security.',
 };
 
 export default function SecurityPage() {
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950">
-      {/* Nav */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <Link href="/" className="text-xl font-bold text-indigo-600 dark:text-indigo-400">
-            Life Navigator
-          </Link>
-          <Link
-            href="/auth/register"
-            className="text-sm px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-          >
-            Get Started
-          </Link>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Hero */}
       <section className="pt-32 pb-16 px-4 sm:px-6 lg:px-8 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-sm mb-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 text-sm mb-6 border border-green-200/50 dark:border-green-800/50">
           <span className="w-2 h-2 rounded-full bg-green-500" />
           Bank-Grade Security
         </div>
@@ -33,9 +23,8 @@ export default function SecurityPage() {
           Your data is sacred
         </h1>
         <p className="mt-4 text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-          We built Life Navigator with security-first architecture. Your
-          personal, financial, and career data is protected by multiple layers
-          of encryption and access control.
+          We built Life Navigator with security-first architecture. Your personal, financial, and
+          career data is protected by multiple layers of encryption and access control.
         </p>
       </section>
 
@@ -44,7 +33,7 @@ export default function SecurityPage() {
         <div className="max-w-4xl mx-auto space-y-12">
           <SecuritySection
             title="Encryption"
-            icon="🔐"
+            icon={<LockIcon />}
             items={[
               {
                 title: 'AES-256 Encryption at Rest',
@@ -66,7 +55,7 @@ export default function SecurityPage() {
 
           <SecuritySection
             title="Access Control"
-            icon="🛡️"
+            icon={<ShieldCheckIcon />}
             items={[
               {
                 title: 'Row-Level Security (RLS)',
@@ -88,7 +77,7 @@ export default function SecurityPage() {
 
           <SecuritySection
             title="GDPR Compliance"
-            icon="🇪🇺"
+            icon={<GlobeIcon />}
             items={[
               {
                 title: 'Right to Access (Article 15)',
@@ -115,7 +104,7 @@ export default function SecurityPage() {
 
           <SecuritySection
             title="Integration Security"
-            icon="🔗"
+            icon={<LinkIcon />}
             items={[
               {
                 title: 'OAuth 2.0 Token Vault',
@@ -125,7 +114,7 @@ export default function SecurityPage() {
               {
                 title: 'Minimal Scope Requests',
                 description:
-                  'We request only the OAuth scopes needed for the features you use. Email read access doesn\'t grant write access unless you enable sending.',
+                  "We request only the OAuth scopes needed for the features you use. Email read access doesn't grant write access unless you enable sending.",
               },
               {
                 title: 'No Data Selling',
@@ -137,7 +126,7 @@ export default function SecurityPage() {
 
           <SecuritySection
             title="Infrastructure"
-            icon="🏗️"
+            icon={<ServerIcon />}
             items={[
               {
                 title: 'Supabase Platform',
@@ -169,14 +158,18 @@ export default function SecurityPage() {
         </p>
         <Link
           href="/auth/register"
-          className="mt-8 inline-flex px-8 py-3.5 rounded-xl bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-all"
+          className="mt-8 inline-flex px-8 py-3.5 rounded-xl bg-cyan-600 text-white font-medium hover:bg-cyan-700 transition-all shadow-lg shadow-cyan-600/25"
         >
           Get Started Free
         </Link>
       </section>
+
+      <Footer />
     </div>
   );
 }
+
+/* ── Helper components ── */
 
 function SecuritySection({
   title,
@@ -184,16 +177,16 @@ function SecuritySection({
   items,
 }: {
   title: string;
-  icon: string;
+  icon: React.ReactNode;
   items: Array<{ title: string; description: string }>;
 }) {
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
-        <span className="text-2xl">{icon}</span>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {title}
-        </h2>
+        <div className="w-10 h-10 flex items-center justify-center rounded-lg bg-cyan-50 dark:bg-cyan-950/50 text-cyan-600 dark:text-cyan-400">
+          {icon}
+        </div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h2>
       </div>
       <div className="space-y-4">
         {items.map((item) => (
@@ -201,9 +194,7 @@ function SecuritySection({
             key={item.title}
             className="p-5 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
           >
-            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-              {item.title}
-            </h3>
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-1">{item.title}</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
               {item.description}
             </p>
@@ -211,5 +202,100 @@ function SecuritySection({
         ))}
       </div>
     </div>
+  );
+}
+
+/* ── Inline SVG Icons ── */
+
+function LockIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+function ShieldCheckIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+function ServerIcon() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+      <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+      <line x1="6" y1="6" x2="6.01" y2="6" />
+      <line x1="6" y1="18" x2="6.01" y2="18" />
+    </svg>
   );
 }

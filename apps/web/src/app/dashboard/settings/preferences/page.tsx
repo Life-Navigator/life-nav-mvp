@@ -1,7 +1,6 @@
 'use client';
-
 import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/hooks/useSession';
 import { useTheme } from 'next-themes';
 import { Card } from '@/components/ui/cards/Card';
 import { Button } from '@/components/ui/buttons/Button';
@@ -33,7 +32,7 @@ export default function PreferencesPage() {
     dateFormat: 'MM/DD/YYYY',
   });
   const [error, setError] = useState<string | null>(null);
-  
+
   // Available options
   const currencies = [
     { value: 'USD', label: 'US Dollar ($)' },
@@ -43,7 +42,7 @@ export default function PreferencesPage() {
     { value: 'CAD', label: 'Canadian Dollar (C$)' },
     { value: 'AUD', label: 'Australian Dollar (A$)' },
   ];
-  
+
   const languages = [
     { value: 'en', label: 'English' },
     { value: 'es', label: 'Spanish' },
@@ -52,54 +51,54 @@ export default function PreferencesPage() {
     { value: 'zh', label: 'Chinese' },
     { value: 'ja', label: 'Japanese' },
   ];
-  
+
   const themes = [
     { value: 'light', label: 'Light' },
     { value: 'dark', label: 'Dark' },
     { value: 'system', label: 'System' },
   ];
-  
+
   const timeFormats = [
     { value: '12h', label: '12-hour (1:30 PM)' },
     { value: '24h', label: '24-hour (13:30)' },
   ];
-  
+
   const dateFormats = [
     { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
     { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
     { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' },
   ];
-  
+
   const dashboardLayouts = [
     { value: 'default', label: 'Default' },
     { value: 'compact', label: 'Compact' },
     { value: 'expanded', label: 'Expanded' },
   ];
-  
+
   // Fetch user settings
   useEffect(() => {
     const fetchUserSettings = async () => {
       if (status === 'loading') return;
-      
+
       if (!session?.user?.id) {
         setError('You must be logged in to view this page');
         setIsLoading(false);
         return;
       }
-      
+
       try {
         const response = await fetch('/api/user/settings');
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch settings');
         }
-        
+
         const data = await response.json();
         setSettings({
           ...settings,
           ...data,
         });
-        
+
         // Update theme directly
         if (data.theme) {
           setTheme(data.theme);
@@ -111,14 +110,14 @@ export default function PreferencesPage() {
         setIsLoading(false);
       }
     };
-    
+
     fetchUserSettings();
   }, [session, status, setTheme]);
-  
+
   // Handle form input changes
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    
+
     if (type === 'checkbox') {
       const checked = (e.target as HTMLInputElement).checked;
       setSettings({
@@ -130,20 +129,20 @@ export default function PreferencesPage() {
         ...settings,
         [name]: value,
       });
-      
+
       // Update theme in real-time
       if (name === 'theme') {
         setTheme(value);
       }
     }
   };
-  
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setError(null);
-    
+
     try {
       const response = await fetch('/api/user/settings', {
         method: 'PUT',
@@ -152,30 +151,30 @@ export default function PreferencesPage() {
         },
         body: JSON.stringify(settings),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to update settings');
       }
-      
+
       toast({
-        title: "Settings Saved",
-        description: "Your preferences have been successfully updated.",
-        type: "success",
+        title: 'Settings Saved',
+        description: 'Your preferences have been successfully updated.',
+        type: 'success',
       });
     } catch (error) {
       console.error('Error updating settings:', error);
       setError('Failed to update settings. Please try again.');
       toast({
-        title: "Update Failed",
-        description: "There was an error updating your preferences.",
-        type: "error",
+        title: 'Update Failed',
+        description: 'There was an error updating your preferences.',
+        type: 'error',
       });
     } finally {
       setIsSaving(false);
     }
   };
-  
+
   // Reset settings to defaults
   const handleResetDefaults = () => {
     const defaultSettings = {
@@ -187,17 +186,17 @@ export default function PreferencesPage() {
       timeFormat: '12h',
       dateFormat: 'MM/DD/YYYY',
     };
-    
+
     setSettings(defaultSettings);
     setTheme(defaultSettings.theme);
-    
+
     toast({
-      title: "Defaults Restored",
-      description: "Your preferences have been reset to the default values.",
-      type: "info",
+      title: 'Defaults Restored',
+      description: 'Your preferences have been reset to the default values.',
+      type: 'info',
     });
   };
-  
+
   // Show loading spinner
   if (isLoading) {
     return (
@@ -206,7 +205,7 @@ export default function PreferencesPage() {
       </div>
     );
   }
-  
+
   // Show error message
   if (error) {
     return (
@@ -217,11 +216,11 @@ export default function PreferencesPage() {
       </div>
     );
   }
-  
+
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-6">Preferences</h1>
-      
+
       <form onSubmit={handleSubmit}>
         <div className="space-y-6">
           {/* Appearance Section */}
@@ -231,11 +230,14 @@ export default function PreferencesPage() {
               <p className="text-gray-500 dark:text-gray-400 mb-6">
                 Customize how Life Navigator looks and behaves.
               </p>
-              
+
               <div className="space-y-6">
                 {/* Theme Selector */}
                 <div>
-                  <label htmlFor="theme" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label
+                    htmlFor="theme"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
                     Theme
                   </label>
                   <select
@@ -257,10 +259,13 @@ export default function PreferencesPage() {
                     Choose between light, dark, or system preference.
                   </p>
                 </div>
-                
+
                 {/* Dashboard Layout */}
                 <div>
-                  <label htmlFor="dashboardLayout" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label
+                    htmlFor="dashboardLayout"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
                     Dashboard Layout
                   </label>
                   <select
@@ -282,7 +287,7 @@ export default function PreferencesPage() {
               </div>
             </div>
           </Card>
-          
+
           {/* Localization Section */}
           <Card>
             <div className="p-6">
@@ -290,11 +295,14 @@ export default function PreferencesPage() {
               <p className="text-gray-500 dark:text-gray-400 mb-6">
                 Configure your preferred language, currency, and date formats.
               </p>
-              
+
               <div className="space-y-6">
                 {/* Language Selector */}
                 <div>
-                  <label htmlFor="language" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label
+                    htmlFor="language"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
                     Language
                   </label>
                   <select
@@ -313,10 +321,13 @@ export default function PreferencesPage() {
                     ))}
                   </select>
                 </div>
-                
+
                 {/* Currency Selector */}
                 <div>
-                  <label htmlFor="currency" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label
+                    htmlFor="currency"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
                     Currency
                   </label>
                   <select
@@ -338,10 +349,13 @@ export default function PreferencesPage() {
                     Used for displaying financial information throughout the app.
                   </p>
                 </div>
-                
+
                 {/* Date Format Selector */}
                 <div>
-                  <label htmlFor="dateFormat" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label
+                    htmlFor="dateFormat"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
                     Date Format
                   </label>
                   <select
@@ -360,10 +374,13 @@ export default function PreferencesPage() {
                     ))}
                   </select>
                 </div>
-                
+
                 {/* Time Format Selector */}
                 <div>
-                  <label htmlFor="timeFormat" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label
+                    htmlFor="timeFormat"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
                     Time Format
                   </label>
                   <select
@@ -385,7 +402,7 @@ export default function PreferencesPage() {
               </div>
             </div>
           </Card>
-          
+
           {/* Notifications Section */}
           <Card>
             <div className="p-6">
@@ -393,7 +410,7 @@ export default function PreferencesPage() {
               <p className="text-gray-500 dark:text-gray-400 mb-6">
                 Control whether you receive notifications within the application.
               </p>
-              
+
               <div className="flex items-center">
                 <input
                   id="notificationsEnabled"
@@ -403,16 +420,26 @@ export default function PreferencesPage() {
                   onChange={handleChange}
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 />
-                <label htmlFor="notificationsEnabled" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
+                <label
+                  htmlFor="notificationsEnabled"
+                  className="ml-2 block text-sm text-gray-700 dark:text-gray-300"
+                >
                   Enable in-app notifications
                 </label>
               </div>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                For more detailed notification preferences, visit the <a href="/dashboard/settings/notifications" className="text-blue-600 dark:text-blue-400 hover:underline">Notifications</a> page.
+                For more detailed notification preferences, visit the{' '}
+                <a
+                  href="/dashboard/settings/notifications"
+                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Notifications
+                </a>{' '}
+                page.
               </p>
             </div>
           </Card>
-          
+
           {/* Action Buttons */}
           <div className="flex justify-between">
             <Button
@@ -423,11 +450,8 @@ export default function PreferencesPage() {
             >
               Reset to Defaults
             </Button>
-            
-            <Button
-              type="submit"
-              disabled={isSaving}
-            >
+
+            <Button type="submit" disabled={isSaving}>
               {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>

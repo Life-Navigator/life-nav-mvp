@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
 import { createVersionSchema } from '@/lib/scenario-lab/validation';
 
@@ -15,10 +15,7 @@ export const dynamic = 'force-dynamic';
 /**
  * GET - List all versions for a scenario
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUserIdFromJWT(request);
     if (!userId) {
@@ -29,10 +26,10 @@ export async function GET(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const scenarioId = params.id;
+    const { id: scenarioId } = await params;
 
     // Verify scenario ownership
-    const { data: scenario, error: scenarioError } = await supabaseAdmin
+    const { data: scenario, error: scenarioError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('id')
       .eq('id', scenarioId)
@@ -44,7 +41,7 @@ export async function GET(
     }
 
     // Fetch versions
-    const { data: versions, error: versionsError } = await supabaseAdmin
+    const { data: versions, error: versionsError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('*')
       .eq('scenario_id', scenarioId)
@@ -71,10 +68,7 @@ export async function GET(
 /**
  * POST - Create new version (save current state)
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUserIdFromJWT(request);
     if (!userId) {
@@ -85,10 +79,10 @@ export async function POST(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const scenarioId = params.id;
+    const { id: scenarioId } = await params;
 
     // Verify scenario ownership and get current version
-    const { data: scenario, error: scenarioError } = await supabaseAdmin
+    const { data: scenario, error: scenarioError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('id, status, current_version_id')
       .eq('id', scenarioId)
@@ -121,7 +115,7 @@ export async function POST(
     const { name, description } = validation.data;
 
     // Get next version number
-    const { data: latestVersion } = await supabaseAdmin
+    const { data: latestVersion } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('version_number')
       .eq('scenario_id', scenarioId)
@@ -132,7 +126,7 @@ export async function POST(
     const nextVersionNumber = (latestVersion?.version_number || 0) + 1;
 
     // Create new version
-    const { data: version, error: createError } = await supabaseAdmin
+    const { data: version, error: createError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .insert({
         scenario_id: scenarioId,
@@ -151,7 +145,7 @@ export async function POST(
 
     // Copy inputs from previous version if exists
     if (scenario.current_version_id) {
-      const { data: previousInputs } = await supabaseAdmin
+      const { data: previousInputs } = await (supabaseAdmin as any)
         .from('scenario_inputs')
         .select('*')
         .eq('version_id', scenario.current_version_id);
@@ -168,12 +162,12 @@ export async function POST(
           confidence: input.confidence,
         }));
 
-        await supabaseAdmin.from('scenario_inputs').insert(newInputs);
+        await (supabaseAdmin as any).from('scenario_inputs').insert(newInputs);
       }
     }
 
     // Update scenario current_version_id
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from('scenario_labs')
       .update({ current_version_id: version.id })
       .eq('id', scenarioId);

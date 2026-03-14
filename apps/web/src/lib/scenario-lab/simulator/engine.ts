@@ -6,7 +6,11 @@
  */
 
 import { supabaseAdmin } from '../supabase-client';
-import type { ScenarioInput, SimulationConfig, SimulationResult } from '../types';
+import type {
+  ScenarioInput,
+  SimulatorConfig as SimulationConfig,
+  SimulatorResult as SimulationResult,
+} from '../types';
 
 // Seeded random number generator (for reproducibility)
 class SeededRandom {
@@ -46,7 +50,7 @@ export async function runSimulation(
   const startTime = Date.now();
 
   // Fetch inputs
-  const { data: inputs, error: inputsError } = await supabaseAdmin
+  const { data: inputs, error: inputsError } = await (supabaseAdmin as any)
     .from('scenario_inputs')
     .select('*')
     .eq('version_id', versionId);
@@ -85,20 +89,16 @@ export async function runSimulation(
 /**
  * Simulate a single goal
  */
-async function simulateGoal(
-  goalId: string,
-  inputs: ScenarioInput[],
-  config: SimulationConfig
-) {
+async function simulateGoal(goalId: string, inputs: ScenarioInput[], config: SimulationConfig) {
   const rng = new SeededRandom(config.seed + parseInt(goalId.slice(-8), 16));
   const iterations = config.iterations;
 
   // Parse inputs into variables
   const variables: Record<string, number> = {};
   for (const input of inputs) {
-    const value = parseFloat(input.field_value);
+    const value = parseFloat(String(input.field_value));
     if (!isNaN(value)) {
-      variables[input.field_name] = value;
+      variables[String(input.field_name)] = value;
     }
   }
 
@@ -128,7 +128,7 @@ async function simulateGoal(
   const successRate = successCounts.reduce((a, b) => a + b, 0) / iterations;
 
   // Calculate percentiles
-  const sortedValues = iterationResults.map(r => r.value).sort((a, b) => a - b);
+  const sortedValues = iterationResults.map((r) => r.value).sort((a, b) => a - b);
   const p10 = sortedValues[Math.floor(iterations * 0.1)];
   const p50 = sortedValues[Math.floor(iterations * 0.5)];
   const p90 = sortedValues[Math.floor(iterations * 0.9)];
@@ -170,12 +170,9 @@ function calculateGoalValue(variables: Record<string, number>): number {
 /**
  * Identify top drivers (positive factors) and risks (negative factors)
  */
-function identifyDriversAndRisks(
-  inputs: ScenarioInput[],
-  variables: Record<string, number>
-) {
-  const factors = inputs.map(input => {
-    const value = parseFloat(input.field_value);
+function identifyDriversAndRisks(inputs: ScenarioInput[], variables: Record<string, number>) {
+  const factors = inputs.map((input) => {
+    const value = parseFloat(String(input.field_value));
     const confidence = input.confidence || 1.0;
 
     // Simple impact score (higher value * confidence = stronger driver)
@@ -192,12 +189,12 @@ function identifyDriversAndRisks(
   factors.sort((a, b) => b.impact - a.impact);
 
   const drivers = factors
-    .filter(f => f.is_positive)
-    .map(f => ({ factor: f.field_name, impact: f.impact }));
+    .filter((f) => f.is_positive)
+    .map((f) => ({ factor: f.field_name, impact: f.impact }));
 
   const risks = factors
-    .filter(f => !f.is_positive)
-    .map(f => ({ factor: f.field_name, impact: f.impact }));
+    .filter((f) => !f.is_positive)
+    .map((f) => ({ factor: f.field_name, impact: f.impact }));
 
   return { drivers, risks };
 }
@@ -215,9 +212,7 @@ function classifyStatus(probability: number): string {
 /**
  * Group inputs by goal_id
  */
-function groupInputsByGoal(
-  inputs: ScenarioInput[]
-): Record<string, ScenarioInput[]> {
+function groupInputsByGoal(inputs: ScenarioInput[]): Record<string, ScenarioInput[]> {
   const grouped: Record<string, ScenarioInput[]> = {};
 
   for (const input of inputs) {
@@ -237,7 +232,7 @@ export function calculateInputsHash(inputs: ScenarioInput[]): string {
   // Simple hash: concatenate all field values and hash
   const inputString = inputs
     .sort((a, b) => a.field_name.localeCompare(b.field_name))
-    .map(i => `${i.field_name}:${i.field_value}`)
+    .map((i) => `${i.field_name}:${i.field_value}`)
     .join('|');
 
   // Simple hash function (for production, use crypto.createHash)

@@ -1,7 +1,6 @@
 'use client';
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/hooks/useSession';
 import Link from 'next/link';
 
 // Types
@@ -78,23 +77,52 @@ interface GenerateInsights {
 // Icons
 function DocumentIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+      />
     </svg>
   );
 }
 
 function SparklesIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
+      />
     </svg>
   );
 }
 
 function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
   );
@@ -102,8 +130,19 @@ function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function TrashIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"
+      />
     </svg>
   );
 }
@@ -111,8 +150,19 @@ function TrashIcon(props: React.SVGProps<SVGSVGElement>) {
 function StarIcon(props: React.SVGProps<SVGSVGElement> & { filled?: boolean }) {
   const { filled, ...rest } = props;
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill={filled ? 'currentColor' : 'none'} viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...rest}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill={filled ? 'currentColor' : 'none'}
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...rest}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+      />
     </svg>
   );
 }
@@ -122,7 +172,7 @@ function ResumeCard({
   resume,
   onDelete,
   onSetDefault,
-  onSelect
+  onSelect,
 }: {
   resume: Resume;
   onDelete: (id: string) => void;
@@ -167,18 +217,26 @@ function ResumeCard({
         <div className="mb-3">
           <div className="flex items-center justify-between text-xs mb-1">
             <span className="text-gray-500 dark:text-gray-400">ATS Score</span>
-            <span className={`font-medium ${
-              resume.atsScore >= 70 ? 'text-green-600' :
-              resume.atsScore >= 50 ? 'text-yellow-600' : 'text-red-600'
-            }`}>
+            <span
+              className={`font-medium ${
+                resume.atsScore >= 70
+                  ? 'text-green-600'
+                  : resume.atsScore >= 50
+                    ? 'text-yellow-600'
+                    : 'text-red-600'
+              }`}
+            >
               {resume.atsScore}%
             </span>
           </div>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
             <div
               className={`h-1.5 rounded-full ${
-                resume.atsScore >= 70 ? 'bg-green-600' :
-                resume.atsScore >= 50 ? 'bg-yellow-600' : 'bg-red-600'
+                resume.atsScore >= 70
+                  ? 'bg-green-600'
+                  : resume.atsScore >= 50
+                    ? 'bg-yellow-600'
+                    : 'bg-red-600'
               }`}
               style={{ width: `${resume.atsScore}%` }}
             />
@@ -187,20 +245,28 @@ function ResumeCard({
       )}
 
       <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>v{resume.version} - {resume.template}</span>
+        <span>
+          v{resume.version} - {resume.template}
+        </span>
         <span>{new Date(resume.updatedAt).toLocaleDateString()}</span>
       </div>
 
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
         <button
-          onClick={(e) => { e.stopPropagation(); onSetDefault(resume.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSetDefault(resume.id);
+          }}
           className={`p-1.5 rounded ${resume.isDefault ? 'text-yellow-500' : 'text-gray-400 hover:text-yellow-500'}`}
           title={resume.isDefault ? 'Default resume' : 'Set as default'}
         >
           <StarIcon className="w-4 h-4" filled={resume.isDefault} />
         </button>
         <button
-          onClick={(e) => { e.stopPropagation(); onDelete(resume.id); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(resume.id);
+          }}
           className="p-1.5 rounded text-gray-400 hover:text-red-500"
           title="Delete resume"
         >
@@ -216,7 +282,7 @@ function GenerateModal({
   isOpen,
   onClose,
   onGenerate,
-  isGenerating
+  isGenerating,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -303,8 +369,20 @@ function GenerateModal({
               {isGenerating ? (
                 <>
                   <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
                   </svg>
                   Generating...
                 </>
@@ -327,7 +405,7 @@ function ResumeEditor({
   resume,
   onClose,
   onUpdate,
-  insights
+  insights,
 }: {
   resume: Resume;
   onClose: () => void;
@@ -357,9 +435,7 @@ function ResumeEditor({
           <div className="flex items-center gap-3">
             <DocumentIcon className="w-6 h-6 text-blue-600" />
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {resume.name}
-              </h2>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{resume.name}</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 {resume.targetJobTitle && `Targeting: ${resume.targetJobTitle}`}
               </p>
@@ -392,7 +468,10 @@ function ResumeEditor({
             ) : (
               <>
                 <button
-                  onClick={() => { setEditedResume(resume); setIsEditing(false); }}
+                  onClick={() => {
+                    setEditedResume(resume);
+                    setIsEditing(false);
+                  }}
                   className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300"
                 >
                   Cancel
@@ -411,7 +490,12 @@ function ResumeEditor({
               className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -423,20 +507,30 @@ function ResumeEditor({
             <div className="max-w-2xl mx-auto space-y-6">
               {/* ATS Score */}
               <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">ATS Compatibility Score</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  ATS Compatibility Score
+                </h3>
                 <div className="flex items-center gap-4">
-                  <div className={`text-5xl font-bold ${
-                    insights.atsScore >= 70 ? 'text-green-600' :
-                    insights.atsScore >= 50 ? 'text-yellow-600' : 'text-red-600'
-                  }`}>
+                  <div
+                    className={`text-5xl font-bold ${
+                      insights.atsScore >= 70
+                        ? 'text-green-600'
+                        : insights.atsScore >= 50
+                          ? 'text-yellow-600'
+                          : 'text-red-600'
+                    }`}
+                  >
                     {insights.atsScore}%
                   </div>
                   <div className="flex-1">
                     <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
                       <div
                         className={`h-3 rounded-full ${
-                          insights.atsScore >= 70 ? 'bg-green-600' :
-                          insights.atsScore >= 50 ? 'bg-yellow-600' : 'bg-red-600'
+                          insights.atsScore >= 70
+                            ? 'bg-green-600'
+                            : insights.atsScore >= 50
+                              ? 'bg-yellow-600'
+                              : 'bg-red-600'
                         }`}
                         style={{ width: `${insights.atsScore}%` }}
                       />
@@ -448,10 +542,15 @@ function ResumeEditor({
               {/* Matched Keywords */}
               {insights.matchedKeywords.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Matched Keywords</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Matched Keywords
+                  </h3>
                   <div className="flex flex-wrap gap-2">
                     {insights.matchedKeywords.map((keyword, i) => (
-                      <span key={i} className="px-3 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full text-sm">
+                      <span
+                        key={i}
+                        className="px-3 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 rounded-full text-sm"
+                      >
                         {keyword}
                       </span>
                     ))}
@@ -462,13 +561,18 @@ function ResumeEditor({
               {/* Missing Keywords */}
               {insights.missingKeywords.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Missing Keywords</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Missing Keywords
+                  </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
                     Consider adding these skills/keywords to improve your match:
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {insights.missingKeywords.map((keyword, i) => (
-                      <span key={i} className="px-3 py-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded-full text-sm">
+                      <span
+                        key={i}
+                        className="px-3 py-1 bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 rounded-full text-sm"
+                      >
                         {keyword}
                       </span>
                     ))}
@@ -479,10 +583,15 @@ function ResumeEditor({
               {/* Suggestions */}
               {insights.suggestions.length > 0 && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Improvement Suggestions</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Improvement Suggestions
+                  </h3>
                   <ul className="space-y-2">
                     {insights.suggestions.map((suggestion, i) => (
-                      <li key={i} className="flex items-start gap-2 text-gray-600 dark:text-gray-400">
+                      <li
+                        key={i}
+                        className="flex items-start gap-2 text-gray-600 dark:text-gray-400"
+                      >
                         <span className="text-blue-500 mt-1">•</span>
                         {suggestion}
                       </li>
@@ -501,7 +610,9 @@ function ResumeEditor({
                     <input
                       type="text"
                       value={editedResume.fullName || ''}
-                      onChange={(e) => setEditedResume({ ...editedResume, fullName: e.target.value })}
+                      onChange={(e) =>
+                        setEditedResume({ ...editedResume, fullName: e.target.value })
+                      }
                       className="text-center w-full bg-transparent border-b border-dashed border-gray-300 focus:border-blue-500 outline-none"
                       placeholder="Your Name"
                     />
@@ -515,9 +626,21 @@ function ResumeEditor({
                   {resume.location && <span>• {resume.location}</span>}
                 </div>
                 <div className="flex flex-wrap justify-center gap-3 text-sm text-blue-600 dark:text-blue-400 mt-2">
-                  {resume.linkedInUrl && <a href={resume.linkedInUrl} target="_blank" rel="noopener noreferrer">LinkedIn</a>}
-                  {resume.githubUrl && <a href={resume.githubUrl} target="_blank" rel="noopener noreferrer">GitHub</a>}
-                  {resume.portfolioUrl && <a href={resume.portfolioUrl} target="_blank" rel="noopener noreferrer">Portfolio</a>}
+                  {resume.linkedInUrl && (
+                    <a href={resume.linkedInUrl} target="_blank" rel="noopener noreferrer">
+                      LinkedIn
+                    </a>
+                  )}
+                  {resume.githubUrl && (
+                    <a href={resume.githubUrl} target="_blank" rel="noopener noreferrer">
+                      GitHub
+                    </a>
+                  )}
+                  {resume.portfolioUrl && (
+                    <a href={resume.portfolioUrl} target="_blank" rel="noopener noreferrer">
+                      Portfolio
+                    </a>
+                  )}
                 </div>
               </div>
 
@@ -530,7 +653,9 @@ function ResumeEditor({
                   {isEditing ? (
                     <textarea
                       value={editedResume.summary || ''}
-                      onChange={(e) => setEditedResume({ ...editedResume, summary: e.target.value })}
+                      onChange={(e) =>
+                        setEditedResume({ ...editedResume, summary: e.target.value })
+                      }
                       rows={4}
                       className="w-full bg-transparent border border-gray-300 dark:border-gray-600 rounded p-2 text-gray-700 dark:text-gray-300"
                     />
@@ -551,8 +676,13 @@ function ResumeEditor({
                       <div key={i}>
                         <div className="flex justify-between items-start">
                           <div>
-                            <h3 className="font-medium text-gray-900 dark:text-white">{exp.title}</h3>
-                            <p className="text-gray-600 dark:text-gray-400">{exp.company}{exp.location && ` - ${exp.location}`}</p>
+                            <h3 className="font-medium text-gray-900 dark:text-white">
+                              {exp.title}
+                            </h3>
+                            <p className="text-gray-600 dark:text-gray-400">
+                              {exp.company}
+                              {exp.location && ` - ${exp.location}`}
+                            </p>
                           </div>
                           <span className="text-sm text-gray-500 dark:text-gray-400">
                             {exp.startDate} - {exp.current ? 'Present' : exp.endDate}
@@ -561,7 +691,10 @@ function ResumeEditor({
                         {exp.bullets && exp.bullets.length > 0 && (
                           <ul className="mt-2 space-y-1">
                             {exp.bullets.map((bullet, j) => (
-                              <li key={j} className="text-gray-700 dark:text-gray-300 text-sm pl-4 relative before:content-['•'] before:absolute before:left-0">
+                              <li
+                                key={j}
+                                className="text-gray-700 dark:text-gray-300 text-sm pl-4 relative before:content-['•'] before:absolute before:left-0"
+                              >
                                 {bullet}
                               </li>
                             ))}
@@ -583,14 +716,19 @@ function ResumeEditor({
                     {(resume.education as Education[]).map((edu, i) => (
                       <div key={i} className="flex justify-between items-start">
                         <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">{edu.institution}</h3>
+                          <h3 className="font-medium text-gray-900 dark:text-white">
+                            {edu.institution}
+                          </h3>
                           <p className="text-gray-600 dark:text-gray-400">
-                            {edu.degree}{edu.major && ` in ${edu.major}`}
+                            {edu.degree}
+                            {edu.major && ` in ${edu.major}`}
                             {edu.gpa && ` - GPA: ${edu.gpa}`}
                           </p>
                         </div>
                         {edu.endDate && (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">{edu.endDate}</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {edu.endDate}
+                          </span>
                         )}
                       </div>
                     ))}
@@ -605,12 +743,18 @@ function ResumeEditor({
                     Skills
                   </h2>
                   <div className="space-y-2">
-                    {Object.entries(resume.skills as Record<string, string[]>).map(([category, skills]) => (
-                      <div key={category}>
-                        <span className="font-medium text-gray-700 dark:text-gray-300 capitalize">{category}: </span>
-                        <span className="text-gray-600 dark:text-gray-400">{skills.join(', ')}</span>
-                      </div>
-                    ))}
+                    {Object.entries(resume.skills as Record<string, string[]>).map(
+                      ([category, skills]) => (
+                        <div key={category}>
+                          <span className="font-medium text-gray-700 dark:text-gray-300 capitalize">
+                            {category}:{' '}
+                          </span>
+                          <span className="text-gray-600 dark:text-gray-400">
+                            {skills.join(', ')}
+                          </span>
+                        </div>
+                      )
+                    )}
                   </div>
                 </div>
               )}
@@ -625,11 +769,15 @@ function ResumeEditor({
                     {(resume.certifications as Certification[]).map((cert, i) => (
                       <div key={i} className="flex justify-between items-start">
                         <div>
-                          <span className="font-medium text-gray-900 dark:text-white">{cert.name}</span>
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            {cert.name}
+                          </span>
                           <span className="text-gray-600 dark:text-gray-400"> - {cert.issuer}</span>
                         </div>
                         {cert.date && (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">{cert.date}</span>
+                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                            {cert.date}
+                          </span>
                         )}
                       </div>
                     ))}
@@ -694,7 +842,7 @@ export default function ResumePage() {
       });
       if (response.ok) {
         const data = await response.json();
-        setResumes(prev => [data.resume, ...prev]);
+        setResumes((prev) => [data.resume, ...prev]);
         // Fetch the full resume data and open editor
         const fullResponse = await fetch(`/api/career/resumes/${data.resume.id}`);
         if (fullResponse.ok) {
@@ -707,7 +855,11 @@ export default function ResumePage() {
     }
   };
 
-  const handleGenerateResume = async (data: { jobTitle: string; jobDescription: string; company?: string }) => {
+  const handleGenerateResume = async (data: {
+    jobTitle: string;
+    jobDescription: string;
+    company?: string;
+  }) => {
     setIsGenerating(true);
     try {
       const response = await fetch('/api/career/resumes/generate', {
@@ -717,7 +869,7 @@ export default function ResumePage() {
       });
       if (response.ok) {
         const result = await response.json();
-        setResumes(prev => [result.resume, ...prev]);
+        setResumes((prev) => [result.resume, ...prev]);
         setSelectedResume(result.resume);
         setGeneratedInsights(result.insights);
         setShowGenerateModal(false);
@@ -734,7 +886,7 @@ export default function ResumePage() {
     try {
       const response = await fetch(`/api/career/resumes/${id}`, { method: 'DELETE' });
       if (response.ok) {
-        setResumes(prev => prev.filter(r => r.id !== id));
+        setResumes((prev) => prev.filter((r) => r.id !== id));
       }
     } catch (error) {
       console.error('Error deleting resume:', error);
@@ -749,10 +901,12 @@ export default function ResumePage() {
         body: JSON.stringify({ isDefault: true }),
       });
       if (response.ok) {
-        setResumes(prev => prev.map(r => ({
-          ...r,
-          isDefault: r.id === id,
-        })));
+        setResumes((prev) =>
+          prev.map((r) => ({
+            ...r,
+            isDefault: r.id === id,
+          }))
+        );
       }
     } catch (error) {
       console.error('Error setting default:', error);
@@ -781,7 +935,7 @@ export default function ResumePage() {
       });
       if (response.ok) {
         const result = await response.json();
-        setResumes(prev => prev.map(r => r.id === id ? { ...r, ...result.resume } : r));
+        setResumes((prev) => prev.map((r) => (r.id === id ? { ...r, ...result.resume } : r)));
         setSelectedResume(result.resume);
       }
     } catch (error) {
@@ -792,7 +946,9 @@ export default function ResumePage() {
   if (status === 'loading') {
     return (
       <div className="container mx-auto py-6 px-4 md:px-6">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">Resume Builder</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">
+          Resume Builder
+        </h1>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
@@ -803,7 +959,9 @@ export default function ResumePage() {
   if (loading) {
     return (
       <div className="container mx-auto py-6 px-4 md:px-6">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">Resume Builder</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">
+          Resume Builder
+        </h1>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <p className="ml-3 text-gray-500 dark:text-gray-400">Loading your resumes...</p>
@@ -815,10 +973,16 @@ export default function ResumePage() {
   if (status === 'unauthenticated') {
     return (
       <div className="container mx-auto py-6 px-4 md:px-6">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">Resume Builder</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">
+          Resume Builder
+        </h1>
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">Please sign in to access the Resume Builder</p>
-          <a href="/auth/login" className="text-blue-600 hover:underline">Sign In</a>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Please sign in to access the Resume Builder
+          </p>
+          <a href="/auth/login" className="text-blue-600 hover:underline">
+            Sign In
+          </a>
         </div>
       </div>
     );
@@ -832,7 +996,7 @@ export default function ResumePage() {
         body: JSON.stringify({ feature: 'resume_builder' }),
       });
       if (response.ok) {
-        alert('Thanks for your interest! We\'ll notify you when Resume Builder launches.');
+        alert("Thanks for your interest! We'll notify you when Resume Builder launches.");
       } else {
         alert('Failed to join waitlist. Please try again.');
       }
@@ -846,7 +1010,9 @@ export default function ResumePage() {
     <div className="container mx-auto py-6 px-4 md:px-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Resume Builder</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+            Resume Builder
+          </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Create ATS-optimized resumes tailored to specific job opportunities
           </p>
@@ -878,7 +1044,9 @@ export default function ResumePage() {
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Coming Soon</h2>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
-              Our AI-powered Resume Builder is currently in development. Create professional, ATS-optimized resumes tailored to any job opportunity with intelligent keyword matching and formatting.
+              Our AI-powered Resume Builder is currently in development. Create professional,
+              ATS-optimized resumes tailored to any job opportunity with intelligent keyword
+              matching and formatting.
             </p>
             <button
               onClick={handleJoinWaitlist}
@@ -893,11 +1061,10 @@ export default function ResumePage() {
       {resumes.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
           <DocumentIcon className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-          <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
-            No resumes yet
-          </h3>
+          <h3 className="text-xl font-medium text-gray-900 dark:text-white mb-2">No resumes yet</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
-            Create professional resumes tailored to your target roles. Use AI to generate optimized content based on job descriptions.
+            Create professional resumes tailored to your target roles. Use AI to generate optimized
+            content based on job descriptions.
           </p>
           <div className="flex justify-center gap-4">
             <button
@@ -918,7 +1085,7 @@ export default function ResumePage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {resumes.map(resume => (
+          {resumes.map((resume) => (
             <ResumeCard
               key={resume.id}
               resume={resume}
@@ -942,7 +1109,10 @@ export default function ResumePage() {
       {selectedResume && (
         <ResumeEditor
           resume={selectedResume}
-          onClose={() => { setSelectedResume(null); setGeneratedInsights(null); }}
+          onClose={() => {
+            setSelectedResume(null);
+            setGeneratedInsights(null);
+          }}
           onUpdate={handleUpdateResume}
           insights={generatedInsights || undefined}
         />

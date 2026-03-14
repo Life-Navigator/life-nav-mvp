@@ -44,7 +44,7 @@ export async function checkRateLimit(
   }
 
   // Count recent jobs of this type
-  const { count, error } = await supabaseAdmin
+  const { count, error } = await (supabaseAdmin as any)
     .from('scenario_jobs')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
@@ -100,7 +100,7 @@ export async function enforceRateLimit(
 
     throw new Error(
       `Rate limit exceeded. You've used ${check.current_count}/${check.limit} ${limitType}s. ` +
-      `Try again in ${minutesUntilReset} minutes.`
+        `Try again in ${minutesUntilReset} minutes.`
     );
   }
 }

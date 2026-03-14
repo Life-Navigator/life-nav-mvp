@@ -4,7 +4,7 @@
  */
 'use client';
 
-import { getCsrfToken } from 'next-auth/react';
+import { getCsrfToken } from '@/hooks/useSession';
 
 type FetchOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
@@ -13,6 +13,7 @@ type FetchOptions = {
   cache?: RequestCache;
   next?: { revalidate?: number | false; tags?: string[] };
   tenantId?: string; // For multi-tenant API calls
+  params?: Record<string, string | number | boolean>; // Query parameters
 };
 
 export class ApiError extends Error {
@@ -34,14 +35,7 @@ async function fetchAPI<T = any>(
   options: FetchOptions = {},
   csrfToken?: string | null
 ): Promise<T> {
-  const {
-    method = 'GET',
-    headers = {},
-    body,
-    cache,
-    next,
-    tenantId,
-  } = options;
+  const { method = 'GET', headers = {}, body, cache, next, tenantId, params } = options;
 
   const requestHeaders = { ...defaultHeaders, ...headers };
 
@@ -72,11 +66,27 @@ async function fetchAPI<T = any>(
     }
   }
 
-  const response = await fetch(`/api${endpoint}`, requestOptions);
+  // Build URL with query parameters if provided
+  let url = `/api${endpoint}`;
+  if (params) {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        searchParams.append(key, String(value));
+      }
+    });
+    const queryString = searchParams.toString();
+    if (queryString) {
+      url += (url.includes('?') ? '&' : '?') + queryString;
+    }
+  }
+
+  const response = await fetch(url, requestOptions);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData.message || errorData.error || `API request failed with status ${response.status}`;
+    const errorMessage =
+      errorData.message || errorData.error || `API request failed with status ${response.status}`;
     throw new ApiError(errorMessage, response.status);
   }
 
@@ -94,17 +104,29 @@ export function useApiClient() {
     get: <T = any>(endpoint: string, options: Omit<FetchOptions, 'method' | 'body'> = {}) =>
       fetchAPI<T>(endpoint, { ...options, method: 'GET' }),
 
-    post: async <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) => {
+    post: async <T = any>(
+      endpoint: string,
+      data: any,
+      options: Omit<FetchOptions, 'method'> = {}
+    ) => {
       const csrfToken = await getCsrfToken();
       return fetchAPI<T>(endpoint, { ...options, method: 'POST', body: data }, csrfToken);
     },
 
-    put: async <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) => {
+    put: async <T = any>(
+      endpoint: string,
+      data: any,
+      options: Omit<FetchOptions, 'method'> = {}
+    ) => {
       const csrfToken = await getCsrfToken();
       return fetchAPI<T>(endpoint, { ...options, method: 'PUT', body: data }, csrfToken);
     },
 
-    patch: async <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) => {
+    patch: async <T = any>(
+      endpoint: string,
+      data: any,
+      options: Omit<FetchOptions, 'method'> = {}
+    ) => {
       const csrfToken = await getCsrfToken();
       return fetchAPI<T>(endpoint, { ...options, method: 'PATCH', body: data }, csrfToken);
     },
@@ -120,16 +142,16 @@ export function useApiClient() {
 export const apiClient = {
   get: <T = any>(endpoint: string, options: Omit<FetchOptions, 'method' | 'body'> = {}) =>
     fetchAPI<T>(endpoint, { ...options, method: 'GET' }),
-    
+
   post: <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) =>
     fetchAPI<T>(endpoint, { ...options, method: 'POST', body: data }),
-    
+
   put: <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) =>
     fetchAPI<T>(endpoint, { ...options, method: 'PUT', body: data }),
-    
+
   patch: <T = any>(endpoint: string, data: any, options: Omit<FetchOptions, 'method'> = {}) =>
     fetchAPI<T>(endpoint, { ...options, method: 'PATCH', body: data }),
-    
+
   delete: <T = any>(endpoint: string, options: Omit<FetchOptions, 'method'> = {}) =>
     fetchAPI<T>(endpoint, { ...options, method: 'DELETE' }),
 };

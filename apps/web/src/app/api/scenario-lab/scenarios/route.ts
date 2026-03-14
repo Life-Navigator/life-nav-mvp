@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
     // Build query
-    let query = supabaseAdmin
+    let query = (supabaseAdmin as any)
       .from('scenario_labs')
       .select('*')
       .eq('user_id', userId)
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     const { name, description, icon, color } = validation.data;
 
     // Create scenario
-    const { data: scenario, error: createError } = await supabaseAdmin
+    const { data: scenario, error: createError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .insert({
         user_id: userId,
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create initial version (v1)
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .insert({
         scenario_id: scenario.id,
@@ -125,12 +125,12 @@ export async function POST(request: NextRequest) {
     if (versionError) {
       console.error('[API] Error creating initial version:', versionError);
       // Rollback scenario creation
-      await supabaseAdmin.from('scenario_labs').delete().eq('id', scenario.id);
+      await (supabaseAdmin as any).from('scenario_labs').delete().eq('id', scenario.id);
       return NextResponse.json({ error: 'Failed to create initial version' }, { status: 500 });
     }
 
     // Update scenario with current_version_id
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .update({ current_version_id: version.id })
       .eq('id', scenario.id);
@@ -148,13 +148,16 @@ export async function POST(request: NextRequest) {
       metadata: { name, version_id: version.id },
     });
 
-    return NextResponse.json({
-      scenario: {
-        ...scenario,
-        current_version_id: version.id,
+    return NextResponse.json(
+      {
+        scenario: {
+          ...scenario,
+          current_version_id: version.id,
+        },
+        version,
       },
-      version,
-    }, { status: 201 });
+      { status: 201 }
+    );
   } catch (error) {
     console.error('[API] Error in POST /scenarios:', error);
     return NextResponse.json(

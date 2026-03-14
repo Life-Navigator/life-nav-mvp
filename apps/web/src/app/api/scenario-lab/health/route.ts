@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     // Check 2: Supabase connection
     try {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await (supabaseAdmin as any)
         .from('scenario_labs')
         .select('id')
         .limit(1);
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 
     // Check 3: Storage buckets
     try {
-      const { data: buckets, error } = await supabaseAdmin.storage.listBuckets();
+      const { data: buckets, error } = await (supabaseAdmin as any).storage.listBuckets();
 
       if (error) {
         checks.storage_buckets = {
@@ -59,8 +59,8 @@ export async function GET(request: NextRequest) {
           message: `Storage error: ${error.message}`,
         };
       } else {
-        const scenarioBuckets = buckets.filter(b =>
-          b.id === 'scenario-docs' || b.id === 'scenario-reports'
+        const scenarioBuckets = buckets.filter(
+          (b) => b.id === 'scenario-docs' || b.id === 'scenario-reports'
         );
         checks.storage_buckets = {
           status: scenarioBuckets.length === 2 ? 'pass' : 'fail',
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
 
     // Check 4: Job queue table
     try {
-      const { data, error } = await supabaseAdmin
+      const { data, error } = await (supabaseAdmin as any)
         .from('scenario_jobs')
         .select('id')
         .limit(1);
@@ -156,25 +156,31 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    const allPassed = Object.values(checks).every(c => c.status === 'pass');
-    const passCount = Object.values(checks).filter(c => c.status === 'pass').length;
+    const allPassed = Object.values(checks).every((c) => c.status === 'pass');
+    const passCount = Object.values(checks).filter((c) => c.status === 'pass').length;
     const totalCount = Object.keys(checks).length;
 
-    return NextResponse.json({
-      status: allPassed ? 'healthy' : 'degraded',
-      summary: `${passCount}/${totalCount} checks passed`,
-      checks,
-      timestamp: new Date().toISOString(),
-    }, {
-      status: allPassed ? 200 : 503,
-    });
+    return NextResponse.json(
+      {
+        status: allPassed ? 'healthy' : 'degraded',
+        summary: `${passCount}/${totalCount} checks passed`,
+        checks,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        status: allPassed ? 200 : 503,
+      }
+    );
   } catch (error) {
-    return NextResponse.json({
-      status: 'error',
-      error: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString(),
-    }, {
-      status: 500,
-    });
+    return NextResponse.json(
+      {
+        status: 'error',
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString(),
+      },
+      {
+        status: 500,
+      }
+    );
   }
 }

@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
 import { z } from 'zod';
 import { generateRoadmap } from '@/lib/scenario-lab/roadmap/generator';
@@ -19,10 +19,7 @@ const commitSchema = z.object({
   supersede: z.boolean().optional().default(false),
 });
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUserIdFromJWT(request);
     if (!userId) {
@@ -33,7 +30,7 @@ export async function POST(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const scenarioId = params.id;
+    const { id: scenarioId } = await params;
 
     // Parse and validate body
     const body = await request.json();
@@ -49,7 +46,7 @@ export async function POST(
     const { versionId, commitMessage, supersede } = validation.data;
 
     // Verify scenario ownership
-    const { data: scenario, error: scenarioError } = await supabaseAdmin
+    const { data: scenario, error: scenarioError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('id, name, status, committed_version_id')
       .eq('id', scenarioId)
@@ -68,7 +65,8 @@ export async function POST(
           {
             error: 'SCENARIO_ALREADY_COMMITTED',
             committedVersionId: scenario.committed_version_id,
-            message: 'This scenario already has a committed version. Fork to change assumptions, or explicitly supersede.',
+            message:
+              'This scenario already has a committed version. Fork to change assumptions, or explicitly supersede.',
           },
           { status: 409 }
         );
@@ -78,7 +76,7 @@ export async function POST(
       const previousVersionId = scenario.committed_version_id;
 
       // Update previous committed version status
-      await supabaseAdmin
+      await (supabaseAdmin as any)
         .from('scenario_versions')
         .update({
           status: 'superseded',
@@ -87,7 +85,7 @@ export async function POST(
         .eq('id', previousVersionId);
 
       // Mark previous plan as 'superseded' (keep for history)
-      await supabaseAdmin
+      await (supabaseAdmin as any)
         .from('plans')
         .update({
           status: 'superseded',
@@ -110,7 +108,7 @@ export async function POST(
     }
 
     // Verify version ownership and belongs to scenario
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id, version_number, name, scenario_id')
       .eq('id', versionId)
@@ -125,19 +123,19 @@ export async function POST(
     // Check if already committed (idempotent)
     if (scenario.committed_version_id === versionId && scenario.status === 'committed') {
       // Already committed, fetch existing plan
-      const { data: existingPlan } = await supabaseAdmin
+      const { data: existingPlan } = await (supabaseAdmin as any)
         .from('plans')
         .select('id')
         .eq('scenario_version_id', versionId)
         .single();
 
       if (existingPlan) {
-        const { data: phases } = await supabaseAdmin
+        const { data: phases } = await (supabaseAdmin as any)
           .from('plan_phases')
           .select('id')
           .eq('plan_id', existingPlan.id);
 
-        const { data: tasks } = await supabaseAdmin
+        const { data: tasks } = await (supabaseAdmin as any)
           .from('plan_tasks')
           .select('id')
           .eq('plan_id', existingPlan.id);
@@ -152,7 +150,7 @@ export async function POST(
     }
 
     // Fetch inputs for roadmap generation
-    const { data: inputs, error: inputsError } = await supabaseAdmin
+    const { data: inputs, error: inputsError } = await (supabaseAdmin as any)
       .from('scenario_inputs')
       .select('*')
       .eq('version_id', versionId);
@@ -170,7 +168,7 @@ export async function POST(
     }
 
     // Fetch latest simulation results (optional)
-    const { data: latestSim } = await supabaseAdmin
+    const { data: latestSim } = await (supabaseAdmin as any)
       .from('scenario_sim_runs')
       .select('id')
       .eq('version_id', versionId)
@@ -180,14 +178,14 @@ export async function POST(
 
     let simulationResults;
     if (latestSim) {
-      const { data: goalSnapshots } = await supabaseAdmin
+      const { data: goalSnapshots } = await (supabaseAdmin as any)
         .from('scenario_goal_snapshots')
         .select('goal_id, top_drivers, top_risks')
         .eq('sim_run_id', latestSim.id);
 
       if (goalSnapshots) {
         simulationResults = {
-          goals: goalSnapshots.map(g => ({
+          goals: goalSnapshots.map((g) => ({
             goal_id: g.goal_id,
             top_drivers: g.top_drivers || [],
             top_risks: g.top_risks || [],
@@ -204,7 +202,7 @@ export async function POST(
     });
 
     // Create plan
-    const { data: plan, error: planError } = await supabaseAdmin
+    const { data: plan, error: planError } = await (supabaseAdmin as any)
       .from('plans')
       .insert({
         scenario_version_id: versionId,
@@ -222,7 +220,7 @@ export async function POST(
     }
 
     // Insert phases
-    const phasesToInsert = roadmap.phases.map(phase => ({
+    const phasesToInsert = roadmap.phases.map((phase) => ({
       plan_id: plan.id,
       phase_number: phase.phase_number,
       name: phase.name,
@@ -232,19 +230,19 @@ export async function POST(
       status: phase.status,
     }));
 
-    const { error: phasesError } = await supabaseAdmin
+    const { error: phasesError } = await (supabaseAdmin as any)
       .from('plan_phases')
       .insert(phasesToInsert);
 
     if (phasesError) {
       console.error('[API] Error creating phases:', phasesError);
       // Rollback plan
-      await supabaseAdmin.from('plans').delete().eq('id', plan.id);
+      await (supabaseAdmin as any).from('plans').delete().eq('id', plan.id);
       return NextResponse.json({ error: 'Failed to create phases' }, { status: 500 });
     }
 
     // Insert tasks
-    const tasksToInsert = roadmap.tasks.map(task => ({
+    const tasksToInsert = roadmap.tasks.map((task) => ({
       plan_id: plan.id,
       phase_number: task.phase_number,
       task_number: task.task_number,
@@ -260,19 +258,19 @@ export async function POST(
       rationale: task.rationale,
     }));
 
-    const { error: tasksError } = await supabaseAdmin
+    const { error: tasksError } = await (supabaseAdmin as any)
       .from('plan_tasks')
       .insert(tasksToInsert);
 
     if (tasksError) {
       console.error('[API] Error creating tasks:', tasksError);
       // Rollback plan and phases
-      await supabaseAdmin.from('plans').delete().eq('id', plan.id);
+      await (supabaseAdmin as any).from('plans').delete().eq('id', plan.id);
       return NextResponse.json({ error: 'Failed to create tasks' }, { status: 500 });
     }
 
     // Update scenario status
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from('scenario_labs')
       .update({
         status: 'committed',
@@ -299,20 +297,25 @@ export async function POST(
     });
 
     // Fetch superseded versions if any
-    const { data: supersededVersions } = await supabaseAdmin
+    const { data: supersededVersions } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id, version_number, name, created_at')
       .eq('scenario_id', scenarioId)
       .eq('status', 'superseded')
       .order('created_at', { ascending: false });
 
-    return NextResponse.json({
-      message: supersede ? 'Scenario committed (superseded previous)' : 'Scenario committed successfully',
-      planId: plan.id,
-      phaseCount: roadmap.phases.length,
-      taskCount: roadmap.tasks.length,
-      supersededVersions: supersededVersions || [],
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        message: supersede
+          ? 'Scenario committed (superseded previous)'
+          : 'Scenario committed successfully',
+        planId: plan.id,
+        phaseCount: roadmap.phases.length,
+        taskCount: roadmap.tasks.length,
+        supersededVersions: supersededVersions || [],
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('[API] Error in POST /scenarios/[id]/commit:', error);
     return NextResponse.json(

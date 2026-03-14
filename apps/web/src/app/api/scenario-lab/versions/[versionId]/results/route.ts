@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin } from '@/lib/scenario-lab/supabase-client';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { versionId: string } }
+  { params }: { params: Promise<{ versionId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -28,10 +28,10 @@ export async function GET(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const versionId = params.versionId;
+    const { versionId } = await params;
 
     // Verify version ownership
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id, scenario_id')
       .eq('id', versionId)
@@ -43,7 +43,7 @@ export async function GET(
     }
 
     // Fetch latest simulation run
-    const { data: simRun, error: simError } = await supabaseAdmin
+    const { data: simRun, error: simError } = await (supabaseAdmin as any)
       .from('scenario_sim_runs')
       .select('*')
       .eq('version_id', versionId)
@@ -59,7 +59,7 @@ export async function GET(
     }
 
     // Fetch goal snapshots
-    const { data: goalSnapshots, error: snapshotsError } = await supabaseAdmin
+    const { data: goalSnapshots, error: snapshotsError } = await (supabaseAdmin as any)
       .from('scenario_goal_snapshots')
       .select('*')
       .eq('sim_run_id', simRun.id)

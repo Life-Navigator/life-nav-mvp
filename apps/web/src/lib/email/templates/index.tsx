@@ -5,11 +5,11 @@
 
 import React from 'react';
 import ReactDOMServer from 'react-dom/server';
-import { WelcomeEmail } from './welcome';
-import { PasswordResetEmail } from './password-reset';
-import { AssessmentCompleteEmail } from './assessment-complete';
-import { GoalReminderEmail } from './goal-reminder';
-import { NotificationEmail } from './notification';
+import WelcomeEmail from './welcome';
+import PasswordResetEmail from './password-reset';
+import AssessmentCompleteEmail from './assessment-complete';
+import GoalReminderEmail from './goal-reminder';
+import NotificationEmail from './notification';
 
 export interface EmailTemplate {
   html: string;
@@ -17,11 +17,11 @@ export interface EmailTemplate {
 }
 
 const templates = {
-  'welcome': WelcomeEmail,
+  welcome: WelcomeEmail,
   'password-reset': PasswordResetEmail,
   'assessment-complete': AssessmentCompleteEmail,
   'goal-reminder': GoalReminderEmail,
-  'notification': NotificationEmail,
+  notification: NotificationEmail,
 };
 
 /**
@@ -32,16 +32,14 @@ export async function renderEmailTemplate(
   data: Record<string, any>
 ): Promise<EmailTemplate> {
   const Template = templates[templateName as keyof typeof templates];
-  
+
   if (!Template) {
     throw new Error(`Email template "${templateName}" not found`);
   }
 
   // Render React component to HTML
   const html = ReactDOMServer.renderToStaticMarkup(
-    React.createElement(EmailLayout, {},
-      React.createElement(Template, data)
-    )
+    React.createElement(EmailLayout as any, {}, React.createElement(Template as any, data))
   );
 
   // Generate text version (simplified)

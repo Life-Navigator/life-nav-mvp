@@ -19,7 +19,10 @@ import {
 import { AssetType, Asset, AssetSummary } from '@/types/financial';
 
 // Asset type icons and colors
-const assetTypeConfig: Record<AssetType, { icon: React.ReactNode; color: string; bgColor: string; label: string }> = {
+const assetTypeConfig: Record<
+  AssetType,
+  { icon: React.ReactNode; color: string; bgColor: string; label: string }
+> = {
   real_estate: {
     icon: <HomeIcon className="w-6 h-6" />,
     color: 'text-blue-600 dark:text-blue-400',
@@ -72,8 +75,12 @@ function formatDate(date: Date | string): string {
 // Asset Card Component
 function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
   const config = assetTypeConfig[asset.type] || assetTypeConfig.other;
-  const equity = asset.currentValue - (asset.loans?.reduce((sum, l) => sum + (l.isActive ? l.currentBalance : 0), 0) || 0);
-  const appreciation = asset.purchasePrice ? ((asset.currentValue - asset.purchasePrice) / asset.purchasePrice) * 100 : null;
+  const equity =
+    asset.currentValue -
+    (asset.loans?.reduce((sum, l) => sum + (l.isActive ? l.currentBalance : 0), 0) || 0);
+  const appreciation = asset.purchasePrice
+    ? ((asset.currentValue - asset.purchasePrice) / asset.purchasePrice) * 100
+    : null;
 
   return (
     <div
@@ -92,9 +99,7 @@ function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
       </h3>
 
       {asset.location && (
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 truncate">
-          {asset.location}
-        </p>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-3 truncate">{asset.location}</p>
       )}
 
       <div className="space-y-2">
@@ -117,7 +122,9 @@ function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
         {appreciation !== null && (
           <div className="flex justify-between items-center">
             <span className="text-sm text-slate-500 dark:text-slate-400">Appreciation</span>
-            <span className={`flex items-center font-medium ${appreciation >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+            <span
+              className={`flex items-center font-medium ${appreciation >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+            >
               {appreciation >= 0 ? (
                 <ArrowTrendingUpIcon className="w-4 h-4 mr-1" />
               ) : (
@@ -134,13 +141,14 @@ function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
         {asset.loans && asset.loans.length > 0 && (
           <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
             <BanknotesIcon className="w-4 h-4 mr-1" />
-            {asset.loans.filter(l => l.isActive).length} loan{asset.loans.filter(l => l.isActive).length !== 1 ? 's' : ''}
+            {asset.loans.filter((l) => l.isActive).length} loan
+            {asset.loans.filter((l) => l.isActive).length !== 1 ? 's' : ''}
           </div>
         )}
         {asset.upgrades && asset.upgrades.length > 0 && (
           <div className="flex items-center text-xs text-slate-500 dark:text-slate-400">
             <WrenchScrewdriverIcon className="w-4 h-4 mr-1" />
-            {asset.upgrades.filter(u => u.status === 'planned').length} planned
+            {asset.upgrades.filter((u) => u.status === 'planned').length} planned
           </div>
         )}
         {asset.documents && Array.isArray(asset.documents) && asset.documents.length > 0 && (
@@ -177,9 +185,7 @@ function SummaryCard({
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5">
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</span>
-        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
-          {icon}
-        </div>
+        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>{icon}</div>
       </div>
       <p className="text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
     </div>
@@ -273,7 +279,9 @@ function AddAssetModal({
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               {Object.entries(assetTypeConfig).map(([key, config]) => (
-                <option key={key} value={key}>{config.label}</option>
+                <option key={key} value={key}>
+                  {config.label}
+                </option>
               ))}
             </select>
           </div>
@@ -374,12 +382,10 @@ function EmptyState({ onAddAsset }: { onAddAsset: () => void }) {
       <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
         <HomeIcon className="w-8 h-8 text-blue-600 dark:text-blue-400" />
       </div>
-      <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-        No Assets Yet
-      </h3>
+      <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No Assets Yet</h3>
       <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-6">
-        Start tracking your valuable assets like real estate, vehicles, and collectibles.
-        Monitor their value, manage loans, and plan upgrades all in one place.
+        Start tracking your valuable assets like real estate, vehicles, and collectibles. Monitor
+        their value, manage loans, and plan upgrades all in one place.
       </p>
       <button
         onClick={onAddAsset}
@@ -393,13 +399,7 @@ function EmptyState({ onAddAsset }: { onAddAsset: () => void }) {
 }
 
 // Asset Detail Modal Component
-function AssetDetailModal({
-  asset,
-  onClose,
-}: {
-  asset: Asset;
-  onClose: () => void;
-}) {
+function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => void }) {
   const config = assetTypeConfig[asset.type] || assetTypeConfig.other;
 
   return (
@@ -407,19 +407,20 @@ function AssetDetailModal({
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-              {asset.name}
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {config.label}
-            </p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{asset.name}</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{config.label}</p>
           </div>
           <button
             onClick={onClose}
             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -444,21 +445,27 @@ function AssetDetailModal({
           {/* Details */}
           {asset.location && (
             <div>
-              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Location</h3>
+              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Location
+              </h3>
               <p className="text-slate-900 dark:text-white">{asset.location}</p>
             </div>
           )}
 
           {asset.description && (
             <div>
-              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Description</h3>
+              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Description
+              </h3>
               <p className="text-slate-900 dark:text-white">{asset.description}</p>
             </div>
           )}
 
           {asset.purchaseDate && (
             <div>
-              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Purchase Date</h3>
+              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Purchase Date
+              </h3>
               <p className="text-slate-900 dark:text-white">{formatDate(asset.purchaseDate)}</p>
             </div>
           )}
@@ -471,20 +478,27 @@ function AssetDetailModal({
                 Loans
               </h3>
               <div className="space-y-2">
-                {asset.loans.filter(l => l.isActive).map((loan) => (
-                  <div key={loan.id} className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 flex justify-between items-center">
-                    <div>
-                      <p className="font-medium text-slate-900 dark:text-white">{loan.lender}</p>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        {loan.interestRate}% APR | {formatCurrency(loan.monthlyPayment)}/mo
-                      </p>
+                {asset.loans
+                  .filter((l) => l.isActive)
+                  .map((loan) => (
+                    <div
+                      key={loan.id}
+                      className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 flex justify-between items-center"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-900 dark:text-white">{loan.lender}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          {loan.interestRate}% APR | {formatCurrency(loan.monthlyPayment)}/mo
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-slate-900 dark:text-white">
+                          {formatCurrency(loan.currentBalance)}
+                        </p>
+                        <p className="text-xs text-slate-500">remaining</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-slate-900 dark:text-white">{formatCurrency(loan.currentBalance)}</p>
-                      <p className="text-xs text-slate-500">remaining</p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           )}
@@ -502,14 +516,21 @@ function AssetDetailModal({
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-medium text-slate-900 dark:text-white">{upgrade.name}</p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">{upgrade.category}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          {upgrade.category}
+                        </p>
                       </div>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        upgrade.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                        upgrade.status === 'in_progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                        upgrade.status === 'planned' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                        'bg-slate-100 text-slate-700 dark:bg-slate-600 dark:text-slate-300'
-                      }`}>
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          upgrade.status === 'completed'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : upgrade.status === 'in_progress'
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                              : upgrade.status === 'planned'
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                                : 'bg-slate-100 text-slate-700 dark:bg-slate-600 dark:text-slate-300'
+                        }`}
+                      >
                         {upgrade.status}
                       </span>
                     </div>
@@ -614,9 +635,8 @@ export default function AssetsPage() {
     }
   };
 
-  const filteredAssets = selectedType === 'all'
-    ? assets
-    : assets.filter(a => a.type === selectedType);
+  const filteredAssets =
+    selectedType === 'all' ? assets : assets.filter((a) => a.type === selectedType);
 
   return (
     <div className="container mx-auto py-6 px-4 md:px-6">
@@ -690,7 +710,7 @@ export default function AssetsPage() {
             }`}
           >
             <span className={selectedType === type ? 'text-white' : config.color}>
-              {React.cloneElement(config.icon as React.ReactElement, { className: 'w-4 h-4' })}
+              {React.cloneElement(config.icon as React.ReactElement<any>, { className: 'w-4 h-4' })}
             </span>
             {config.label}
           </button>
@@ -701,7 +721,10 @@ export default function AssetsPage() {
       {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 animate-pulse">
+            <div
+              key={i}
+              className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-5 animate-pulse"
+            >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 bg-slate-200 dark:bg-slate-700 rounded-lg" />
                 <div className="w-5 h-5 bg-slate-200 dark:bg-slate-700 rounded" />
@@ -726,11 +749,7 @@ export default function AssetsPage() {
       {!loading && filteredAssets.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredAssets.map((asset) => (
-            <AssetCard
-              key={asset.id}
-              asset={asset}
-              onClick={() => setSelectedAsset(asset)}
-            />
+            <AssetCard key={asset.id} asset={asset} onClick={() => setSelectedAsset(asset)} />
           ))}
         </div>
       )}
@@ -744,14 +763,17 @@ export default function AssetsPage() {
           <div className="space-y-4">
             {summary.byType.map((item) => {
               const config = assetTypeConfig[item.type as AssetType] || assetTypeConfig.other;
-              const percentage = summary.totalValue > 0 ? (item.value / summary.totalValue) * 100 : 0;
+              const percentage =
+                summary.totalValue > 0 ? (item.value / summary.totalValue) * 100 : 0;
 
               return (
                 <div key={item.type}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <span className={config.color}>
-                        {React.cloneElement(config.icon as React.ReactElement, { className: 'w-4 h-4' })}
+                        {React.cloneElement(config.icon as React.ReactElement<any>, {
+                          className: 'w-4 h-4',
+                        })}
                       </span>
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                         {config.label}
@@ -786,10 +808,7 @@ export default function AssetsPage() {
 
       {/* Asset Detail Modal */}
       {selectedAsset && (
-        <AssetDetailModal
-          asset={selectedAsset}
-          onClose={() => setSelectedAsset(null)}
-        />
+        <AssetDetailModal asset={selectedAsset} onClose={() => setSelectedAsset(null)} />
       )}
     </div>
   );

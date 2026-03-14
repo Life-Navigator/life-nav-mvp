@@ -44,6 +44,8 @@ export interface Medication {
   prescribed_by?: string;
   pharmacy_name?: string;
   reminder_enabled: boolean;
+  reminder_times?: (string | Date)[];
+  next_refill_date?: string | Date;
   side_effects?: string[];
   notes?: string;
   created_at: string;

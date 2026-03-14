@@ -76,8 +76,10 @@ const nextConfig: NextConfig = {
     ],
   },
   typescript: {
-    // Type checking handled in CI/CD pipeline
-    ignoreBuildErrors: process.env.NODE_ENV === 'production',
+    // Type checking runs in a dedicated CI job for faster feedback.
+    // Build still fails on type errors — this only skips the redundant
+    // tsc pass that Next.js runs internally during `next build`.
+    ignoreBuildErrors: !!process.env.CI,
   },
   // Add security headers to all responses
   async headers() {

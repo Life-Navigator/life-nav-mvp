@@ -62,10 +62,7 @@ export class FPASEngine {
     );
 
     // Calculate GPA adjustment factor
-    const gpaAdjustment = this.calculateGPAAdjustment(
-      studentProfile.targetGPA,
-      longTermGoalType
-    );
+    const gpaAdjustment = this.calculateGPAAdjustment(studentProfile.targetGPA, longTermGoalType);
 
     // Calculate test score adjustment (if provided)
     const testScoreAdjustment = this.calculateTestScoreAdjustment(
@@ -155,10 +152,7 @@ export class FPASEngine {
   /**
    * Get base FPAS score from degree program
    */
-  private getBaseFPAS(
-    degreeProgram: DegreeProgram,
-    goalType: LongTermGoalType
-  ): number {
+  private getBaseFPAS(degreeProgram: DegreeProgram, goalType: LongTermGoalType): number {
     switch (goalType) {
       case 'jd':
         return degreeProgram.fpasLawSchool || 1.0;
@@ -191,33 +185,33 @@ export class FPASEngine {
     > = {
       jd: {
         top_10: { baseRate: 0.15, tierName: 'T14 Law Schools' },
-        top_25: { baseRate: 0.30, tierName: 'T50 Law Schools' },
-        top_50: { baseRate: 0.50, tierName: 'T100 Law Schools' },
-        any: { baseRate: 0.70, tierName: 'Any ABA Law School' },
+        top_25: { baseRate: 0.3, tierName: 'T50 Law Schools' },
+        top_50: { baseRate: 0.5, tierName: 'T100 Law Schools' },
+        any: { baseRate: 0.7, tierName: 'Any ABA Law School' },
       },
       md: {
         top_10: { baseRate: 0.05, tierName: 'Top 10 Medical Schools' },
-        top_25: { baseRate: 0.10, tierName: 'Top 25 Medical Schools' },
-        top_50: { baseRate: 0.20, tierName: 'Top 50 Medical Schools' },
+        top_25: { baseRate: 0.1, tierName: 'Top 25 Medical Schools' },
+        top_50: { baseRate: 0.2, tierName: 'Top 50 Medical Schools' },
         any: { baseRate: 0.41, tierName: 'Any MD Program' }, // National average
       },
       mba: {
         top_10: { baseRate: 0.12, tierName: 'M7 MBA Programs' },
         top_25: { baseRate: 0.25, tierName: 'T15 MBA Programs' },
-        top_50: { baseRate: 0.40, tierName: 'T50 MBA Programs' },
-        any: { baseRate: 0.60, tierName: 'Any MBA Program' },
+        top_50: { baseRate: 0.4, tierName: 'T50 MBA Programs' },
+        any: { baseRate: 0.6, tierName: 'Any MBA Program' },
       },
       phd: {
-        top_10: { baseRate: 0.10, tierName: 'Top 10 PhD Programs' },
-        top_25: { baseRate: 0.20, tierName: 'Top 25 PhD Programs' },
+        top_10: { baseRate: 0.1, tierName: 'Top 10 PhD Programs' },
+        top_25: { baseRate: 0.2, tierName: 'Top 25 PhD Programs' },
         top_50: { baseRate: 0.35, tierName: 'Top 50 PhD Programs' },
         any: { baseRate: 0.55, tierName: 'Any PhD Program' },
       },
       masters: {
         top_10: { baseRate: 0.15, tierName: 'Top 10 Masters Programs' },
-        top_25: { baseRate: 0.30, tierName: 'Top 25 Masters Programs' },
-        top_50: { baseRate: 0.50, tierName: 'Top 50 Masters Programs' },
-        any: { baseRate: 0.70, tierName: 'Any Masters Program' },
+        top_25: { baseRate: 0.3, tierName: 'Top 25 Masters Programs' },
+        top_50: { baseRate: 0.5, tierName: 'Top 50 Masters Programs' },
+        any: { baseRate: 0.7, tierName: 'Any Masters Program' },
       },
       none: {
         top_10: { baseRate: 0, tierName: 'None' },
@@ -308,7 +302,9 @@ export class FPASEngine {
     probability: number,
     expectedTier: string
   ): string {
-    const school = degreeProgram.school ? (degreeProgram.school as any).name : 'this program';
+    const school = (degreeProgram as any).school
+      ? (degreeProgram as any).school.name
+      : 'this program';
 
     let reasoning = `${school} `;
 

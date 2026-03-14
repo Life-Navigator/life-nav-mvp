@@ -17,7 +17,9 @@ export class CacheManager {
   private memoryCache: LRUCache<string, any>;
   private redisClient: Redis | null = null;
   private readonly DEFAULT_TTL = 300; // 5 minutes
-  
+  private _hits = 0;
+  private _misses = 0;
+
   constructor() {
     // L1 Cache: In-memory LRU cache (10MB limit)
     this.memoryCache = new LRUCache({
@@ -30,7 +32,7 @@ export class CacheManager {
       updateAgeOnGet: true,
       updateAgeOnHas: true,
     });
-    
+
     // L2 Cache: Redis (only in production)
     if (process.env.REDIS_URL && process.env.NODE_ENV === 'production') {
       this.redisClient = new Redis(process.env.REDIS_URL, {
@@ -38,7 +40,7 @@ export class CacheManager {
         enableReadyCheck: true,
         lazyConnect: true,
       });
-      
+
       this.redisClient.on('error', (err) => {
         console.error('Redis error:', err);
         // Don't crash, just disable Redis caching
@@ -46,7 +48,7 @@ export class CacheManager {
       });
     }
   }
-  
+
   /**
    * Generate cache key with namespace
    */
@@ -57,7 +59,7 @@ export class CacheManager {
       .substring(0, 16);
     return `${namespace}:${hash}`;
   }
-  
+
   /**
    * Get from cache with fallback
    */
@@ -68,13 +70,15 @@ export class CacheManager {
     ttl: number = this.DEFAULT_TTL
   ): Promise<T | null> {
     const key = this.generateKey(namespace, identifier);
-    
+
     // L1: Check memory cache
     const memoryValue = this.memoryCache.get(key);
     if (memoryValue !== undefined) {
+      this._hits++;
       return memoryValue;
     }
-    
+    this._misses++;
+
     // L2: Check Redis cache
     if (this.redisClient) {
       try {
@@ -89,17 +93,17 @@ export class CacheManager {
         console.error('Redis get error:', error);
       }
     }
-    
+
     // L3: Fallback to database/computation
     if (fallback) {
       const value = await fallback();
       await this.set(namespace, identifier, value, ttl);
       return value;
     }
-    
+
     return null;
   }
-  
+
   /**
    * Set cache value in all layers
    */
@@ -110,24 +114,20 @@ export class CacheManager {
     ttl: number = this.DEFAULT_TTL
   ): Promise<void> {
     const key = this.generateKey(namespace, identifier);
-    
+
     // L1: Set in memory cache
     this.memoryCache.set(key, value, { ttl: ttl * 1000 });
-    
+
     // L2: Set in Redis cache
     if (this.redisClient) {
       try {
-        await this.redisClient.setex(
-          key,
-          ttl,
-          JSON.stringify(value)
-        );
+        await this.redisClient.setex(key, ttl, JSON.stringify(value));
       } catch (error) {
         console.error('Redis set error:', error);
       }
     }
   }
-  
+
   /**
    * Invalidate cache across all layers
    */
@@ -136,7 +136,7 @@ export class CacheManager {
       // Invalidate specific key
       const key = this.generateKey(namespace, identifier);
       this.memoryCache.delete(key);
-      
+
       if (this.redisClient) {
         try {
           await this.redisClient.del(key);
@@ -147,14 +147,14 @@ export class CacheManager {
     } else {
       // Invalidate entire namespace
       const pattern = `${namespace}:*`;
-      
+
       // Clear from memory cache
       for (const key of this.memoryCache.keys()) {
         if (key.startsWith(namespace)) {
           this.memoryCache.delete(key);
         }
       }
-      
+
       // Clear from Redis
       if (this.redisClient) {
         try {
@@ -168,17 +168,14 @@ export class CacheManager {
       }
     }
   }
-  
+
   /**
    * Batch get for multiple keys (reduces round trips)
    */
-  async batchGet<T>(
-    namespace: string,
-    identifiers: string[]
-  ): Promise<Map<string, T>> {
+  async batchGet<T>(namespace: string, identifiers: string[]): Promise<Map<string, T>> {
     const results = new Map<string, T>();
     const missingKeys: string[] = [];
-    
+
     // Check L1 cache first
     for (const id of identifiers) {
       const key = this.generateKey(namespace, id);
@@ -189,13 +186,13 @@ export class CacheManager {
         missingKeys.push(id);
       }
     }
-    
+
     // Check L2 cache for missing keys
     if (this.redisClient && missingKeys.length > 0) {
       try {
-        const keys = missingKeys.map(id => this.generateKey(namespace, id));
+        const keys = missingKeys.map((id) => this.generateKey(namespace, id));
         const values = await this.redisClient.mget(...keys);
-        
+
         values.forEach((value, index) => {
           if (value) {
             const parsed = JSON.parse(value);
@@ -209,28 +206,29 @@ export class CacheManager {
         console.error('Redis batch get error:', error);
       }
     }
-    
+
     return results;
   }
-  
+
   /**
    * Get cache statistics
    */
   getStats() {
+    const total = this._hits + this._misses;
     return {
       memory: {
         size: this.memoryCache.size,
         calculatedSize: this.memoryCache.calculatedSize,
-        hits: this.memoryCache.hits,
-        misses: this.memoryCache.misses,
-        hitRate: this.memoryCache.hits / (this.memoryCache.hits + this.memoryCache.misses),
+        hits: this._hits,
+        misses: this._misses,
+        hitRate: total > 0 ? this._hits / total : 0,
       },
       redis: {
         connected: this.redisClient?.status === 'ready',
       },
     };
   }
-  
+
   /**
    * Cleanup resources
    */
@@ -253,18 +251,13 @@ export const cache = new CacheManager();
 export function Cacheable(namespace: string, ttl: number = 300) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
-    
+
     descriptor.value = async function (...args: any[]) {
       const identifier = JSON.stringify(args);
-      
-      return cache.get(
-        namespace,
-        identifier,
-        async () => originalMethod.apply(this, args),
-        ttl
-      );
+
+      return cache.get(namespace, identifier, async () => originalMethod.apply(this, args), ttl);
     };
-    
+
     return descriptor;
   };
 }
@@ -275,13 +268,13 @@ export function Cacheable(namespace: string, ttl: number = 300) {
 export function InvalidateCache(namespace: string) {
   return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
-    
+
     descriptor.value = async function (...args: any[]) {
       const result = await originalMethod.apply(this, args);
       await cache.invalidate(namespace);
       return result;
     };
-    
+
     return descriptor;
   };
 }

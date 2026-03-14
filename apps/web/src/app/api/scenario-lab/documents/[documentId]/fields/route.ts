@@ -6,26 +6,42 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin } from '@/lib/scenario-lab/supabase-client';
 
 export const dynamic = 'force-dynamic';
 
 // Field categorization for better UX
 const FIELD_CATEGORIES: Record<string, string[]> = {
-  'Education': ['tuition', 'fees', 'scholarship', 'grant', 'student_loan', 'graduation_date', 'enrollment_date'],
-  'Career': ['salary', 'hourly_wage', 'bonus', 'commission', 'start_date', 'annual_income'],
-  'Housing': ['rent', 'mortgage', 'property_tax', 'hoa_fee', 'insurance_home', 'utilities'],
-  'Debt': ['loan_principal', 'loan_balance', 'apr', 'interest_rate', 'monthly_payment', 'term_months', 'payoff_date'],
-  'Insurance': ['premium', 'deductible', 'coverage_amount', 'policy_number'],
-  'Budget': ['monthly_expense', 'annual_expense', 'emergency_fund', 'savings'],
+  Education: [
+    'tuition',
+    'fees',
+    'scholarship',
+    'grant',
+    'student_loan',
+    'graduation_date',
+    'enrollment_date',
+  ],
+  Career: ['salary', 'hourly_wage', 'bonus', 'commission', 'start_date', 'annual_income'],
+  Housing: ['rent', 'mortgage', 'property_tax', 'hoa_fee', 'insurance_home', 'utilities'],
+  Debt: [
+    'loan_principal',
+    'loan_balance',
+    'apr',
+    'interest_rate',
+    'monthly_payment',
+    'term_months',
+    'payoff_date',
+  ],
+  Insurance: ['premium', 'deductible', 'coverage_amount', 'policy_number'],
+  Budget: ['monthly_expense', 'annual_expense', 'emergency_fund', 'savings'],
 };
 
 function categorizeField(fieldKey: string): string {
   const lowerKey = fieldKey.toLowerCase();
 
   for (const [category, keywords] of Object.entries(FIELD_CATEGORIES)) {
-    if (keywords.some(keyword => lowerKey.includes(keyword))) {
+    if (keywords.some((keyword) => lowerKey.includes(keyword))) {
       return category;
     }
   }
@@ -35,7 +51,7 @@ function categorizeField(fieldKey: string): string {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { documentId: string } }
+  { params }: { params: Promise<{ documentId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -47,10 +63,10 @@ export async function GET(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const documentId = params.documentId;
+    const { documentId } = await params;
 
     // Verify document ownership
-    const { data: document, error: docError } = await supabaseAdmin
+    const { data: document, error: docError } = await (supabaseAdmin as any)
       .from('scenario_documents')
       .select('id, ocr_status')
       .eq('id', documentId)
@@ -63,7 +79,11 @@ export async function GET(
     }
 
     // Check OCR status
-    if (document.ocr_status === 'pending' || document.ocr_status === 'queued' || document.ocr_status === 'processing') {
+    if (
+      document.ocr_status === 'pending' ||
+      document.ocr_status === 'queued' ||
+      document.ocr_status === 'processing'
+    ) {
       return NextResponse.json({
         status: document.ocr_status,
         message: 'OCR is still processing. Please wait.',
@@ -80,7 +100,7 @@ export async function GET(
     }
 
     // Fetch extracted fields
-    const { data: fields, error: fieldsError } = await supabaseAdmin
+    const { data: fields, error: fieldsError } = await (supabaseAdmin as any)
       .from('scenario_extracted_fields')
       .select('*')
       .eq('document_id', documentId)
@@ -132,7 +152,15 @@ export async function GET(
     }));
 
     // Sort categories (Education, Career, Housing, Debt, Insurance, Budget, Other)
-    const categoryOrder = ['Education', 'Career', 'Housing', 'Debt', 'Insurance', 'Budget', 'Other'];
+    const categoryOrder = [
+      'Education',
+      'Career',
+      'Housing',
+      'Debt',
+      'Insurance',
+      'Budget',
+      'Other',
+    ];
     groups.sort((a, b) => {
       const indexA = categoryOrder.indexOf(a.category);
       const indexB = categoryOrder.indexOf(b.category);

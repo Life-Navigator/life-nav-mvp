@@ -11,9 +11,9 @@ import type {
   ScenarioComparisonResult,
   AssetAllocationResponse,
   LumpSumVsDcaResponse,
-  HistoricalReturnsResponse
+  HistoricalReturnsResponse,
 } from '@/types/calculator';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // Cache keys
 export const CACHE_KEYS = {
@@ -36,7 +36,7 @@ const generateCacheKey = (prefix: string, params: any) => {
       }
       return obj;
     }, {});
-  
+
   return [prefix, JSON.stringify(orderedParams)];
 };
 
@@ -52,26 +52,34 @@ export function useInvestmentCalculatorWithCache() {
    * Calculate investment growth with caching
    */
   const useInvestmentGrowth = (params: InvestmentGrowthRequest, enabled = true) => {
-    return useQuery({
+    const query = useQuery({
       queryKey: generateCacheKey(CACHE_KEYS.INVESTMENT_GROWTH, params),
       queryFn: () => calculatorApi.calculateInvestmentGrowth(params),
       enabled,
       staleTime: 1000 * 60 * 15, // 15 minutes
       gcTime: 1000 * 60 * 60 * 24, // 24 hours
-      onSuccess: (data) => {
-        setResults(prevResults => ({
+    });
+
+    useEffect(() => {
+      if (query.data) {
+        setResults((prevResults) => ({
           ...prevResults,
-          investment_growth: data
+          investment_growth: query.data,
         }));
-      },
-      onError: (error: any) => {
+      }
+    }, [query.data]);
+
+    useEffect(() => {
+      if (query.error) {
         toast({
           title: 'Error',
-          description: error?.message || 'Failed to calculate investment growth',
-          variant: 'destructive'
+          description: (query.error as any)?.message || 'Failed to calculate investment growth',
+          variant: 'destructive',
         });
       }
-    });
+    }, [query.error]);
+
+    return query;
   };
 
   /**
@@ -79,125 +87,156 @@ export function useInvestmentCalculatorWithCache() {
    * Use this for calculations that should not be cached
    */
   const investmentGrowthMutation = useMutation({
-    mutationFn: (data: InvestmentGrowthRequest) => 
-      calculatorApi.calculateInvestmentGrowth(data),
+    mutationFn: (data: InvestmentGrowthRequest) => calculatorApi.calculateInvestmentGrowth(data),
     onSuccess: (data) => {
-      setResults(prevResults => ({
+      setResults((prevResults) => ({
         ...prevResults,
-        investment_growth: data
+        investment_growth: data,
       }));
     },
     onError: (error: any) => {
       toast({
         title: 'Error',
         description: error?.message || 'Failed to calculate investment growth',
-        variant: 'destructive'
+        variant: 'destructive',
       });
-    }
+    },
   });
 
   /**
    * Compare investment scenarios with caching
    */
   const useScenarioComparison = (params: ScenarioComparisonRequest, enabled = true) => {
-    return useQuery({
+    const query = useQuery({
       queryKey: generateCacheKey(CACHE_KEYS.SCENARIO_COMPARISON, params),
       queryFn: () => calculatorApi.compareInvestmentScenarios(params),
       enabled,
       staleTime: 1000 * 60 * 15, // 15 minutes
       gcTime: 1000 * 60 * 60 * 24, // 24 hours
-      onSuccess: (data) => {
-        setResults(prevResults => ({
+    });
+
+    useEffect(() => {
+      if (query.data) {
+        setResults((prevResults) => ({
           ...prevResults,
-          scenario_comparison: data
+          scenario_comparison: query.data,
         }));
-      },
-      onError: (error: any) => {
+      }
+    }, [query.data]);
+
+    useEffect(() => {
+      if (query.error) {
         toast({
           title: 'Error',
-          description: error?.message || 'Failed to compare investment scenarios',
-          variant: 'destructive'
+          description: (query.error as any)?.message || 'Failed to compare investment scenarios',
+          variant: 'destructive',
         });
       }
-    });
+    }, [query.error]);
+
+    return query;
   };
 
   /**
    * Calculate asset allocation with caching
    */
   const useAssetAllocation = (params: AssetAllocationRequest, enabled = true) => {
-    return useQuery({
+    const query = useQuery({
       queryKey: generateCacheKey(CACHE_KEYS.ASSET_ALLOCATION, params),
       queryFn: () => calculatorApi.calculateAssetAllocation(params),
       enabled,
       staleTime: 1000 * 60 * 15, // 15 minutes
       gcTime: 1000 * 60 * 60 * 24, // 24 hours
-      onSuccess: (data) => {
-        setResults(prevResults => ({
+    });
+
+    useEffect(() => {
+      if (query.data) {
+        setResults((prevResults) => ({
           ...prevResults,
-          asset_allocation: data
+          asset_allocation: query.data,
         }));
-      },
-      onError: (error: any) => {
+      }
+    }, [query.data]);
+
+    useEffect(() => {
+      if (query.error) {
         toast({
           title: 'Error',
-          description: error?.message || 'Failed to calculate asset allocation',
-          variant: 'destructive'
+          description: (query.error as any)?.message || 'Failed to calculate asset allocation',
+          variant: 'destructive',
         });
       }
-    });
+    }, [query.error]);
+
+    return query;
   };
 
   /**
    * Compare lump sum vs dollar cost averaging with caching
    */
   const useLumpSumVsDca = (params: LumpSumVsDcaRequest, enabled = true) => {
-    return useQuery({
+    const query = useQuery({
       queryKey: generateCacheKey(CACHE_KEYS.LUMP_SUM_VS_DCA, params),
       queryFn: () => calculatorApi.optimizeLumpSumVsDca(params),
       enabled,
       staleTime: 1000 * 60 * 15, // 15 minutes
       gcTime: 1000 * 60 * 60 * 24, // 24 hours
-      onSuccess: (data) => {
-        setResults(prevResults => ({
+    });
+
+    useEffect(() => {
+      if (query.data) {
+        setResults((prevResults) => ({
           ...prevResults,
-          lump_sum_dca: data
+          lump_sum_dca: query.data,
         }));
-      },
-      onError: (error: any) => {
+      }
+    }, [query.data]);
+
+    useEffect(() => {
+      if (query.error) {
         toast({
           title: 'Error',
-          description: error?.message || 'Failed to optimize lump sum vs DCA',
-          variant: 'destructive'
+          description: (query.error as any)?.message || 'Failed to optimize lump sum vs DCA',
+          variant: 'destructive',
         });
       }
-    });
+    }, [query.error]);
+
+    return query;
   };
 
   /**
    * Get historical returns with caching
    */
   const useHistoricalReturns = (enabled = true) => {
-    return useQuery({
+    const query = useQuery({
       queryKey: [CACHE_KEYS.HISTORICAL_RETURNS],
       queryFn: () => calculatorApi.getHistoricalReturns(),
       enabled,
       staleTime: 1000 * 60 * 60 * 24, // 24 hours (this data changes less frequently)
       gcTime: 1000 * 60 * 60 * 24 * 7, // 7 days
-      onSuccess: (data) => {
-        setResults(prevResults => ({
+    });
+
+    useEffect(() => {
+      if (query.data) {
+        setResults((prevResults) => ({
           ...prevResults,
-          historical_returns: data
+          historical_returns: query.data,
         }));
-      },
-      onError: (error: any) => {
+      }
+    }, [query.data]);
+
+    useEffect(() => {
+      if (query.error) {
         toast({
           title: 'Error',
-          description: error?.message || 'Failed to get historical returns',
-          variant: 'destructive'
+          description: (query.error as any)?.message || 'Failed to get historical returns',
+          variant: 'destructive',
         });
       }
-    });
+    }, [query.error]);
+
+    return query;
   };
 
   /**
@@ -234,10 +273,8 @@ export function useInvestmentCalculatorWithCache() {
    * Remove specific calculation from cache
    */
   const removeFromCache = (cacheKey: string, params?: any) => {
-    const queryKey = params 
-      ? generateCacheKey(cacheKey, params)
-      : [cacheKey];
-    
+    const queryKey = params ? generateCacheKey(cacheKey, params) : [cacheKey];
+
     queryClient.removeQueries({ queryKey });
   };
 
@@ -253,7 +290,7 @@ export function useInvestmentCalculatorWithCache() {
    */
   const resetResultsByType = (type: keyof InvestmentCalculatorResults) => {
     if (!results) return;
-    
+
     const newResults = { ...results };
     delete newResults[type];
     setResults(newResults);
@@ -266,15 +303,15 @@ export function useInvestmentCalculatorWithCache() {
       const cachedData = queryClient.getQueryData<InvestmentGrowthResponse>(
         generateCacheKey(CACHE_KEYS.INVESTMENT_GROWTH, data)
       );
-      
+
       if (cachedData) {
-        setResults(prev => ({
+        setResults((prev) => ({
           ...prev,
-          investment_growth: cachedData
+          investment_growth: cachedData,
         }));
         return cachedData;
       }
-      
+
       // Not in cache, perform mutation
       const result = await investmentGrowthMutation.mutateAsync(data);
       return result;
@@ -287,16 +324,16 @@ export function useInvestmentCalculatorWithCache() {
   const compareInvestmentScenarios = async (data: ScenarioComparisonRequest) => {
     try {
       const result = await calculatorApi.compareInvestmentScenarios(data);
-      setResults(prev => ({
+      setResults((prev) => ({
         ...prev,
-        scenario_comparison: result
+        scenario_comparison: result,
       }));
       return result;
     } catch (error) {
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to compare scenarios',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return null;
     }
@@ -305,16 +342,17 @@ export function useInvestmentCalculatorWithCache() {
   const calculateAssetAllocation = async (data: AssetAllocationRequest) => {
     try {
       const result = await calculatorApi.calculateAssetAllocation(data);
-      setResults(prev => ({
+      setResults((prev) => ({
         ...prev,
-        asset_allocation: result
+        asset_allocation: result,
       }));
       return result;
     } catch (error) {
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to calculate asset allocation',
-        variant: 'destructive'
+        description:
+          error instanceof Error ? error.message : 'Failed to calculate asset allocation',
+        variant: 'destructive',
       });
       return null;
     }
@@ -323,16 +361,17 @@ export function useInvestmentCalculatorWithCache() {
   const optimizeLumpSumVsDca = async (data: LumpSumVsDcaRequest) => {
     try {
       const result = await calculatorApi.optimizeLumpSumVsDca(data);
-      setResults(prev => ({
+      setResults((prev) => ({
         ...prev,
-        lump_sum_dca: result
+        lump_sum_dca: result,
       }));
       return result;
     } catch (error) {
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to optimize investment strategy',
-        variant: 'destructive'
+        description:
+          error instanceof Error ? error.message : 'Failed to optimize investment strategy',
+        variant: 'destructive',
       });
       return null;
     }
@@ -341,16 +380,16 @@ export function useInvestmentCalculatorWithCache() {
   const getHistoricalReturns = async () => {
     try {
       const result = await calculatorApi.getHistoricalReturns();
-      setResults(prev => ({
+      setResults((prev) => ({
         ...prev,
-        historical_returns: result
+        historical_returns: result,
       }));
       return result;
     } catch (error) {
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to get historical returns',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return null;
     }
@@ -360,31 +399,31 @@ export function useInvestmentCalculatorWithCache() {
     // Results and state
     results,
     isLoading: investmentGrowthMutation.isPending,
-    
+
     // React Query hooks
     useInvestmentGrowth,
     useScenarioComparison,
     useAssetAllocation,
     useLumpSumVsDca,
     useHistoricalReturns,
-    
+
     // Prefetching functions
     prefetchInvestmentGrowth,
     prefetchScenarioComparison,
-    
+
     // Cache management
     invalidateCache,
     removeFromCache,
-    
+
     // Original API-compatible functions
     calculateInvestmentGrowth,
     compareInvestmentScenarios,
     calculateAssetAllocation,
     optimizeLumpSumVsDca,
     getHistoricalReturns,
-    
+
     // State management
     resetResults,
-    resetResultsByType
+    resetResultsByType,
   };
 }

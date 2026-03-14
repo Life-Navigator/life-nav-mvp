@@ -12,15 +12,18 @@ export type InvestmentHolding = {
   shares: number;
   price: number;
   value: number;
+  totalValue?: number;
   costBasis: number;
   gainLoss: number;
   gainLossPercent: number;
+  unrealizedGainPercent?: number;
   allocation: number;
 };
 
 export type AssetAllocation = {
   name: string;
   value: number;
+  percentage?: number;
   color: string;
 }[];
 

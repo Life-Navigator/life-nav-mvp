@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
 import { createInputSchema } from '@/lib/scenario-lab/validation';
 
@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { versionId: string } }
+  { params }: { params: Promise<{ versionId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -30,10 +30,10 @@ export async function GET(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const versionId = params.versionId;
+    const { versionId } = await params;
 
     // Verify version ownership
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id, scenario_id')
       .eq('id', versionId)
@@ -45,7 +45,7 @@ export async function GET(
     }
 
     // Fetch inputs
-    const { data: inputs, error: inputsError } = await supabaseAdmin
+    const { data: inputs, error: inputsError } = await (supabaseAdmin as any)
       .from('scenario_inputs')
       .select('*')
       .eq('version_id', versionId)
@@ -74,7 +74,7 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { versionId: string } }
+  { params }: { params: Promise<{ versionId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -86,10 +86,10 @@ export async function POST(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const versionId = params.versionId;
+    const { versionId } = await params;
 
     // Verify version ownership and scenario status
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id, scenario_id, scenario_labs!inner(status)')
       .eq('id', versionId)
@@ -132,13 +132,13 @@ export async function POST(
     }
 
     // Delete existing inputs for these goal_id + field_name combinations
-    const deleteConditions = validatedInputs.map(input => ({
+    const deleteConditions = validatedInputs.map((input) => ({
       goal_id: input.goal_id,
       field_name: input.field_name,
     }));
 
     for (const condition of deleteConditions) {
-      await supabaseAdmin
+      await (supabaseAdmin as any)
         .from('scenario_inputs')
         .delete()
         .eq('version_id', versionId)
@@ -147,7 +147,7 @@ export async function POST(
     }
 
     // Insert new inputs
-    const inputsToInsert = validatedInputs.map(input => ({
+    const inputsToInsert = validatedInputs.map((input) => ({
       version_id: versionId,
       user_id: userId,
       goal_id: input.goal_id,
@@ -158,7 +158,7 @@ export async function POST(
       confidence: input.confidence || 1.0,
     }));
 
-    const { data: insertedInputs, error: insertError } = await supabaseAdmin
+    const { data: insertedInputs, error: insertError } = await (supabaseAdmin as any)
       .from('scenario_inputs')
       .insert(inputsToInsert)
       .select();
@@ -195,7 +195,7 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { versionId: string } }
+  { params }: { params: Promise<{ versionId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -207,7 +207,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const versionId = params.versionId;
+    const { versionId } = await params;
     const { searchParams } = new URL(request.url);
     const inputId = searchParams.get('id');
 
@@ -216,7 +216,7 @@ export async function DELETE(
     }
 
     // Verify version ownership
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id, scenario_labs!inner(status)')
       .eq('id', versionId)
@@ -236,7 +236,7 @@ export async function DELETE(
     }
 
     // Delete input
-    const { error: deleteError } = await supabaseAdmin
+    const { error: deleteError } = await (supabaseAdmin as any)
       .from('scenario_inputs')
       .delete()
       .eq('id', inputId)

@@ -1,0 +1,17 @@
+# Default owner for everything
+* @riffe007
+
+# CI/CD configuration requires explicit review
+.github/ @riffe007
+turbo.json @riffe007
+
+# Security-sensitive files
+apps/web/next.config.ts @riffe007
+apps/web/src/middleware.ts @riffe007
+apps/web/src/lib/auth/ @riffe007
+apps/web/src/lib/supabase/ @riffe007
+supabase/migrations/ @riffe007
+supabase/config.toml @riffe007
+
+# Infrastructure
+apps/web/vercel.json @riffe007

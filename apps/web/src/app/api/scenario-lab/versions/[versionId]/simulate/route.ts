@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
 import { enqueueJob } from '@/lib/scenario-lab/job-queue';
 import { enforceRateLimit } from '@/lib/scenario-lab/rate-limiter';
@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { versionId: string } }
+  { params }: { params: Promise<{ versionId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -34,16 +34,13 @@ export async function POST(
     try {
       await enforceRateLimit(userId, 'simulation');
     } catch (rateLimitError: any) {
-      return NextResponse.json(
-        { error: rateLimitError.message },
-        { status: 429 }
-      );
+      return NextResponse.json({ error: rateLimitError.message }, { status: 429 });
     }
 
-    const versionId = params.versionId;
+    const { versionId } = await params;
 
     // Verify version ownership
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id, scenario_id')
       .eq('id', versionId)
@@ -55,7 +52,7 @@ export async function POST(
     }
 
     // Check if inputs exist
-    const { data: inputs, error: inputsError } = await supabaseAdmin
+    const { data: inputs, error: inputsError } = await (supabaseAdmin as any)
       .from('scenario_inputs')
       .select('id')
       .eq('version_id', versionId)
@@ -95,11 +92,14 @@ export async function POST(
       metadata: { job_id: job.id, iterations, seed },
     });
 
-    return NextResponse.json({
-      job_id: job.id,
-      status: job.status,
-      message: 'Simulation job enqueued. Poll /api/scenario-lab/jobs/{job_id} for status.',
-    }, { status: 202 });
+    return NextResponse.json(
+      {
+        job_id: job.id,
+        status: job.status,
+        message: 'Simulation job enqueued. Poll /api/scenario-lab/jobs/{job_id} for status.',
+      },
+      { status: 202 }
+    );
   } catch (error) {
     console.error('[API] Error in POST /versions/[versionId]/simulate:', error);
     return NextResponse.json(

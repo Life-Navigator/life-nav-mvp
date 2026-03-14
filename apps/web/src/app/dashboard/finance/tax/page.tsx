@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from 'react';
 import {
   FilingStatus,
   TaxProfile,
@@ -8,10 +8,10 @@ import {
   TaxIncomeItem,
   TaxOptimization,
   IncomeCategory,
-} from "@/types/tax";
+} from '@/types/tax';
 
 // Tab types
-type TabType = "overview" | "documents" | "strategies" | "benefits" | "deductions";
+type TabType = 'overview' | 'documents' | 'strategies' | 'benefits' | 'deductions';
 
 // Document types for tax documents
 interface TaxDocument {
@@ -103,6 +103,7 @@ interface DeductionOpportunity {
   description?: string;
   estimatedAmount: number;
   potentialSavings: number;
+  estimatedSavings?: number;
   status: string;
   actionRequired?: string;
   goalAlignmentScore?: number;
@@ -115,21 +116,21 @@ function SummaryCard({
   subtitle,
   icon,
   trend,
-  color = "blue",
+  color = 'blue',
 }: {
   title: string;
   value: string;
   subtitle?: string;
   icon: React.ReactNode;
   trend?: { value: number; label: string };
-  color?: "blue" | "green" | "red" | "amber" | "purple";
+  color?: 'blue' | 'green' | 'red' | 'amber' | 'purple';
 }) {
   const colorClasses = {
-    blue: "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
-    green: "bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400",
-    red: "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400",
-    amber: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400",
-    purple: "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400",
+    blue: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
+    green: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
+    red: 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400',
+    amber: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
+    purple: 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400',
   };
 
   return (
@@ -142,8 +143,8 @@ function SummaryCard({
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
           )}
           {trend && (
-            <p className={`mt-2 text-sm ${trend.value >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {trend.value >= 0 ? "+" : ""}
+            <p className={`mt-2 text-sm ${trend.value >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {trend.value >= 0 ? '+' : ''}
               {trend.value.toFixed(1)}% {trend.label}
             </p>
           )}
@@ -163,7 +164,7 @@ function TaxBracketChart({
   filingStatus: FilingStatus;
 }) {
   const brackets =
-    filingStatus === "married_jointly"
+    filingStatus === 'married_jointly'
       ? [
           { rate: 10, max: 23200 },
           { rate: 12, max: 94300 },
@@ -219,13 +220,13 @@ function TaxBracketChart({
                   className={`h-full rounded-full transition-all duration-500 ${
                     percentFilled > 0
                       ? bracket.rate <= 12
-                        ? "bg-green-500"
+                        ? 'bg-green-500'
                         : bracket.rate <= 24
-                        ? "bg-blue-500"
-                        : bracket.rate <= 32
-                        ? "bg-amber-500"
-                        : "bg-red-500"
-                      : "bg-slate-200 dark:bg-slate-600"
+                          ? 'bg-blue-500'
+                          : bracket.rate <= 32
+                            ? 'bg-amber-500'
+                            : 'bg-red-500'
+                      : 'bg-slate-200 dark:bg-slate-600'
                   }`}
                   style={{ width: `${Math.max(percentFilled, 0)}%` }}
                 />
@@ -267,16 +268,16 @@ function IncomeSourceCard({
   onAddIncome: () => void;
 }) {
   const categories: { key: IncomeCategory; label: string; color: string }[] = [
-    { key: "wages", label: "Wages & Salary", color: "bg-blue-500" },
-    { key: "self_employment", label: "Self-Employment", color: "bg-purple-500" },
-    { key: "business", label: "Business Income", color: "bg-indigo-500" },
-    { key: "dividends", label: "Dividends", color: "bg-green-500" },
-    { key: "interest", label: "Interest", color: "bg-teal-500" },
-    { key: "capital_gains", label: "Capital Gains", color: "bg-amber-500" },
-    { key: "rental", label: "Rental Income", color: "bg-orange-500" },
-    { key: "retirement", label: "Retirement", color: "bg-pink-500" },
-    { key: "social_security", label: "Social Security", color: "bg-rose-500" },
-    { key: "other", label: "Other", color: "bg-slate-500" },
+    { key: 'wages', label: 'Wages & Salary', color: 'bg-blue-500' },
+    { key: 'self_employment', label: 'Self-Employment', color: 'bg-purple-500' },
+    { key: 'business', label: 'Business Income', color: 'bg-indigo-500' },
+    { key: 'dividends', label: 'Dividends', color: 'bg-green-500' },
+    { key: 'interest', label: 'Interest', color: 'bg-teal-500' },
+    { key: 'capital_gains', label: 'Capital Gains', color: 'bg-amber-500' },
+    { key: 'rental', label: 'Rental Income', color: 'bg-orange-500' },
+    { key: 'retirement', label: 'Retirement', color: 'bg-pink-500' },
+    { key: 'social_security', label: 'Social Security', color: 'bg-rose-500' },
+    { key: 'other', label: 'Other', color: 'bg-slate-500' },
   ];
 
   const totalIncome = incomes.reduce((sum, i) => sum + i.amount, 0);
@@ -365,9 +366,9 @@ function IncomeSourceCard({
 // Optimization Card
 function OptimizationCard({ optimizations }: { optimizations: TaxOptimization[] }) {
   const complexityColors = {
-    simple: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    moderate: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-    complex: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    simple: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    moderate: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    complex: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
   };
 
   return (
@@ -455,10 +456,10 @@ function QuarterlyPayments({
   estimate: TaxEstimateResult | null;
 }) {
   const quarters = [
-    { q: 1, due: `Apr 15, ${taxYear}`, period: "Jan 1 - Mar 31" },
-    { q: 2, due: `Jun 15, ${taxYear}`, period: "Apr 1 - May 31" },
-    { q: 3, due: `Sep 15, ${taxYear}`, period: "Jun 1 - Aug 31" },
-    { q: 4, due: `Jan 15, ${taxYear + 1}`, period: "Sep 1 - Dec 31" },
+    { q: 1, due: `Apr 15, ${taxYear}`, period: 'Jan 1 - Mar 31' },
+    { q: 2, due: `Jun 15, ${taxYear}`, period: 'Apr 1 - May 31' },
+    { q: 3, due: `Sep 15, ${taxYear}`, period: 'Jun 1 - Aug 31' },
+    { q: 4, due: `Jan 15, ${taxYear + 1}`, period: 'Sep 1 - Dec 31' },
   ];
 
   const estimatedTax = estimate?.totalTaxLiability || 0;
@@ -477,8 +478,8 @@ function QuarterlyPayments({
               key={q}
               className={`p-4 rounded-lg border ${
                 isPast
-                  ? "bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600"
-                  : "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800"
+                  ? 'bg-slate-50 dark:bg-slate-700/50 border-slate-200 dark:border-slate-600'
+                  : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
               }`}
             >
               <div className="flex items-center justify-between">
@@ -517,10 +518,10 @@ function AddIncomeModal({
   onSave: (data: Partial<TaxIncomeItem>) => void;
 }) {
   const [formData, setFormData] = useState({
-    category: "wages" as IncomeCategory,
-    source: "",
-    amount: "",
-    taxWithheld: "",
+    category: 'wages' as IncomeCategory,
+    source: '',
+    amount: '',
+    taxWithheld: '',
     isW2: true,
     is1099: false,
   });
@@ -536,17 +537,17 @@ function AddIncomeModal({
       taxWithheld: parseFloat(formData.taxWithheld) || 0,
       isW2: formData.isW2,
       is1099: formData.is1099,
-      frequency: "annual",
+      frequency: 'annual',
       expenses: 0,
       qbiEligible: false,
       isQualified: false,
       documentIds: [],
     });
     setFormData({
-      category: "wages",
-      source: "",
-      amount: "",
-      taxWithheld: "",
+      category: 'wages',
+      source: '',
+      amount: '',
+      taxWithheld: '',
       isW2: true,
       is1099: false,
     });
@@ -557,7 +558,9 @@ function AddIncomeModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md">
         <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">Add Income Source</h2>
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+            Add Income Source
+          </h2>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
@@ -566,7 +569,9 @@ function AddIncomeModal({
             </label>
             <select
               value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value as IncomeCategory })}
+              onChange={(e) =>
+                setFormData({ ...formData, category: e.target.value as IncomeCategory })
+              }
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
             >
               <option value="wages">Wages & Salary (W-2)</option>
@@ -634,7 +639,9 @@ function AddIncomeModal({
               <input
                 type="checkbox"
                 checked={formData.isW2}
-                onChange={(e) => setFormData({ ...formData, isW2: e.target.checked, is1099: false })}
+                onChange={(e) =>
+                  setFormData({ ...formData, isW2: e.target.checked, is1099: false })
+                }
                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">W-2 Income</span>
@@ -643,7 +650,9 @@ function AddIncomeModal({
               <input
                 type="checkbox"
                 checked={formData.is1099}
-                onChange={(e) => setFormData({ ...formData, is1099: e.target.checked, isW2: false })}
+                onChange={(e) =>
+                  setFormData({ ...formData, is1099: e.target.checked, isW2: false })
+                }
                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">1099 Income</span>
@@ -674,7 +683,12 @@ function AddIncomeModal({
 function DocumentsTab({ taxYear }: { taxYear: number }) {
   const [documents, setDocuments] = useState<TaxDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [summary, setSummary] = useState<{ total: number; pending: number; received: number; missingTypes: string[] }>({ total: 0, pending: 0, received: 0, missingTypes: [] });
+  const [summary, setSummary] = useState<{
+    total: number;
+    pending: number;
+    received: number;
+    missingTypes: string[];
+  }>({ total: 0, pending: 0, received: 0, missingTypes: [] });
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -686,7 +700,7 @@ function DocumentsTab({ taxYear }: { taxYear: number }) {
           setSummary(data.summary || { total: 0, pending: 0, received: 0, missingTypes: [] });
         }
       } catch (error) {
-        console.warn("Failed to fetch documents:", error);
+        console.warn('Failed to fetch documents:', error);
       } finally {
         setLoading(false);
       }
@@ -695,14 +709,18 @@ function DocumentsTab({ taxYear }: { taxYear: number }) {
   }, [taxYear]);
 
   const statusColors: Record<string, string> = {
-    pending: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-    received: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-    reviewed: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-    entered: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    received: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    reviewed: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+    entered: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
   }
 
   return (
@@ -732,7 +750,8 @@ function DocumentsTab({ taxYear }: { taxYear: number }) {
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
           <h4 className="font-medium text-amber-800 dark:text-amber-400 mb-2">Missing Documents</h4>
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            Based on your income sources, you may need: {summary.missingTypes.map(t => t.toUpperCase().replace('_', '-')).join(', ')}
+            Based on your income sources, you may need:{' '}
+            {summary.missingTypes.map((t) => t.toUpperCase().replace('_', '-')).join(', ')}
           </p>
         </div>
       )}
@@ -747,30 +766,63 @@ function DocumentsTab({ taxYear }: { taxYear: number }) {
         </div>
         {documents.length === 0 ? (
           <div className="p-8 text-center">
-            <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <svg
+              className="mx-auto h-12 w-12 text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
             </svg>
             <p className="mt-2 text-sm text-slate-500">No documents uploaded yet</p>
-            <p className="text-xs text-slate-400 mt-1">Upload W-2s, 1099s, and other tax documents</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Upload W-2s, 1099s, and other tax documents
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
             {documents.map((doc) => (
-              <div key={doc.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50">
+              <div
+                key={doc.id}
+                className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-700/50"
+              >
                 <div className="flex items-center gap-4">
                   <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                    <svg className="w-6 h-6 text-slate-600 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg
+                      className="w-6 h-6 text-slate-600 dark:text-slate-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
                     </svg>
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900 dark:text-white">{doc.typeInfo?.name || doc.type}</p>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {doc.typeInfo?.name || doc.type}
+                    </p>
                     <p className="text-sm text-slate-500">{doc.issuerName}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  {doc.grossAmount && <span className="text-sm font-medium text-slate-900 dark:text-white">${doc.grossAmount.toLocaleString()}</span>}
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[doc.status] || statusColors.pending}`}>
+                  {doc.grossAmount && (
+                    <span className="text-sm font-medium text-slate-900 dark:text-white">
+                      ${doc.grossAmount.toLocaleString()}
+                    </span>
+                  )}
+                  <span
+                    className={`px-2 py-1 text-xs font-medium rounded-full ${statusColors[doc.status] || statusColors.pending}`}
+                  >
                     {doc.status}
                   </span>
                 </div>
@@ -799,7 +851,7 @@ function StrategiesTab({ taxYear }: { taxYear: number }) {
           setRecommendations(data.recommendations || []);
         }
       } catch (error) {
-        console.warn("Failed to fetch strategies:", error);
+        console.warn('Failed to fetch strategies:', error);
       } finally {
         setLoading(false);
       }
@@ -808,14 +860,18 @@ function StrategiesTab({ taxYear }: { taxYear: number }) {
   }, [taxYear]);
 
   const statusColors: Record<string, string> = {
-    recommended: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-    active: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    completed: "bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400",
-    paused: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+    recommended: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+    completed: 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-400',
+    paused: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
   }
 
   return (
@@ -823,34 +879,57 @@ function StrategiesTab({ taxYear }: { taxYear: number }) {
       {/* Recommended Strategies */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Recommended Strategies</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+            Recommended Strategies
+          </h3>
           <p className="text-sm text-slate-500">Goal-aligned tax optimization opportunities</p>
         </div>
         {recommendations.length === 0 ? (
           <div className="p-8 text-center">
-            <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+            <svg
+              className="mx-auto h-12 w-12 text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
             </svg>
-            <p className="mt-2 text-sm text-slate-500">Add income data to see personalized recommendations</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Add income data to see personalized recommendations
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
             {recommendations.slice(0, 5).map((strategy) => (
-              <div key={strategy.strategyType} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50">
+              <div
+                key={strategy.strategyType}
+                className="p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-medium text-slate-900 dark:text-white">{strategy.name}</h4>
+                      <h4 className="font-medium text-slate-900 dark:text-white">
+                        {strategy.name}
+                      </h4>
                       {strategy.goalAlignmentScore > 70 && (
                         <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-full">
                           {strategy.goalAlignmentScore}% aligned
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{strategy.description}</p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                      {strategy.description}
+                    </p>
                   </div>
                   <div className="ml-4 text-right">
-                    <p className="text-lg font-bold text-green-600">${strategy.estimatedSavings.toLocaleString()}</p>
+                    <p className="text-lg font-bold text-green-600">
+                      ${strategy.estimatedSavings.toLocaleString()}
+                    </p>
                     <p className="text-xs text-slate-500">potential savings</p>
                   </div>
                 </div>
@@ -866,12 +945,16 @@ function StrategiesTab({ taxYear }: { taxYear: number }) {
       {/* Active Strategies */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Your Active Strategies</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+            Your Active Strategies
+          </h3>
         </div>
         {strategies.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-sm text-slate-500">No active strategies yet</p>
-            <p className="text-xs text-slate-400 mt-1">Start a recommended strategy above to begin tracking</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Start a recommended strategy above to begin tracking
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -880,30 +963,52 @@ function StrategiesTab({ taxYear }: { taxYear: number }) {
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h4 className="font-medium text-slate-900 dark:text-white">{strategy.name}</h4>
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[strategy.status]}`}>
+                    <span
+                      className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[strategy.status]}`}
+                    >
                       {strategy.status}
                     </span>
                   </div>
-                  <p className="text-lg font-bold text-green-600">${strategy.estimatedSavings.toLocaleString()}</p>
+                  <p className="text-lg font-bold text-green-600">
+                    ${strategy.estimatedSavings.toLocaleString()}
+                  </p>
                 </div>
                 {strategy.milestones && strategy.milestones.length > 0 && (
                   <div className="space-y-2">
-                    {strategy.milestones.sort((a, b) => a.order - b.order).map((milestone) => (
-                      <div key={milestone.id} className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${
-                          milestone.status === 'completed' ? 'bg-green-500' : milestone.status === 'in_progress' ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'
-                        }`}>
-                          {milestone.status === 'completed' && (
-                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          )}
+                    {strategy.milestones
+                      .sort((a, b) => a.order - b.order)
+                      .map((milestone) => (
+                        <div key={milestone.id} className="flex items-center gap-3">
+                          <div
+                            className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                              milestone.status === 'completed'
+                                ? 'bg-green-500'
+                                : milestone.status === 'in_progress'
+                                  ? 'bg-blue-500'
+                                  : 'bg-slate-300 dark:bg-slate-600'
+                            }`}
+                          >
+                            {milestone.status === 'completed' && (
+                              <svg
+                                className="w-3 h-3 text-white"
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            )}
+                          </div>
+                          <span
+                            className={`text-sm ${milestone.status === 'completed' ? 'text-slate-500 line-through' : 'text-slate-700 dark:text-slate-300'}`}
+                          >
+                            {milestone.title}
+                          </span>
                         </div>
-                        <span className={`text-sm ${milestone.status === 'completed' ? 'text-slate-500 line-through' : 'text-slate-700 dark:text-slate-300'}`}>
-                          {milestone.title}
-                        </span>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 )}
               </div>
@@ -933,7 +1038,7 @@ function BenefitsTab() {
           setTotalSavings(data.totalPotentialSavings || 0);
         }
       } catch (error) {
-        console.warn("Failed to fetch benefits:", error);
+        console.warn('Failed to fetch benefits:', error);
       } finally {
         setLoading(false);
       }
@@ -942,19 +1047,23 @@ function BenefitsTab() {
   }, []);
 
   const priorityColors: Record<number, string> = {
-    10: "border-l-4 border-l-green-500",
-    9: "border-l-4 border-l-green-400",
-    8: "border-l-4 border-l-blue-500",
-    7: "border-l-4 border-l-blue-400",
-    6: "border-l-4 border-l-amber-500",
-    5: "border-l-4 border-l-amber-400",
+    10: 'border-l-4 border-l-green-500',
+    9: 'border-l-4 border-l-green-400',
+    8: 'border-l-4 border-l-blue-500',
+    7: 'border-l-4 border-l-blue-400',
+    6: 'border-l-4 border-l-amber-500',
+    5: 'border-l-4 border-l-amber-400',
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
   }
 
-  const currentEmployer = benefits.find(b => b.isCurrentEmployer);
+  const currentEmployer = benefits.find((b) => b.isCurrentEmployer);
 
   return (
     <div className="space-y-6">
@@ -963,7 +1072,9 @@ function BenefitsTab() {
         <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white">
           <h3 className="text-lg font-medium opacity-90">Potential Annual Savings</h3>
           <p className="text-4xl font-bold mt-2">${totalSavings.toLocaleString()}</p>
-          <p className="text-sm opacity-80 mt-1">{opportunities.length} optimization opportunities found</p>
+          <p className="text-sm opacity-80 mt-1">
+            {opportunities.length} optimization opportunities found
+          </p>
         </div>
       )}
 
@@ -971,8 +1082,12 @@ function BenefitsTab() {
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Employer Benefits</h3>
-            {currentEmployer && <p className="text-sm text-slate-500">{currentEmployer.employerName}</p>}
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Employer Benefits
+            </h3>
+            {currentEmployer && (
+              <p className="text-sm text-slate-500">{currentEmployer.employerName}</p>
+            )}
           </div>
           <button className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
             + Add Employer
@@ -980,11 +1095,23 @@ function BenefitsTab() {
         </div>
         {!currentEmployer ? (
           <div className="p-8 text-center">
-            <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            <svg
+              className="mx-auto h-12 w-12 text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+              />
             </svg>
             <p className="mt-2 text-sm text-slate-500">No employer benefits configured</p>
-            <p className="text-xs text-slate-400 mt-1">Upload your offer letter or benefits summary to get started</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Upload your offer letter or benefits summary to get started
+            </p>
             <button className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700">
               Upload Offer Letter
             </button>
@@ -1007,28 +1134,41 @@ function BenefitsTab() {
               </div>
               <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                 <p className="text-xs text-slate-500">Health Plans</p>
-                <p className="text-lg font-semibold text-slate-900 dark:text-white">{currentEmployer.healthBenefits.length}</p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                  {currentEmployer.healthBenefits.length}
+                </p>
               </div>
               <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
                 <p className="text-xs text-slate-500">Retirement Plans</p>
-                <p className="text-lg font-semibold text-slate-900 dark:text-white">{currentEmployer.retirementBenefits.length}</p>
+                <p className="text-lg font-semibold text-slate-900 dark:text-white">
+                  {currentEmployer.retirementBenefits.length}
+                </p>
               </div>
             </div>
 
             {/* Retirement Benefits */}
             {currentEmployer.retirementBenefits.length > 0 && (
               <div>
-                <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-2">Retirement Benefits</h4>
+                <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  Retirement Benefits
+                </h4>
                 <div className="space-y-2">
                   {currentEmployer.retirementBenefits.map((rb) => (
-                    <div key={rb.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                    <div
+                      key={rb.id}
+                      className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg"
+                    >
                       <div>
-                        <p className="font-medium text-slate-900 dark:text-white">{rb.planType.toUpperCase().replace('_', ' ')}</p>
+                        <p className="font-medium text-slate-900 dark:text-white">
+                          {rb.planType.toUpperCase().replace('_', ' ')}
+                        </p>
                         <p className="text-xs text-slate-500">
                           {rb.employerMatchPct}% match up to {rb.employerMatchLimit}% of salary
                         </p>
                       </div>
-                      <span className={`px-2 py-1 text-xs rounded-full ${rb.isEnrolled ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>
+                      <span
+                        className={`px-2 py-1 text-xs rounded-full ${rb.isEnrolled ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}
+                      >
                         {rb.isEnrolled ? 'Enrolled' : 'Not Enrolled'}
                       </span>
                     </div>
@@ -1043,12 +1183,16 @@ function BenefitsTab() {
       {/* Optimization Opportunities */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Optimization Opportunities</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+            Optimization Opportunities
+          </h3>
           <p className="text-sm text-slate-500">Actions to maximize your benefits</p>
         </div>
         {opportunities.length === 0 ? (
           <div className="p-8 text-center">
-            <p className="text-sm text-slate-500">Add employer benefits to see optimization opportunities</p>
+            <p className="text-sm text-slate-500">
+              Add employer benefits to see optimization opportunities
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -1062,11 +1206,17 @@ function BenefitsTab() {
                         {opp.category}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{opp.description}</p>
-                    <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">{opp.actionRequired}</p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                      {opp.description}
+                    </p>
+                    <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                      {opp.actionRequired}
+                    </p>
                   </div>
                   <div className="ml-4 text-right">
-                    <p className="text-lg font-bold text-green-600">${opp.potentialSavings.toLocaleString()}</p>
+                    <p className="text-lg font-bold text-green-600">
+                      ${opp.potentialSavings.toLocaleString()}
+                    </p>
                     <p className="text-xs text-slate-500">potential savings</p>
                   </div>
                 </div>
@@ -1091,12 +1241,14 @@ function DeductionsTab({ taxYear }: { taxYear: number }) {
         if (res.ok) {
           const data = await res.json();
           // Filter to deduction-type optimizations
-          setDeductions(data.optimizations?.filter((o: TaxOptimization) =>
-            ['housing', 'healthcare', 'charitable', 'education', 'business'].includes(o.category)
-          ) || []);
+          setDeductions(
+            data.optimizations?.filter((o: TaxOptimization) =>
+              ['housing', 'healthcare', 'charitable', 'education', 'business'].includes(o.category)
+            ) || []
+          );
         }
       } catch (error) {
-        console.warn("Failed to fetch deductions:", error);
+        console.warn('Failed to fetch deductions:', error);
       } finally {
         setLoading(false);
       }
@@ -1105,25 +1257,77 @@ function DeductionsTab({ taxYear }: { taxYear: number }) {
   }, [taxYear]);
 
   const categoryIcons: Record<string, React.ReactNode> = {
-    housing: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>,
-    healthcare: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>,
-    charitable: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-    education: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" /></svg>,
-    business: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>,
+    housing: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+        />
+      </svg>
+    ),
+    healthcare: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+        />
+      </svg>
+    ),
+    charitable: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        />
+      </svg>
+    ),
+    education: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"
+        />
+      </svg>
+    ),
+    business: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+        />
+      </svg>
+    ),
   };
 
   const statusColors: Record<string, string> = {
-    identified: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-    considering: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-    planned: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-    claimed: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+    identified: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+    considering: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+    planned: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+    claimed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>;
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      </div>
+    );
   }
 
-  const totalPotentialSavings = deductions.reduce((sum, d) => sum + (d.potentialSavings || d.estimatedSavings), 0);
+  const totalPotentialSavings = deductions.reduce(
+    (sum, d) => sum + (d.potentialSavings || d.estimatedSavings),
+    0
+  );
 
   return (
     <div className="space-y-6">
@@ -1135,12 +1339,14 @@ function DeductionsTab({ taxYear }: { taxYear: number }) {
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <p className="text-sm text-slate-500">Potential Tax Savings</p>
-          <p className="text-2xl font-bold text-green-600">${totalPotentialSavings.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-green-600">
+            ${totalPotentialSavings.toLocaleString()}
+          </p>
         </div>
         <div className="bg-white dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
           <p className="text-sm text-slate-500">Categories</p>
           <p className="text-2xl font-bold text-slate-900 dark:text-white">
-            {new Set(deductions.map(d => d.category)).size}
+            {new Set(deductions.map((d) => d.category)).size}
           </p>
         </div>
       </div>
@@ -1148,16 +1354,30 @@ function DeductionsTab({ taxYear }: { taxYear: number }) {
       {/* Deductions List */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
         <div className="p-4 border-b border-slate-200 dark:border-slate-700">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Potential Deductions</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+            Potential Deductions
+          </h3>
           <p className="text-sm text-slate-500">Track and claim eligible tax deductions</p>
         </div>
         {deductions.length === 0 ? (
           <div className="p-8 text-center">
-            <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+            <svg
+              className="mx-auto h-12 w-12 text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+              />
             </svg>
             <p className="mt-2 text-sm text-slate-500">No deductions identified yet</p>
-            <p className="text-xs text-slate-400 mt-1">Add income and expense data to identify eligible deductions</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Add income and expense data to identify eligible deductions
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -1169,18 +1389,28 @@ function DeductionsTab({ taxYear }: { taxYear: number }) {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="font-medium text-slate-900 dark:text-white">{deduction.name}</h4>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[deduction.status] || statusColors.identified}`}>
+                      <h4 className="font-medium text-slate-900 dark:text-white">
+                        {deduction.name}
+                      </h4>
+                      <span
+                        className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[deduction.status] || statusColors.identified}`}
+                      >
                         {deduction.status}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{deduction.description}</p>
+                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                      {deduction.description}
+                    </p>
                     {deduction.actionRequired && (
-                      <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">{deduction.actionRequired}</p>
+                      <p className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                        {deduction.actionRequired}
+                      </p>
                     )}
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-green-600">${(deduction.potentialSavings || deduction.estimatedSavings).toLocaleString()}</p>
+                    <p className="text-lg font-bold text-green-600">
+                      ${(deduction.potentialSavings || deduction.estimatedSavings).toLocaleString()}
+                    </p>
                     <p className="text-xs text-slate-500">savings</p>
                   </div>
                 </div>
@@ -1192,14 +1422,18 @@ function DeductionsTab({ taxYear }: { taxYear: number }) {
 
       {/* Common Deduction Categories */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Common Deduction Categories</h3>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+          Common Deduction Categories
+        </h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {['housing', 'healthcare', 'charitable', 'education', 'business'].map((cat) => (
             <div key={cat} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg text-center">
               <div className="flex justify-center text-slate-600 dark:text-slate-400 mb-2">
                 {categoryIcons[cat]}
               </div>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">{cat}</p>
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">
+                {cat}
+              </p>
             </div>
           ))}
         </div>
@@ -1217,34 +1451,79 @@ export default function TaxPlanningPage() {
   const [optimizations, setOptimizations] = useState<TaxOptimization[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddIncome, setShowAddIncome] = useState(false);
-  const [filingStatus, setFilingStatus] = useState<FilingStatus>("single");
-  const [activeTab, setActiveTab] = useState<TabType>("overview");
+  const [filingStatus, setFilingStatus] = useState<FilingStatus>('single');
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     {
-      id: "overview",
-      label: "Overview",
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+      id: 'overview',
+      label: 'Overview',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+          />
+        </svg>
+      ),
     },
     {
-      id: "documents",
-      label: "Documents",
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+      id: 'documents',
+      label: 'Documents',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+          />
+        </svg>
+      ),
     },
     {
-      id: "deductions",
-      label: "Deductions",
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+      id: 'deductions',
+      label: 'Deductions',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
+          />
+        </svg>
+      ),
     },
     {
-      id: "strategies",
-      label: "Strategies",
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>,
+      id: 'strategies',
+      label: 'Strategies',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+          />
+        </svg>
+      ),
     },
     {
-      id: "benefits",
-      label: "Benefits",
-      icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+      id: 'benefits',
+      label: 'Benefits',
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+          />
+        </svg>
+      ),
     },
   ];
 
@@ -1276,7 +1555,7 @@ export default function TaxPlanningPage() {
         setOptimizations(data.optimizations || []);
       }
     } catch (error) {
-      console.warn("Failed to fetch tax data:", error);
+      console.warn('Failed to fetch tax data:', error);
     } finally {
       setLoading(false);
     }
@@ -1288,32 +1567,32 @@ export default function TaxPlanningPage() {
 
   const handleAddIncome = async (data: Partial<TaxIncomeItem>) => {
     try {
-      const res = await fetch("/api/tax/income", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/tax/income', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...data, taxYear }),
       });
 
       if (res.ok) {
         // Refetch data and recalculate
         await fetchData();
-        await fetch("/api/tax/calculate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        await fetch('/api/tax/calculate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ taxYear }),
         });
         await fetchData();
       }
     } catch (error) {
-      console.error("Failed to add income:", error);
+      console.error('Failed to add income:', error);
     }
   };
 
   const handleCreateProfile = async () => {
     try {
-      const res = await fetch("/api/tax/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('/api/tax/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taxYear, filingStatus }),
       });
 
@@ -1321,7 +1600,7 @@ export default function TaxPlanningPage() {
         await fetchData();
       }
     } catch (error) {
-      console.error("Failed to create profile:", error);
+      console.error('Failed to create profile:', error);
     }
   };
 
@@ -1378,8 +1657,8 @@ export default function TaxPlanningPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 hover:border-slate-300"
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 hover:border-slate-300'
               }`}
             >
               {tab.icon}
@@ -1390,13 +1669,13 @@ export default function TaxPlanningPage() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === "documents" && <DocumentsTab taxYear={taxYear} />}
-      {activeTab === "strategies" && <StrategiesTab taxYear={taxYear} />}
-      {activeTab === "benefits" && <BenefitsTab />}
-      {activeTab === "deductions" && <DeductionsTab taxYear={taxYear} />}
+      {activeTab === 'documents' && <DocumentsTab taxYear={taxYear} />}
+      {activeTab === 'strategies' && <StrategiesTab taxYear={taxYear} />}
+      {activeTab === 'benefits' && <BenefitsTab />}
+      {activeTab === 'deductions' && <DeductionsTab taxYear={taxYear} />}
 
       {/* Overview Tab Content */}
-      {activeTab === "overview" && (
+      {activeTab === 'overview' && (
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1421,186 +1700,194 @@ export default function TaxPlanningPage() {
               value={`$${(estimate?.totalTaxLiability || 0).toLocaleString()}`}
               subtitle={`${(estimate?.effectiveRate || 0).toFixed(1)}% effective rate`}
               color="amber"
-          icon={
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-              />
-            </svg>
-          }
-        />
-        <SummaryCard
-          title={estimate && estimate.refundOrOwed >= 0 ? "Refund" : "Amount Owed"}
-          value={`$${Math.abs(estimate?.refundOrOwed || 0).toLocaleString()}`}
-          subtitle={`$${totalWithholding.toLocaleString()} withheld YTD`}
-          color={estimate && estimate.refundOrOwed >= 0 ? "green" : "red"}
-          icon={
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d={
-                  estimate && estimate.refundOrOwed >= 0
-                    ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    : "M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                }
-              />
-            </svg>
-          }
-        />
-        <SummaryCard
-          title="Optimization Potential"
-          value={`$${totalOptimizationSavings.toLocaleString()}`}
-          subtitle={`${optimizations.length} opportunities found`}
-          color="purple"
-          icon={
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-              />
-            </svg>
-          }
-        />
-      </div>
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <IncomeSourceCard incomes={incomes} onAddIncome={() => setShowAddIncome(true)} />
-        <TaxBracketChart estimate={estimate} filingStatus={filingStatus} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <OptimizationCard optimizations={optimizations} />
-        <QuarterlyPayments taxYear={taxYear} estimate={estimate} />
-      </div>
-
-      {/* Tax Breakdown */}
-      {estimate && (
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-            Tax Calculation Breakdown
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div>
-              <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Income</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Gross Income</span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.grossIncome.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Above-line Deductions</span>
-                  <span className="text-slate-900 dark:text-white">
-                    -${estimate.aboveLineDeductions.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between font-medium border-t border-slate-200 dark:border-slate-700 pt-2">
-                  <span className="text-slate-700 dark:text-slate-300">AGI</span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.adjustedGrossIncome.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Deductions</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Standard</span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.standardDeduction.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Itemized</span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.itemizedDeductions.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between font-medium border-t border-slate-200 dark:border-slate-700 pt-2">
-                  <span className="text-slate-700 dark:text-slate-300">
-                    Using {estimate.deductionUsed}
-                  </span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.totalDeductions.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Taxes</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Federal Income Tax</span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.ordinaryIncomeTax.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Self-Employment Tax</span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.selfEmploymentTax.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">NIIT</span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.netInvestmentIncomeTax.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between font-medium border-t border-slate-200 dark:border-slate-700 pt-2">
-                  <span className="text-slate-700 dark:text-slate-300">Total Before Credits</span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.totalTaxBeforeCredits.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div>
-              <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-3">
-                Credits & Payments
-              </h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Tax Credits</span>
-                  <span className="text-green-600 dark:text-green-400">
-                    -${estimate.totalCredits.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Withholding</span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.totalWithholding.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-600 dark:text-slate-400">Est. Payments</span>
-                  <span className="text-slate-900 dark:text-white">
-                    ${estimate.estimatedPayments.toLocaleString()}
-                  </span>
-                </div>
-                <div
-                  className={`flex justify-between font-medium border-t border-slate-200 dark:border-slate-700 pt-2 ${
-                    estimate.refundOrOwed >= 0 ? "text-green-600" : "text-red-600"
-                  }`}
-                >
-                  <span>{estimate.refundOrOwed >= 0 ? "Refund" : "Owed"}</span>
-                  <span>${Math.abs(estimate.refundOrOwed).toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
+              icon={
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+              }
+            />
+            <SummaryCard
+              title={estimate && estimate.refundOrOwed >= 0 ? 'Refund' : 'Amount Owed'}
+              value={`$${Math.abs(estimate?.refundOrOwed || 0).toLocaleString()}`}
+              subtitle={`$${totalWithholding.toLocaleString()} withheld YTD`}
+              color={estimate && estimate.refundOrOwed >= 0 ? 'green' : 'red'}
+              icon={
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d={
+                      estimate && estimate.refundOrOwed >= 0
+                        ? 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+                        : 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+                    }
+                  />
+                </svg>
+              }
+            />
+            <SummaryCard
+              title="Optimization Potential"
+              value={`$${totalOptimizationSavings.toLocaleString()}`}
+              subtitle={`${optimizations.length} opportunities found`}
+              color="purple"
+              icon={
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                  />
+                </svg>
+              }
+            />
           </div>
-        </div>
-        )}
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <IncomeSourceCard incomes={incomes} onAddIncome={() => setShowAddIncome(true)} />
+            <TaxBracketChart estimate={estimate} filingStatus={filingStatus} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <OptimizationCard optimizations={optimizations} />
+            <QuarterlyPayments taxYear={taxYear} estimate={estimate} />
+          </div>
+
+          {/* Tax Breakdown */}
+          {estimate && (
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6">
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
+                Tax Calculation Breakdown
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div>
+                  <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Income</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">Gross Income</span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.grossIncome.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">
+                        Above-line Deductions
+                      </span>
+                      <span className="text-slate-900 dark:text-white">
+                        -${estimate.aboveLineDeductions.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-medium border-t border-slate-200 dark:border-slate-700 pt-2">
+                      <span className="text-slate-700 dark:text-slate-300">AGI</span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.adjustedGrossIncome.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-3">
+                    Deductions
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">Standard</span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.standardDeduction.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">Itemized</span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.itemizedDeductions.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-medium border-t border-slate-200 dark:border-slate-700 pt-2">
+                      <span className="text-slate-700 dark:text-slate-300">
+                        Using {estimate.deductionUsed}
+                      </span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.totalDeductions.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-3">Taxes</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">Federal Income Tax</span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.ordinaryIncomeTax.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">
+                        Self-Employment Tax
+                      </span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.selfEmploymentTax.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">NIIT</span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.netInvestmentIncomeTax.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between font-medium border-t border-slate-200 dark:border-slate-700 pt-2">
+                      <span className="text-slate-700 dark:text-slate-300">
+                        Total Before Credits
+                      </span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.totalTaxBeforeCredits.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-3">
+                    Credits & Payments
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">Tax Credits</span>
+                      <span className="text-green-600 dark:text-green-400">
+                        -${estimate.totalCredits.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">Withholding</span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.totalWithholding.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600 dark:text-slate-400">Est. Payments</span>
+                      <span className="text-slate-900 dark:text-white">
+                        ${estimate.estimatedPayments.toLocaleString()}
+                      </span>
+                    </div>
+                    <div
+                      className={`flex justify-between font-medium border-t border-slate-200 dark:border-slate-700 pt-2 ${
+                        estimate.refundOrOwed >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      <span>{estimate.refundOrOwed >= 0 ? 'Refund' : 'Owed'}</span>
+                      <span>${Math.abs(estimate.refundOrOwed).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 

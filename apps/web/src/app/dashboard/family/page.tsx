@@ -1,7 +1,6 @@
 'use client';
-
 import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/hooks/useSession';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -120,7 +119,7 @@ export default function FamilyPage() {
             <span className="text-3xl">👨‍👩‍👧‍👦</span>
           </div>
           <p className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">
-            {familyMembers.filter(m => m.isActive).length}
+            {familyMembers.filter((m) => m.isActive).length}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">Active members</p>
         </div>
@@ -131,7 +130,7 @@ export default function FamilyPage() {
             <span className="text-3xl">🐾</span>
           </div>
           <p className="text-4xl font-bold text-green-600 dark:text-green-400 mb-2">
-            {pets.filter(p => p.isActive).length}
+            {pets.filter((p) => p.isActive).length}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">Active pets</p>
         </div>
@@ -165,7 +164,8 @@ export default function FamilyPage() {
               No family members yet
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Start by adding your family members to keep track of their information and appointments
+              Start by adding your family members to keep track of their information and
+              appointments
             </p>
             <button
               onClick={() => router.push('/dashboard/family/members/new')}
@@ -185,7 +185,11 @@ export default function FamilyPage() {
                 <div className="flex items-start gap-4">
                   <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-2xl overflow-hidden flex-shrink-0">
                     {member.photoUrl ? (
-                      <img src={member.photoUrl} alt={member.firstName} className="w-full h-full object-cover" />
+                      <img
+                        src={member.photoUrl}
+                        alt={member.firstName}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       '👤'
                     )}
@@ -239,7 +243,8 @@ export default function FamilyPage() {
               No pets yet
             </h3>
             <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Add your pets to keep track of their medical records, vet appointments, and care information
+              Add your pets to keep track of their medical records, vet appointments, and care
+              information
             </p>
             <button
               onClick={() => router.push('/dashboard/family/pets/new')}
@@ -259,7 +264,11 @@ export default function FamilyPage() {
                 <div className="flex items-start gap-4">
                   <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-2xl overflow-hidden flex-shrink-0">
                     {pet.photoUrl ? (
-                      <img src={pet.photoUrl} alt={pet.name} className="w-full h-full object-cover" />
+                      <img
+                        src={pet.photoUrl}
+                        alt={pet.name}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       '🐾'
                     )}
@@ -287,7 +296,9 @@ export default function FamilyPage() {
       {/* Upcoming Appointments Section */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Upcoming Appointments</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+            Upcoming Appointments
+          </h2>
           <button
             onClick={() => router.push('/dashboard/family/appointments/new')}
             className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"

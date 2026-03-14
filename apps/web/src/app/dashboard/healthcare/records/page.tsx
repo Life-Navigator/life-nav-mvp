@@ -1,7 +1,6 @@
 'use client';
-
 import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/hooks/useSession';
 import Link from 'next/link';
 
 interface HealthRecord {
@@ -54,28 +53,35 @@ export default function HealthRecordsPage() {
 
   // Filter records based on view, search term, and date
   const filteredRecords = records
-    .filter(record => view === 'all' || record.type === view)
-    .filter(record => 
-      record.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.provider.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.summary.toLowerCase().includes(searchTerm.toLowerCase())
+    .filter((record) => view === 'all' || record.type === view)
+    .filter(
+      (record) =>
+        record.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        record.provider.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        record.summary.toLowerCase().includes(searchTerm.toLowerCase())
     )
-    .filter(record => !dateFilter || record.date.includes(dateFilter))
+    .filter((record) => !dateFilter || record.date.includes(dateFilter))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const getRecordTypeIcon = (type: string) => {
     switch (type) {
-      case 'visit': return '👨‍⚕️';
-      case 'lab': return '🧪';
-      case 'imaging': return '📷';
-      default: return '📄';
+      case 'visit':
+        return '👨‍⚕️';
+      case 'lab':
+        return '🧪';
+      case 'imaging':
+        return '📷';
+      default:
+        return '📄';
     }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="text-xl font-semibold text-gray-700 dark:text-gray-300">Loading health records...</div>
+        <div className="text-xl font-semibold text-gray-700 dark:text-gray-300">
+          Loading health records...
+        </div>
       </div>
     );
   }
@@ -86,7 +92,7 @@ export default function HealthRecordsPage() {
         <div className="max-w-md p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-4">Error</h2>
           <p className="text-gray-700 dark:text-gray-300">{error}</p>
-          <button 
+          <button
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             onClick={() => window.location.reload()}
           >
@@ -111,7 +117,7 @@ export default function HealthRecordsPage() {
             </button>
           </div>
         </div>
-        
+
         {/* Filters and search */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm mb-6 p-4">
           <div className="flex flex-col md:flex-row md:items-center md:space-x-4">
@@ -152,13 +158,15 @@ export default function HealthRecordsPage() {
             </div>
           </div>
         </div>
-        
+
         {/* Records list */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
           {filteredRecords.length === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-gray-600 dark:text-gray-400 text-lg">No health records found with the current filters.</p>
-              <button 
+              <p className="text-gray-600 dark:text-gray-400 text-lg">
+                No health records found with the current filters.
+              </p>
+              <button
                 className="mt-4 px-4 py-2 text-red-600 dark:text-red-400 border border-red-600 dark:border-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
                 onClick={() => {
                   setSearchTerm('');
@@ -172,12 +180,13 @@ export default function HealthRecordsPage() {
           ) : (
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {filteredRecords.map((record) => (
-                <div key={record.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                <div
+                  key={record.id}
+                  className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                >
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                     <div className="flex">
-                      <div className="text-2xl mr-4">
-                        {getRecordTypeIcon(record.type)}
-                      </div>
+                      <div className="text-2xl mr-4">{getRecordTypeIcon(record.type)}</div>
                       <div>
                         <h3 className="text-lg font-medium text-gray-900 dark:text-white">
                           {record.title}
@@ -196,7 +205,7 @@ export default function HealthRecordsPage() {
                       </button>
                     </div>
                   </div>
-                  
+
                   {record.files && record.files.length > 0 && (
                     <div className="mt-4 pl-10">
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -204,7 +213,7 @@ export default function HealthRecordsPage() {
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {record.files.map((file) => (
-                          <div 
+                          <div
                             key={file.id}
                             className="flex items-center px-3 py-1.5 bg-gray-100 dark:bg-gray-700 rounded-md"
                           >
@@ -212,8 +221,12 @@ export default function HealthRecordsPage() {
                             {file.type === 'Image' && <span className="mr-2">🖼️</span>}
                             {file.type === 'ZIP' && <span className="mr-2">📦</span>}
                             {file.type === 'TXT' && <span className="mr-2">📝</span>}
-                            <span className="text-sm text-gray-700 dark:text-gray-300">{file.name}</span>
-                            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">({file.size})</span>
+                            <span className="text-sm text-gray-700 dark:text-gray-300">
+                              {file.name}
+                            </span>
+                            <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                              ({file.size})
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -224,11 +237,11 @@ export default function HealthRecordsPage() {
             </div>
           )}
         </div>
-        
+
         {/* Navigation and help */}
         <div className="mt-8 flex flex-col md:flex-row md:justify-between">
           <div className="mb-4 md:mb-0">
-            <Link 
+            <Link
               href="/dashboard/healthcare"
               className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
             >

@@ -27,7 +27,7 @@ function initializeBrowserErrorHandlers(): void {
   // Handle unhandled errors
   window.addEventListener('error', async (event: ErrorEvent) => {
     event.preventDefault();
-    
+
     await captureError(event.error || new Error(event.message), {
       severity: ErrorSeverity.HIGH,
       category: ErrorCategory.SYSTEM,
@@ -45,11 +45,9 @@ function initializeBrowserErrorHandlers(): void {
   // Handle unhandled promise rejections
   window.addEventListener('unhandledrejection', async (event: PromiseRejectionEvent) => {
     event.preventDefault();
-    
-    const error = event.reason instanceof Error 
-      ? event.reason 
-      : new Error(String(event.reason));
-    
+
+    const error = event.reason instanceof Error ? event.reason : new Error(String(event.reason));
+
     await captureError(error, {
       severity: ErrorSeverity.HIGH,
       category: ErrorCategory.SYSTEM,
@@ -76,12 +74,17 @@ function initializeBrowserErrorHandlers(): void {
 
   // Handle chunk load errors (for Next.js)
   const originalFetch = window.fetch;
-  window.fetch = async function(...args) {
+  window.fetch = async function (...args) {
     try {
       const response = await originalFetch.apply(this, args);
-      
+
       // Check for failed chunk loads
-      if (!response.ok && args[0] && typeof args[0] === 'string' && args[0].includes('_next/static/chunks')) {
+      if (
+        !response.ok &&
+        args[0] &&
+        typeof args[0] === 'string' &&
+        args[0].includes('_next/static/chunks')
+      ) {
         await captureError(new Error(`Failed to load chunk: ${args[0]}`), {
           severity: ErrorSeverity.MEDIUM,
           category: ErrorCategory.NETWORK,
@@ -93,7 +96,7 @@ function initializeBrowserErrorHandlers(): void {
           recoverable: true,
         });
       }
-      
+
       return response;
     } catch (error) {
       // Capture fetch errors
@@ -114,21 +117,23 @@ function initializeBrowserErrorHandlers(): void {
 
   // Monitor console errors
   const originalConsoleError = console.error;
-  console.error = function(...args) {
+  console.error = function (...args) {
     originalConsoleError.apply(console, args);
-    
+
     // Extract error from console
-    const error = args.find(arg => arg instanceof Error) || new Error(args.join(' '));
-    
+    const error = args.find((arg) => arg instanceof Error) || new Error(args.join(' '));
+
     captureError(error, {
       severity: ErrorSeverity.LOW,
       category: ErrorCategory.UNKNOWN,
       context: {
         source: 'console.error',
-        args: args.map(arg => 
-          arg instanceof Error ? arg.message : 
-          typeof arg === 'object' ? JSON.stringify(arg) : 
-          String(arg)
+        args: args.map((arg) =>
+          arg instanceof Error
+            ? arg.message
+            : typeof arg === 'object'
+              ? JSON.stringify(arg)
+              : String(arg)
         ),
       },
     });
@@ -140,7 +145,8 @@ function initializeBrowserErrorHandlers(): void {
       // Long tasks (blocking main thread)
       const longTaskObserver = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
-          if (entry.duration > 50) { // Task longer than 50ms
+          if (entry.duration > 50) {
+            // Task longer than 50ms
             captureError(new Error(`Long task detected: ${entry.duration}ms`), {
               severity: entry.duration > 200 ? ErrorSeverity.MEDIUM : ErrorSeverity.LOW,
               category: ErrorCategory.SYSTEM,
@@ -160,7 +166,8 @@ function initializeBrowserErrorHandlers(): void {
       const layoutShiftObserver = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
           const shift = entry as any;
-          if (!shift.hadRecentInput && shift.value > 0.1) { // Significant layout shift
+          if (!shift.hadRecentInput && shift.value > 0.1) {
+            // Significant layout shift
             captureError(new Error(`Layout shift detected: ${shift.value}`), {
               severity: shift.value > 0.25 ? ErrorSeverity.MEDIUM : ErrorSeverity.LOW,
               category: ErrorCategory.SYSTEM,
@@ -184,7 +191,7 @@ function initializeBrowserErrorHandlers(): void {
     setInterval(() => {
       const memory = (performance as any).memory;
       const usedPercent = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
-      
+
       if (usedPercent > 90) {
         captureError(new Error(`High memory usage: ${usedPercent.toFixed(1)}%`), {
           severity: ErrorSeverity.HIGH,
@@ -228,7 +235,7 @@ function initializeNodeErrorHandlers(): void {
   // Handle uncaught exceptions
   process.on('uncaughtException', async (error: Error) => {
     console.error('[FATAL] Uncaught Exception:', error);
-    
+
     await captureError(error, {
       severity: ErrorSeverity.CRITICAL,
       category: ErrorCategory.SYSTEM,
@@ -239,7 +246,7 @@ function initializeNodeErrorHandlers(): void {
         nodeVersion: process.version,
       },
     });
-    
+
     // Give time for error to be logged
     setTimeout(() => {
       process.exit(1);
@@ -248,10 +255,8 @@ function initializeNodeErrorHandlers(): void {
 
   // Handle unhandled promise rejections
   process.on('unhandledRejection', async (reason: any, promise: Promise<any>) => {
-    const error = reason instanceof Error 
-      ? reason 
-      : new Error(String(reason));
-    
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+
     await captureError(error, {
       severity: ErrorSeverity.HIGH,
       category: ErrorCategory.SYSTEM,
@@ -278,7 +283,7 @@ function initializeNodeErrorHandlers(): void {
   setInterval(() => {
     const usage = process.memoryUsage();
     const heapUsedPercent = (usage.heapUsed / usage.heapTotal) * 100;
-    
+
     if (heapUsedPercent > 85) {
       captureError(new Error(`High memory usage: ${heapUsedPercent.toFixed(1)}%`), {
         severity: heapUsedPercent > 95 ? ErrorSeverity.CRITICAL : ErrorSeverity.HIGH,
@@ -296,8 +301,9 @@ function initializeNodeErrorHandlers(): void {
   setInterval(() => {
     const now = Date.now();
     const lag = now - lastCheck - 5000; // Expected 5 second interval
-    
-    if (lag > 100) { // More than 100ms lag
+
+    if (lag > 100) {
+      // More than 100ms lag
       captureError(new Error(`Event loop lag detected: ${lag}ms`), {
         severity: lag > 500 ? ErrorSeverity.HIGH : ErrorSeverity.MEDIUM,
         category: ErrorCategory.SYSTEM,
@@ -307,7 +313,7 @@ function initializeNodeErrorHandlers(): void {
         },
       });
     }
-    
+
     lastCheck = now;
   }, 5000);
 
@@ -326,7 +332,7 @@ export function createExpressErrorHandler() {
         source: 'express-middleware',
         method: req.method,
         url: req.url,
-        ip: req.ip,
+        ip: req.headers?.get?.('x-forwarded-for')?.split(',')[0]?.trim() || req.ip || 'unknown',
         userAgent: req.get('user-agent'),
         body: req.body,
         query: req.query,
@@ -336,9 +342,10 @@ export function createExpressErrorHandler() {
 
     res.status(500).json({
       error: 'Internal Server Error',
-      message: process.env.NODE_ENV === 'production' 
-        ? 'An error occurred processing your request' 
-        : err.message,
+      message:
+        process.env.NODE_ENV === 'production'
+          ? 'An error occurred processing your request'
+          : err.message,
       errorId: structuredError.id,
     });
   };
@@ -366,9 +373,10 @@ export function withErrorHandler(handler: Function) {
 
       res.status(500).json({
         error: 'Internal Server Error',
-        message: process.env.NODE_ENV === 'production' 
-          ? 'An error occurred processing your request' 
-          : (error as Error).message,
+        message:
+          process.env.NODE_ENV === 'production'
+            ? 'An error occurred processing your request'
+            : (error as Error).message,
         errorId: structuredError.id,
       });
     }
@@ -389,10 +397,12 @@ export function wrapAsync<T extends (...args: any[]) => Promise<any>>(fn: T): T 
         context: {
           source: 'async-wrapper',
           function: fn.name,
-          args: args.map(arg => 
-            typeof arg === 'object' ? '[Object]' : 
-            typeof arg === 'function' ? '[Function]' : 
-            String(arg)
+          args: args.map((arg) =>
+            typeof arg === 'object'
+              ? '[Object]'
+              : typeof arg === 'function'
+                ? '[Function]'
+                : String(arg)
           ),
         },
       });

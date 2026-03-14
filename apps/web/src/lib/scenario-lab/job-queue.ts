@@ -22,7 +22,7 @@ export async function enqueueJob(params: {
 
   // Check for existing job with same idempotency key
   if (idempotencyKey) {
-    const { data: existing } = await supabaseAdmin
+    const { data: existing } = await (supabaseAdmin as any)
       .from('scenario_jobs')
       .select('*')
       .eq('idempotency_key', idempotencyKey)
@@ -33,7 +33,7 @@ export async function enqueueJob(params: {
     }
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await (supabaseAdmin as any)
     .from('scenario_jobs')
     .insert({
       user_id: userId,
@@ -56,7 +56,7 @@ export async function enqueueJob(params: {
  * Get job by ID
  */
 export async function getJob(jobId: string): Promise<ScenarioJob | null> {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await (supabaseAdmin as any)
     .from('scenario_jobs')
     .select('*')
     .eq('id', jobId)
@@ -71,17 +71,20 @@ export async function getJob(jobId: string): Promise<ScenarioJob | null> {
  */
 export async function updateJobStatus(
   jobId: string,
-  status: JobStatus | 'processing' | {
-    status: JobStatus | 'processing';
-    output_json?: any;
-    result_json?: any;
-    error_text?: string;
-    error?: string;
-    progress?: number;
-    started_at?: string;
-    completed_at?: string;
-    attempts?: number;
-  },
+  status:
+    | JobStatus
+    | 'processing'
+    | {
+        status: JobStatus | 'processing';
+        output_json?: any;
+        result_json?: any;
+        error_text?: string;
+        error?: string;
+        progress?: number;
+        started_at?: string;
+        completed_at?: string;
+        attempts?: number;
+      },
   updates: Partial<{
     output_json: any;
     error_text: string;
@@ -90,13 +93,9 @@ export async function updateJobStatus(
     attempts: number;
   }> = {}
 ): Promise<void> {
-  const updateInput = typeof status === 'string'
-    ? { status, ...updates }
-    : status;
+  const updateInput = typeof status === 'string' ? { status, ...updates } : status;
 
-  const normalizedStatus = updateInput.status === 'processing'
-    ? 'running'
-    : updateInput.status;
+  const normalizedStatus = updateInput.status === 'processing' ? 'running' : updateInput.status;
 
   const payload: any = {
     status: normalizedStatus,
@@ -121,7 +120,9 @@ export async function updateJobStatus(
 
   if (typeof updateInput.progress === 'number') {
     payload.output_json = {
-      ...(payload.output_json && typeof payload.output_json === 'object' ? payload.output_json : {}),
+      ...(payload.output_json && typeof payload.output_json === 'object'
+        ? payload.output_json
+        : {}),
       progress: updateInput.progress,
     };
   }
@@ -130,14 +131,14 @@ export async function updateJobStatus(
   if (normalizedStatus === 'running' && !updateInput.started_at) {
     payload.started_at = new Date().toISOString();
   }
-  if ((normalizedStatus === 'completed' || normalizedStatus === 'failed') && !updateInput.completed_at) {
+  if (
+    (normalizedStatus === 'completed' || normalizedStatus === 'failed') &&
+    !updateInput.completed_at
+  ) {
     payload.completed_at = new Date().toISOString();
   }
 
-  await supabaseAdmin
-    .from('scenario_jobs')
-    .update(payload)
-    .eq('id', jobId);
+  await (supabaseAdmin as any).from('scenario_jobs').update(payload).eq('id', jobId);
 }
 
 /**
@@ -145,7 +146,7 @@ export async function updateJobStatus(
  * Uses SELECT FOR UPDATE SKIP LOCKED for concurrency safety
  */
 export async function getNextQueuedJob(jobType?: JobType): Promise<ScenarioJob | null> {
-  let query = supabaseAdmin
+  let query = (supabaseAdmin as any)
     .from('scenario_jobs')
     .select('*')
     .eq('status', 'queued')
@@ -178,7 +179,7 @@ export async function retryJob(jobId: string): Promise<boolean> {
   const job = await getJob(jobId);
   if (!job || job.attempts >= job.max_attempts) return false;
 
-  await supabaseAdmin
+  await (supabaseAdmin as any)
     .from('scenario_jobs')
     .update({
       status: 'queued' as JobStatus,
@@ -201,7 +202,7 @@ export async function getUserJobs(
     limit?: number;
   }
 ): Promise<ScenarioJob[]> {
-  let query = supabaseAdmin
+  let query = (supabaseAdmin as any)
     .from('scenario_jobs')
     .select('*')
     .eq('user_id', userId)
@@ -232,7 +233,7 @@ export async function cleanupOldJobs(olderThanDays: number = 30): Promise<number
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await (supabaseAdmin as any)
     .from('scenario_jobs')
     .delete()
     .in('status', ['completed', 'failed'])

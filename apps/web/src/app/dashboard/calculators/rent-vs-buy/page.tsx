@@ -4,7 +4,18 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Card } from '@/components/ui/cards/Card';
 import { ArrowLeft, Home, Car, TrendingUp, DollarSign, BarChart3 } from 'lucide-react';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 interface HouseInputs {
   homePrice: number;
@@ -100,7 +111,9 @@ export default function RentVsBuyCalculator() {
     const numPayments = houseInputs.loanTerm * 12;
 
     // Monthly mortgage payment (P&I)
-    const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
+    const monthlyPayment =
+      (loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))) /
+      (Math.pow(1 + monthlyRate, numPayments) - 1);
 
     let homeValue = houseInputs.homePrice;
     let remainingBalance = loanAmount;
@@ -120,24 +133,30 @@ export default function RentVsBuyCalculator() {
 
       const propertyTax = homeValue * (houseInputs.propertyTaxRate / 100);
       const maintenance = homeValue * (houseInputs.maintenancePercent / 100);
-      const yearlyOwningCost = (monthlyPayment * 12) + propertyTax + houseInputs.homeInsurance + (houseInputs.hoaFees * 12) + maintenance;
+      const yearlyOwningCost =
+        monthlyPayment * 12 +
+        propertyTax +
+        houseInputs.homeInsurance +
+        houseInputs.hoaFees * 12 +
+        maintenance;
 
       totalBuyingCost += yearlyOwningCost;
 
       // Home appreciation
-      homeValue *= (1 + houseInputs.homeAppreciationRate / 100);
+      homeValue *= 1 + houseInputs.homeAppreciationRate / 100;
 
       // Calculate renting costs for this year
-      const currentRent = houseInputs.rentAmount * Math.pow(1 + houseInputs.rentIncreaseRate / 100, year - 1);
+      const currentRent =
+        houseInputs.rentAmount * Math.pow(1 + houseInputs.rentIncreaseRate / 100, year - 1);
       const yearlyRentCost = currentRent * 12;
       totalRentingCost += yearlyRentCost;
 
       // Calculate investment growth of the difference
-      const monthlySavings = (yearlyOwningCost / 12) - currentRent;
+      const monthlySavings = yearlyOwningCost / 12 - currentRent;
       if (monthlySavings < 0) {
         // If renting costs less, invest the difference
         for (let month = 1; month <= 12; month++) {
-          rentSavingsInvested *= (1 + houseInputs.investmentReturnRate / 100 / 12);
+          rentSavingsInvested *= 1 + houseInputs.investmentReturnRate / 100 / 12;
           rentSavingsInvested += Math.abs(monthlySavings);
         }
       } else {
@@ -167,7 +186,9 @@ export default function RentVsBuyCalculator() {
     const numPayments = autoInputs.loanTerm * 12;
 
     // Monthly loan payment
-    const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1);
+    const monthlyPayment =
+      (loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))) /
+      (Math.pow(1 + monthlyRate, numPayments) - 1);
 
     let carValue = autoInputs.carPrice;
     let remainingBalance = loanAmount;
@@ -179,7 +200,7 @@ export default function RentVsBuyCalculator() {
     for (let year = 1; year <= yearsToCalculate; year++) {
       // Buying costs
       if (year <= autoInputs.loanTerm) {
-        totalBuyingCost += (monthlyPayment * 12);
+        totalBuyingCost += monthlyPayment * 12;
         for (let month = 1; month <= 12; month++) {
           const interestPayment = remainingBalance * monthlyRate;
           const principalPayment = monthlyPayment - interestPayment;
@@ -189,14 +210,14 @@ export default function RentVsBuyCalculator() {
       totalBuyingCost += autoInputs.maintenanceCostPerYear + autoInputs.insurancePerYear;
 
       // Car depreciation
-      carValue *= (1 - autoInputs.depreciationRate / 100);
+      carValue *= 1 - autoInputs.depreciationRate / 100;
 
       // Leasing costs
       const leasesCyclesCompleted = Math.floor((year - 0.5) / autoInputs.leaseTerm);
       const isInLeasePeriod = (year - 1) % autoInputs.leaseTerm < autoInputs.leaseTerm;
 
       if (isInLeasePeriod) {
-        totalLeasingCost += (autoInputs.leasePayment * 12) + autoInputs.insurancePerYear;
+        totalLeasingCost += autoInputs.leasePayment * 12 + autoInputs.insurancePerYear;
       }
 
       // Add new lease down payment at start of each new lease
@@ -227,11 +248,11 @@ export default function RentVsBuyCalculator() {
   }, [houseInputs, autoInputs, activeTab]);
 
   const updateHouseInput = (key: keyof HouseInputs, value: number) => {
-    setHouseInputs(prev => ({ ...prev, [key]: value }));
+    setHouseInputs((prev) => ({ ...prev, [key]: value }));
   };
 
   const updateAutoInput = (key: keyof AutoInputs, value: number) => {
-    setAutoInputs(prev => ({ ...prev, [key]: value }));
+    setAutoInputs((prev) => ({ ...prev, [key]: value }));
   };
 
   const formatCurrency = (value: number) => {
@@ -243,9 +264,11 @@ export default function RentVsBuyCalculator() {
     }).format(value);
   };
 
-  const finalResult = activeTab === 'house'
-    ? houseResults[houseResults.length - 1]
-    : autoResults[autoResults.length - 1];
+  const finalResult = (
+    activeTab === 'house'
+      ? houseResults[houseResults.length - 1]
+      : autoResults[autoResults.length - 1]
+  ) as (ComparisonResult & AutoComparisonResult) | undefined;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-100 dark:from-gray-900 dark:to-gray-800 p-6">
@@ -317,7 +340,9 @@ export default function RentVsBuyCalculator() {
                         <input
                           type="number"
                           value={houseInputs.homePrice}
-                          onChange={(e) => updateHouseInput('homePrice', parseFloat(e.target.value) || 0)}
+                          onChange={(e) =>
+                            updateHouseInput('homePrice', parseFloat(e.target.value) || 0)
+                          }
                           className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                         />
                       </div>
@@ -325,7 +350,11 @@ export default function RentVsBuyCalculator() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Down Payment: {houseInputs.downPaymentPercent}% ({formatCurrency(houseInputs.homePrice * houseInputs.downPaymentPercent / 100)})
+                        Down Payment: {houseInputs.downPaymentPercent}% (
+                        {formatCurrency(
+                          (houseInputs.homePrice * houseInputs.downPaymentPercent) / 100
+                        )}
+                        )
                       </label>
                       <input
                         type="range"
@@ -333,7 +362,9 @@ export default function RentVsBuyCalculator() {
                         max="50"
                         step="5"
                         value={houseInputs.downPaymentPercent}
-                        onChange={(e) => updateHouseInput('downPaymentPercent', parseFloat(e.target.value))}
+                        onChange={(e) =>
+                          updateHouseInput('downPaymentPercent', parseFloat(e.target.value))
+                        }
                         className="w-full"
                       />
                     </div>
@@ -348,7 +379,9 @@ export default function RentVsBuyCalculator() {
                         max="10"
                         step="0.25"
                         value={houseInputs.interestRate}
-                        onChange={(e) => updateHouseInput('interestRate', parseFloat(e.target.value))}
+                        onChange={(e) =>
+                          updateHouseInput('interestRate', parseFloat(e.target.value))
+                        }
                         className="w-full"
                       />
                     </div>
@@ -389,7 +422,9 @@ export default function RentVsBuyCalculator() {
                           max="3"
                           step="0.1"
                           value={houseInputs.propertyTaxRate}
-                          onChange={(e) => updateHouseInput('propertyTaxRate', parseFloat(e.target.value))}
+                          onChange={(e) =>
+                            updateHouseInput('propertyTaxRate', parseFloat(e.target.value))
+                          }
                           className="w-full"
                         />
                       </div>
@@ -400,7 +435,9 @@ export default function RentVsBuyCalculator() {
                         <input
                           type="number"
                           value={houseInputs.homeInsurance}
-                          onChange={(e) => updateHouseInput('homeInsurance', parseFloat(e.target.value) || 0)}
+                          onChange={(e) =>
+                            updateHouseInput('homeInsurance', parseFloat(e.target.value) || 0)
+                          }
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                         />
                       </div>
@@ -414,7 +451,9 @@ export default function RentVsBuyCalculator() {
                         <input
                           type="number"
                           value={houseInputs.hoaFees}
-                          onChange={(e) => updateHouseInput('hoaFees', parseFloat(e.target.value) || 0)}
+                          onChange={(e) =>
+                            updateHouseInput('hoaFees', parseFloat(e.target.value) || 0)
+                          }
                           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                         />
                       </div>
@@ -428,7 +467,9 @@ export default function RentVsBuyCalculator() {
                           max="3"
                           step="0.5"
                           value={houseInputs.maintenancePercent}
-                          onChange={(e) => updateHouseInput('maintenancePercent', parseFloat(e.target.value))}
+                          onChange={(e) =>
+                            updateHouseInput('maintenancePercent', parseFloat(e.target.value))
+                          }
                           className="w-full"
                         />
                       </div>
@@ -451,7 +492,9 @@ export default function RentVsBuyCalculator() {
                       <input
                         type="number"
                         value={houseInputs.rentAmount}
-                        onChange={(e) => updateHouseInput('rentAmount', parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateHouseInput('rentAmount', parseFloat(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       />
                     </div>
@@ -467,7 +510,9 @@ export default function RentVsBuyCalculator() {
                           max="10"
                           step="0.5"
                           value={houseInputs.rentIncreaseRate}
-                          onChange={(e) => updateHouseInput('rentIncreaseRate', parseFloat(e.target.value))}
+                          onChange={(e) =>
+                            updateHouseInput('rentIncreaseRate', parseFloat(e.target.value))
+                          }
                           className="w-full"
                         />
                       </div>
@@ -481,7 +526,9 @@ export default function RentVsBuyCalculator() {
                           max="10"
                           step="0.5"
                           value={houseInputs.homeAppreciationRate}
-                          onChange={(e) => updateHouseInput('homeAppreciationRate', parseFloat(e.target.value))}
+                          onChange={(e) =>
+                            updateHouseInput('homeAppreciationRate', parseFloat(e.target.value))
+                          }
                           className="w-full"
                         />
                       </div>
@@ -498,7 +545,9 @@ export default function RentVsBuyCalculator() {
                           max="15"
                           step="0.5"
                           value={houseInputs.investmentReturnRate}
-                          onChange={(e) => updateHouseInput('investmentReturnRate', parseFloat(e.target.value))}
+                          onChange={(e) =>
+                            updateHouseInput('investmentReturnRate', parseFloat(e.target.value))
+                          }
                           className="w-full"
                         />
                       </div>
@@ -512,7 +561,9 @@ export default function RentVsBuyCalculator() {
                           max="30"
                           step="5"
                           value={houseInputs.timeHorizon}
-                          onChange={(e) => updateHouseInput('timeHorizon', parseInt(e.target.value))}
+                          onChange={(e) =>
+                            updateHouseInput('timeHorizon', parseInt(e.target.value))
+                          }
                           className="w-full"
                         />
                       </div>
@@ -527,10 +578,14 @@ export default function RentVsBuyCalculator() {
               {finalResult && (
                 <>
                   {/* Summary Card */}
-                  <Card className={`${finalResult.netDifference > 0 ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-blue-500 to-cyan-600'}`}>
+                  <Card
+                    className={`${finalResult.netDifference > 0 ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-blue-500 to-cyan-600'}`}
+                  >
                     <div className="p-6 text-white">
                       <h2 className="text-2xl font-bold mb-4">
-                        {finalResult.netDifference > 0 ? '🏠 Buying is Better' : '🏘️ Renting is Better'}
+                        {finalResult.netDifference > 0
+                          ? '🏠 Buying is Better'
+                          : '🏘️ Renting is Better'}
                       </h2>
                       <div className="text-4xl font-bold mb-2">
                         {formatCurrency(Math.abs(finalResult.netDifference))}
@@ -586,20 +641,36 @@ export default function RentVsBuyCalculator() {
                           </h3>
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Total Buying Cost</div>
-                              <div className="font-bold text-gray-900 dark:text-white">{formatCurrency(finalResult.buyingCost)}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Total Buying Cost
+                              </div>
+                              <div className="font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(finalResult.buyingCost)}
+                              </div>
                             </div>
                             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Total Renting Cost</div>
-                              <div className="font-bold text-gray-900 dark:text-white">{formatCurrency(finalResult.rentingCost)}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Total Renting Cost
+                              </div>
+                              <div className="font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(finalResult.rentingCost)}
+                              </div>
                             </div>
                             <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Home Equity (Buying)</div>
-                              <div className="font-bold text-green-600 dark:text-green-400">{formatCurrency(finalResult.buyingEquity)}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Home Equity (Buying)
+                              </div>
+                              <div className="font-bold text-green-600 dark:text-green-400">
+                                {formatCurrency(finalResult.buyingEquity)}
+                              </div>
                             </div>
                             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Net Difference</div>
-                              <div className="font-bold text-blue-600 dark:text-blue-400">{formatCurrency(Math.abs(finalResult.netDifference))}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Net Difference
+                              </div>
+                              <div className="font-bold text-blue-600 dark:text-blue-400">
+                                {formatCurrency(Math.abs(finalResult.netDifference))}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -614,13 +685,33 @@ export default function RentVsBuyCalculator() {
                             </h3>
                             <ResponsiveContainer width="100%" height={250}>
                               <LineChart data={houseResults}>
-                                <CartesianGrid strokeDasharray="3 3" className="stroke-gray-300 dark:stroke-gray-600" />
-                                <XAxis dataKey="years" label={{ value: 'Years', position: 'insideBottom', offset: -5 }} />
-                                <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+                                <CartesianGrid
+                                  strokeDasharray="3 3"
+                                  className="stroke-gray-300 dark:stroke-gray-600"
+                                />
+                                <XAxis
+                                  dataKey="years"
+                                  label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+                                />
+                                <YAxis
+                                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                                />
                                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
                                 <Legend />
-                                <Line type="monotone" dataKey="buyingCost" stroke="#10b981" strokeWidth={2} name="Buying Cost" />
-                                <Line type="monotone" dataKey="rentingCost" stroke="#3b82f6" strokeWidth={2} name="Renting Cost" />
+                                <Line
+                                  type="monotone"
+                                  dataKey="buyingCost"
+                                  stroke="#10b981"
+                                  strokeWidth={2}
+                                  name="Buying Cost"
+                                />
+                                <Line
+                                  type="monotone"
+                                  dataKey="rentingCost"
+                                  stroke="#3b82f6"
+                                  strokeWidth={2}
+                                  name="Renting Cost"
+                                />
                               </LineChart>
                             </ResponsiveContainer>
                           </div>
@@ -633,16 +724,27 @@ export default function RentVsBuyCalculator() {
                               <AreaChart data={houseResults}>
                                 <defs>
                                   <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                                    <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
                                   </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="years" label={{ value: 'Years', position: 'insideBottom', offset: -5 }} />
-                                <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+                                <XAxis
+                                  dataKey="years"
+                                  label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+                                />
+                                <YAxis
+                                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                                />
                                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
                                 <Legend />
-                                <Area type="monotone" dataKey="buyingEquity" stroke="#10b981" fill="url(#colorEquity)" name="Home Equity" />
+                                <Area
+                                  type="monotone"
+                                  dataKey="buyingEquity"
+                                  stroke="#10b981"
+                                  fill="url(#colorEquity)"
+                                  name="Home Equity"
+                                />
                               </AreaChart>
                             </ResponsiveContainer>
                           </div>
@@ -664,11 +766,20 @@ export default function RentVsBuyCalculator() {
                             </thead>
                             <tbody className="text-gray-600 dark:text-gray-400">
                               {houseResults.map((result) => (
-                                <tr key={result.years} className="border-b border-gray-200 dark:border-gray-700">
+                                <tr
+                                  key={result.years}
+                                  className="border-b border-gray-200 dark:border-gray-700"
+                                >
                                   <td className="py-2 px-2 font-medium">{result.years}</td>
-                                  <td className="text-right py-2 px-2">{formatCurrency(result.buyingCost)}</td>
-                                  <td className="text-right py-2 px-2">{formatCurrency(result.rentingCost)}</td>
-                                  <td className="text-right py-2 px-2 text-green-600 dark:text-green-400">{formatCurrency(result.buyingEquity)}</td>
+                                  <td className="text-right py-2 px-2">
+                                    {formatCurrency(result.buyingCost)}
+                                  </td>
+                                  <td className="text-right py-2 px-2">
+                                    {formatCurrency(result.rentingCost)}
+                                  </td>
+                                  <td className="text-right py-2 px-2 text-green-600 dark:text-green-400">
+                                    {formatCurrency(result.buyingEquity)}
+                                  </td>
                                   <td className="text-right py-2 px-2 font-semibold">
                                     {formatCurrency(Math.abs(result.netDifference))}
                                   </td>
@@ -706,7 +817,9 @@ export default function RentVsBuyCalculator() {
                       <input
                         type="number"
                         value={autoInputs.carPrice}
-                        onChange={(e) => updateAutoInput('carPrice', parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateAutoInput('carPrice', parseFloat(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       />
                     </div>
@@ -718,7 +831,9 @@ export default function RentVsBuyCalculator() {
                       <input
                         type="number"
                         value={autoInputs.downPayment}
-                        onChange={(e) => updateAutoInput('downPayment', parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateAutoInput('downPayment', parseFloat(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       />
                     </div>
@@ -770,7 +885,9 @@ export default function RentVsBuyCalculator() {
                       <input
                         type="number"
                         value={autoInputs.leasePayment}
-                        onChange={(e) => updateAutoInput('leasePayment', parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateAutoInput('leasePayment', parseFloat(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       />
                     </div>
@@ -782,7 +899,9 @@ export default function RentVsBuyCalculator() {
                       <input
                         type="number"
                         value={autoInputs.leaseDownPayment}
-                        onChange={(e) => updateAutoInput('leaseDownPayment', parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateAutoInput('leaseDownPayment', parseFloat(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       />
                     </div>
@@ -819,7 +938,9 @@ export default function RentVsBuyCalculator() {
                       <input
                         type="number"
                         value={autoInputs.maintenanceCostPerYear}
-                        onChange={(e) => updateAutoInput('maintenanceCostPerYear', parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateAutoInput('maintenanceCostPerYear', parseFloat(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       />
                     </div>
@@ -831,7 +952,9 @@ export default function RentVsBuyCalculator() {
                       <input
                         type="number"
                         value={autoInputs.insurancePerYear}
-                        onChange={(e) => updateAutoInput('insurancePerYear', parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateAutoInput('insurancePerYear', parseFloat(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                       />
                     </div>
@@ -846,7 +969,9 @@ export default function RentVsBuyCalculator() {
                         max="25"
                         step="1"
                         value={autoInputs.depreciationRate}
-                        onChange={(e) => updateAutoInput('depreciationRate', parseFloat(e.target.value))}
+                        onChange={(e) =>
+                          updateAutoInput('depreciationRate', parseFloat(e.target.value))
+                        }
                         className="w-full"
                       />
                     </div>
@@ -860,13 +985,23 @@ export default function RentVsBuyCalculator() {
               {autoResults.length > 0 && (
                 <>
                   {/* Summary Card */}
-                  <Card className={`${autoResults[autoResults.length - 1].buyingCost < autoResults[autoResults.length - 1].leasingCost ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-blue-500 to-cyan-600'}`}>
+                  <Card
+                    className={`${autoResults[autoResults.length - 1].buyingCost < autoResults[autoResults.length - 1].leasingCost ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-blue-500 to-cyan-600'}`}
+                  >
                     <div className="p-6 text-white">
                       <h2 className="text-2xl font-bold mb-4">
-                        {autoResults[autoResults.length - 1].buyingCost < autoResults[autoResults.length - 1].leasingCost ? '🚗 Buying is Better' : '🔑 Leasing is Better'}
+                        {autoResults[autoResults.length - 1].buyingCost <
+                        autoResults[autoResults.length - 1].leasingCost
+                          ? '🚗 Buying is Better'
+                          : '🔑 Leasing is Better'}
                       </h2>
                       <div className="text-4xl font-bold mb-2">
-                        {formatCurrency(Math.abs(autoResults[autoResults.length - 1].buyingCost - autoResults[autoResults.length - 1].leasingCost))}
+                        {formatCurrency(
+                          Math.abs(
+                            autoResults[autoResults.length - 1].buyingCost -
+                              autoResults[autoResults.length - 1].leasingCost
+                          )
+                        )}
                       </div>
                       <p className="text-sm opacity-90">
                         Total cost difference after {autoResults.length} years
@@ -919,16 +1054,28 @@ export default function RentVsBuyCalculator() {
                           </h3>
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Total Buying Cost</div>
-                              <div className="font-bold text-gray-900 dark:text-white">{formatCurrency(autoResults[autoResults.length - 1].buyingCost)}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Total Buying Cost
+                              </div>
+                              <div className="font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(autoResults[autoResults.length - 1].buyingCost)}
+                              </div>
                             </div>
                             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Total Leasing Cost</div>
-                              <div className="font-bold text-gray-900 dark:text-white">{formatCurrency(autoResults[autoResults.length - 1].leasingCost)}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Total Leasing Cost
+                              </div>
+                              <div className="font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(autoResults[autoResults.length - 1].leasingCost)}
+                              </div>
                             </div>
                             <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg col-span-2">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Car Equity (if buying)</div>
-                              <div className="font-bold text-green-600 dark:text-green-400">{formatCurrency(autoResults[autoResults.length - 1].buyingEquity)}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Car Equity (if buying)
+                              </div>
+                              <div className="font-bold text-green-600 dark:text-green-400">
+                                {formatCurrency(autoResults[autoResults.length - 1].buyingEquity)}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -944,12 +1091,29 @@ export default function RentVsBuyCalculator() {
                             <ResponsiveContainer width="100%" height={300}>
                               <LineChart data={autoResults}>
                                 <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="years" label={{ value: 'Years', position: 'insideBottom', offset: -5 }} />
-                                <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+                                <XAxis
+                                  dataKey="years"
+                                  label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+                                />
+                                <YAxis
+                                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                                />
                                 <Tooltip formatter={(value: number) => formatCurrency(value)} />
                                 <Legend />
-                                <Line type="monotone" dataKey="buyingCost" stroke="#10b981" strokeWidth={2} name="Buying" />
-                                <Line type="monotone" dataKey="leasingCost" stroke="#3b82f6" strokeWidth={2} name="Leasing" />
+                                <Line
+                                  type="monotone"
+                                  dataKey="buyingCost"
+                                  stroke="#10b981"
+                                  strokeWidth={2}
+                                  name="Buying"
+                                />
+                                <Line
+                                  type="monotone"
+                                  dataKey="leasingCost"
+                                  stroke="#3b82f6"
+                                  strokeWidth={2}
+                                  name="Leasing"
+                                />
                               </LineChart>
                             </ResponsiveContainer>
                           </div>
@@ -970,11 +1134,20 @@ export default function RentVsBuyCalculator() {
                             </thead>
                             <tbody className="text-gray-600 dark:text-gray-400">
                               {autoResults.map((result) => (
-                                <tr key={result.years} className="border-b border-gray-200 dark:border-gray-700">
+                                <tr
+                                  key={result.years}
+                                  className="border-b border-gray-200 dark:border-gray-700"
+                                >
                                   <td className="py-2 px-2 font-medium">{result.years}</td>
-                                  <td className="text-right py-2 px-2">{formatCurrency(result.buyingCost)}</td>
-                                  <td className="text-right py-2 px-2">{formatCurrency(result.leasingCost)}</td>
-                                  <td className="text-right py-2 px-2 text-green-600 dark:text-green-400">{formatCurrency(result.buyingEquity)}</td>
+                                  <td className="text-right py-2 px-2">
+                                    {formatCurrency(result.buyingCost)}
+                                  </td>
+                                  <td className="text-right py-2 px-2">
+                                    {formatCurrency(result.leasingCost)}
+                                  </td>
+                                  <td className="text-right py-2 px-2 text-green-600 dark:text-green-400">
+                                    {formatCurrency(result.buyingEquity)}
+                                  </td>
                                 </tr>
                               ))}
                             </tbody>

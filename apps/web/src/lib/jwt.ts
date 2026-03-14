@@ -60,3 +60,6 @@ export async function getUserIdFromJWT(request?: Request): Promise<string | null
   const payload = await verifyJWT(request);
   return payload?.sub || null;
 }
+
+// Alias used by some API routes
+export const verifyToken = verifyJWT;

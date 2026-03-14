@@ -71,29 +71,29 @@ export async function encryptData(
 ): Promise<EncryptedData> {
   // Generate random IV for each encryption operation
   const iv = await randomBytesAsync(IV_LENGTH);
-  
+
   // Create cipher
   const cipher = createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
-  
+
   // Add Additional Authenticated Data if provided (for AEAD)
   if (additionalAuthenticatedData) {
     cipher.setAAD(additionalAuthenticatedData);
   }
-  
+
   // Encrypt the data
   const encrypted = Buffer.concat([
     cipher.update(typeof plaintext === 'string' ? Buffer.from(plaintext, 'utf8') : plaintext),
-    cipher.final()
+    cipher.final(),
   ]);
-  
+
   // Get the authentication tag
   const tag = cipher.getAuthTag();
-  
+
   return {
     encrypted,
     iv,
     tag,
-    algorithm: ENCRYPTION_ALGORITHM
+    algorithm: ENCRYPTION_ALGORITHM,
   };
 }
 
@@ -112,21 +112,18 @@ export async function decryptData(
     key,
     encryptedData.iv
   );
-  
+
   // Set the authentication tag
-  decipher.setAuthTag(encryptedData.tag);
-  
+  (decipher as any).setAuthTag(encryptedData.tag);
+
   // Add Additional Authenticated Data if provided
   if (additionalAuthenticatedData) {
-    decipher.setAAD(additionalAuthenticatedData);
+    (decipher as any).setAAD(additionalAuthenticatedData);
   }
-  
+
   // Decrypt and verify
   try {
-    const decrypted = Buffer.concat([
-      decipher.update(encryptedData.encrypted),
-      decipher.final()
-    ]);
+    const decrypted = Buffer.concat([decipher.update(encryptedData.encrypted), decipher.final()]);
     return decrypted;
   } catch (error) {
     // Authentication tag verification failed
@@ -146,7 +143,7 @@ export async function encryptField(
   return {
     encrypted: result.encrypted,
     iv: result.iv,
-    tag: result.tag
+    tag: result.tag,
   };
 }
 
@@ -163,9 +160,9 @@ export async function decryptField(
     encrypted,
     iv,
     tag,
-    algorithm: ENCRYPTION_ALGORITHM
+    algorithm: ENCRYPTION_ALGORITHM,
   };
-  
+
   const decrypted = await decryptData(encryptedData, key);
   return decrypted.toString('utf8');
 }
@@ -192,15 +189,11 @@ export async function doubleEncrypt(
 ): Promise<{ layer1: EncryptedData; layer2: EncryptedData }> {
   // First layer of encryption
   const layer1 = await encryptData(plaintext, key1);
-  
+
   // Second layer of encryption on the encrypted data
-  const combinedLayer1 = Buffer.concat([
-    layer1.encrypted,
-    layer1.iv,
-    layer1.tag
-  ]);
+  const combinedLayer1 = Buffer.concat([layer1.encrypted, layer1.iv, layer1.tag]);
   const layer2 = await encryptData(combinedLayer1, key2);
-  
+
   return { layer1, layer2 };
 }
 
@@ -215,24 +208,24 @@ export async function doubleDecrypt(
 ): Promise<string> {
   // Decrypt second layer
   const combinedLayer1 = await decryptData(layer2, key2);
-  
+
   // Extract components from first layer
   const encryptedLength = combinedLayer1.length - IV_LENGTH - TAG_LENGTH;
   const encrypted = combinedLayer1.subarray(0, encryptedLength);
   const iv = combinedLayer1.subarray(encryptedLength, encryptedLength + IV_LENGTH);
   const tag = combinedLayer1.subarray(encryptedLength + IV_LENGTH);
-  
+
   // Decrypt first layer
   const plaintext = await decryptData(
     {
       encrypted,
       iv,
       tag,
-      algorithm: ENCRYPTION_ALGORITHM
+      algorithm: ENCRYPTION_ALGORITHM,
     },
     key1
   );
-  
+
   return plaintext.toString('utf8');
 }
 
@@ -267,7 +260,7 @@ export async function rotateEncryption(
 ): Promise<EncryptedData> {
   // Decrypt with old key
   const plaintext = await decryptData(encryptedData, oldKey);
-  
+
   // Re-encrypt with new key
   return await encryptData(plaintext, newKey);
 }
@@ -279,13 +272,13 @@ export function validateEncryptionStrength(key: Buffer): boolean {
   if (key.length < KEY_LENGTH) {
     throw new Error(`Key must be at least ${KEY_LENGTH} bytes for AES-256`);
   }
-  
+
   // Check for weak keys (all zeros, all ones, etc.)
   const uniqueBytes = new Set(key);
   if (uniqueBytes.size < 16) {
     throw new Error('Key appears to be weak (insufficient entropy)');
   }
-  
+
   return true;
 }
 
@@ -297,12 +290,12 @@ export function secureCompare(a: Buffer, b: Buffer): boolean {
   if (a.length !== b.length) {
     return false;
   }
-  
+
   let result = 0;
   for (let i = 0; i < a.length; i++) {
     result |= a[i] ^ b[i];
   }
-  
+
   return result === 0;
 }
 
@@ -321,8 +314,5 @@ export function generateSignature(data: Buffer, key: Buffer): string {
  */
 export function verifySignature(data: Buffer, signature: string, key: Buffer): boolean {
   const expectedSignature = generateSignature(data, key);
-  return secureCompare(
-    Buffer.from(signature, 'hex'),
-    Buffer.from(expectedSignature, 'hex')
-  );
+  return secureCompare(Buffer.from(signature, 'hex'), Buffer.from(expectedSignature, 'hex'));
 }

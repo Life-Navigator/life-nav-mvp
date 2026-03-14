@@ -6,14 +6,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin } from '@/lib/scenario-lab/supabase-client';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { versionId: string } }
+  { params }: { params: Promise<{ versionId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -25,10 +25,10 @@ export async function GET(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const versionId = params.versionId;
+    const { versionId } = await params;
 
     // Verify version ownership
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id, scenario_id')
       .eq('id', versionId)
@@ -40,7 +40,7 @@ export async function GET(
     }
 
     // Fetch plan for this version
-    const { data: plan, error: planError } = await supabaseAdmin
+    const { data: plan, error: planError } = await (supabaseAdmin as any)
       .from('plans')
       .select('*')
       .eq('scenario_version_id', versionId)
@@ -55,7 +55,7 @@ export async function GET(
     }
 
     // Fetch phases
-    const { data: phases, error: phasesError } = await supabaseAdmin
+    const { data: phases, error: phasesError } = await (supabaseAdmin as any)
       .from('plan_phases')
       .select('*')
       .eq('plan_id', plan.id)
@@ -67,7 +67,7 @@ export async function GET(
     }
 
     // Fetch tasks
-    const { data: tasks, error: tasksError } = await supabaseAdmin
+    const { data: tasks, error: tasksError } = await (supabaseAdmin as any)
       .from('plan_tasks')
       .select('*')
       .eq('plan_id', plan.id)

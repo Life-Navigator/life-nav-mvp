@@ -1,7 +1,6 @@
 'use client';
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/hooks/useSession';
 import Link from 'next/link';
 
 // Types
@@ -29,15 +28,33 @@ interface CertificationStats {
 // Icons
 function CertificateIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342M6.75 15a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm0 0v-3.675A55.378 55.378 0 0 1 12 8.443m-7.007 11.55A5.981 5.981 0 0 0 6.75 15.75v-1.5"
+      />
     </svg>
   );
 }
 
 function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
     </svg>
   );
@@ -45,23 +62,52 @@ function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function LinkIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244"
+      />
     </svg>
   );
 }
 
 function CalendarIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"
+      />
     </svg>
   );
 }
 
 function XMarkIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
     </svg>
   );
@@ -69,24 +115,57 @@ function XMarkIcon(props: React.SVGProps<SVGSVGElement>) {
 
 function BuildingIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z"
+      />
     </svg>
   );
 }
 
 function SparklesIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"
+      />
     </svg>
   );
 }
 
 function TrophyIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 0 0 2.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 0 1 2.916.52 6.003 6.003 0 0 1-5.395 4.972m0 0a6.726 6.726 0 0 1-2.749 1.35m0 0a6.772 6.772 0 0 1-2.748 0" />
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      strokeWidth={1.5}
+      stroke="currentColor"
+      {...props}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M16.5 18.75h-9m9 0a3 3 0 0 1 3 3h-15a3 3 0 0 1 3-3m9 0v-3.375c0-.621-.503-1.125-1.125-1.125h-.871M7.5 18.75v-3.375c0-.621.504-1.125 1.125-1.125h.872m5.007 0H9.497m5.007 0a7.454 7.454 0 0 1-.982-3.172M9.497 14.25a7.454 7.454 0 0 0 .981-3.172M5.25 4.236c-.982.143-1.954.317-2.916.52A6.003 6.003 0 0 0 7.73 9.728M5.25 4.236V4.5c0 2.108.966 3.99 2.48 5.228M5.25 4.236V2.721C7.456 2.41 9.71 2.25 12 2.25c2.291 0 4.545.16 6.75.47v1.516M7.73 9.728a6.726 6.726 0 0 0 2.748 1.35m8.272-6.842V4.5c0 2.108-.966 3.99-2.48 5.228m2.48-5.492a46.32 46.32 0 0 1 2.916.52 6.003 6.003 0 0 1-5.395 4.972m0 0a6.726 6.726 0 0 1-2.749 1.35m0 0a6.772 6.772 0 0 1-2.748 0"
+      />
     </svg>
   );
 }
@@ -109,12 +188,12 @@ function CertificationCard({
 
   const getProviderColor = (provider: string) => {
     const colors: Record<string, string> = {
-      'Coursera': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      'Udemy': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-      'AWS': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-      'Google': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-      'Microsoft': 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
-      'LinkedIn': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      Coursera: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+      Udemy: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+      AWS: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+      Google: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
+      Microsoft: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
+      LinkedIn: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
     };
     return colors[provider] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
   };
@@ -130,7 +209,9 @@ function CertificationCard({
             <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2">
               {certification.title}
             </h3>
-            <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getProviderColor(certification.provider)}`}>
+            <span
+              className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getProviderColor(certification.provider)}`}
+            >
               {certification.provider}
             </span>
           </div>
@@ -224,7 +305,12 @@ function AddCertificationModal({
       platform: formData.platform || undefined,
       certificateUrl: formData.certificateUrl || undefined,
       certificateDate: formData.certificateDate || undefined,
-      skills: formData.skills ? formData.skills.split(',').map(s => s.trim()).filter(Boolean) : [],
+      skills: formData.skills
+        ? formData.skills
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [],
     });
 
     setFormData({
@@ -246,9 +332,7 @@ function AddCertificationModal({
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Add Certification
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Add Certification</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -403,12 +487,18 @@ function StatsCard({
 export default function CertificationsPage() {
   const { data: session, status } = useSession();
   const [certifications, setCertifications] = useState<Certification[]>([]);
-  const [stats, setStats] = useState<CertificationStats>({ total: 0, thisYear: 0, providers: 0, skills: 0 });
+  const [stats, setStats] = useState<CertificationStats>({
+    total: 0,
+    thisYear: 0,
+    providers: 0,
+    skills: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterProvider, setFilterProvider] = useState<string>('');
+  const [isSyncingCredly, setIsSyncingCredly] = useState(false);
 
   const fetchCertifications = useCallback(async () => {
     try {
@@ -453,21 +543,38 @@ export default function CertificationsPage() {
         method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete certification');
-      setCertifications(prev => prev.filter(c => c.id !== id));
-      setStats(prev => ({ ...prev, total: prev.total - 1 }));
+      setCertifications((prev) => prev.filter((c) => c.id !== id));
+      setStats((prev) => ({ ...prev, total: prev.total - 1 }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete certification');
     }
   };
 
+  const handleCredlySync = async () => {
+    setIsSyncingCredly(true);
+    try {
+      const res = await fetch('/api/integrations/credly/sync', { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Sync failed');
+      }
+      await fetchCertifications();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Credly sync failed');
+    } finally {
+      setIsSyncingCredly(false);
+    }
+  };
+
   // Get unique providers for filter
-  const providers = [...new Set(certifications.map(c => c.provider))];
+  const providers = [...new Set(certifications.map((c) => c.provider))];
 
   // Filter certifications
-  const filteredCertifications = certifications.filter(cert => {
-    const matchesSearch = cert.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+  const filteredCertifications = certifications.filter((cert) => {
+    const matchesSearch =
+      cert.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       cert.provider.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cert.skills || []).some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
+      (cert.skills || []).some((s) => s.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesProvider = !filterProvider || cert.provider === filterProvider;
     return matchesSearch && matchesProvider;
   });
@@ -486,7 +593,9 @@ export default function CertificationsPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">Please sign in to view certifications</p>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Please sign in to view certifications
+          </p>
           <Link href="/auth/login" className="text-blue-600 hover:underline">
             Sign In
           </Link>
@@ -501,27 +610,36 @@ export default function CertificationsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Certifications
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Certifications</h1>
             <p className="mt-1 text-gray-500 dark:text-gray-400">
               Track your professional certifications and credentials
             </p>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <PlusIcon className="h-5 w-5" />
-            Add Certification
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleCredlySync}
+              disabled={isSyncingCredly}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-orange-600 text-orange-600 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 disabled:opacity-50 transition-colors"
+            >
+              {isSyncingCredly ? 'Syncing...' : 'Sync Credly'}
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <PlusIcon className="h-5 w-5" />
+              Add Certification
+            </button>
+          </div>
         </div>
 
         {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-300">
             {error}
-            <button onClick={() => setError(null)} className="ml-2 underline">Dismiss</button>
+            <button onClick={() => setError(null)} className="ml-2 underline">
+              Dismiss
+            </button>
           </div>
         )}
 
@@ -570,8 +688,10 @@ export default function CertificationsPage() {
             className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Providers</option>
-            {providers.map(provider => (
-              <option key={provider} value={provider}>{provider}</option>
+            {providers.map((provider) => (
+              <option key={provider} value={provider}>
+                {provider}
+              </option>
             ))}
           </select>
         </div>
@@ -581,7 +701,9 @@ export default function CertificationsPage() {
           <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <CertificateIcon className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              {searchTerm || filterProvider ? 'No matching certifications' : 'No certifications yet'}
+              {searchTerm || filterProvider
+                ? 'No matching certifications'
+                : 'No certifications yet'}
             </h3>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
               {searchTerm || filterProvider
@@ -600,7 +722,7 @@ export default function CertificationsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCertifications.map(certification => (
+            {filteredCertifications.map((certification) => (
               <CertificationCard
                 key={certification.id}
                 certification={certification}
@@ -614,11 +736,10 @@ export default function CertificationsPage() {
         <div className="mt-8 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold mb-1">
-                Boost Your Resume
-              </h3>
+              <h3 className="text-lg font-semibold mb-1">Boost Your Resume</h3>
               <p className="text-blue-100">
-                Your certifications are automatically included when you generate AI-optimized resumes.
+                Your certifications are automatically included when you generate AI-optimized
+                resumes.
               </p>
             </div>
             <Link

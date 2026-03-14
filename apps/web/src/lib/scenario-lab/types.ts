@@ -32,7 +32,14 @@ export type DocumentType =
   | 'other';
 
 export type FieldType = 'number' | 'currency' | 'date' | 'text' | 'boolean';
-export type InputType = 'timeline' | 'budget' | 'income' | 'expense' | 'asset' | 'liability' | 'constraint';
+export type InputType =
+  | 'timeline'
+  | 'budget'
+  | 'income'
+  | 'expense'
+  | 'asset'
+  | 'liability'
+  | 'constraint';
 export type SourceType = 'manual' | 'extracted';
 export type ExtractionMethod = 'ocr_pattern' | 'pdf_text' | 'heuristic';
 
@@ -121,11 +128,14 @@ export interface ScenarioInput {
   source_type: SourceType;
   source_field_id: string | null;
   input_key: string;
-  input_value: any;  // JSONB
+  input_value: any; // JSONB
   input_type: InputType;
   unit: string | null;
   confidence: number | null;
   created_at: string;
+  field_name?: string;
+  goal_id?: string;
+  field_value?: string | number;
 }
 
 export interface ScenarioSimRun {
@@ -166,7 +176,7 @@ export interface ScenarioGoalSnapshot {
 }
 
 export interface ProbabilityPoint {
-  date: string;  // ISO date
+  date: string; // ISO date
   p10: number;
   p50: number;
   p90: number;
@@ -361,7 +371,7 @@ export interface UploadDocumentRequest {
 
 export interface UploadDocumentResponse {
   document: ScenarioDocument;
-  upload_url: string;  // Signed URL for upload
+  upload_url: string; // Signed URL for upload
 }
 
 // OCR
@@ -436,7 +446,7 @@ export interface ListReportsResponse {
 }
 
 export interface GetReportDownloadResponse {
-  download_url: string;  // Signed URL
+  download_url: string; // Signed URL
 }
 
 // Pins
@@ -462,10 +472,10 @@ export interface GetJobStatusResponse {
 // ============================================================================
 
 export interface SimulatorConfig {
-  model_version: string;
+  model_version?: string;
   iterations: number;
   seed: number;
-  include_shock_events: boolean;
+  include_shock_events?: boolean;
 }
 
 export interface SimulatorInputs {
@@ -509,23 +519,34 @@ export interface GoalInput {
 
 export interface SimulationOutput {
   goal_id: string;
-  probability_series: ProbabilityPoint[];
-  final_success_probability: number;
-  confidence_band: ConfidenceBand;
-  completion_time_distribution: {
+  probability_series?: ProbabilityPoint[];
+  final_success_probability?: number;
+  confidence_band?: ConfidenceBand;
+  completion_time_distribution?: {
     p10_days: number;
     p50_days: number;
     p90_days: number;
   };
-  drivers: Driver[];
-  risks: Risk[];
+  drivers?: Driver[];
+  risks?: Risk[];
   status: GoalSnapshotStatus;
+  probability?: number;
+  p10?: number;
+  p50?: number;
+  p90?: number;
+  top_drivers?: any[];
+  top_risks?: any[];
 }
 
 export interface SimulatorResult {
   goals: SimulationOutput[];
-  overall_robustness_score: number;
-  metadata: {
+  overall_robustness_score?: number;
+  version_id?: string;
+  iterations?: number;
+  seed?: number;
+  model_version?: string;
+  duration_ms?: number;
+  metadata?: {
     model_version: string;
     iterations: number;
     seed: number;
@@ -554,7 +575,15 @@ export type PlaybackSpeed = 'slow' | 'normal' | 'fast' | 'instant';
 export type TimeStep = 'month' | 'quarter' | 'year';
 export type PlaybackState = 'idle' | 'playing' | 'paused' | 'completed';
 export type PathType = 'best' | 'likely' | 'worst';
-export type LifeEventType = 'marriage' | 'child_birth' | 'home_purchase' | 'education' | 'career_change' | 'health' | 'retirement' | 'other';
+export type LifeEventType =
+  | 'marriage'
+  | 'child_birth'
+  | 'home_purchase'
+  | 'education'
+  | 'career_change'
+  | 'health'
+  | 'retirement'
+  | 'other';
 export type EventSeverity = 'positive' | 'neutral' | 'negative';
 
 export interface TimelinePlaybackConfig {

@@ -16,7 +16,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Server not configured' }, { status: 503 });
     }
 
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    const {
+      data: { user },
+      error: authErr,
+    } = await supabase.auth.getUser();
     if (authErr || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -44,19 +47,16 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error('Onboarding error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 async function handleProfile(
   supabase: NonNullable<Awaited<ReturnType<typeof createServerSupabaseClient>>>,
   userId: string,
-  body: Record<string, unknown>,
+  body: Record<string, unknown>
 ) {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('profiles')
     .update({
       display_name: body.name as string,
@@ -80,7 +80,7 @@ async function handleGoals(
   supabase: NonNullable<Awaited<ReturnType<typeof createServerSupabaseClient>>>,
   userId: string,
   body: Record<string, unknown>,
-  category: string,
+  category: string
 ) {
   const goals = body.goals as Record<string, unknown> | undefined;
   if (!goals || typeof goals !== 'object') {
@@ -108,9 +108,10 @@ async function handleGoals(
     }
   } else {
     // Handle object format (common from form data)
-    const title = (goals as Record<string, unknown>).title ||
-                  (goals as Record<string, unknown>).primaryGoal ||
-                  (goals as Record<string, unknown>).goal;
+    const title =
+      (goals as Record<string, unknown>).title ||
+      (goals as Record<string, unknown>).primaryGoal ||
+      (goals as Record<string, unknown>).goal;
     if (title) {
       goalsToInsert.push({
         user_id: userId,
@@ -126,7 +127,7 @@ async function handleGoals(
   }
 
   if (goalsToInsert.length > 0) {
-    const { error } = await supabase.from('goals').insert(goalsToInsert);
+    const { error } = await (supabase as any).from('goals').insert(goalsToInsert);
     if (error) {
       console.error(`Failed to insert ${category} goals:`, error);
       return NextResponse.json({ error: error.message }, { status: 400 });
@@ -139,24 +140,18 @@ async function handleGoals(
 async function handleRiskProfile(
   supabase: NonNullable<Awaited<ReturnType<typeof createServerSupabaseClient>>>,
   userId: string,
-  body: Record<string, unknown>,
+  body: Record<string, unknown>
 ) {
   // Calculate overall risk score from individual tolerances
   const financialRisk = Number(body.financialRiskTolerance) || 50;
   const careerRisk = Number(body.careerRiskTolerance) || 50;
   const educationRisk = Number(body.educationRiskTolerance) || 50;
-  const overallScore = Math.round(
-    (financialRisk + careerRisk + educationRisk) / 3,
-  );
+  const overallScore = Math.round((financialRisk + careerRisk + educationRisk) / 3);
 
   const riskLevel =
-    overallScore >= 70
-      ? 'aggressive'
-      : overallScore >= 40
-        ? 'moderate'
-        : 'conservative';
+    overallScore >= 70 ? 'aggressive' : overallScore >= 40 ? 'moderate' : 'conservative';
 
-  const { error } = await supabase.from('risk_assessments').insert({
+  const { error } = await (supabase as any).from('risk_assessments').insert({
     user_id: userId,
     assessment_type: 'onboarding',
     overall_score: overallScore,
@@ -180,9 +175,9 @@ async function handleRiskProfile(
 
 async function handleComplete(
   supabase: NonNullable<Awaited<ReturnType<typeof createServerSupabaseClient>>>,
-  userId: string,
+  userId: string
 ) {
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('profiles')
     .update({
       setup_completed: true,

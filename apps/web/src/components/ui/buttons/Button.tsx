@@ -1,15 +1,25 @@
 import { forwardRef } from 'react';
 import { classNames } from '@/lib/utils/classNames';
 
-export type ButtonVariant = 'default' | 'outline' | 'ghost' | 'link' | 'danger';
+export type ButtonVariant =
+  | 'default'
+  | 'primary'
+  | 'secondary'
+  | 'outline'
+  | 'ghost'
+  | 'link'
+  | 'danger'
+  | 'destructive'
+  | 'text';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'icon';
   isLoading?: boolean;
   fullWidth?: boolean;
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  asChild?: boolean;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -24,29 +34,36 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       fullWidth = false,
       leftIcon,
       rightIcon,
+      asChild = false,
       type = 'button',
       ...props
     },
     ref
   ) => {
-    const baseStyles = 'inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
-    
-    const variantStyles = {
+    const baseStyles =
+      'inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
+
+    const variantStyles: Record<ButtonVariant, string> = {
       default: 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800',
+      primary: 'bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800',
+      secondary: 'bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300',
       outline: 'border border-gray-300 bg-transparent hover:bg-gray-50 active:bg-gray-100',
       ghost: 'bg-transparent hover:bg-gray-100 active:bg-gray-200',
       link: 'bg-transparent underline-offset-4 hover:underline text-blue-600',
       danger: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
+      destructive: 'bg-red-600 text-white hover:bg-red-700 active:bg-red-800',
+      text: 'bg-transparent text-blue-600 hover:text-blue-700 active:text-blue-800',
     };
-    
-    const sizeStyles = {
+
+    const sizeStyles: Record<NonNullable<ButtonProps['size']>, string> = {
       sm: 'text-xs h-8 px-3 rounded',
       md: 'text-sm h-10 px-4 rounded-md',
       lg: 'text-base h-12 px-6 rounded-md',
+      icon: 'h-10 w-10 rounded-md',
     };
 
     const widthStyles = fullWidth ? 'w-full' : '';
-    
+
     return (
       <button
         ref={ref}
@@ -83,7 +100,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
             ></path>
           </svg>
         )}
-        
+
         {!isLoading && leftIcon && <span className="mr-2">{leftIcon}</span>}
         <span>{children}</span>
         {!isLoading && rightIcon && <span className="ml-2">{rightIcon}</span>}

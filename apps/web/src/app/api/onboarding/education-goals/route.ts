@@ -7,7 +7,9 @@ export async function POST(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
@@ -26,7 +28,7 @@ export async function POST(request: NextRequest) {
     }));
 
   if (rows.length) {
-    const { error } = await supabase.from('goals').insert(rows);
+    const { error } = await (supabase as any).from('goals').insert(rows);
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   }
 

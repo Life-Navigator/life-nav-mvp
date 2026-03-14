@@ -12,14 +12,8 @@ import { getNextQueuedJob, updateJobStatus } from '../lib/scenario-lab/job-queue
 import type { ScenarioJob } from '../lib/scenario-lab/types';
 
 // Environment configuration
-const POLL_INTERVAL_MS = parseInt(
-  process.env.SCENARIO_WORKER_POLL_INTERVAL_MS || '5000',
-  10
-);
-const MAX_CONCURRENT_JOBS = parseInt(
-  process.env.SCENARIO_WORKER_MAX_CONCURRENT_JOBS || '3',
-  10
-);
+const POLL_INTERVAL_MS = parseInt(process.env.SCENARIO_WORKER_POLL_INTERVAL_MS || '5000', 10);
+const MAX_CONCURRENT_JOBS = parseInt(process.env.SCENARIO_WORKER_MAX_CONCURRENT_JOBS || '3', 10);
 
 let activeJobs = 0;
 let isShuttingDown = false;
@@ -141,9 +135,7 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
 
   const { document_id, storage_bucket, storage_path, mime_type } = input;
 
-  console.log(
-    `[Worker] OCR extraction for document ${document_id}, path: ${storage_path}`
-  );
+  console.log(`[Worker] OCR extraction for document ${document_id}, path: ${storage_path}`);
 
   // Import dependencies
   const { supabaseAdmin } = await import('../lib/scenario-lab/supabase-client');
@@ -152,14 +144,13 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
 
   try {
     // Update document status
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from('scenario_documents')
       .update({ ocr_status: 'processing' })
       .eq('id', document_id);
 
     // Download file from storage
-    const { data: fileData, error: downloadError } = await supabaseAdmin
-      .storage
+    const { data: fileData, error: downloadError } = await (supabaseAdmin as any).storage
       .from(storage_bucket)
       .download(storage_path);
 
@@ -197,13 +188,13 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
     });
 
     // Delete prior extracted fields for this document (idempotency)
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from('scenario_extracted_fields')
       .delete()
       .eq('document_id', document_id);
 
     // Fetch user_id from document
-    const { data: doc } = await supabaseAdmin
+    const { data: doc } = await (supabaseAdmin as any)
       .from('scenario_documents')
       .select('user_id')
       .eq('id', document_id)
@@ -215,7 +206,7 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
 
     // Insert extracted fields
     if (extractionResult.extracted_fields.length > 0) {
-      const fieldsToInsert = extractionResult.extracted_fields.map(field => ({
+      const fieldsToInsert = extractionResult.extracted_fields.map((field) => ({
         document_id,
         user_id: doc.user_id,
         field_key: field.field_key,
@@ -231,7 +222,7 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
         approval_status: 'pending',
       }));
 
-      const { error: insertError } = await supabaseAdmin
+      const { error: insertError } = await (supabaseAdmin as any)
         .from('scenario_extracted_fields')
         .insert(fieldsToInsert);
 
@@ -241,7 +232,7 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
     }
 
     // Update document status
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from('scenario_documents')
       .update({
         ocr_status: 'completed',
@@ -249,7 +240,9 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
       })
       .eq('id', document_id);
 
-    console.log(`[Worker] OCR completed, ${extractionResult.extracted_fields.length} fields stored`);
+    console.log(
+      `[Worker] OCR completed, ${extractionResult.extracted_fields.length} fields stored`
+    );
 
     return {
       document_id,
@@ -263,7 +256,7 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
     console.error(`[Worker] OCR extraction failed:`, error);
 
     // Mark document as failed
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from('scenario_documents')
       .update({
         ocr_status: 'failed',
@@ -290,9 +283,8 @@ async function processSimulationJob(job: ScenarioJob): Promise<any> {
   );
 
   // Import simulator engine
-  const { runSimulation, calculateInputsHash } = await import(
-    '../lib/scenario-lab/simulator/engine'
-  );
+  const { runSimulation, calculateInputsHash } =
+    await import('../lib/scenario-lab/simulator/engine');
   const { supabaseAdmin } = await import('../lib/scenario-lab/supabase-client');
 
   // Run simulation
@@ -307,7 +299,7 @@ async function processSimulationJob(job: ScenarioJob): Promise<any> {
   );
 
   // Fetch inputs for hash
-  const { data: inputs } = await supabaseAdmin
+  const { data: inputs } = await (supabaseAdmin as any)
     .from('scenario_inputs')
     .select('*')
     .eq('version_id', version_id);
@@ -315,7 +307,7 @@ async function processSimulationJob(job: ScenarioJob): Promise<any> {
   const inputsHash = inputs ? calculateInputsHash(inputs) : '';
 
   // Store simulation run
-  const { data: simRun, error: simError } = await supabaseAdmin
+  const { data: simRun, error: simError } = await (supabaseAdmin as any)
     .from('scenario_sim_runs')
     .insert({
       version_id,
@@ -345,7 +337,7 @@ async function processSimulationJob(job: ScenarioJob): Promise<any> {
     top_risks: goal.top_risks,
   }));
 
-  const { error: snapshotsError } = await supabaseAdmin
+  const { error: snapshotsError } = await (supabaseAdmin as any)
     .from('scenario_goal_snapshots')
     .insert(goalSnapshots);
 
@@ -387,13 +379,13 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
 
   try {
     // Update report status
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from('scenario_reports')
       .update({ status: 'processing' })
       .eq('id', report_id);
 
     // Step 1: Fetch scenario data
-    const { data: scenario, error: scenarioError } = await supabaseAdmin
+    const { data: scenario, error: scenarioError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('*')
       .eq('id', scenario_id)
@@ -404,7 +396,7 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
     }
 
     // Step 2: Fetch version data
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('*')
       .eq('id', version_id)
@@ -415,7 +407,7 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
     }
 
     // Step 3: Fetch approved inputs only
-    const { data: inputs, error: inputsError } = await supabaseAdmin
+    const { data: inputs, error: inputsError } = await (supabaseAdmin as any)
       .from('scenario_inputs')
       .select('*')
       .eq('version_id', version_id);
@@ -425,7 +417,7 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
     }
 
     // Step 4: Fetch latest simulation results
-    const { data: latestSim } = await supabaseAdmin
+    const { data: latestSim } = await (supabaseAdmin as any)
       .from('scenario_sim_runs')
       .select('id')
       .eq('version_id', version_id)
@@ -435,7 +427,7 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
 
     let simulationResults = null;
     if (latestSim) {
-      const { data: goalSnapshots } = await supabaseAdmin
+      const { data: goalSnapshots } = await (supabaseAdmin as any)
         .from('scenario_goal_snapshots')
         .select('*')
         .eq('sim_run_id', latestSim.id);
@@ -456,7 +448,7 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
     }
 
     // Step 5: Fetch plan data
-    const { data: plan, error: planError } = await supabaseAdmin
+    const { data: plan, error: planError } = await (supabaseAdmin as any)
       .from('plans')
       .select('*')
       .eq('scenario_version_id', version_id)
@@ -467,7 +459,7 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
     }
 
     // Step 6: Fetch phases
-    const { data: phases, error: phasesError } = await supabaseAdmin
+    const { data: phases, error: phasesError } = await (supabaseAdmin as any)
       .from('plan_phases')
       .select('*')
       .eq('plan_id', plan.id)
@@ -478,7 +470,7 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
     }
 
     // Step 7: Fetch tasks
-    const { data: tasks, error: tasksError } = await supabaseAdmin
+    const { data: tasks, error: tasksError } = await (supabaseAdmin as any)
       .from('plan_tasks')
       .select('*')
       .eq('plan_id', plan.id)
@@ -501,37 +493,40 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
         name: version.name || `Version ${version.version_number}`,
         created_at: version.created_at,
       },
-      inputs: inputs?.map((input) => ({
-        field_name: input.field_name,
-        field_value: input.field_value,
-        category: input.category || 'other',
-        source: input.source || 'User Input',
-      })) || [],
+      inputs:
+        inputs?.map((input) => ({
+          field_name: input.field_name,
+          field_value: input.field_value,
+          category: input.category || 'other',
+          source: input.source || 'User Input',
+        })) || [],
       simulation: simulationResults,
       plan: {
         name: plan.name,
         description: plan.description || '',
         created_at: plan.created_at,
       },
-      phases: phases?.map((phase) => ({
-        phase_number: phase.phase_number,
-        name: phase.name,
-        description: phase.description || '',
-        start_date: phase.start_date,
-        end_date: phase.end_date,
-      })) || [],
-      tasks: tasks?.map((task) => ({
-        phase_number: task.phase_number,
-        task_number: task.task_number,
-        title: task.title,
-        description: task.description || '',
-        category: task.category,
-        priority: task.priority,
-        status: task.status,
-        due_date: task.due_date,
-        estimated_hours: task.estimated_hours,
-        rationale: task.rationale,
-      })) || [],
+      phases:
+        phases?.map((phase) => ({
+          phase_number: phase.phase_number,
+          name: phase.name,
+          description: phase.description || '',
+          start_date: phase.start_date,
+          end_date: phase.end_date,
+        })) || [],
+      tasks:
+        tasks?.map((task) => ({
+          phase_number: task.phase_number,
+          task_number: task.task_number,
+          title: task.title,
+          description: task.description || '',
+          category: task.category,
+          priority: task.priority,
+          status: task.status,
+          due_date: task.due_date,
+          estimated_hours: task.estimated_hours,
+          rationale: task.rationale,
+        })) || [],
       metadata: {
         reportId: report_id,
         generatedAt: new Date().toISOString(),
@@ -548,7 +543,7 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
     // Step 10: Upload to storage
     const storagePath = `${scenario.user_id}/${scenario_id}/${report_id}.pdf`;
 
-    const { error: uploadError } = await supabaseAdmin.storage
+    const { error: uploadError } = await (supabaseAdmin as any).storage
       .from('scenario-reports')
       .upload(storagePath, pdfBuffer, {
         contentType: 'application/pdf',
@@ -565,7 +560,7 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
     const estimatedPages = Math.max(6, Math.ceil(pdfData.tasks.length / 15) + 5);
 
     // Step 12: Update report record
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from('scenario_reports')
       .update({
         status: 'completed',
@@ -605,7 +600,7 @@ async function processPDFJob(job: ScenarioJob): Promise<any> {
     console.error(`[Worker] PDF generation failed:`, error);
 
     // Mark report as failed
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from('scenario_reports')
       .update({
         status: 'failed',

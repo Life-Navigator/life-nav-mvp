@@ -6,15 +6,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin } from '@/lib/scenario-lab/supabase-client';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUserIdFromJWT(request);
     if (!userId) {
@@ -25,10 +22,10 @@ export async function GET(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const scenarioId = params.id;
+    const { id: scenarioId } = await params;
 
     // Verify scenario ownership
-    const { data: scenario, error: scenarioError } = await supabaseAdmin
+    const { data: scenario, error: scenarioError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('id')
       .eq('id', scenarioId)
@@ -40,7 +37,7 @@ export async function GET(
     }
 
     // Fetch reports for this scenario
-    const { data: reports, error: reportsError } = await supabaseAdmin
+    const { data: reports, error: reportsError } = await (supabaseAdmin as any)
       .from('scenario_reports')
       .select('*')
       .eq('scenario_id', scenarioId)

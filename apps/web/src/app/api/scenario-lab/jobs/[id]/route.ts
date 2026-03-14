@@ -6,15 +6,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { getJob } from '@/lib/scenario-lab/job-queue';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     // Auth check
     const userId = await getUserIdFromJWT(request);
@@ -27,7 +24,7 @@ export async function GET(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const jobId = params.id;
+    const { id: jobId } = await params;
 
     // Get job
     const job = await getJob(jobId);

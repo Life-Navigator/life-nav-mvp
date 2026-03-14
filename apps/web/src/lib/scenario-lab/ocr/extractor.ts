@@ -26,7 +26,10 @@ export interface DocumentExtractionResult {
 async function extractTextFromPDF(fileBuffer: Buffer): Promise<{ text: string; pages: number }> {
   try {
     // Dynamic import to avoid bundling issues
-    const pdfParse = (await import('pdf-parse')).default;
+    const pdfParseModule = await import('pdf-parse');
+    const pdfParse = (pdfParseModule.default || pdfParseModule) as unknown as (
+      buffer: Buffer
+    ) => Promise<any>;
     const data = await pdfParse(fileBuffer);
 
     return {
@@ -81,7 +84,9 @@ export async function extractDocumentFields(
 
       // If PDF has insufficient text, fall back to OCR (future enhancement)
       if (extractionResult.text.trim().length < 50) {
-        console.log('[OCR] PDF has insufficient text, would fall back to OCR (not implemented yet)');
+        console.log(
+          '[OCR] PDF has insufficient text, would fall back to OCR (not implemented yet)'
+        );
         // For MVP, we accept the text as-is
       }
     } else if (mimeType.startsWith('image/')) {
@@ -95,7 +100,7 @@ export async function extractDocumentFields(
     const rawFields = extractFieldsFromText(extractionResult.text);
 
     // Layer 3: Redaction
-    const redactedFields = rawFields.map(field => {
+    const redactedFields = rawFields.map((field) => {
       // Check for sensitive data in source_text
       if (field.source_text) {
         const redactionResult = detectSensitiveData(field.source_text);
@@ -107,7 +112,7 @@ export async function extractDocumentFields(
             source_text: redactionResult.redacted,
             // Store hash instead of full text for audit trail
             was_redacted: true,
-            redaction_reason: redactionResult.redactions.map(r => r.type).join(', '),
+            redaction_reason: redactionResult.redactions.map((r) => r.type).join(', '),
           };
         }
       }
@@ -120,7 +125,7 @@ export async function extractDocumentFields(
           ...field,
           field_value: '[REDACTED]',
           was_redacted: true,
-          redaction_reason: valueRedaction.redactions.map(r => r.type).join(', '),
+          redaction_reason: valueRedaction.redactions.map((r) => r.type).join(', '),
           confidence_score: 0, // Mark as unusable
         };
       }
@@ -132,7 +137,7 @@ export async function extractDocumentFields(
     });
 
     // Filter out fully redacted fields (confidence = 0)
-    const usableFields = redactedFields.filter(f => f.confidence_score > 0);
+    const usableFields = redactedFields.filter((f) => f.confidence_score > 0);
 
     const duration = Date.now() - startTime;
 

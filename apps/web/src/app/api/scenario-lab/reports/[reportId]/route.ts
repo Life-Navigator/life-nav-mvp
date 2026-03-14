@@ -6,14 +6,14 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { reportId: string } }
+  { params }: { params: Promise<{ reportId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -25,10 +25,10 @@ export async function GET(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const reportId = params.reportId;
+    const { reportId } = await params;
 
     // Fetch report (user-scoped)
-    const { data: report, error: reportError } = await supabaseAdmin
+    const { data: report, error: reportError } = await (supabaseAdmin as any)
       .from('scenario_reports')
       .select('*')
       .eq('id', reportId)
@@ -42,7 +42,7 @@ export async function GET(
     // If report is completed and has storage_path, generate signed URL
     let signed_download_url = null;
     if (report.status === 'completed' && report.storage_path) {
-      const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin.storage
+      const { data: signedUrlData, error: signedUrlError } = await (supabaseAdmin as any).storage
         .from('scenario-reports')
         .createSignedUrl(report.storage_path, 3600); // 60 minutes
 

@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
 import { approveFieldsSchema } from '@/lib/scenario-lab/validation';
 
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { versionId: string } }
+  { params }: { params: Promise<{ versionId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -26,10 +26,10 @@ export async function POST(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const versionId = params.versionId;
+    const { versionId } = await params;
 
     // Verify version ownership and scenario status
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id, scenario_id, scenario_labs!inner(status)')
       .eq('id', versionId)
@@ -62,8 +62,8 @@ export async function POST(
     const { fields } = validation.data;
 
     // Fetch all extracted fields to verify
-    const extractedFieldIds = fields.map(f => f.extracted_field_id);
-    const { data: extractedFields, error: fetchError } = await supabaseAdmin
+    const extractedFieldIds = fields.map((f) => f.extracted_field_id);
+    const { data: extractedFields, error: fetchError } = await (supabaseAdmin as any)
       .from('scenario_extracted_fields')
       .select('*')
       .in('id', extractedFieldIds);
@@ -74,14 +74,14 @@ export async function POST(
     }
 
     // Verify all fields belong to user
-    const invalidFields = extractedFields.filter(f => f.user_id !== userId);
+    const invalidFields = extractedFields.filter((f) => f.user_id !== userId);
     if (invalidFields.length > 0) {
       return NextResponse.json({ error: 'Unauthorized field access' }, { status: 403 });
     }
 
     // Prepare inputs to upsert
-    const inputsToCreate = fields.map(approval => {
-      const extractedField = extractedFields.find(f => f.id === approval.extracted_field_id);
+    const inputsToCreate = fields.map((approval) => {
+      const extractedField = extractedFields.find((f) => f.id === approval.extracted_field_id);
       if (!extractedField) {
         throw new Error(`Extracted field ${approval.extracted_field_id} not found`);
       }
@@ -103,7 +103,7 @@ export async function POST(
 
     // Delete existing inputs for these goal_id + field_name combinations (upsert pattern)
     for (const input of inputsToCreate) {
-      await supabaseAdmin
+      await (supabaseAdmin as any)
         .from('scenario_inputs')
         .delete()
         .eq('version_id', versionId)
@@ -112,7 +112,7 @@ export async function POST(
     }
 
     // Insert new inputs
-    const { data: createdInputs, error: insertError } = await supabaseAdmin
+    const { data: createdInputs, error: insertError } = await (supabaseAdmin as any)
       .from('scenario_inputs')
       .insert(inputsToCreate)
       .select();
@@ -123,7 +123,7 @@ export async function POST(
     }
 
     // Update extracted fields approval status
-    const { error: updateError } = await supabaseAdmin
+    const { error: updateError } = await (supabaseAdmin as any)
       .from('scenario_extracted_fields')
       .update({
         approval_status: 'approved',
@@ -148,11 +148,14 @@ export async function POST(
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      inputs_created: createdInputs?.length || 0,
-      message: `${createdInputs?.length || 0} fields approved and added to scenario inputs.`,
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        inputs_created: createdInputs?.length || 0,
+        message: `${createdInputs?.length || 0} fields approved and added to scenario inputs.`,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('[API] Error in POST /versions/[versionId]/fields/approve:', error);
     return NextResponse.json(

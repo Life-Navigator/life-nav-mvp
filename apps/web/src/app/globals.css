@@ -1,6 +1,5 @@
 @import "tailwindcss";
 
-/* Add these to your existing globals.css */
 @layer base {
   :root {
     --background: 249 250 251; /* gray-50 */
@@ -9,14 +8,14 @@
     --card-foreground: 17 24 39;
     --border: 229 231 235;
     --input: 255 255 255;
-    --primary: 79 70 229; /* indigo-600 */
+    --primary: 8 145 178; /* cyan-600 */
     --primary-foreground: 255 255 255;
     --secondary: 14 165 233; /* sky-500 */
     --secondary-foreground: 255 255 255;
     --accent: 249 250 251;
     --accent-foreground: 17 24 39;
   }
-  
+
   .dark {
     --background: 17 24 39; /* gray-900 */
     --foreground: 249 250 251; /* gray-50 */
@@ -24,8 +23,8 @@
     --card-foreground: 249 250 251;
     --border: 55 65 81; /* gray-700 */
     --input: 31 41 55;
-    --primary: 99 102 241; /* indigo-500 */
-    --primary-foreground: 255 255 255;
+    --primary: 34 211 238; /* cyan-400 */
+    --primary-foreground: 17 24 39;
     --secondary: 56 189 248; /* sky-400 */
     --secondary-foreground: 17 24 39;
     --accent: 31 41 55;
@@ -43,7 +42,7 @@
   --muted: #f3f4f6;
   --muted-fg: #6b7280;
   --border: #e5e7eb;
-  --primary: #4f46e5;
+  --primary: #0891b2; /* cyan-600 */
   --primary-fg: #ffffff;
 
   /* Typography */
@@ -63,7 +62,7 @@
   --muted: #334155 !important;
   --muted-fg: #94a3b8 !important;
   --border: #475569 !important;
-  --primary: #6366f1 !important;
+  --primary: #22d3ee !important; /* cyan-400 */
   --primary-fg: #ffffff !important;
 }
 

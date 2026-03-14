@@ -3,6 +3,8 @@ import { classNames } from '@/lib/utils/classNames';
 
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
 }
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
@@ -27,3 +29,33 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 );
 
 Select.displayName = 'Select';
+
+// Shadcn-style sub-component stubs for compatibility
+export const SelectTrigger = forwardRef<HTMLButtonElement, any>(
+  ({ children, className, ...props }, ref) => (
+    <button
+      ref={ref}
+      className={classNames('w-full rounded-md border px-3 py-2 text-left', className)}
+      {...props}
+    >
+      {children}
+    </button>
+  )
+);
+SelectTrigger.displayName = 'SelectTrigger';
+
+export const SelectContent = ({ children, className, ...props }: any) => (
+  <div className={classNames('', className)} {...props}>
+    {children}
+  </div>
+);
+
+export const SelectItem = ({ children, value, className, ...props }: any) => (
+  <option value={value} className={className} {...props}>
+    {children}
+  </option>
+);
+
+export const SelectValue = ({ placeholder, className }: any) => (
+  <span className={className}>{placeholder}</span>
+);

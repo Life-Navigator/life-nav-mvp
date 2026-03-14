@@ -171,10 +171,7 @@ export class GoogleHealthConnectClient {
     this.accessToken = accessToken;
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const response = await fetch(`${FITNESS_API_BASE}${endpoint}`, {
       ...options,
       headers: {
@@ -186,9 +183,7 @@ export class GoogleHealthConnectClient {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(
-        `Fitness API error: ${error.error?.message || response.statusText}`
-      );
+      throw new Error(`Fitness API error: ${error.error?.message || response.statusText}`);
     }
 
     return response.json();
@@ -202,9 +197,7 @@ export class GoogleHealthConnectClient {
    * List all data sources
    */
   async listDataSources(dataTypeName?: string): Promise<FitnessDataSource[]> {
-    const params = dataTypeName
-      ? `?dataTypeName=${encodeURIComponent(dataTypeName)}`
-      : '';
+    const params = dataTypeName ? `?dataTypeName=${encodeURIComponent(dataTypeName)}` : '';
     const data = await this.request<{ dataSource: FitnessDataSource[] }>(
       `/users/me/dataSources${params}`
     );
@@ -257,9 +250,7 @@ export class GoogleHealthConnectClient {
     const endNanos = endTime.getTime() * 1000000;
 
     const data = await this.request<{ point: FitnessDataPoint[] }>(
-      `/users/me/dataSources/${encodeURIComponent(
-        dataSourceId
-      )}/datasets/${startNanos}-${endNanos}`
+      `/users/me/dataSources/${encodeURIComponent(dataSourceId)}/datasets/${startNanos}-${endNanos}`
     );
 
     return data.point || [];
@@ -274,9 +265,7 @@ export class GoogleHealthConnectClient {
     points: FitnessDataPoint[]
   ): Promise<void> {
     await this.request(
-      `/users/me/dataSources/${encodeURIComponent(
-        dataSourceId
-      )}/datasets/${datasetId}`,
+      `/users/me/dataSources/${encodeURIComponent(dataSourceId)}/datasets/${datasetId}`,
       {
         method: 'PATCH',
         body: JSON.stringify({
@@ -290,11 +279,7 @@ export class GoogleHealthConnectClient {
   /**
    * Delete data points
    */
-  async deleteDataPoints(
-    dataSourceId: string,
-    startTime: Date,
-    endTime: Date
-  ): Promise<void> {
+  async deleteDataPoints(dataSourceId: string, startTime: Date, endTime: Date): Promise<void> {
     const startNanos = startTime.getTime() * 1000000;
     const endNanos = endTime.getTime() * 1000000;
 
@@ -447,8 +432,7 @@ export class GoogleHealthConnectClient {
 
     return result.bucket.map((bucket) => ({
       date: new Date(parseInt(bucket.startTimeMillis)),
-      steps:
-        bucket.dataset[0]?.point[0]?.value[0]?.intVal || 0,
+      steps: bucket.dataset[0]?.point[0]?.value[0]?.intVal || 0,
     }));
   }
 
@@ -465,11 +449,7 @@ export class GoogleHealthConnectClient {
     const allPoints: Array<{ timestamp: Date; bpm: number }> = [];
 
     for (const source of sources) {
-      const points = await this.getDataPoints(
-        source.dataStreamId,
-        startDate,
-        endDate
-      );
+      const points = await this.getDataPoints(source.dataStreamId, startDate, endDate);
 
       for (const point of points) {
         const bpm = point.value[0]?.fpVal;
@@ -518,8 +498,7 @@ export class GoogleHealthConnectClient {
       for (const point of bucket.dataset[0]?.point || []) {
         const activityType = point.value[0]?.intVal;
         const duration =
-          (parseInt(point.endTimeNanos) - parseInt(point.startTimeNanos)) /
-          60000000000; // nanoseconds to minutes
+          (parseInt(point.endTimeNanos) - parseInt(point.startTimeNanos)) / 60000000000; // nanoseconds to minutes
 
         totalMinutes += duration;
 
@@ -597,11 +576,7 @@ export class GoogleHealthConnectClient {
     }> = [];
 
     for (const source of sources) {
-      const points = await this.getDataPoints(
-        source.dataStreamId,
-        startDate,
-        endDate
-      );
+      const points = await this.getDataPoints(source.dataStreamId, startDate, endDate);
 
       for (const point of points) {
         // Blood pressure has multiple values: systolic, diastolic, etc.
@@ -616,9 +591,7 @@ export class GoogleHealthConnectClient {
       }
     }
 
-    return allReadings.sort(
-      (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
-    );
+    return allReadings.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   }
 
   /**
@@ -644,11 +617,7 @@ export class GoogleHealthConnectClient {
     }> = [];
 
     for (const source of sources) {
-      const points = await this.getDataPoints(
-        source.dataStreamId,
-        startDate,
-        endDate
-      );
+      const points = await this.getDataPoints(source.dataStreamId, startDate, endDate);
 
       for (const point of points) {
         const glucose = point.value[0]?.fpVal;
@@ -694,8 +663,7 @@ export class GoogleHealthConnectClient {
       return {
         id: session.id,
         name: session.name,
-        activityType:
-          ACTIVITY_TYPES[session.activityType] || `Activity ${session.activityType}`,
+        activityType: ACTIVITY_TYPES[session.activityType] || `Activity ${session.activityType}`,
         startTime,
         endTime,
         durationMinutes: (endTime.getTime() - startTime.getTime()) / 60000,
@@ -833,11 +801,8 @@ function getMealType(type?: number): string | undefined {
 }
 
 // Factory function
-export function createGoogleHealthConnectClient(
-  accessToken: string
-): GoogleHealthConnectClient {
+export function createGoogleHealthConnectClient(accessToken: string): GoogleHealthConnectClient {
   return new GoogleHealthConnectClient(accessToken);
 }
 
-// Export data type constants
-export { HEALTH_DATA_TYPES, ACTIVITY_TYPES };
+// Data type constants already exported at definition above

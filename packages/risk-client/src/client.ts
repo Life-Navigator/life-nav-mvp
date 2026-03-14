@@ -99,7 +99,7 @@ export class RiskClient {
     const validated = RiskComputeRequestSchema.parse(request);
 
     let eventSource: EventSource | null = null;
-    let heartbeatInterval: NodeJS.Timeout | null = null;
+    let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
     let streamId: string | null = null;
 
     const connect = async () => {

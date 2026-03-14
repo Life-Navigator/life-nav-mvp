@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch user's pin (only one per user)
-    const { data: pin, error: pinError } = await supabaseAdmin
+    const { data: pin, error: pinError } = await (supabaseAdmin as any)
       .from('scenario_pins')
       .select('*')
       .eq('user_id', userId)
@@ -42,14 +42,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch scenario metadata
-    const { data: scenario } = await supabaseAdmin
+    const { data: scenario } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('name')
       .eq('id', pin.scenario_id)
       .single();
 
     // Fetch latest simulation run for this version
-    const { data: latestSim } = await supabaseAdmin
+    const { data: latestSim } = await (supabaseAdmin as any)
       .from('scenario_sim_runs')
       .select('id, created_at')
       .eq('version_id', pin.version_id)
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch goal snapshot
-    const { data: snapshot } = await supabaseAdmin
+    const { data: snapshot } = await (supabaseAdmin as any)
       .from('scenario_goal_snapshots')
       .select('*')
       .eq('sim_run_id', latestSim.id)
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch trend data (last 20 p50 values from recent sim runs)
-    const { data: recentSims } = await supabaseAdmin
+    const { data: recentSims } = await (supabaseAdmin as any)
       .from('scenario_sim_runs')
       .select('id, created_at')
       .eq('version_id', pin.version_id)
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
     const trend: number[] = [];
     if (recentSims && recentSims.length > 0) {
       for (const sim of recentSims) {
-        const { data: goalSnapshot } = await supabaseAdmin
+        const { data: goalSnapshot } = await (supabaseAdmin as any)
           .from('scenario_goal_snapshots')
           .select('p50')
           .eq('sim_run_id', sim.id)
@@ -196,7 +196,7 @@ export async function POST(request: NextRequest) {
     const { scenarioId, versionId, goalId } = validation.data;
 
     // Verify scenario ownership
-    const { data: scenario, error: scenarioError } = await supabaseAdmin
+    const { data: scenario, error: scenarioError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('id, status, committed_version_id')
       .eq('id', scenarioId)
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify version ownership and belongs to scenario
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id')
       .eq('id', versionId)
@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify goal exists in simulation results
-    const { data: latestSim } = await supabaseAdmin
+    const { data: latestSim } = await (supabaseAdmin as any)
       .from('scenario_sim_runs')
       .select('id')
       .eq('version_id', versionId)
@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (latestSim) {
-      const { data: goalSnapshot } = await supabaseAdmin
+      const { data: goalSnapshot } = await (supabaseAdmin as any)
         .from('scenario_goal_snapshots')
         .select('id')
         .eq('sim_run_id', latestSim.id)
@@ -257,10 +257,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Delete any existing pins for this user (only one pin allowed)
-    await supabaseAdmin.from('scenario_pins').delete().eq('user_id', userId);
+    await (supabaseAdmin as any).from('scenario_pins').delete().eq('user_id', userId);
 
     // Create new pin
-    const { data: pin, error: pinError } = await supabaseAdmin
+    const { data: pin, error: pinError } = await (supabaseAdmin as any)
       .from('scenario_pins')
       .insert({
         user_id: userId,
@@ -330,7 +330,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Fetch current pin
-    const { data: pin } = await supabaseAdmin
+    const { data: pin } = await (supabaseAdmin as any)
       .from('scenario_pins')
       .select('id')
       .eq('user_id', userId)
@@ -341,7 +341,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete pin
-    const { error: deleteError } = await supabaseAdmin
+    const { error: deleteError } = await (supabaseAdmin as any)
       .from('scenario_pins')
       .delete()
       .eq('user_id', userId);

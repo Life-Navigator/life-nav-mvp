@@ -1,70 +1,51 @@
-/**
- * Plaid Token Exchange API Route
- *
- * Exchanges a Plaid public token for an access token.
- */
-
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { exchangePublicToken, getAccounts } from '@/lib/integrations/plaid/client';
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
-    const body = await request.json();
-    const { publicToken, institutionId, institutionName, accounts } = body;
-
+    const { publicToken, institutionId, institutionName } = await request.json();
     if (!publicToken) {
-      return NextResponse.json(
-        { error: 'Missing publicToken' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing publicToken' }, { status: 400 });
     }
 
-    // Get session token for backend authentication
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get('session_token')?.value;
+    const { accessToken, itemId } = await exchangePublicToken(publicToken);
 
-    if (!sessionToken) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
-    }
-
-    // Forward request to backend
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const response = await fetch(`${backendUrl}/api/v1/integrations/plaid/exchange`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${sessionToken}`,
+    // Store in plaid_items table via Supabase
+    const { error: insertError } = await (supabase as any).from('plaid_items').upsert(
+      {
+        user_id: user.id,
+        item_id: itemId,
+        access_token: accessToken,
+        institution_id: institutionId || null,
+        institution_name: institutionName || null,
+        status: 'active',
       },
-      body: JSON.stringify({
-        public_token: publicToken,
-        institution_id: institutionId,
-        institution_name: institutionName,
-        accounts,
-      }),
-    });
+      { onConflict: 'item_id' }
+    );
 
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: error.detail || 'Failed to exchange token' },
-        { status: response.status }
-      );
-    }
+    if (insertError) throw insertError;
 
-    const data = await response.json();
+    // Fetch linked accounts to return to client
+    const accounts = await getAccounts(accessToken);
 
     return NextResponse.json({
-      success: data.success,
-      accountsLinked: data.accounts_linked,
+      success: true,
+      accountsLinked: accounts.length,
+      accounts,
     });
   } catch (err) {
     console.error('Plaid exchange error:', err);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
 }

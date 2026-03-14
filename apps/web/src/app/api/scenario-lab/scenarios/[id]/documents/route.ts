@@ -6,9 +6,13 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
-import { uploadDocumentSchema, validateFileType, validateFileSize } from '@/lib/scenario-lab/validation';
+import {
+  uploadDocumentSchema,
+  validateFileType,
+  validateFileSize,
+} from '@/lib/scenario-lab/validation';
 import { enforceRateLimit } from '@/lib/scenario-lab/rate-limiter';
 import crypto from 'crypto';
 
@@ -18,10 +22,7 @@ export const dynamic = 'force-dynamic';
  * POST - Get signed upload URL for document
  * Returns document_id and upload_url for client-side upload
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUserIdFromJWT(request);
     if (!userId) {
@@ -36,16 +37,13 @@ export async function POST(
     try {
       await enforceRateLimit(userId, 'upload');
     } catch (rateLimitError: any) {
-      return NextResponse.json(
-        { error: rateLimitError.message },
-        { status: 429 }
-      );
+      return NextResponse.json({ error: rateLimitError.message }, { status: 429 });
     }
 
-    const scenarioId = params.id;
+    const { id: scenarioId } = await params;
 
     // Verify scenario ownership
-    const { data: scenario, error: scenarioError } = await supabaseAdmin
+    const { data: scenario, error: scenarioError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('id, status')
       .eq('id', scenarioId)
@@ -70,7 +68,13 @@ export async function POST(
     const { filename, mime_type, file_size_bytes, document_type } = validation.data;
 
     // Additional validation
-    const allowedMimeTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    const allowedMimeTypes = [
+      'application/pdf',
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+    ];
 
     if (!allowedMimeTypes.includes(mime_type)) {
       return NextResponse.json(
@@ -93,7 +97,7 @@ export async function POST(
     const storagePath = `${userId}/${scenarioId}/${timestamp}_${sanitizedFilename}`;
 
     // Create document record
-    const { data: document, error: createError } = await supabaseAdmin
+    const { data: document, error: createError } = await (supabaseAdmin as any)
       .from('scenario_documents')
       .insert({
         scenario_id: scenarioId,
@@ -117,15 +121,14 @@ export async function POST(
     }
 
     // Generate signed upload URL (60 minutes expiry)
-    const { data: signedData, error: signedError } = await supabaseAdmin
-      .storage
+    const { data: signedData, error: signedError } = await (supabaseAdmin as any).storage
       .from('scenario-docs')
       .createSignedUploadUrl(storagePath);
 
     if (signedError || !signedData) {
       console.error('[API] Error generating signed URL:', signedError);
       // Rollback document creation
-      await supabaseAdmin.from('scenario_documents').delete().eq('id', document.id);
+      await (supabaseAdmin as any).from('scenario_documents').delete().eq('id', document.id);
       return NextResponse.json({ error: 'Failed to generate upload URL' }, { status: 500 });
     }
 
@@ -138,13 +141,16 @@ export async function POST(
       metadata: { scenario_id: scenarioId, filename: sanitizedFilename, file_size_bytes },
     });
 
-    return NextResponse.json({
-      document_id: document.id,
-      upload_url: signedData.signedUrl,
-      upload_token: signedData.token,
-      storage_path: storagePath,
-      expires_in: 3600, // 60 minutes
-    }, { status: 201 });
+    return NextResponse.json(
+      {
+        document_id: document.id,
+        upload_url: signedData.signedUrl,
+        upload_token: signedData.token,
+        storage_path: storagePath,
+        expires_in: 3600, // 60 minutes
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('[API] Error in POST /scenarios/[id]/documents:', error);
     return NextResponse.json(
@@ -160,10 +166,7 @@ export async function POST(
 /**
  * GET - List documents for scenario
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUserIdFromJWT(request);
     if (!userId) {
@@ -174,10 +177,10 @@ export async function GET(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const scenarioId = params.id;
+    const { id: scenarioId } = await params;
 
     // Verify scenario ownership
-    const { data: scenario, error: scenarioError } = await supabaseAdmin
+    const { data: scenario, error: scenarioError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('id')
       .eq('id', scenarioId)
@@ -189,7 +192,7 @@ export async function GET(
     }
 
     // Fetch documents (exclude soft-deleted)
-    const { data: documents, error: docsError } = await supabaseAdmin
+    const { data: documents, error: docsError } = await (supabaseAdmin as any)
       .from('scenario_documents')
       .select('*')
       .eq('scenario_id', scenarioId)

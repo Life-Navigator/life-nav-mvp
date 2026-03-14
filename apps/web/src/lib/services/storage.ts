@@ -14,7 +14,12 @@
  */
 
 import { Storage } from '@google-cloud/storage';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { writeFile, unlink, mkdir, readFile } from 'fs/promises';
 import { existsSync } from 'fs';
@@ -102,11 +107,7 @@ class LocalStorage {
     this.baseUrl = '/uploads';
   }
 
-  async upload(
-    fileId: string,
-    buffer: Buffer,
-    options: UploadOptions
-  ): Promise<StorageResult> {
+  async upload(fileId: string, buffer: Buffer, options: UploadOptions): Promise<StorageResult> {
     try {
       const ext = getExtensionFromContentType(options.contentType);
       const filename = `${fileId}.${ext}`;
@@ -164,9 +165,7 @@ class LocalStorage {
     const { readdir } = await import('fs/promises');
     try {
       const files = await readdir(this.basePath);
-      return files
-        .filter(f => f.startsWith(fileId))
-        .map(f => path.join(this.basePath, f));
+      return files.filter((f) => f.startsWith(fileId)).map((f) => path.join(this.basePath, f));
     } catch {
       return [];
     }
@@ -185,11 +184,7 @@ class GCSStorage {
     this.bucket = bucket;
   }
 
-  async upload(
-    fileId: string,
-    buffer: Buffer,
-    options: UploadOptions
-  ): Promise<StorageResult> {
+  async upload(fileId: string, buffer: Buffer, options: UploadOptions): Promise<StorageResult> {
     try {
       const ext = getExtensionFromContentType(options.contentType);
       const filename = `${fileId}.${ext}`;
@@ -234,7 +229,7 @@ class GCSStorage {
       const bucket = this.storage.bucket(this.bucket);
       const [files] = await bucket.getFiles({ prefix: fileId });
 
-      await Promise.all(files.map(file => file.delete()));
+      await Promise.all(files.map((file) => file.delete()));
       return true;
     } catch {
       return false;
@@ -282,11 +277,7 @@ class S3Storage {
     this.region = region;
   }
 
-  async upload(
-    fileId: string,
-    buffer: Buffer,
-    options: UploadOptions
-  ): Promise<StorageResult> {
+  async upload(fileId: string, buffer: Buffer, options: UploadOptions): Promise<StorageResult> {
     try {
       const ext = getExtensionFromContentType(options.contentType);
       const key = `${fileId}.${ext}`;
@@ -448,7 +439,8 @@ export async function getFileUrl(fileId: string): Promise<string | null> {
 // QUARANTINE FUNCTIONS
 //=====================
 
-const QUARANTINE_BUCKET = process.env.QUARANTINE_BUCKET || process.env.STORAGE_BUCKET + '-quarantine';
+const QUARANTINE_BUCKET =
+  process.env.QUARANTINE_BUCKET || process.env.STORAGE_BUCKET + '-quarantine';
 
 /**
  * Move file to quarantine storage
@@ -663,61 +655,6 @@ export async function restoreQuarantinedFile(
 
   // Add S3 and local implementations as needed
   return { success: false, restoredPath: '', error: 'Provider not supported for restore' };
-}
-
-//=====================
-// IMAGE OPTIMIZATION HELPERS
-//=====================
-
-import { getImageUrl, getBlurPlaceholder, type ImagePreset } from './image-url';
-
-/**
- * Get an optimized image URL for a stored file
- * Uses Imgproxy for on-the-fly transformation
- */
-export function getOptimizedImageUrl(
-  fileId: string,
-  preset: ImagePreset | { width?: number; height?: number; quality?: number } = 'preview'
-): string {
-  const config = getConfig();
-
-  // Build the source URL based on storage provider
-  let sourceUrl: string;
-
-  if (config.provider === 'gcs') {
-    sourceUrl = `gs://${config.bucket}/${fileId}`;
-  } else if (config.provider === 's3') {
-    sourceUrl = `s3://${config.bucket}/${fileId}`;
-  } else {
-    // Local storage - return direct URL
-    return `/uploads/${fileId}`;
-  }
-
-  // Use Imgproxy URL signing
-  if (typeof preset === 'string') {
-    return getImageUrl(sourceUrl, { preset });
-  }
-
-  return getImageUrl(sourceUrl, preset);
-}
-
-/**
- * Get blur placeholder URL for lazy loading
- */
-export function getImageBlurPlaceholder(fileId: string): string {
-  const config = getConfig();
-
-  let sourceUrl: string;
-
-  if (config.provider === 'gcs') {
-    sourceUrl = `gs://${config.bucket}/${fileId}`;
-  } else if (config.provider === 's3') {
-    sourceUrl = `s3://${config.bucket}/${fileId}`;
-  } else {
-    return `/uploads/${fileId}`;
-  }
-
-  return getBlurPlaceholder(sourceUrl);
 }
 
 /**

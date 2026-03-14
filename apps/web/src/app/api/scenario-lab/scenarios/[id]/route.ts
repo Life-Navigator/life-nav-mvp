@@ -7,7 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
 import { updateScenarioSchema } from '@/lib/scenario-lab/validation';
 
@@ -16,10 +16,7 @@ export const dynamic = 'force-dynamic';
 /**
  * GET - Get scenario with versions and latest results
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUserIdFromJWT(request);
     if (!userId) {
@@ -30,10 +27,10 @@ export async function GET(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const scenarioId = params.id;
+    const { id: scenarioId } = await params;
 
     // Fetch scenario
-    const { data: scenario, error: scenarioError } = await supabaseAdmin
+    const { data: scenario, error: scenarioError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('*')
       .eq('id', scenarioId)
@@ -45,7 +42,7 @@ export async function GET(
     }
 
     // Fetch versions
-    const { data: versions, error: versionsError } = await supabaseAdmin
+    const { data: versions, error: versionsError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('*')
       .eq('scenario_id', scenarioId)
@@ -59,7 +56,7 @@ export async function GET(
     // Fetch latest simulation results if exists
     let latestSimulation = null;
     if (scenario.current_version_id) {
-      const { data: simData } = await supabaseAdmin
+      const { data: simData } = await (supabaseAdmin as any)
         .from('scenario_sim_runs')
         .select('*, scenario_goal_snapshots(*)')
         .eq('version_id', scenario.current_version_id)
@@ -90,10 +87,7 @@ export async function GET(
 /**
  * PATCH - Update scenario metadata
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUserIdFromJWT(request);
     if (!userId) {
@@ -104,10 +98,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const scenarioId = params.id;
+    const { id: scenarioId } = await params;
 
     // Verify ownership
-    const { data: existing, error: fetchError } = await supabaseAdmin
+    const { data: existing, error: fetchError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('id, status')
       .eq('id', scenarioId)
@@ -120,10 +114,7 @@ export async function PATCH(
 
     // Prevent editing committed scenarios
     if (existing.status === 'committed') {
-      return NextResponse.json(
-        { error: 'Cannot edit committed scenario' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Cannot edit committed scenario' }, { status: 400 });
     }
 
     // Parse and validate body
@@ -140,7 +131,7 @@ export async function PATCH(
     const updates = validation.data;
 
     // Update scenario
-    const { data: scenario, error: updateError } = await supabaseAdmin
+    const { data: scenario, error: updateError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .update({
         ...updates,
@@ -182,7 +173,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -194,10 +185,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const scenarioId = params.id;
+    const { id: scenarioId } = await params;
 
     // Verify ownership
-    const { data: existing, error: fetchError } = await supabaseAdmin
+    const { data: existing, error: fetchError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('id')
       .eq('id', scenarioId)
@@ -209,7 +200,7 @@ export async function DELETE(
     }
 
     // Delete scenario (CASCADE will handle related records)
-    const { error: deleteError } = await supabaseAdmin
+    const { error: deleteError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .delete()
       .eq('id', scenarioId);

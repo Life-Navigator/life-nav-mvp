@@ -7,10 +7,12 @@ export async function POST(_request: NextRequest) {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from('profiles')
     .update({
       setup_completed: true,

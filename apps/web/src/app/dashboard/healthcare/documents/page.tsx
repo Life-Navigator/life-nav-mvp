@@ -1,9 +1,21 @@
 'use client';
-
 import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/hooks/useSession';
 import Link from 'next/link';
-import { LockClosedIcon, ShieldCheckIcon, DocumentIcon, FolderIcon, TagIcon, MagnifyingGlassIcon, FunnelIcon, ArrowUpTrayIcon, QrCodeIcon, TrashIcon, PencilIcon, ShareIcon } from '@heroicons/react/24/outline';
+import {
+  LockClosedIcon,
+  ShieldCheckIcon,
+  DocumentIcon,
+  FolderIcon,
+  TagIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  ArrowUpTrayIcon,
+  QrCodeIcon,
+  TrashIcon,
+  PencilIcon,
+  ShareIcon,
+} from '@heroicons/react/24/outline';
 
 interface SecureDocument {
   id: string;
@@ -62,25 +74,26 @@ export default function DocumentVaultPage() {
 
   // Filter documents based on category and search term
   const filteredDocuments = documents
-    .filter(doc => selectedCategory === 'all' || doc.category === selectedCategory)
-    .filter(doc => 
-      doc.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter((doc) => selectedCategory === 'all' || doc.category === selectedCategory)
+    .filter(
+      (doc) =>
+        doc.filename.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()))
     )
     .sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
 
   const toggleFavorite = (id: string) => {
-    setDocuments(prevDocs => 
-      prevDocs.map(doc => 
-        doc.id === id ? { ...doc, favorite: !doc.favorite } : doc
-      )
+    setDocuments((prevDocs) =>
+      prevDocs.map((doc) => (doc.id === id ? { ...doc, favorite: !doc.favorite } : doc))
     );
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="text-xl font-semibold text-gray-700 dark:text-gray-300">Loading secure documents...</div>
+        <div className="text-xl font-semibold text-gray-700 dark:text-gray-300">
+          Loading secure documents...
+        </div>
       </div>
     );
   }
@@ -91,7 +104,7 @@ export default function DocumentVaultPage() {
         <div className="max-w-md p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-4">Error</h2>
           <p className="text-gray-700 dark:text-gray-300">{error}</p>
-          <button 
+          <button
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
             onClick={() => window.location.reload()}
           >
@@ -109,19 +122,23 @@ export default function DocumentVaultPage() {
           <div className="flex items-center">
             <ShieldCheckIcon className="h-8 w-8 text-red-600 dark:text-red-400 mr-2" />
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Ultra Secure Document Vault</h1>
-              <p className="text-gray-600 dark:text-gray-400">Store and manage your sensitive documents with end-to-end encryption</p>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Ultra Secure Document Vault
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Store and manage your sensitive documents with end-to-end encryption
+              </p>
             </div>
           </div>
           <div className="mt-4 md:mt-0 flex space-x-3">
-            <button 
+            <button
               onClick={() => setShowScanModal(true)}
               className="flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
             >
               <QrCodeIcon className="h-5 w-5 mr-2" />
               Scan Document
             </button>
-            <button 
+            <button
               onClick={() => setShowUploadModal(true)}
               className="flex items-center px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 shadow-sm transition-colors"
             >
@@ -130,21 +147,24 @@ export default function DocumentVaultPage() {
             </button>
           </div>
         </div>
-        
+
         {/* Security info */}
         <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
           <div className="flex items-start">
             <LockClosedIcon className="h-6 w-6 text-blue-500 dark:text-blue-400 mt-0.5 mr-3 flex-shrink-0" />
             <div>
-              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">End-to-End Encrypted Storage</h3>
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                End-to-End Encrypted Storage
+              </h3>
               <p className="mt-1 text-sm text-blue-700 dark:text-blue-400">
-                All documents are encrypted before storage using AES-256 encryption. Only you can access your documents.
-                Your data is protected with biometric verification for added security.
+                All documents are encrypted before storage using AES-256 encryption. Only you can
+                access your documents. Your data is protected with biometric verification for added
+                security.
               </p>
             </div>
           </div>
         </div>
-        
+
         {/* Categories and search */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm mb-6 p-4">
           <div className="flex flex-col md:flex-row md:items-center space-y-4 md:space-y-0">
@@ -177,20 +197,22 @@ export default function DocumentVaultPage() {
             </div>
           </div>
         </div>
-        
+
         {/* Documents list */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
           {filteredDocuments.length === 0 ? (
             <div className="p-12 text-center">
               <DocumentIcon className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-              <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">No documents found</p>
+              <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">
+                No documents found
+              </p>
               <p className="text-gray-500 dark:text-gray-500 mt-1">
-                {searchTerm 
-                  ? "Try a different search term or category" 
-                  : "Upload your first document to get started"}
+                {searchTerm
+                  ? 'Try a different search term or category'
+                  : 'Upload your first document to get started'}
               </p>
               {(searchTerm || selectedCategory !== 'all') && (
-                <button 
+                <button
                   className="mt-4 px-4 py-2 text-red-600 dark:text-red-400 border border-red-600 dark:border-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
                   onClick={() => {
                     setSearchTerm('');
@@ -206,29 +228,50 @@ export default function DocumentVaultPage() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-900">
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                    >
                       Document
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                    >
                       Category
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                    >
                       Size
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                    >
                       Uploaded
                     </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                    >
                       Tags
                     </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th
+                      scope="col"
+                      className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                    >
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredDocuments.map((doc) => (
-                    <tr key={doc.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors">
+                    <tr
+                      key={doc.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700">
@@ -236,8 +279,19 @@ export default function DocumentVaultPage() {
                               <DocumentIcon className="h-6 w-6 text-red-500" />
                             )}
                             {doc.type === 'IMAGE' && (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-6 w-6 text-green-500"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                />
                               </svg>
                             )}
                           </div>
@@ -253,14 +307,19 @@ export default function DocumentVaultPage() {
                                 onClick={() => toggleFavorite(doc.id)}
                                 className="ml-2 text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400"
                               >
-                                <svg 
-                                  xmlns="http://www.w3.org/2000/svg" 
-                                  className={`h-4 w-4 ${doc.favorite ? 'text-yellow-500 fill-yellow-500' : ''}`} 
-                                  fill="none" 
-                                  viewBox="0 0 24 24" 
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className={`h-4 w-4 ${doc.favorite ? 'text-yellow-500 fill-yellow-500' : ''}`}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
                                   stroke="currentColor"
                                 >
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                                  />
                                 </svg>
                               </button>
                             </div>
@@ -317,11 +376,11 @@ export default function DocumentVaultPage() {
             </div>
           )}
         </div>
-        
+
         {/* Bottom navigation */}
         <div className="mt-8 flex flex-col md:flex-row md:justify-between">
           <div className="mb-4 md:mb-0">
-            <Link 
+            <Link
               href="/dashboard/healthcare"
               className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
             >
@@ -347,14 +406,21 @@ export default function DocumentVaultPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Upload Secure Document</h3>
-              <button 
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+                Upload Secure Document
+              </h3>
+              <button
                 onClick={() => setShowUploadModal(false)}
                 className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
               >
                 <span className="sr-only">Close</span>
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -376,10 +442,10 @@ export default function DocumentVaultPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Document Tags (separate with commas)
                 </label>
-                <input 
-                  type="text" 
-                  placeholder="insurance, policy, healthcare" 
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" 
+                <input
+                  type="text"
+                  placeholder="insurance, policy, healthcare"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                 />
               </div>
               <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
@@ -387,8 +453,8 @@ export default function DocumentVaultPage() {
                 <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">
                   Drag and drop your document here or
                 </p>
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   className="text-sm text-red-600 dark:text-red-400 font-medium"
                 >
                   browse files
@@ -431,19 +497,26 @@ export default function DocumentVaultPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">Scan Document</h3>
-              <button 
+              <button
                 onClick={() => setShowScanModal(false)}
                 className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
               >
                 <span className="sr-only">Close</span>
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
             <div className="text-center mb-6">
               <QrCodeIcon className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-              <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Scan from Mobile Device</h4>
+              <h4 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Scan from Mobile Device
+              </h4>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Use your mobile device to scan documents directly into your secure vault
               </p>

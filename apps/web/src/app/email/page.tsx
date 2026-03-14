@@ -16,6 +16,8 @@ interface EmailAccount {
   name: string;
   lastSync: string | null;
   status: string;
+  connected: boolean;
+  unread: number;
   folders: string[];
 }
 
@@ -67,11 +69,11 @@ export default function EmailPage() {
       if (!response.ok) throw new Error('Failed to disconnect account');
 
       // Remove from local state
-      setEmailAccounts(accounts => accounts.filter(a => a.id !== accountId));
+      setEmailAccounts((accounts) => accounts.filter((a) => a.id !== accountId));
 
       // If this was the active account, switch to another
       if (activeAccount === accountId) {
-        const remaining = emailAccounts.filter(a => a.id !== accountId);
+        const remaining = emailAccounts.filter((a) => a.id !== accountId);
         setActiveAccount(remaining.length > 0 ? remaining[0].id : null);
       }
     } catch (err) {
@@ -117,7 +119,7 @@ export default function EmailPage() {
   };
 
   // Get the active account details
-  const activeAccountDetails = emailAccounts.find(account => account.id === activeAccount);
+  const activeAccountDetails = emailAccounts.find((account) => account.id === activeAccount);
 
   // Loading state
   if (loading) {
@@ -193,9 +195,12 @@ export default function EmailPage() {
                 <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
                   <EnvelopeIcon className="w-8 h-8 text-blue-500" />
                 </div>
-                <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">No Email Accounts Connected</h2>
+                <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
+                  No Email Accounts Connected
+                </h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  Connect your email accounts to view all your messages in one place and automatically sync your calendars.
+                  Connect your email accounts to view all your messages in one place and
+                  automatically sync your calendars.
                 </p>
                 <Button
                   onClick={handleConnectNewEmail}
@@ -207,19 +212,13 @@ export default function EmailPage() {
               </Card>
             </div>
           ) : (
-            <EmailInbox
-              accountId={activeAccount}
-              folder={activeFolder}
-            />
+            <EmailInbox accountId={activeAccount} folder={activeFolder} />
           )}
         </div>
       </div>
 
       {/* New Email Account Modal */}
-      <EmailAccountModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-      />
+      <EmailAccountModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

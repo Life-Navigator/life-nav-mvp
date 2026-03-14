@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromJWT } from '@/lib/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
 import { enqueueJob } from '@/lib/scenario-lab/job-queue';
 
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { documentId: string } }
+  { params }: { params: Promise<{ documentId: string }> }
 ) {
   try {
     const userId = await getUserIdFromJWT(request);
@@ -26,10 +26,10 @@ export async function POST(
       return NextResponse.json({ error: 'Feature not enabled' }, { status: 403 });
     }
 
-    const documentId = params.documentId;
+    const { documentId } = await params;
 
     // Fetch document and verify ownership
-    const { data: document, error: docError } = await supabaseAdmin
+    const { data: document, error: docError } = await (supabaseAdmin as any)
       .from('scenario_documents')
       .select('*')
       .eq('id', documentId)
@@ -65,7 +65,7 @@ export async function POST(
     });
 
     // Update document status
-    await supabaseAdmin
+    await (supabaseAdmin as any)
       .from('scenario_documents')
       .update({
         ocr_status: 'queued',
@@ -83,11 +83,14 @@ export async function POST(
       metadata: { job_id: job.id },
     });
 
-    return NextResponse.json({
-      job_id: job.id,
-      status: job.status,
-      message: 'OCR job enqueued. Poll /api/scenario-lab/jobs/{job_id} for status.',
-    }, { status: 202 });
+    return NextResponse.json(
+      {
+        job_id: job.id,
+        status: job.status,
+        message: 'OCR job enqueued. Poll /api/scenario-lab/jobs/{job_id} for status.',
+      },
+      { status: 202 }
+    );
   } catch (error) {
     console.error('[API] Error in POST /documents/[documentId]/ocr:', error);
     return NextResponse.json(

@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const { scenarioId, versionId } = validation.data;
 
     // Verify scenario ownership
-    const { data: scenario, error: scenarioError } = await supabaseAdmin
+    const { data: scenario, error: scenarioError } = await (supabaseAdmin as any)
       .from('scenario_labs')
       .select('id, name, status, committed_version_id, user_id')
       .eq('id', scenarioId)
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify version ownership and belongs to scenario
-    const { data: version, error: versionError } = await supabaseAdmin
+    const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .select('id, version_number, name, scenario_id')
       .eq('id', versionId)
@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     // Check rate limit (10 reports per day)
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data: recentReports, error: countError } = await supabaseAdmin
+    const { data: recentReports, error: countError } = await (supabaseAdmin as any)
       .from('scenario_reports')
       .select('id')
       .eq('user_id', userId)
@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create scenario_reports record
-    const { data: report, error: reportError } = await supabaseAdmin
+    const { data: report, error: reportError } = await (supabaseAdmin as any)
       .from('scenario_reports')
       .insert({
         scenario_id: scenarioId,
@@ -118,10 +118,7 @@ export async function POST(request: NextRequest) {
 
     if (reportError || !report) {
       console.error('[API] Error creating report record:', reportError);
-      return NextResponse.json(
-        { error: 'Failed to create report record' },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to create report record' }, { status: 500 });
     }
 
     // Enqueue PDF generation job
@@ -138,7 +135,7 @@ export async function POST(request: NextRequest) {
 
     if (!job) {
       // Rollback report record
-      await supabaseAdmin.from('scenario_reports').delete().eq('id', report.id);
+      await (supabaseAdmin as any).from('scenario_reports').delete().eq('id', report.id);
       return NextResponse.json({ error: 'Failed to enqueue job' }, { status: 500 });
     }
 

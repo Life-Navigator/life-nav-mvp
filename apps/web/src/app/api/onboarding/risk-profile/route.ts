@@ -7,7 +7,9 @@ export async function POST(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
@@ -20,7 +22,7 @@ export async function POST(request: NextRequest) {
   const riskLevel =
     overallScore >= 70 ? 'aggressive' : overallScore >= 40 ? 'moderate' : 'conservative';
 
-  const { error } = await supabase.from('risk_assessments').insert({
+  const { error } = await (supabase as any).from('risk_assessments').insert({
     user_id: user.id,
     assessment_type: 'onboarding',
     overall_score: overallScore,

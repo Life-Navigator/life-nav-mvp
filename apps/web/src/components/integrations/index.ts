@@ -5,5 +5,4 @@
  */
 
 export { GoogleConnect } from './GoogleConnect';
-export { PlaidLinkButton, PlaidAccountsList } from './PlaidLink';
-export { StripeCheckout } from './StripeCheckout';
+export { PlaidLinkButton } from './PlaidLinkButton';
