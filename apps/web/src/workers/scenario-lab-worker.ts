@@ -131,6 +131,7 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
     storage_path: string;
     mime_type: string;
     filename: string;
+    document_type?: string;
   };
 
   const { document_id, storage_bucket, storage_path, mime_type } = input;
@@ -139,7 +140,6 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
 
   // Import dependencies
   const { supabaseAdmin } = await import('../lib/scenario-lab/supabase-client');
-  const { extractDocumentFields } = await import('../lib/scenario-lab/ocr/extractor');
   const { updateJobStatus } = await import('../lib/scenario-lab/job-queue');
 
   try {
@@ -149,20 +149,16 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
       .update({ ocr_status: 'processing' })
       .eq('id', document_id);
 
-    // Download file from storage
-    const { data: fileData, error: downloadError } = await (supabaseAdmin as any).storage
-      .from(storage_bucket)
-      .download(storage_path);
+    // Fetch user_id from document (needed for Edge Function call)
+    const { data: doc } = await (supabaseAdmin as any)
+      .from('scenario_documents')
+      .select('user_id')
+      .eq('id', document_id)
+      .single();
 
-    if (downloadError || !fileData) {
-      throw new Error(`Failed to download file: ${downloadError?.message}`);
+    if (!doc) {
+      throw new Error('Document not found');
     }
-
-    // Convert Blob to Buffer
-    const arrayBuffer = await fileData.arrayBuffer();
-    const fileBuffer = Buffer.from(arrayBuffer);
-
-    console.log(`[Worker] Downloaded file, size: ${fileBuffer.length} bytes`);
 
     // Update job progress
     await updateJobStatus(job.id, {
@@ -170,8 +166,37 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
       progress: 25,
     });
 
-    // Extract fields
-    const extractionResult = await extractDocumentFields(fileBuffer, mime_type);
+    // Call document-ocr Edge Function
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceKey) {
+      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+    }
+
+    const ocrResponse = await fetch(`${supabaseUrl}/functions/v1/document-ocr`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify({
+        document_id,
+        document_source: 'scenario_lab',
+        storage_bucket,
+        storage_path,
+        mime_type,
+        document_type: input.document_type,
+        user_id: doc.user_id,
+      }),
+    });
+
+    if (!ocrResponse.ok) {
+      const errorBody = await ocrResponse.text().catch(() => '');
+      throw new Error(`document-ocr Edge Function error (${ocrResponse.status}): ${errorBody}`);
+    }
+
+    const extractionResult = await ocrResponse.json();
 
     if (!extractionResult.success) {
       throw new Error(extractionResult.error || 'Extraction failed');
@@ -192,17 +217,6 @@ async function processOCRJob(job: ScenarioJob): Promise<any> {
       .from('scenario_extracted_fields')
       .delete()
       .eq('document_id', document_id);
-
-    // Fetch user_id from document
-    const { data: doc } = await (supabaseAdmin as any)
-      .from('scenario_documents')
-      .select('user_id')
-      .eq('id', document_id)
-      .single();
-
-    if (!doc) {
-      throw new Error('Document not found');
-    }
 
     // Insert extracted fields
     if (extractionResult.extracted_fields.length > 0) {

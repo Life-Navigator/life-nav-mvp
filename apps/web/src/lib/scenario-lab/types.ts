@@ -41,7 +41,12 @@ export type InputType =
   | 'liability'
   | 'constraint';
 export type SourceType = 'manual' | 'extracted';
-export type ExtractionMethod = 'ocr_pattern' | 'pdf_text' | 'heuristic';
+export type ExtractionMethod =
+  | 'ocr_pattern'
+  | 'pdf_text'
+  | 'heuristic'
+  | 'gemini_vision'
+  | 'document_ai';
 
 // ============================================================================
 // DATABASE MODELS

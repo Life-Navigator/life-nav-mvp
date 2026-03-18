@@ -4,13 +4,16 @@ import json
 import httpx
 from lib.config import Config
 
-EMBED_URL = "https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent"
-GENERATE_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
-STREAM_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse"
+EMBED_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{Config.GEMINI_EMBED_MODEL}:embedContent"
+GENERATE_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{Config.GEMINI_GENERATE_MODEL}:generateContent"
+STREAM_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{Config.GEMINI_GENERATE_MODEL}:streamGenerateContent?alt=sse"
 
 
 def embed_text(text: str) -> list[float]:
-    """Generate a 768-dim embedding for the given text via Gemini."""
+    """Generate an embedding for the given text via Gemini.
+
+    Explicitly requests output_dimensionality=768 to match Qdrant collection config.
+    """
     resp = httpx.post(
         EMBED_URL,
         headers={
@@ -20,6 +23,7 @@ def embed_text(text: str) -> list[float]:
         json={
             "model": Config.GEMINI_EMBED_MODEL,
             "content": {"parts": [{"text": text}]},
+            "outputDimensionality": Config.EMBEDDING_DIMENSIONS,
         },
         timeout=30.0,
     )

@@ -385,6 +385,82 @@ async function processOneJob(
   ensureFileSizeWithinLimit(doc, fileBytes.length);
   checkTimeBudget(startedAtMs, 'downloaded');
 
+  // Route PDF/image files through Gemini Vision OCR Edge Function
+  const fileType = doc.detected_file_type.toUpperCase();
+  if (['PDF', 'PNG', 'JPEG', 'JPG'].includes(fileType)) {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    if (supabaseUrl && serviceRoleKey) {
+      try {
+        const ocrResponse = await fetch(
+          `${supabaseUrl}/functions/v1/document-ocr`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({
+              document_id: doc.id,
+              document_source: 'ingestion',
+              storage_bucket: doc.bucket_id,
+              storage_path: doc.storage_path,
+              mime_type: doc.mime_type,
+              user_id: doc.user_id,
+            }),
+          },
+        );
+
+        if (ocrResponse.ok) {
+          const ocrResult = await ocrResponse.json();
+
+          if (ocrResult.success && ocrResult.extracted_fields?.length > 0) {
+            // Store extracted fields as document_facts
+            for (const field of ocrResult.extracted_fields) {
+              await supabase
+                .schema('core')
+                .from('document_facts')
+                .upsert(
+                  {
+                    document_id: doc.id,
+                    user_id: doc.user_id,
+                    ingestion_job_id: job.id,
+                    fact_key: field.field_key,
+                    fact_value: {
+                      value: field.field_value,
+                      type: field.field_type,
+                    },
+                    confidence: field.confidence_score,
+                    source: ocrResult.extraction_method,
+                  },
+                  {
+                    onConflict: 'document_id,fact_key,source',
+                    ignoreDuplicates: false,
+                  },
+                );
+            }
+
+            return {
+              parser: `ocr-${ocrResult.extraction_method}`,
+              detected_type: fileType,
+              fields_extracted: ocrResult.extracted_fields.length,
+              pages_processed: ocrResult.pages_processed,
+              duration_ms: ocrResult.duration_ms,
+            };
+          }
+        }
+        // Fall through to existing domain-specific processing on failure
+      } catch (ocrError) {
+        console.error(
+          `[process-ingestion] OCR Edge Function failed for doc ${doc.id}, falling back:`,
+          safeError(ocrError),
+        );
+        // Fall through to existing domain-specific processing
+      }
+    }
+  }
+
   if (doc.domain === 'financial') {
     return processFinancialDocument(supabase, job, doc, fileBytes, startedAtMs);
   }

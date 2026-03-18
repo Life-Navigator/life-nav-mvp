@@ -13,13 +13,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'education_record', OLD.id::text,
+      OLD.user_id, 'education_record', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'education_record', NEW.id::text,
+      NEW.user_id, 'education_record', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'institution_name', NEW.institution_name,
@@ -46,13 +46,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'course', OLD.id::text,
+      OLD.user_id, 'course', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'course', NEW.id::text,
+      NEW.user_id, 'course', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'course_name', NEW.course_name,
@@ -81,13 +81,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'job_application', OLD.id::text,
+      OLD.user_id, 'job_application', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'job_application', NEW.id::text,
+      NEW.user_id, 'job_application', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'company', NEW.company,
@@ -113,13 +113,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'career_connection', OLD.id::text,
+      OLD.user_id, 'career_connection', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'career_connection', NEW.id::text,
+      NEW.user_id, 'career_connection', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'name', NEW.name,
@@ -144,13 +144,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'resume', OLD.id::text,
+      OLD.user_id, 'resume', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'resume', NEW.id::text,
+      NEW.user_id, 'resume', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'title', NEW.title,
@@ -178,13 +178,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'financial_goal', OLD.id::text,
+      OLD.user_id, 'financial_goal', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'financial_goal', NEW.id::text,
+      NEW.user_id, 'financial_goal', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'name', NEW.name,
@@ -211,13 +211,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'investment_holding', OLD.id::text,
+      OLD.user_id, 'investment_holding', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'investment_holding', NEW.id::text,
+      NEW.user_id, 'investment_holding', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'symbol', NEW.symbol,
@@ -242,13 +242,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'transaction', OLD.id::text,
+      OLD.user_id, 'transaction', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'transaction', NEW.id::text,
+      NEW.user_id, 'transaction', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'amount', NEW.amount,
@@ -277,13 +277,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'family_member', OLD.id::text,
+      OLD.user_id, 'family_member', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'family_member', NEW.id::text,
+      NEW.user_id, 'family_member', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'name', NEW.name,
@@ -309,13 +309,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'health_record', OLD.id::text,
+      OLD.user_id, 'health_record', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'health_record', NEW.id::text,
+      NEW.user_id, 'health_record', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'record_type', NEW.record_type,
@@ -339,13 +339,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'health_metric', OLD.id::text,
+      OLD.user_id, 'health_metric', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'health_metric', NEW.id::text,
+      NEW.user_id, 'health_metric', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'metric_type', NEW.metric_type,
@@ -372,13 +372,13 @@ RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     PERFORM graphrag.enqueue_sync(
-      OLD.user_id, 'document', OLD.id::text,
+      OLD.user_id, 'document', OLD.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'delete', '{}'::jsonb
     );
     RETURN OLD;
   ELSE
     PERFORM graphrag.enqueue_sync(
-      NEW.user_id, 'document', NEW.id::text,
+      NEW.user_id, 'document', NEW.id,
       TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, 'upsert',
       jsonb_build_object(
         'name', NEW.name,

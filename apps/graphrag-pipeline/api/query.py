@@ -72,8 +72,12 @@ class handler(BaseHTTPRequestHandler):
         provided = self.headers.get("x-worker-secret", "")
         auth_header = self.headers.get("authorization", "")
 
-        if secret and provided and hmac.compare_digest(provided, secret):
-            pass  # Service-to-service auth — user_id from body
+        if secret and provided:
+            # Service-to-service auth via shared secret
+            if not hmac.compare_digest(provided, secret):
+                self._json_response(401, {"error": "Invalid worker secret"})
+                return
+            # user_id from body is trusted
         elif auth_header.startswith("Bearer "):
             # Validate JWT via Supabase
             try:
@@ -126,6 +130,8 @@ class handler(BaseHTTPRequestHandler):
         query_vector = gemini_client.embed_text(query)
 
         # --- Parallel hybrid search ---
+        warnings = []
+
         # Vector search
         vector_results = []
         try:
@@ -142,7 +148,7 @@ class handler(BaseHTTPRequestHandler):
                 for h in hits
             ]
         except Exception as e:
-            print(f"Qdrant search failed: {e}")
+            warnings.append(f"vector_search_degraded: {str(e)[:200]}")
 
         # Graph search (NL→Cypher)
         graph_results = []
@@ -163,7 +169,7 @@ class handler(BaseHTTPRequestHandler):
                     for i, row in enumerate(rows)
                 ]
         except Exception as e:
-            print(f"Neo4j query failed: {e}")
+            warnings.append(f"graph_search_degraded: {str(e)[:200]}")
 
         # --- RRF fusion ---
         fused = reciprocal_rank_fusion(vector_results, graph_results)
@@ -220,6 +226,7 @@ class handler(BaseHTTPRequestHandler):
                 "vector_results": len(vector_results),
                 "graph_results": len(graph_results),
                 "fused_results": len(fused),
+                **({"warnings": warnings} if warnings else {}),
             },
         }
 

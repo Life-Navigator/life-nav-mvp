@@ -63,3 +63,4 @@ android/app/build/
 *.crt
 credentials.json
 service-account.json
+.env.supabase.prod

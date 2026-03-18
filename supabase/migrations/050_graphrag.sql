@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS graphrag.sync_queue (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
   entity_type TEXT NOT NULL,
-  entity_id UUID NOT NULL,
+  entity_id UUID NOT NULL UNIQUE,
   source_table TEXT NOT NULL,
   operation TEXT NOT NULL CHECK (operation IN ('upsert', 'delete')),
   payload JSONB NOT NULL DEFAULT '{}',
@@ -78,7 +78,12 @@ BEGIN
   ) VALUES (
     p_user_id, p_entity_type, p_entity_id, p_source_table, p_operation, p_payload
   )
-  ON CONFLICT DO NOTHING
+  ON CONFLICT (entity_id) DO UPDATE SET
+    operation = EXCLUDED.operation,
+    payload = EXCLUDED.payload,
+    sync_status = 'pending',
+    attempts = 0,
+    last_error = NULL
   RETURNING id INTO v_id;
 
   RETURN v_id;

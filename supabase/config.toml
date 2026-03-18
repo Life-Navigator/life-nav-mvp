@@ -88,8 +88,27 @@ ip_version = "IPv4"
 [analytics]
 enabled = true
 
+[functions.document-ocr]
+verify_jwt = false  # Uses dual-auth internally (worker-secret or JWT)
+
 [functions.process-ingestion]
 verify_jwt = false
 
 [functions.sync-user-to-backend]
 verify_jwt = false
+
+# Plaid Edge Functions — JWT verified by Supabase Auth
+[functions.plaid-link-token]
+verify_jwt = true
+
+[functions.plaid-exchange]
+verify_jwt = true
+
+[functions.plaid-accounts]
+verify_jwt = true
+
+[functions.plaid-transactions]
+verify_jwt = true
+
+[functions.plaid-disconnect]
+verify_jwt = true

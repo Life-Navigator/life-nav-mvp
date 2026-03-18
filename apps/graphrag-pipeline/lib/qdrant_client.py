@@ -24,6 +24,17 @@ def get_client() -> QdrantClient:
     return _client
 
 
+def get_collection_info(collection: str | None = None) -> dict | None:
+    """Get collection info for health checks."""
+    client = get_client()
+    col = collection or Config.QDRANT_COLLECTION
+    try:
+        info = client.get_collection(collection_name=col)
+        return {"points_count": info.points_count, "status": info.status.value}
+    except Exception:
+        return None
+
+
 def upsert_points(
     points: list[dict],
     collection: str | None = None,

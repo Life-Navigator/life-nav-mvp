@@ -56,7 +56,8 @@ const CORS_HEADERS = {
 };
 
 const GEMINI_EMBED_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent';
+const EMBEDDING_DIMENSIONS = 768;
 
 const MAX_CLAIM = 50;
 const JOB_TIMEOUT_MS = 25_000;
@@ -266,8 +267,9 @@ async function embed(text: string, apiKey: string): Promise<number[]> {
       'x-goog-api-key': apiKey,
     },
     body: JSON.stringify({
-      model: 'models/text-embedding-004',
+      model: 'models/gemini-embedding-001',
       content: { parts: [{ text }] },
+      outputDimensionality: EMBEDDING_DIMENSIONS,
     }),
   });
 
@@ -380,7 +382,9 @@ serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
-    const neo4jUrl = Deno.env.get('NEO4J_HTTP_URL');
+    // Neo4j Aura HTTPS Query API URL (port 443, not 7473)
+    // Example: https://xxxxx.databases.neo4j.io
+    const neo4jUrl = Deno.env.get('NEO4J_QUERY_API_URL');
     const neo4jUser = Deno.env.get('NEO4J_USERNAME');
     const neo4jPass = Deno.env.get('NEO4J_PASSWORD');
     const qdrantUrl = Deno.env.get('QDRANT_URL');
@@ -397,7 +401,7 @@ serve(async (req: Request) => {
       !qdrantKey
     ) {
       throw new Error(
-        'Missing required env vars: GEMINI_API_KEY, NEO4J_HTTP_URL, NEO4J_USERNAME, NEO4J_PASSWORD, QDRANT_URL, QDRANT_API_KEY',
+        'Missing required env vars: GEMINI_API_KEY, NEO4J_QUERY_API_URL, NEO4J_USERNAME, NEO4J_PASSWORD, QDRANT_URL, QDRANT_API_KEY',
       );
     }
 

@@ -7,7 +7,7 @@ Edge Function that syncs data from Supabase to Neo4j Aura + Qdrant Cloud.
 1. Claims pending jobs from `graphrag.sync_queue` (populated by triggers on goals, financial_accounts, risk_assessments, career_profiles)
 2. For each job:
    - Builds text representation of the entity
-   - Generates embedding via Gemini `text-embedding-004` (768 dims)
+   - Generates embedding via Gemini `gemini-embedding-001` (768 dims)
    - Upserts/deletes node in Neo4j Aura (HTTP Transaction API)
    - Upserts/deletes point in Qdrant Cloud (REST API)
 3. Marks jobs as completed or failed
@@ -18,7 +18,7 @@ Edge Function that syncs data from Supabase to Neo4j Aura + Qdrant Cloud.
 supabase secrets set \
   GRAPHRAG_WORKER_SECRET=<random-secret> \
   GEMINI_API_KEY=<google-ai-api-key> \
-  NEO4J_HTTP_URL=https://<dbid>.databases.neo4j.io \
+  NEO4J_QUERY_API_URL=https://<dbid>.databases.neo4j.io \
   NEO4J_USERNAME=neo4j \
   NEO4J_PASSWORD=<password> \
   QDRANT_URL=https://<cluster>.qdrant.io:6333 \

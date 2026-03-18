@@ -50,7 +50,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     category: 'finance',
     strategy: 'sdk',
     clientId: process.env.PLAID_CLIENT_ID || 'mock_client_id',
-    clientSecret: process.env.PLAID_CLIENT_SECRET || 'mock_client_secret',
+    clientSecret: process.env.PLAID_SECRET || 'mock_client_secret',
     authorizationUrl: 'https://cdn.plaid.com/link/v2/stable/link.html',
     tokenUrl: 'https://sandbox.plaid.com/item/public_token/exchange',
     apiBaseUrl: 'https://sandbox.plaid.com',
@@ -75,7 +75,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     authorizationUrl: 'https://app.youneedabudget.com/oauth/authorize',
     tokenUrl: 'https://api.youneedabudget.com/v1/oauth/token',
     apiBaseUrl: 'https://api.youneedabudget.com/v1',
-    redirectUri: `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/ynab`,
+    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/integrations/oauth/callback/ynab`,
     scopes: [],
     responseType: 'code',
     grantType: 'authorization_code',
@@ -98,7 +98,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     authorizationUrl: 'https://mint.intuit.com/oauth2/v1/authorize',
     tokenUrl: 'https://mint.intuit.com/oauth2/v1/tokens/bearer',
     apiBaseUrl: 'https://mint.intuit.com/api',
-    redirectUri: `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/mint`,
+    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/integrations/oauth/callback/mint`,
     scopes: ['read'],
     responseType: 'code',
     authorizationMethod: 'header',
@@ -120,7 +120,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     authorizationUrl: 'https://www.coinbase.com/oauth/authorize',
     tokenUrl: 'https://api.coinbase.com/oauth/token',
     apiBaseUrl: 'https://api.coinbase.com/v2',
-    redirectUri: `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/coinbase`,
+    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/integrations/oauth/callback/coinbase`,
     scopes: ['wallet:accounts:read', 'wallet:transactions:read'],
     responseType: 'code',
     authorizationMethod: 'header',
@@ -142,7 +142,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     authorizationUrl: 'https://canvas.instructure.com/login/oauth2/auth',
     tokenUrl: 'https://canvas.instructure.com/login/oauth2/token',
     apiBaseUrl: 'https://canvas.instructure.com/api/v1',
-    redirectUri: `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/canvas`,
+    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/integrations/oauth/callback/canvas`,
     scopes: ['url:GET|/api/v1/courses', 'url:GET|/api/v1/users/self/grades'],
     responseType: 'code',
     authorizationMethod: 'body',
@@ -163,7 +163,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
     apiBaseUrl: 'https://classroom.googleapis.com/v1',
-    redirectUri: `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/google_classroom`,
+    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/integrations/oauth/callback/google_classroom`,
     scopes: [
       'https://www.googleapis.com/auth/classroom.courses.readonly',
       'https://www.googleapis.com/auth/classroom.coursework.me.readonly',
@@ -188,7 +188,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     authorizationUrl: 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/authorize',
     tokenUrl: 'https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token',
     apiBaseUrl: 'https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4',
-    redirectUri: `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/epic_mychart`,
+    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/integrations/oauth/callback/epic_mychart`,
     scopes: ['patient/Patient.read', 'patient/Observation.read', 'patient/Appointment.read'],
     responseType: 'code',
     authorizationMethod: 'header',
@@ -225,7 +225,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     authorizationUrl: 'https://www.linkedin.com/oauth/v2/authorization',
     tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
     apiBaseUrl: 'https://api.linkedin.com/v2',
-    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/linkedin`,
+    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_APP_URL || ''}/api/integrations/oauth/callback/linkedin`,
     scopes: ['r_liteprofile', 'r_emailaddress'],
     responseType: 'code',
     authorizationMethod: 'query',
@@ -263,7 +263,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     authorizationUrl: 'https://connect.smartcar.com/oauth/authorize',
     tokenUrl: 'https://auth.smartcar.com/oauth/token',
     apiBaseUrl: 'https://api.smartcar.com/v2.0',
-    redirectUri: `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/smartcar`,
+    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/integrations/oauth/callback/smartcar`,
     scopes: ['read_vehicle_info', 'read_odometer', 'read_location'],
     responseType: 'code',
     authorizationMethod: 'header',
@@ -285,7 +285,7 @@ const OAUTH_CONFIGS: Record<string, ProviderConfig> = {
     authorizationUrl: 'https://accounts.google.com/o/oauth2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
     apiBaseUrl: 'https://homegraph.googleapis.com/v1',
-    redirectUri: `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback/google_home`,
+    redirectUri: `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/integrations/oauth/callback/google_home`,
     scopes: ['https://www.googleapis.com/auth/homegraph'],
     responseType: 'code',
     authorizationMethod: 'body',
@@ -334,7 +334,7 @@ export function buildAuthorizationUrl(
   url.searchParams.append('client_id', config.clientId);
   url.searchParams.append(
     'redirect_uri',
-    config.redirectUri || `${process.env.NEXTAUTH_URL}/api/integrations/oauth/callback`
+    config.redirectUri || `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/integrations/oauth/callback`
   );
   url.searchParams.append('response_type', config.responseType || 'code');
   url.searchParams.append('state', state);

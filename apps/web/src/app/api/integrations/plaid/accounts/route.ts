@@ -1,6 +1,7 @@
+// DEPRECATED: Plaid accounts now handled by Supabase Edge Function 'plaid-accounts'
+// This route proxies for backward compatibility
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { getAccounts } from '@/lib/integrations/plaid/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,33 +15,9 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
-    const { data: items, error } = await (supabase as any)
-      .from('plaid_items')
-      .select('*')
-      .eq('user_id', user.id);
-
-    if (error) throw error;
-    if (!items || items.length === 0) {
-      return NextResponse.json({ accounts: [] });
-    }
-
-    const allAccounts = [];
-    for (const item of items) {
-      try {
-        const accounts = await getAccounts(item.access_token);
-        allAccounts.push(
-          ...accounts.map((a: any) => ({
-            ...a,
-            institution_name: item.institution_name,
-            item_id: item.item_id,
-          }))
-        );
-      } catch {
-        // Skip items with expired tokens
-      }
-    }
-
-    return NextResponse.json({ accounts: allAccounts });
+    const { data, error } = await supabase.functions.invoke('plaid-accounts');
+    if (error) throw new Error(error.message);
+    return NextResponse.json(data);
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { usePlaidLink } from 'react-plaid-link';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 interface PlaidLinkButtonProps {
   onSuccess?: (accounts: unknown[]) => void;
@@ -17,13 +18,14 @@ export function PlaidLinkButton({ onSuccess, onError, className, children }: Pla
   const fetchLinkToken = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/integrations/plaid/link-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ products: ['auth', 'transactions'] }),
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new Error('Supabase not configured');
+
+      const { data, error } = await supabase.functions.invoke('plaid-link-token', {
+        body: { products: ['auth', 'transactions'] },
       });
-      if (!res.ok) throw new Error('Failed to create link token');
-      const data = await res.json();
+
+      if (error) throw new Error(error.message || 'Failed to create link token');
       setLinkToken(data.linkToken);
     } catch (err) {
       onError?.((err as Error).message);
@@ -35,18 +37,18 @@ export function PlaidLinkButton({ onSuccess, onError, className, children }: Pla
   const handlePlaidSuccess = useCallback(
     async (publicToken: string, metadata: any) => {
       try {
-        const res = await fetch('/api/integrations/plaid/exchange', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
+        const supabase = getSupabaseClient();
+        if (!supabase) throw new Error('Supabase not configured');
+
+        const { data, error } = await supabase.functions.invoke('plaid-exchange', {
+          body: {
             publicToken,
             institutionId: metadata.institution?.institution_id,
             institutionName: metadata.institution?.name,
-            accounts: metadata.accounts,
-          }),
+          },
         });
-        if (!res.ok) throw new Error('Failed to exchange token');
-        const data = await res.json();
+
+        if (error) throw new Error(error.message || 'Failed to exchange token');
         onSuccess?.(data.accounts || []);
       } catch (err) {
         onError?.((err as Error).message);

@@ -1,6 +1,7 @@
 /**
- * Stubs for next-auth — replaced by Supabase auth.
- * Returns safe defaults so pages don't crash during SSR/prerender.
+ * Legacy session stubs — Supabase Auth is the real auth system.
+ * These return safe defaults so pages that still reference useSession don't crash.
+ * TODO: Migrate remaining pages to use Supabase auth hooks directly.
  */
 export function useSession(): { data: any; status: string; update: () => Promise<any> } {
   return {

@@ -1,6 +1,7 @@
+// DEPRECATED: Plaid link-token now handled by Supabase Edge Function 'plaid-link-token'
+// This route proxies for backward compatibility
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { createLinkToken } from '@/lib/integrations/plaid/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,11 +16,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { products } = body;
-    const result = await createLinkToken(user.id, products);
-    return NextResponse.json(result);
+    const { data, error } = await supabase.functions.invoke('plaid-link-token', {
+      body,
+    });
+    if (error) throw new Error(error.message);
+    return NextResponse.json(data);
   } catch (err) {
-    console.error('Plaid link token error:', err);
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
 }
