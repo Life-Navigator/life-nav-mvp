@@ -124,6 +124,4 @@ export default withSentryConfig(nextConfig, {
     deleteSourcemapsAfterUpload: true,
   },
 
-  // Disable Sentry SDK tree-shaking for dev builds
-  disableLogger: true,
 });

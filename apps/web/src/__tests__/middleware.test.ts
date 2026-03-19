@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { middleware } from '../middleware';
+import { proxy as middleware } from '../proxy';
 
 // Mock next/server without requireActual (avoids needing Web Request/Response globals)
 jest.mock('next/server', () => ({
