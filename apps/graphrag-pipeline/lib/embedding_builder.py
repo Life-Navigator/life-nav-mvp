@@ -161,6 +161,28 @@ def build_entity_text(entity_type: str, payload: dict) -> str:
             if payload.get("mime_type"):
                 parts.append(f"Format: {payload['mime_type']}")
 
+        case "email":
+            parts.append(f"Email: {payload.get('subject', 'No Subject')}")
+            if payload.get("from_name") or payload.get("from_address"):
+                parts.append(f"From: {payload.get('from_name', payload.get('from_address', ''))}")
+            if payload.get("snippet"):
+                parts.append(f"Preview: {payload['snippet'][:300]}")
+            if payload.get("date"):
+                parts.append(f"Date: {payload['date']}")
+
+        case "calendar_event":
+            parts.append(f"Calendar Event: {payload.get('summary', 'Untitled Event')}")
+            if payload.get("description"):
+                parts.append(f"Description: {payload['description'][:300]}")
+            if payload.get("location"):
+                parts.append(f"Location: {payload['location']}")
+            if payload.get("start_time"):
+                parts.append(f"Start: {payload['start_time']}")
+            if payload.get("end_time"):
+                parts.append(f"End: {payload['end_time']}")
+            if payload.get("attendee_count"):
+                parts.append(f"Attendees: {payload['attendee_count']}")
+
         case _:
             # Fallback: serialize the payload
             import json

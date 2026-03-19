@@ -9,6 +9,21 @@ from lib.embedding_builder import build_entity_text
 from lib.graph_schema import LABEL_MAP, REL_MAP, DOMAIN_MAP, CROSS_RELATIONSHIPS
 
 
+class SyncPartialError(Exception):
+    """Raised when one backend succeeds but the other fails.
+
+    Carries partial success flags so the caller can record which backends
+    completed before the failure.
+    """
+
+    def __init__(
+        self, message: str, neo4j_synced: bool = False, qdrant_synced: bool = False
+    ):
+        super().__init__(message)
+        self.neo4j_synced = neo4j_synced
+        self.qdrant_synced = qdrant_synced
+
+
 def sync_entity(
     entity_type: str,
     entity_id: str,
@@ -19,6 +34,8 @@ def sync_entity(
     """Sync a single entity to Neo4j and Qdrant.
 
     Returns {"neo4j": bool, "qdrant": bool} indicating success.
+    Raises SyncPartialError if one backend succeeds and the other fails,
+    preserving which backend completed for accurate retry tracking.
     """
     label = LABEL_MAP.get(entity_type, "Entity")
     rel = REL_MAP.get(entity_type, "HAS_ENTITY")
@@ -26,8 +43,29 @@ def sync_entity(
 
     # --- DELETE ---
     if operation == "delete":
-        neo4j_client.delete_entity(label, entity_id, user_id)
-        qdrant_client.delete_points([entity_id])
+        neo4j_ok = False
+        qdrant_ok = False
+        errors: list[str] = []
+
+        try:
+            neo4j_client.delete_entity(label, entity_id, user_id)
+            neo4j_ok = True
+        except Exception as e:
+            errors.append(f"Neo4j delete: {e}")
+
+        try:
+            qdrant_client.delete_points([entity_id])
+            qdrant_ok = True
+        except Exception as e:
+            errors.append(f"Qdrant delete: {e}")
+
+        if errors:
+            raise SyncPartialError(
+                "; ".join(errors),
+                neo4j_synced=neo4j_ok,
+                qdrant_synced=qdrant_ok,
+            )
+
         return {"neo4j": True, "qdrant": True}
 
     # --- UPSERT ---
@@ -40,34 +78,52 @@ def sync_entity(
     # 3. Prepare scalar props for Neo4j
     props = neo4j_client.scalar_props(payload)
 
-    # 4. Upsert to Neo4j
-    neo4j_client.upsert_entity(
-        label=label,
-        entity_id=entity_id,
-        tenant_id=user_id,
-        user_id=user_id,
-        props=props,
-        rel_type=rel,
-    )
+    neo4j_ok = False
+    qdrant_ok = False
+    errors = []
 
-    # 5. Create cross-entity relationships if applicable
-    _create_cross_relationships(entity_type, entity_id, user_id, payload)
+    # 4. Upsert to Neo4j + cross-relationships
+    try:
+        neo4j_client.upsert_entity(
+            label=label,
+            entity_id=entity_id,
+            tenant_id=user_id,
+            user_id=user_id,
+            props=props,
+            rel_type=rel,
+        )
+        # 5. Create cross-entity relationships if applicable
+        _create_cross_relationships(entity_type, entity_id, user_id, payload)
+        neo4j_ok = True
+    except Exception as e:
+        errors.append(f"Neo4j upsert: {e}")
 
     # 6. Upsert to Qdrant
-    qdrant_client.upsert_points([
-        {
-            "id": entity_id,
-            "vector": vector,
-            "payload": {
-                "tenant_id": user_id,
-                "entity_type": entity_type,
-                "entity_id": entity_id,
-                "domain": domain,
-                "text": text,
-                **props,
-            },
-        }
-    ])
+    try:
+        qdrant_client.upsert_points([
+            {
+                "id": entity_id,
+                "vector": vector,
+                "payload": {
+                    "tenant_id": user_id,
+                    "entity_type": entity_type,
+                    "entity_id": entity_id,
+                    "domain": domain,
+                    "text": text,
+                    **props,
+                },
+            }
+        ])
+        qdrant_ok = True
+    except Exception as e:
+        errors.append(f"Qdrant upsert: {e}")
+
+    if errors:
+        raise SyncPartialError(
+            "; ".join(errors),
+            neo4j_synced=neo4j_ok,
+            qdrant_synced=qdrant_ok,
+        )
 
     return {"neo4j": True, "qdrant": True}
 

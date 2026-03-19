@@ -28,6 +28,9 @@ LABEL_MAP: dict[str, str] = {
     "health_metric": "HealthMetric",
     # Documents
     "document": "Document",
+    # Communication & Calendar
+    "email": "Email",
+    "calendar_event": "CalendarEvent",
 }
 
 # entity_type → relationship type from Person to entity
@@ -48,6 +51,8 @@ REL_MAP: dict[str, str] = {
     "health_record": "HAS_HEALTH_RECORD",
     "health_metric": "HAS_HEALTH_METRIC",
     "document": "HAS_DOCUMENT",
+    "email": "HAS_EMAIL",
+    "calendar_event": "HAS_EVENT",
 }
 
 # entity_type → domain string for Qdrant payload
@@ -68,6 +73,8 @@ DOMAIN_MAP: dict[str, str] = {
     "health_record": "health",
     "health_metric": "health",
     "document": "documents",
+    "email": "communication",
+    "calendar_event": "calendar",
 }
 
 # entity_type → source table (for reindex lookups)
@@ -88,6 +95,8 @@ SOURCE_TABLE_MAP: dict[str, str] = {
     "health_record": "health_meta.health_records",
     "health_metric": "health_meta.health_metrics",
     "document": "public.documents",
+    "email": "public.email_messages",
+    "calendar_event": "public.calendar_events",
 }
 
 # Cross-entity relationships that the pipeline creates between entities
@@ -120,6 +129,8 @@ Node labels and properties:
 - (:HealthRecord {entity_id, tenant_id, record_type, date, provider})
 - (:HealthMetric {entity_id, tenant_id, metric_type, value, unit, date})
 - (:Document {entity_id, tenant_id, name, document_type, mime_type})
+- (:Email {entity_id, tenant_id, subject, from_address, from_name, snippet, date, is_read, labels})
+- (:CalendarEvent {entity_id, tenant_id, summary, location, start_time, end_time, all_day, attendee_count, is_organizer})
 
 Relationships:
 - (Person)-[:HAS_GOAL]->(Goal)
@@ -138,6 +149,8 @@ Relationships:
 - (Person)-[:HAS_HEALTH_RECORD]->(HealthRecord)
 - (Person)-[:HAS_HEALTH_METRIC]->(HealthMetric)
 - (Person)-[:HAS_DOCUMENT]->(Document)
+- (Person)-[:HAS_EMAIL]->(Email)
+- (Person)-[:HAS_EVENT]->(CalendarEvent)
 - (Goal)-[:DEPENDS_ON]->(Goal)
 - (FinancialGoal)-[:RELATED_TO_ACCOUNT]->(FinancialAccount)
 - (Transaction)-[:IN_ACCOUNT]->(FinancialAccount)

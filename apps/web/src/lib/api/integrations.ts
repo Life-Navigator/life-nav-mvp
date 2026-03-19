@@ -1,5 +1,5 @@
 // lib/api/integrations.ts
-import { ConnectedService } from '@/types/integration';
+import { ConnectedService, SyncStatusResponse, SyncNowResponse } from '@/types/integration';
 
 /**
  * Initiates the OAuth flow for a provider
@@ -30,12 +30,12 @@ export async function initiateOAuth(providerId: string): Promise<string> {
  */
 export async function fetchConnectedServices(): Promise<ConnectedService[]> {
   const response = await fetch('/api/integrations/services');
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'Failed to fetch connected services');
   }
-  
+
   return response.json();
 }
 
@@ -61,7 +61,7 @@ export async function refreshServices(): Promise<void> {
   const response = await fetch('/api/integrations/refresh', {
     method: 'POST',
   });
-  
+
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || 'Failed to refresh services');
@@ -69,9 +69,9 @@ export async function refreshServices(): Promise<void> {
 }
 
 /**
- * Gets the current sync status
+ * Gets the current sync status including per-source details and GraphRAG queue stats
  */
-export async function getSyncStatus(): Promise<{ status: 'success' | 'in_progress' | 'failed', lastSync: string | null }> {
+export async function getSyncStatus(): Promise<SyncStatusResponse> {
   const response = await fetch('/api/integrations/sync-status');
 
   if (!response.ok) {
@@ -83,24 +83,32 @@ export async function getSyncStatus(): Promise<{ status: 'success' | 'in_progres
 }
 
 /**
- * Manually triggers a sync for a specific integration
- * @param integrationId The ID of the integration to sync
+ * Manually triggers a sync for a specific provider/type
+ * @param provider The provider to sync (e.g., "google", "microsoft")
+ * @param type The sync type: "email" or "calendar"
  */
-export async function triggerSync(integrationId: string): Promise<any> {
-  const response = await fetch('/api/integrations/sync/trigger', {
+export async function triggerSyncNow(
+  provider: string,
+  type: 'email' | 'calendar'
+): Promise<SyncNowResponse> {
+  const response = await fetch('/api/integrations/sync-now', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ integrationId }),
+    body: JSON.stringify({ provider, type }),
   });
 
+  const data = await response.json();
+
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to trigger sync');
+    if (response.status === 429) {
+      return { success: false, error: data.error, retryAfterSeconds: data.retryAfterSeconds };
+    }
+    throw new Error(data.error || 'Failed to trigger sync');
   }
 
-  return response.json();
+  return data;
 }
 
 /**

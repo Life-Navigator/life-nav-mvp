@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
+import * as Sentry from '@sentry/nextjs';
 
 interface RegisterFormData {
   name: string;
@@ -74,6 +75,13 @@ export default function RegisterForm() {
 
     setIsLoading(true);
 
+    Sentry.addBreadcrumb({
+      category: 'auth',
+      message: 'Registration form submitted',
+      level: 'info',
+      data: { route: '/auth/register' },
+    });
+
     try {
       // Call the register API
       const response = await fetch('/api/auth/register', {
@@ -84,6 +92,13 @@ export default function RegisterForm() {
           email: formData.email,
           password: formData.password,
         }),
+      });
+
+      Sentry.addBreadcrumb({
+        category: 'auth',
+        message: `Register API responded ${response.status}`,
+        level: response.ok ? 'info' : 'warning',
+        data: { route: '/auth/register', status: response.status },
       });
 
       // Parse response
@@ -114,6 +129,13 @@ export default function RegisterForm() {
         type: 'success',
       });
 
+      Sentry.addBreadcrumb({
+        category: 'auth',
+        message: 'Registration succeeded, redirecting to login',
+        level: 'info',
+        data: { route: '/auth/register', redirectTo: '/auth/login?registered=true' },
+      });
+
       // Redirect to login page with a query parameter to show a success message
       router.push('/auth/login?registered=true');
     } catch (err) {
@@ -128,6 +150,13 @@ export default function RegisterForm() {
 
       setError(errorMessage);
       console.error('Registration error:', err);
+
+      Sentry.addBreadcrumb({
+        category: 'auth',
+        message: `Registration failed: ${errorMessage}`,
+        level: 'error',
+        data: { route: '/auth/register' },
+      });
 
       // Show error toast as well
       addToast({

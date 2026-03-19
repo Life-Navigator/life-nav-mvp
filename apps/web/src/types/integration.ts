@@ -44,3 +44,29 @@ export interface SyncStatus {
     smarthome?: 'success' | 'in_progress' | 'failed';
   };
 }
+
+export interface SyncSource {
+  provider: string;
+  type: 'email' | 'calendar';
+  status: string;
+  lastSyncAt: string | null;
+  recordCount: number;
+}
+
+export interface GraphRAGQueueStatus {
+  pendingJobs: number;
+  failedJobs: number;
+  lastProcessedAt: string | null;
+}
+
+export interface SyncStatusResponse {
+  sources: SyncSource[];
+  graphrag: GraphRAGQueueStatus;
+}
+
+export interface SyncNowResponse {
+  success: boolean;
+  error?: string;
+  retryAfterSeconds?: number;
+  [key: string]: unknown;
+}

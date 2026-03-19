@@ -11,7 +11,7 @@ import time
 
 from lib.config import Config
 from lib import supabase_client
-from lib.entity_mapper import sync_entity
+from lib.entity_mapper import sync_entity, SyncPartialError
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -95,6 +95,26 @@ class handler(BaseHTTPRequestHandler):
                     "entity_type": entity_type,
                     "operation": operation,
                     "status": "completed",
+                    "duration_ms": int((time.time() - started) * 1000),
+                })
+            except SyncPartialError as e:
+                # One backend succeeded, the other failed — record partial progress
+                err_text = str(e)[:2000]
+                supabase_client.complete_sync_job(
+                    job_id=job_id,
+                    neo4j_synced=e.neo4j_synced,
+                    qdrant_synced=e.qdrant_synced,
+                    error=err_text,
+                )
+                summary["failed"] += 1
+                summary["details"].append({
+                    "job_id": job_id,
+                    "entity_type": entity_type,
+                    "operation": operation,
+                    "status": "partial",
+                    "neo4j_synced": e.neo4j_synced,
+                    "qdrant_synced": e.qdrant_synced,
+                    "error": err_text,
                     "duration_ms": int((time.time() - started) * 1000),
                 })
             except Exception as e:

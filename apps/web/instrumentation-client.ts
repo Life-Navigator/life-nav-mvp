@@ -16,6 +16,15 @@ Sentry.init({
     Sentry.browserTracingIntegration(),
   ],
 
+  // Filter non-actionable browser errors
+  ignoreErrors: [
+    // RSC stream closed by browser (bots, navigating away, network interruptions)
+    'Connection closed.',
+    // Common benign browser errors
+    'ResizeObserver loop limit exceeded',
+    'ResizeObserver loop completed with undelivered notifications',
+  ],
+
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
   debug: false,
 });
