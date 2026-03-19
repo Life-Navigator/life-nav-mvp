@@ -22,7 +22,30 @@ export async function GET() {
     const raw = await listCertifications(supabase, user.id);
     const certifications = raw.map(mapCourseToCertification);
     const stats = computeCertificationStats(raw);
-    return NextResponse.json({ certifications, stats });
+
+    // Query documents table for linked certificate images
+    const { data: docs } = (await supabase
+      .from('documents')
+      .select('storage_path, metadata')
+      .eq('user_id', user.id)
+      .in('document_type', ['certificate', 'transcript'])) as {
+      data: Array<{ storage_path: string; metadata: Record<string, unknown> }> | null;
+    };
+
+    const imageMap = new Map<string, string>();
+    for (const doc of docs || []) {
+      const linkedId = doc.metadata?.linked_course_id;
+      if (typeof linkedId === 'string') {
+        imageMap.set(linkedId, doc.storage_path);
+      }
+    }
+
+    const certsWithImages = certifications.map((c: Record<string, unknown>) => ({
+      ...c,
+      certificateImagePath: imageMap.get(c.id as string) || null,
+    }));
+
+    return NextResponse.json({ certifications: certsWithImages, stats });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
@@ -40,16 +63,36 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const courseData = {
-      title: body.title,
+      course_name: body.title || body.courseName || body.name,
       provider: body.provider,
-      platform: body.platform || null,
+      url: body.platform || null,
       certificate_url: body.certificateUrl || null,
       status: 'completed',
-      completed_at: body.certificateDate || new Date().toISOString(),
+      completion_date: body.certificateDate || new Date().toISOString(),
       skills_learned: body.skills || [],
     };
     const course = await createCourse(supabase, user.id, courseData);
-    return NextResponse.json({ certification: mapCourseToCertification(course) }, { status: 201 });
+    const certification = mapCourseToCertification(course);
+
+    // If a document was uploaded, link it to the newly created course
+    if (body.documentId) {
+      await (supabase.from('documents') as any)
+        .update({
+          metadata: { linked_course_id: course.id },
+        })
+        .eq('id', body.documentId)
+        .eq('user_id', user.id);
+    }
+
+    return NextResponse.json(
+      {
+        certification: {
+          ...certification,
+          certificateImagePath: body.storagePath || null,
+        },
+      },
+      { status: 201 }
+    );
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }

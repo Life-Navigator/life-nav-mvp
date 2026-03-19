@@ -1,0 +1,455 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# ============================================================================
+# SHACL Validation Shapes for Goals Domain
+# ============================================================================
+
+# Goal Shape
+ln:GoalShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Goal ;
+    sh:property [
+        sh:path ln:goalName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Goal must have exactly one non-empty goalName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:goalStartDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Goal can have at most one goalStartDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:goalTargetDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Goal can have at most one goalTargetDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:goalCompletedDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Goal can have at most one goalCompletedDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:goalStatus ;
+        sh:datatype xsd:string ;
+        sh:in ("NOT_STARTED" "IN_PROGRESS" "ON_TRACK" "AT_RISK" "BLOCKED" "COMPLETED" "ABANDONED") ;
+        sh:maxCount 1 ;
+        sh:message "Goal status must be valid goal status"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:goalPriority ;
+        sh:datatype xsd:string ;
+        sh:in ("LOW" "MEDIUM" "HIGH" "CRITICAL") ;
+        sh:maxCount 1 ;
+        sh:message "Goal priority must be valid priority level"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:goalCategory ;
+        sh:datatype xsd:string ;
+        sh:in ("FINANCIAL" "CAREER" "HEALTH" "EDUCATION" "PERSONAL" "RELATIONSHIP") ;
+        sh:maxCount 1 ;
+        sh:message "Goal category must be valid goal category"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:timeHorizon ;
+        sh:datatype xsd:string ;
+        sh:in ("SHORT_TERM" "MID_TERM" "LONG_TERM") ;
+        sh:maxCount 1 ;
+        sh:message "Time horizon must be valid time horizon"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isPublic ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Goal can have at most one isPublic flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:targetValue ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:message "Goal can have at most one targetValue"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:currentValue ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:message "Goal can have at most one currentValue"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:startingValue ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:message "Goal can have at most one startingValue"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:progressPercentage ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message "Progress percentage must be between 0.0 and 100.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:goalOf ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Goal must belong to exactly one Person"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Goal must have exactly one non-empty tenantId"@en ;
+    ] .
+
+# SMART Goal Shape
+ln:SMARTGoalShape
+    a sh:NodeShape ;
+    sh:targetClass ln:SMARTGoal ;
+    sh:property [
+        sh:path ln:isSpecific ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "SMART goal can have at most one isSpecific flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isMeasurable ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "SMART goal can have at most one isMeasurable flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isAchievable ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "SMART goal can have at most one isAchievable flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isRelevant ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "SMART goal can have at most one isRelevant flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isTimeBound ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "SMART goal can have at most one isTimeBound flag"@en ;
+    ] .
+
+# Milestone Shape
+ln:MilestoneShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Milestone ;
+    sh:property [
+        sh:path ln:milestoneName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Milestone must have exactly one non-empty milestoneName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:milestoneTargetDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Milestone can have at most one milestoneTargetDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:milestoneCompletedDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Milestone can have at most one milestoneCompletedDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:milestoneStatus ;
+        sh:datatype xsd:string ;
+        sh:in ("NOT_STARTED" "IN_PROGRESS" "COMPLETED" "SKIPPED") ;
+        sh:maxCount 1 ;
+        sh:message "Milestone status must be valid milestone status"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:milestoneOrder ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 1 ;
+        sh:message "Milestone order must be positive"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:milestoneValue ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:message "Milestone can have at most one milestoneValue"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:milestoneFor ;
+        sh:class ln:Goal ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Milestone must be for exactly one Goal"@en ;
+    ] .
+
+# Action Item Shape
+ln:ActionItemShape
+    a sh:NodeShape ;
+    sh:targetClass ln:ActionItem ;
+    sh:property [
+        sh:path ln:actionName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Action item must have exactly one non-empty actionName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:actionDueDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Action item can have at most one actionDueDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:actionCompletedDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Action item can have at most one actionCompletedDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:actionStatus ;
+        sh:datatype xsd:string ;
+        sh:in ("TODO" "IN_PROGRESS" "DONE" "CANCELLED") ;
+        sh:maxCount 1 ;
+        sh:message "Action status must be valid action status"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:estimatedEffort ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 1 ;
+        sh:maxInclusive 10080 ;
+        sh:message "Estimated effort must be between 1 and 10080 minutes (1 week)"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:actualEffort ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:message "Actual effort must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:actionFor ;
+        sh:class ln:Goal ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Action item must be for exactly one Goal"@en ;
+    ] .
+
+# Recurring Action Shape
+ln:RecurringActionShape
+    a sh:NodeShape ;
+    sh:targetClass ln:RecurringAction ;
+    sh:property [
+        sh:path ln:recurrencePattern ;
+        sh:datatype xsd:string ;
+        sh:in ("DAILY" "WEEKLY" "BIWEEKLY" "MONTHLY" "QUARTERLY" "ANNUALLY") ;
+        sh:maxCount 1 ;
+        sh:message "Recurrence pattern must be valid recurrence pattern"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:recurrenceStartDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Recurring action can have at most one recurrenceStartDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:recurrenceEndDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Recurring action can have at most one recurrenceEndDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:completionCount ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:message "Completion count must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:targetCompletionCount ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 1 ;
+        sh:message "Target completion count must be positive"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:currentStreak ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:message "Current streak must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:longestStreak ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:message "Longest streak must be non-negative"@en ;
+    ] .
+
+# Progress Update Shape
+ln:ProgressUpdateShape
+    a sh:NodeShape ;
+    sh:targetClass ln:ProgressUpdate ;
+    sh:property [
+        sh:path ln:updateDate ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Progress update must have exactly one updateDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:valueAtUpdate ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:message "Progress update can have at most one valueAtUpdate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:percentageAtUpdate ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message "Percentage at update must be between 0.0 and 100.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:updateFor ;
+        sh:class ln:Goal ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Progress update must be for exactly one Goal"@en ;
+    ] .
+
+# Check-In Shape
+ln:CheckInShape
+    a sh:NodeShape ;
+    sh:targetClass ln:CheckIn ;
+    sh:property [
+        sh:path ln:checkInDate ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Check-in must have exactly one checkInDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:checkInType ;
+        sh:datatype xsd:string ;
+        sh:in ("DAILY" "WEEKLY" "MONTHLY" "QUARTERLY") ;
+        sh:maxCount 1 ;
+        sh:message "Check-in type must be valid check-in type"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:onTrack ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Check-in can have at most one onTrack flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:confidenceLevel ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 1.0 ;
+        sh:message "Confidence level must be between 0.0 and 1.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:motivationLevel ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 1 ;
+        sh:maxInclusive 10 ;
+        sh:message "Motivation level must be between 1 and 10"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:needsAdjustment ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Check-in can have at most one needsAdjustment flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:checkInFor ;
+        sh:class ln:Goal ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Check-in must be for exactly one Goal"@en ;
+    ] .
+
+# Reflection Shape
+ln:ReflectionShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Reflection ;
+    sh:property [
+        sh:path ln:reflectionDate ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Reflection must have exactly one reflectionDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:reflectionText ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Reflection must have exactly one non-empty reflectionText"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:reflectionOn ;
+        sh:class ln:Goal ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Reflection must be on exactly one Goal"@en ;
+    ] .
+
+# Financial Goal Shape
+ln:FinancialGoalShape
+    a sh:NodeShape ;
+    sh:targetClass ln:FinancialGoal ;
+    sh:property [
+        sh:path ln:relatedToAccount ;
+        sh:class ln:FinancialAccount ;
+        sh:maxCount 1 ;
+        sh:message "Financial goal can be related to at most one FinancialAccount"@en ;
+    ] .
+
+# Education Goal Shape
+ln:EducationGoalShape
+    a sh:NodeShape ;
+    sh:targetClass ln:EducationGoal ;
+    sh:property [
+        sh:path ln:relatedToEducation ;
+        sh:class ln:EducationRecord ;
+        sh:maxCount 1 ;
+        sh:message "Education goal can be related to at most one EducationRecord"@en ;
+    ] .
+
+# Health Goal Shape
+ln:HealthGoalShape
+    a sh:NodeShape ;
+    sh:targetClass ln:HealthGoal ;
+    sh:property [
+        sh:path ln:relatedToCondition ;
+        sh:class ln:Condition ;
+        sh:maxCount 1 ;
+        sh:message "Health goal can be related to at most one Condition"@en ;
+    ] .

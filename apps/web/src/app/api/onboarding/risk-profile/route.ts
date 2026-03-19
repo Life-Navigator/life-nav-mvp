@@ -25,15 +25,15 @@ export async function POST(request: NextRequest) {
   const { error } = await (supabase as any).from('risk_assessments').insert({
     user_id: user.id,
     assessment_type: 'onboarding',
-    overall_score: overallScore,
-    risk_level: riskLevel,
-    status: 'completed',
-    responses: body.assessmentResponses || body.responses || {},
+    overall_risk_score: overallScore,
+    risk_tolerance: riskLevel,
+    completed_at: new Date().toISOString(),
     metadata: {
       financialRiskTolerance: financialRisk,
       careerRiskTolerance: careerRisk,
       educationRiskTolerance: educationRisk,
       riskTheta: body.riskTheta,
+      assessmentResponses: body.assessmentResponses || body.responses || {},
     },
   });
 

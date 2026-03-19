@@ -1,0 +1,66 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ============================================================================
+# Cross-Domain Object Properties
+# Links between Career, Education, Finance, Health, and Goals domains
+# ============================================================================
+
+# Education → Career
+ln:skillFromCourse a owl:ObjectProperty ;
+    rdfs:domain ln:Course ;
+    rdfs:range ln:Skill ;
+    rdfs:label "skill from course"@en ;
+    rdfs:comment "Skill acquired from completing a course"@en .
+
+# Education → Finance
+ln:fundedBy a owl:ObjectProperty ;
+    rdfs:domain ln:EducationRecord ;
+    rdfs:range ln:FinancialAccount ;
+    rdfs:label "funded by"@en ;
+    rdfs:comment "Financial account used to fund education"@en .
+
+# Career → Finance
+ln:salaryAccount a owl:ObjectProperty ;
+    rdfs:domain ln:JobExperience ;
+    rdfs:range ln:FinancialAccount ;
+    rdfs:label "salary account"@en ;
+    rdfs:comment "Account where salary is deposited"@en .
+
+# Health → Goals (inverse of existing relatedToCondition)
+ln:conditionAffects a owl:ObjectProperty ;
+    rdfs:domain ln:Condition ;
+    rdfs:range ln:Goal ;
+    rdfs:label "condition affects"@en ;
+    rdfs:comment "Goal affected by this health condition"@en ;
+    owl:inverseOf ln:relatedToCondition .
+
+# Finance holdings → Goals
+ln:investmentForGoal a owl:ObjectProperty ;
+    rdfs:domain ln:InvestmentHolding ;
+    rdfs:range ln:FinancialGoal ;
+    rdfs:label "investment for goal"@en ;
+    rdfs:comment "Investment holding allocated toward a financial goal"@en .
+
+# Health internal
+ln:appointmentForCondition a owl:ObjectProperty ;
+    rdfs:domain ln:Appointment ;
+    rdfs:range ln:Condition ;
+    rdfs:label "appointment for condition"@en ;
+    rdfs:comment "Medical appointment related to a specific condition"@en .
+
+ln:labResultForCondition a owl:ObjectProperty ;
+    rdfs:domain ln:LabResult ;
+    rdfs:range ln:Condition ;
+    rdfs:label "lab result for condition"@en ;
+    rdfs:comment "Lab test result related to a specific condition"@en .
+
+# Metadata
+<https://ln.life/ontology/core/cross-domain> a owl:Ontology ;
+    dc:title "Life Navigator Cross-Domain Properties"@en ;
+    dc:description "Object properties linking Career, Education, Finance, Health, and Goals domains"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

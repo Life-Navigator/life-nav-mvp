@@ -1,0 +1,630 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix schema: <https://schema.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ============================================================================
+# Career Domain - Job Search, Applications, Interviews
+# ============================================================================
+
+# Core Job Search Classes
+ln:JobPosting a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Job Posting"@en ;
+    rdfs:comment "A job opening or position listing"@en .
+
+ln:JobApplication a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Job Application"@en ;
+    rdfs:comment "Application submitted for a job posting"@en .
+
+ln:Interview a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Interview"@en ;
+    rdfs:comment "Interview session for a job application"@en .
+
+ln:PhoneScreen a owl:Class ;
+    rdfs:subClassOf ln:Interview ;
+    rdfs:label "Phone Screen"@en .
+
+ln:TechnicalInterview a owl:Class ;
+    rdfs:subClassOf ln:Interview ;
+    rdfs:label "Technical Interview"@en .
+
+ln:BehavioralInterview a owl:Class ;
+    rdfs:subClassOf ln:Interview ;
+    rdfs:label "Behavioral Interview"@en .
+
+ln:OnSiteInterview a owl:Class ;
+    rdfs:subClassOf ln:Interview ;
+    rdfs:label "On-Site Interview"@en .
+
+ln:PanelInterview a owl:Class ;
+    rdfs:subClassOf ln:Interview ;
+    rdfs:label "Panel Interview"@en .
+
+# Resume and Cover Letter Classes
+ln:Resume a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Resume"@en ;
+    rdfs:comment "Professional resume/CV document"@en .
+
+ln:CoverLetter a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Cover Letter"@en ;
+    rdfs:comment "Application cover letter"@en .
+
+# Job Offer Classes
+ln:JobOffer a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Job Offer"@en ;
+    rdfs:comment "Formal job offer from employer"@en .
+
+ln:Rejection a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Rejection"@en ;
+    rdfs:comment "Job application rejection"@en .
+
+# Networking Classes
+ln:Contact a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Professional Contact"@en ;
+    rdfs:comment "Professional connection or network contact"@en .
+
+ln:Referral a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Referral"@en ;
+    rdfs:comment "Employee referral for a job"@en .
+
+# Job Posting Properties
+ln:postingTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "posting title"@en .
+
+ln:postingCompany a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "posting company"@en .
+
+ln:postingLocation a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "posting location"@en .
+
+ln:postingUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "posting URL"@en .
+
+ln:postingDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "posting description"@en .
+
+ln:postingRequirements a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "posting requirements"@en .
+
+ln:requiredSkills a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "required skills"@en ;
+    rdfs:comment "Comma-separated list of required skills"@en .
+
+ln:preferredSkills a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "preferred skills"@en .
+
+ln:salaryMin a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "minimum salary"@en .
+
+ln:salaryMax a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "maximum salary"@en .
+
+ln:salaryCurrency a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "salary currency"@en .
+
+ln:salaryPeriod a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "salary period"@en ;
+    rdfs:comment "HOURLY, MONTHLY, ANNUAL"@en .
+
+ln:employmentType a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "employment type"@en ;
+    rdfs:comment "FULL_TIME, PART_TIME, CONTRACT, INTERNSHIP, TEMPORARY"@en .
+
+ln:workArrangement a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "work arrangement"@en ;
+    rdfs:comment "REMOTE, HYBRID, ON_SITE"@en .
+
+ln:experienceLevel a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "experience level"@en ;
+    rdfs:comment "ENTRY, MID, SENIOR, LEAD, MANAGER, DIRECTOR, EXECUTIVE"@en .
+
+ln:postedDate a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:date ;
+    rdfs:label "posted date"@en .
+
+ln:applicationDeadline a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:date ;
+    rdfs:label "application deadline"@en .
+
+ln:postingSource a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "posting source"@en ;
+    rdfs:comment "Platform where found (LinkedIn, Indeed, company site)"@en .
+
+ln:postingIsActive a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "posting is active"@en .
+
+ln:benefits a owl:DatatypeProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range xsd:string ;
+    rdfs:label "benefits"@en ;
+    rdfs:comment "Benefit package description"@en .
+
+# Job Application Properties
+ln:applicationStatus a owl:DatatypeProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "application status"@en ;
+    rdfs:comment "SAVED, APPLIED, UNDER_REVIEW, INTERVIEWING, OFFERED, REJECTED, WITHDRAWN, ACCEPTED"@en .
+
+ln:appliedDate a owl:DatatypeProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "applied date"@en .
+
+ln:lastUpdateDate a owl:DatatypeProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "last update date"@en .
+
+ln:applicationNotes a owl:DatatypeProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "application notes"@en ;
+    rdfs:comment "Personal notes about the application"@en .
+
+ln:followUpDate a owl:DatatypeProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range xsd:date ;
+    rdfs:label "follow-up date"@en ;
+    rdfs:comment "Planned date to follow up"@en .
+
+ln:contactName a owl:DatatypeProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact name"@en ;
+    rdfs:comment "Recruiter or hiring manager name"@en .
+
+ln:contactEmail a owl:DatatypeProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact email"@en .
+
+ln:contactPhone a owl:DatatypeProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact phone"@en .
+
+ln:applicationPriority a owl:DatatypeProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range xsd:string ;
+    rdfs:label "application priority"@en ;
+    rdfs:comment "LOW, MEDIUM, HIGH, TOP_CHOICE"@en .
+
+ln:matchScore a owl:DatatypeProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "match score"@en ;
+    rdfs:comment "AI-calculated match score (0.0-1.0)"@en .
+
+# Interview Properties
+ln:interviewType a owl:DatatypeProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range xsd:string ;
+    rdfs:label "interview type"@en ;
+    rdfs:comment "PHONE, VIDEO, IN_PERSON, TECHNICAL, BEHAVIORAL, PANEL"@en .
+
+ln:interviewDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "interview date"@en .
+
+ln:interviewDuration a owl:DatatypeProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range xsd:integer ;
+    rdfs:label "interview duration"@en ;
+    rdfs:comment "Duration in minutes"@en .
+
+ln:interviewLocation a owl:DatatypeProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range xsd:string ;
+    rdfs:label "interview location"@en ;
+    rdfs:comment "Physical address or video call link"@en .
+
+ln:interviewerName a owl:DatatypeProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range xsd:string ;
+    rdfs:label "interviewer name"@en .
+
+ln:interviewerTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range xsd:string ;
+    rdfs:label "interviewer title"@en .
+
+ln:interviewNotes a owl:DatatypeProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range xsd:string ;
+    rdfs:label "interview notes"@en ;
+    rdfs:comment "Notes taken during/after interview"@en .
+
+ln:interviewQuestions a owl:DatatypeProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range xsd:string ;
+    rdfs:label "interview questions"@en ;
+    rdfs:comment "Questions asked during interview"@en .
+
+ln:technicalTopics a owl:DatatypeProperty ;
+    rdfs:domain ln:TechnicalInterview ;
+    rdfs:range xsd:string ;
+    rdfs:label "technical topics"@en ;
+    rdfs:comment "Technical topics covered (algorithms, system design, etc.)"@en .
+
+ln:codingChallengeUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:TechnicalInterview ;
+    rdfs:range xsd:string ;
+    rdfs:label "coding challenge URL"@en .
+
+ln:interviewOutcome a owl:DatatypeProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range xsd:string ;
+    rdfs:label "interview outcome"@en ;
+    rdfs:comment "PASSED, FAILED, PENDING, CANCELLED"@en .
+
+ln:interviewFeedback a owl:DatatypeProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range xsd:string ;
+    rdfs:label "interview feedback"@en ;
+    rdfs:comment "Feedback received from interviewer"@en .
+
+# Resume Properties
+ln:resumeTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:Resume ;
+    rdfs:range xsd:string ;
+    rdfs:label "resume title"@en .
+
+ln:resumeVersion a owl:DatatypeProperty ;
+    rdfs:domain ln:Resume ;
+    rdfs:range xsd:string ;
+    rdfs:label "resume version"@en ;
+    rdfs:comment "Version identifier (e.g., v2.3, Software Engineer Resume)"@en .
+
+ln:resumeFileUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:Resume ;
+    rdfs:range xsd:string ;
+    rdfs:label "resume file URL"@en .
+
+ln:resumeFormat a owl:DatatypeProperty ;
+    rdfs:domain ln:Resume ;
+    rdfs:range xsd:string ;
+    rdfs:label "resume format"@en ;
+    rdfs:comment "PDF, DOCX, TXT"@en .
+
+ln:createdDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Resume ;
+    rdfs:range xsd:date ;
+    rdfs:label "created date"@en .
+
+ln:lastModifiedDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Resume ;
+    rdfs:range xsd:date ;
+    rdfs:label "last modified date"@en .
+
+ln:tailoredFor a owl:DatatypeProperty ;
+    rdfs:domain ln:Resume ;
+    rdfs:range xsd:string ;
+    rdfs:label "tailored for"@en ;
+    rdfs:comment "Job title or company this resume is optimized for"@en .
+
+ln:isDefaultResume a owl:DatatypeProperty ;
+    rdfs:domain ln:Resume ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is default resume"@en .
+
+# Cover Letter Properties
+ln:coverLetterText a owl:DatatypeProperty ;
+    rdfs:domain ln:CoverLetter ;
+    rdfs:range xsd:string ;
+    rdfs:label "cover letter text"@en .
+
+ln:coverLetterFileUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:CoverLetter ;
+    rdfs:range xsd:string ;
+    rdfs:label "cover letter file URL"@en .
+
+ln:addressedTo a owl:DatatypeProperty ;
+    rdfs:domain ln:CoverLetter ;
+    rdfs:range xsd:string ;
+    rdfs:label "addressed to"@en ;
+    rdfs:comment "Hiring manager name"@en .
+
+# Job Offer Properties
+ln:offerDate a owl:DatatypeProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range xsd:date ;
+    rdfs:label "offer date"@en .
+
+ln:offerDeadline a owl:DatatypeProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range xsd:date ;
+    rdfs:label "offer deadline"@en ;
+    rdfs:comment "Deadline to accept/decline"@en .
+
+ln:offerSalary a owl:DatatypeProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "offer salary"@en .
+
+ln:signingBonus a owl:DatatypeProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "signing bonus"@en .
+
+ln:equityGrant a owl:DatatypeProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range xsd:string ;
+    rdfs:label "equity grant"@en ;
+    rdfs:comment "Stock options, RSUs, etc."@en .
+
+ln:startDate a owl:DatatypeProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range xsd:date ;
+    rdfs:label "start date"@en .
+
+ln:offerStatus a owl:DatatypeProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range xsd:string ;
+    rdfs:label "offer status"@en ;
+    rdfs:comment "PENDING, ACCEPTED, DECLINED, NEGOTIATING"@en .
+
+ln:offerBenefits a owl:DatatypeProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range xsd:string ;
+    rdfs:label "offer benefits"@en .
+
+ln:offerFileUrl a owl:DatatypeProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range xsd:string ;
+    rdfs:label "offer file URL"@en ;
+    rdfs:comment "Link to offer letter PDF"@en .
+
+ln:negotiationNotes a owl:DatatypeProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range xsd:string ;
+    rdfs:label "negotiation notes"@en .
+
+# Rejection Properties
+ln:rejectionDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Rejection ;
+    rdfs:range xsd:date ;
+    rdfs:label "rejection date"@en .
+
+ln:rejectionReason a owl:DatatypeProperty ;
+    rdfs:domain ln:Rejection ;
+    rdfs:range xsd:string ;
+    rdfs:label "rejection reason"@en ;
+    rdfs:comment "Reason provided (if any)"@en .
+
+ln:rejectionStage a owl:DatatypeProperty ;
+    rdfs:domain ln:Rejection ;
+    rdfs:range xsd:string ;
+    rdfs:label "rejection stage"@en ;
+    rdfs:comment "APPLICATION, PHONE_SCREEN, TECHNICAL, FINAL, POST_OFFER"@en .
+
+ln:rejectionFeedback a owl:DatatypeProperty ;
+    rdfs:domain ln:Rejection ;
+    rdfs:range xsd:string ;
+    rdfs:label "rejection feedback"@en .
+
+# Contact Properties
+ln:contactFullName a owl:DatatypeProperty ;
+    rdfs:domain ln:Contact ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact full name"@en .
+
+ln:contactTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:Contact ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact title"@en .
+
+ln:contactCompany a owl:DatatypeProperty ;
+    rdfs:domain ln:Contact ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact company"@en .
+
+ln:contactEmail a owl:DatatypeProperty ;
+    rdfs:domain ln:Contact ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact email"@en .
+
+ln:contactLinkedIn a owl:DatatypeProperty ;
+    rdfs:domain ln:Contact ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact LinkedIn"@en .
+
+ln:relationshipType a owl:DatatypeProperty ;
+    rdfs:domain ln:Contact ;
+    rdfs:range xsd:string ;
+    rdfs:label "relationship type"@en ;
+    rdfs:comment "COLLEAGUE, RECRUITER, HIRING_MANAGER, PEER, MENTOR"@en .
+
+ln:lastContactedDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Contact ;
+    rdfs:range xsd:date ;
+    rdfs:label "last contacted date"@en .
+
+ln:contactNotes a owl:DatatypeProperty ;
+    rdfs:domain ln:Contact ;
+    rdfs:range xsd:string ;
+    rdfs:label "contact notes"@en .
+
+# Referral Properties
+ln:referralDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Referral ;
+    rdfs:range xsd:date ;
+    rdfs:label "referral date"@en .
+
+ln:referredBy a owl:DatatypeProperty ;
+    rdfs:domain ln:Referral ;
+    rdfs:range xsd:string ;
+    rdfs:label "referred by"@en .
+
+ln:referralCode a owl:DatatypeProperty ;
+    rdfs:domain ln:Referral ;
+    rdfs:range xsd:string ;
+    rdfs:label "referral code"@en .
+
+ln:referralStatus a owl:DatatypeProperty ;
+    rdfs:domain ln:Referral ;
+    rdfs:range xsd:string ;
+    rdfs:label "referral status"@en ;
+    rdfs:comment "PENDING, SUBMITTED, ACCEPTED, DECLINED"@en .
+
+# Relationships - Person to Applications
+ln:appliedTo a owl:ObjectProperty ;
+    rdfs:domain ln:Person ;
+    rdfs:range ln:JobApplication ;
+    rdfs:label "applied to"@en ;
+    owl:inverseOf ln:applicationBy .
+
+ln:applicationBy a owl:ObjectProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range ln:Person ;
+    rdfs:label "application by"@en ;
+    owl:inverseOf ln:appliedTo .
+
+# Relationships - Application to Posting
+ln:applicationFor a owl:ObjectProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range ln:JobPosting ;
+    rdfs:label "application for"@en ;
+    owl:inverseOf ln:hasApplication .
+
+ln:hasApplication a owl:ObjectProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range ln:JobApplication ;
+    rdfs:label "has application"@en ;
+    owl:inverseOf ln:applicationFor .
+
+# Relationships - Application to Resume/Cover Letter
+ln:submittedResume a owl:ObjectProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range ln:Resume ;
+    rdfs:label "submitted resume"@en .
+
+ln:submittedCoverLetter a owl:ObjectProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range ln:CoverLetter ;
+    rdfs:label "submitted cover letter"@en .
+
+# Relationships - Application to Interviews
+ln:hasInterview a owl:ObjectProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range ln:Interview ;
+    rdfs:label "has interview"@en ;
+    owl:inverseOf ln:interviewFor .
+
+ln:interviewFor a owl:ObjectProperty ;
+    rdfs:domain ln:Interview ;
+    rdfs:range ln:JobApplication ;
+    rdfs:label "interview for"@en ;
+    owl:inverseOf ln:hasInterview .
+
+# Relationships - Application to Offer/Rejection
+ln:receivedOffer a owl:ObjectProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range ln:JobOffer ;
+    rdfs:label "received offer"@en ;
+    owl:inverseOf ln:offerFor .
+
+ln:offerFor a owl:ObjectProperty ;
+    rdfs:domain ln:JobOffer ;
+    rdfs:range ln:JobApplication ;
+    rdfs:label "offer for"@en ;
+    owl:inverseOf ln:receivedOffer .
+
+ln:receivedRejection a owl:ObjectProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range ln:Rejection ;
+    rdfs:label "received rejection"@en ;
+    owl:inverseOf ln:rejectionFor .
+
+ln:rejectionFor a owl:ObjectProperty ;
+    rdfs:domain ln:Rejection ;
+    rdfs:range ln:JobApplication ;
+    rdfs:label "rejection for"@en ;
+    owl:inverseOf ln:receivedRejection .
+
+# Relationships - Application to Referral
+ln:hasReferral a owl:ObjectProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range ln:Referral ;
+    rdfs:label "has referral"@en .
+
+ln:referredFrom a owl:ObjectProperty ;
+    rdfs:domain ln:JobApplication ;
+    rdfs:range ln:Contact ;
+    rdfs:label "referred from"@en ;
+    rdfs:comment "Contact who provided the referral"@en .
+
+# Relationships - Person to Contacts
+ln:hasContact a owl:ObjectProperty ;
+    rdfs:domain ln:Person ;
+    rdfs:range ln:Contact ;
+    rdfs:label "has contact"@en ;
+    owl:inverseOf ln:contactOf .
+
+ln:contactOf a owl:ObjectProperty ;
+    rdfs:domain ln:Contact ;
+    rdfs:range ln:Person ;
+    rdfs:label "contact of"@en ;
+    owl:inverseOf ln:hasContact .
+
+# Relationships - Posting to Organization
+ln:postedBy a owl:ObjectProperty ;
+    rdfs:domain ln:JobPosting ;
+    rdfs:range schema:Organization ;
+    rdfs:label "posted by"@en .
+
+# Metadata
+<https://ln.life/ontology/career/job> a owl:Ontology ;
+    dc:title "Life Navigator Career Job Search Ontology"@en ;
+    dc:description "Ontology for job search, applications, interviews, offers, and networking"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

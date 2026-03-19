@@ -1,0 +1,451 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# ============================================================================
+# SHACL Validation Shapes for Finance Domain
+# ============================================================================
+
+# FinancialAccount Shape
+ln:FinancialAccountShape
+    a sh:NodeShape ;
+    sh:targetClass ln:FinancialAccount ;
+    sh:property [
+        sh:path ln:accountName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Financial account must have exactly one non-empty accountName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:accountBalance ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:message "Account can have at most one accountBalance"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:currency ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:pattern "^[A-Z]{3}$" ;
+        sh:message "Currency must be a valid ISO 4217 code (3 uppercase letters)"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:accountIsActive ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Account can have at most one accountIsActive flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:accountOwnedBy ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Financial account must be owned by exactly one Person"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Financial account must have exactly one non-empty tenantId"@en ;
+    ] .
+
+# Transaction Shape
+ln:TransactionShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Transaction ;
+    sh:property [
+        sh:path ln:transactionAmount ;
+        sh:datatype xsd:decimal ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Transaction must have exactly one transactionAmount"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:transactionDate ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Transaction must have exactly one transactionDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:category ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "Transaction can have at most one category"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:transactionIn ;
+        sh:class ln:FinancialAccount ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Transaction must be in exactly one FinancialAccount"@en ;
+    ] .
+
+# Investment Instrument Shape
+ln:InvestmentInstrumentShape
+    a sh:NodeShape ;
+    sh:targetClass ln:InvestmentInstrument ;
+    sh:property [
+        sh:path ln:instrumentName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Investment instrument must have exactly one non-empty instrumentName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tickerSymbol ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:pattern "^[A-Z]{1,5}$" ;
+        sh:message "Ticker symbol must be 1-5 uppercase letters"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:currentPrice ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Current price must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:assetClass ;
+        sh:datatype xsd:string ;
+        sh:in ("EQUITY" "FIXED_INCOME" "COMMODITY" "REAL_ESTATE" "CRYPTO") ;
+        sh:maxCount 1 ;
+        sh:message "Asset class must be valid asset class type"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:riskRating ;
+        sh:datatype xsd:string ;
+        sh:in ("LOW" "MEDIUM" "HIGH" "VERY_HIGH") ;
+        sh:maxCount 1 ;
+        sh:message "Risk rating must be valid risk level"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isActiveTrade ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Instrument can have at most one isActiveTrade flag"@en ;
+    ] .
+
+# InvestmentHolding Shape
+ln:InvestmentHoldingShape
+    a sh:NodeShape ;
+    sh:targetClass ln:InvestmentHolding ;
+    sh:property [
+        sh:path ln:quantity ;
+        sh:datatype xsd:decimal ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minExclusive 0.0 ;
+        sh:message "Holding must have exactly one positive quantity"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:costBasis ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Cost basis must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:currentValue ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Current value must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:purchaseDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Holding can have at most one purchaseDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:holdsInstrument ;
+        sh:class ln:InvestmentInstrument ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Holding must hold exactly one InvestmentInstrument"@en ;
+    ] .
+
+# Financial Strategy Shape
+ln:FinancialStrategyShape
+    a sh:NodeShape ;
+    sh:targetClass ln:FinancialStrategy ;
+    sh:property [
+        sh:path ln:strategyName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Strategy must have exactly one non-empty strategyName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:strategyStartDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Strategy can have at most one strategyStartDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:strategyEndDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Strategy can have at most one strategyEndDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isActiveStrategy ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Strategy can have at most one isActiveStrategy flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:strategyOwnedBy ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Strategy must be owned by exactly one Person"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Strategy must have exactly one non-empty tenantId"@en ;
+    ] .
+
+# Investment Strategy Shape
+ln:InvestmentStrategyShape
+    a sh:NodeShape ;
+    sh:targetClass ln:InvestmentStrategy ;
+    sh:property [
+        sh:path ln:riskTolerance ;
+        sh:datatype xsd:string ;
+        sh:in ("CONSERVATIVE" "MODERATE" "AGGRESSIVE") ;
+        sh:maxCount 1 ;
+        sh:message "Risk tolerance must be valid risk tolerance level"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:timeHorizon ;
+        sh:datatype xsd:string ;
+        sh:in ("SHORT_TERM" "MEDIUM_TERM" "LONG_TERM") ;
+        sh:maxCount 1 ;
+        sh:message "Time horizon must be valid time horizon"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:expectedReturn ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:message "Expected return can be at most one value"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:actualReturn ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:message "Actual return can be at most one value"@en ;
+    ] .
+
+# Asset Allocation Shape
+ln:AssetAllocationShape
+    a sh:NodeShape ;
+    sh:targetClass ln:AssetAllocation ;
+    sh:property [
+        sh:path ln:equityAllocation ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message "Equity allocation must be between 0 and 100"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:fixedIncomeAllocation ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message "Fixed income allocation must be between 0 and 100"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:cashAllocation ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message "Cash allocation must be between 0 and 100"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:alternativeAllocation ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message "Alternative allocation must be between 0 and 100"@en ;
+    ] .
+
+# Budget Plan Shape
+ln:BudgetPlanShape
+    a sh:NodeShape ;
+    sh:targetClass ln:BudgetPlan ;
+    sh:property [
+        sh:path ln:budgetPeriod ;
+        sh:datatype xsd:string ;
+        sh:in ("WEEKLY" "BIWEEKLY" "MONTHLY" "ANNUAL") ;
+        sh:maxCount 1 ;
+        sh:message "Budget period must be valid budgeting frequency"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:totalIncome ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Total income must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:totalExpenses ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Total expenses must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:totalSavings ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Total savings must be non-negative"@en ;
+    ] .
+
+# Budget Category Shape
+ln:BudgetCategoryShape
+    a sh:NodeShape ;
+    sh:targetClass ln:BudgetCategory ;
+    sh:property [
+        sh:path ln:categoryName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Budget category must have exactly one non-empty categoryName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:budgetedAmount ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Budgeted amount must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:actualAmount ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Actual amount must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:percentageOfTotal ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message "Percentage of total must be between 0 and 100"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:categoryOf ;
+        sh:class ln:BudgetPlan ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Budget category must belong to exactly one BudgetPlan"@en ;
+    ] .
+
+# Savings Goal Shape
+ln:SavingsGoalShape
+    a sh:NodeShape ;
+    sh:targetClass ln:SavingsGoal ;
+    sh:property [
+        sh:path ln:goalName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Savings goal must have exactly one non-empty goalName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:targetAmount ;
+        sh:datatype xsd:decimal ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minExclusive 0.0 ;
+        sh:message "Target amount must be positive"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:currentSaved ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Current saved must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:targetDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Savings goal can have at most one targetDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:monthlyContribution ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Monthly contribution must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:goalPriority ;
+        sh:datatype xsd:string ;
+        sh:in ("LOW" "MEDIUM" "HIGH" "CRITICAL") ;
+        sh:maxCount 1 ;
+        sh:message "Goal priority must be valid priority level"@en ;
+    ] .
+
+# Debt Payoff Plan Shape
+ln:DebtPayoffPlanShape
+    a sh:NodeShape ;
+    sh:targetClass ln:DebtPayoffPlan ;
+    sh:property [
+        sh:path ln:payoffMethod ;
+        sh:datatype xsd:string ;
+        sh:in ("SNOWBALL" "AVALANCHE") ;
+        sh:maxCount 1 ;
+        sh:message "Payoff method must be SNOWBALL or AVALANCHE"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:totalDebt ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Total debt must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:debtPaid ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Debt paid must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:remainingDebt ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Remaining debt must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:projectedPayoffDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Payoff plan can have at most one projectedPayoffDate"@en ;
+    ] .

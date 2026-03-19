@@ -14,27 +14,16 @@ from lib.config import Config
 from lib import supabase_client, gemini_client, qdrant_client, neo4j_client
 from lib.graph_schema import GRAPH_SCHEMA
 from lib.rrf import reciprocal_rank_fusion
+from lib.system_prompts import build_system_prompt, detect_domains
+from lib.compliance_checker import check_query_escalation, check_response_compliance
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, content-type, x-worker-secret, apikey",
 }
 
-ANSWER_SYSTEM = """\
-You are Life Navigator, a personalized AI advisor helping users manage goals,
-finances, career, and personal development.
 
-You have access to the user's ACTUAL data retrieved from their knowledge graph.
-Use it to give specific, personalized, actionable advice.
-
-Guidelines:
-- Reference the user's specific goals, accounts, and data
-- Consider the user's risk tolerance when advising on finances
-- Be encouraging but realistic
-- Provide concrete next steps
-- If data is missing, acknowledge it honestly
-- Never fabricate data about the user
-- Keep tone conversational and helpful"""
+# ANSWER_SYSTEM replaced by dynamic build_system_prompt() — see _process_query()
 
 
 def _hash_query(query: str) -> str:
@@ -129,6 +118,9 @@ class handler(BaseHTTPRequestHandler):
         # --- Embed query ---
         query_vector = gemini_client.embed_text(query)
 
+        # --- Early domain detection for compliance search ---
+        detected_domains = detect_domains(query)
+
         # --- Parallel hybrid search ---
         warnings = []
 
@@ -171,8 +163,29 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             warnings.append(f"graph_search_degraded: {str(e)[:200]}")
 
+        # --- Compliance search (domain-triggered) ---
+        compliance_results = []
+        if any(d in Config.COMPLIANCE_TRIGGER_DOMAINS for d in detected_domains):
+            try:
+                compliance_results = qdrant_client.search_compliance(
+                    query_vector, domains=detected_domains, top_k=5
+                )
+                compliance_results = [
+                    {
+                        "entity_id": r["id"],
+                        "entity_type": r["payload"].get("document_type", "regulation"),
+                        "text": r["payload"].get("text", ""),
+                        "score": r["score"],
+                        "source": "compliance",
+                        "metadata": r["payload"],
+                    }
+                    for r in compliance_results
+                ]
+            except Exception as e:
+                warnings.append(f"compliance_search_degraded: {str(e)[:200]}")
+
         # --- RRF fusion ---
-        fused = reciprocal_rank_fusion(vector_results, graph_results)
+        fused = reciprocal_rank_fusion(vector_results, graph_results, compliance_results)
 
         # --- Build context ---
         context_lines = ["## User Data from Knowledge Graph\n"]
@@ -198,19 +211,42 @@ class handler(BaseHTTPRequestHandler):
         except Exception:
             pass
 
+        # --- Refine domain detection with context & pre-generation escalation check ---
+        detected_domains = detect_domains(query, context)
+
+        pre_escalation = check_query_escalation(query)
+
+        # --- Build compliance context for system prompt ---
+        compliance_context = None
+        if compliance_results:
+            compliance_lines = ["## Relevant Regulatory Context\n"]
+            for r in compliance_results[:3]:
+                doc_type = r["metadata"].get("document_type", "")
+                text = r["metadata"].get("text", r.get("text", ""))
+                compliance_lines.append(f"- [{doc_type}] {text[:500]}")
+            compliance_context = "\n".join(compliance_lines)
+
+        system_prompt = build_system_prompt(query, context, compliance_context)
+
         # --- Generate answer ---
         full_prompt = f"{context}\n\n---\n\nUser question: {query}"
         answer = gemini_client.generate(
-            ANSWER_SYSTEM,
+            system_prompt,
             full_prompt,
             temperature=0.7,
             max_tokens=2048,
         )
 
+        # --- Post-generation compliance check ---
+        compliance = check_response_compliance(answer, query, detected_domains)
+
+        # Use modified response (with disclaimers/escalation prepended) if available
+        final_answer = compliance.modified_response or answer
+
         duration_ms = int((time.time() - start_ms) * 1000)
 
         response = {
-            "message": answer,
+            "message": final_answer,
             "conversation_id": conversation_id or f"conv_{user_id[:8]}_{int(time.time())}",
             "sources": [
                 {
@@ -225,7 +261,15 @@ class handler(BaseHTTPRequestHandler):
                 "duration_ms": duration_ms,
                 "vector_results": len(vector_results),
                 "graph_results": len(graph_results),
+                "compliance_sources": len(compliance_results),
                 "fused_results": len(fused),
+                "detected_domains": detected_domains,
+                "compliance": {
+                    "is_compliant": compliance.is_compliant,
+                    "violations": compliance.violations,
+                    "disclaimers_added": compliance.required_disclaimers,
+                    "escalation_needed": compliance.escalation_needed,
+                },
                 **({"warnings": warnings} if warnings else {}),
             },
         }

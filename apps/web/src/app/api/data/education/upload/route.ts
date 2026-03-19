@@ -45,13 +45,16 @@ export async function POST(request: NextRequest) {
     if (name.includes('transcript')) docCategory = 'transcript';
     else if (name.includes('cert') || name.includes('diploma')) docCategory = 'certificate';
 
+    const linkedCourseId = formData.get('linkedCourseId') as string | null;
+
     const doc = await createDocumentRecord(supabase, user.id, {
-      category: docCategory,
+      document_type: docCategory,
       storage_path: path,
-      file_name: file.name,
-      file_size: file.size,
+      name: file.name,
+      file_size_bytes: file.size,
       mime_type: file.type,
       tags: ['education'],
+      metadata: linkedCourseId ? { linked_course_id: linkedCourseId } : {},
     });
 
     let processedData: Record<string, unknown> | null = null;
@@ -63,6 +66,7 @@ export async function POST(request: NextRequest) {
       success: true,
       fileId: doc.id,
       fileUrl: path,
+      storagePath: path,
       processedData,
       message: processedData
         ? 'File uploaded and fields extracted for review'

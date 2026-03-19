@@ -1,0 +1,180 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ==========================================================================
+# Life Navigator — Compliance & Regulatory Ontology
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+# Classes
+# --------------------------------------------------------------------------
+
+ln:Regulation a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Regulation"@en ;
+    rdfs:comment "A regulatory framework governing AI-generated advice (e.g., SEC rules, HIPAA, CCPA)."@en .
+
+ln:ComplianceDomain a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Compliance Domain"@en ;
+    rdfs:comment "A regulated domain within which specific compliance rules apply (e.g., finance, health, legal)."@en .
+
+ln:ProhibitedAction a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Prohibited Action"@en ;
+    rdfs:comment "An action the AI must never perform, such as diagnosing conditions or recommending securities."@en .
+
+ln:RequiredDisclaimer a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Required Disclaimer"@en ;
+    rdfs:comment "A disclaimer that must accompany AI-generated advice in a specific domain."@en .
+
+ln:EscalationTrigger a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Escalation Trigger"@en ;
+    rdfs:comment "A condition detected in user input that requires immediate professional referral or crisis resource."@en .
+
+ln:ProfessionalReferral a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Professional Referral"@en ;
+    rdfs:comment "A licensed professional type to whom users should be referred (e.g., CFP, MD, JD, LCSW)."@en .
+
+ln:RegulatoryBody a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Regulatory Body"@en ;
+    rdfs:comment "A government or industry body that enforces regulations (e.g., SEC, FDA, state bar)."@en .
+
+# --------------------------------------------------------------------------
+# Object Properties (relationships)
+# --------------------------------------------------------------------------
+
+ln:governsDomain a owl:ObjectProperty ;
+    rdfs:domain ln:Regulation ;
+    rdfs:range ln:ComplianceDomain ;
+    rdfs:label "governs domain"@en ;
+    rdfs:comment "Links a regulation to the compliance domain it governs."@en .
+
+ln:enforcedBy a owl:ObjectProperty ;
+    rdfs:domain ln:Regulation ;
+    rdfs:range ln:RegulatoryBody ;
+    rdfs:label "enforced by"@en ;
+    rdfs:comment "Links a regulation to its enforcement body."@en .
+
+ln:prohibitedInDomain a owl:ObjectProperty ;
+    rdfs:domain ln:ProhibitedAction ;
+    rdfs:range ln:ComplianceDomain ;
+    rdfs:label "prohibited in domain"@en ;
+    rdfs:comment "Links a prohibited action to the domain in which it is prohibited."@en .
+
+ln:requiredForDomain a owl:ObjectProperty ;
+    rdfs:domain ln:RequiredDisclaimer ;
+    rdfs:range ln:ComplianceDomain ;
+    rdfs:label "required for domain"@en ;
+    rdfs:comment "Links a required disclaimer to the domain that requires it."@en .
+
+ln:triggersReferralTo a owl:ObjectProperty ;
+    rdfs:domain ln:EscalationTrigger ;
+    rdfs:range ln:ProfessionalReferral ;
+    rdfs:label "triggers referral to"@en ;
+    rdfs:comment "Links an escalation trigger to the professional referral it requires."@en .
+
+ln:appliesInDomain a owl:ObjectProperty ;
+    rdfs:domain ln:EscalationTrigger ;
+    rdfs:range ln:ComplianceDomain ;
+    rdfs:label "applies in domain"@en ;
+    rdfs:comment "Links an escalation trigger to the domain in which it applies."@en .
+
+ln:regulatesBody a owl:ObjectProperty ;
+    rdfs:domain ln:RegulatoryBody ;
+    rdfs:range ln:ComplianceDomain ;
+    rdfs:label "regulates"@en ;
+    rdfs:comment "Links a regulatory body to the domain it oversees."@en .
+
+# --------------------------------------------------------------------------
+# Datatype Properties (attributes)
+# --------------------------------------------------------------------------
+
+ln:regulationName a owl:DatatypeProperty ;
+    rdfs:domain ln:Regulation ;
+    rdfs:range xsd:string ;
+    rdfs:label "regulation name"@en ;
+    rdfs:comment "Official name of the regulation."@en .
+
+ln:regulationCode a owl:DatatypeProperty ;
+    rdfs:domain ln:Regulation ;
+    rdfs:range xsd:string ;
+    rdfs:label "regulation code"@en ;
+    rdfs:comment "Legal citation or code (e.g., '15 USC § 80b-2')."@en .
+
+ln:jurisdictions a owl:DatatypeProperty ;
+    rdfs:domain ln:Regulation ;
+    rdfs:range xsd:string ;
+    rdfs:label "jurisdictions"@en ;
+    rdfs:comment "Jurisdictions where the regulation applies (e.g., 'US', 'US-CA')."@en .
+
+ln:triggerPattern a owl:DatatypeProperty ;
+    rdfs:domain ln:EscalationTrigger ;
+    rdfs:range xsd:string ;
+    rdfs:label "trigger pattern"@en ;
+    rdfs:comment "Regex pattern that activates this escalation trigger."@en .
+
+ln:urgencyLevel a owl:DatatypeProperty ;
+    rdfs:domain ln:EscalationTrigger ;
+    rdfs:range xsd:string ;
+    rdfs:label "urgency level"@en ;
+    rdfs:comment "Urgency of the escalation: CRITICAL, HIGH, MEDIUM, LOW."@en .
+
+ln:professionalType a owl:DatatypeProperty ;
+    rdfs:domain ln:ProfessionalReferral ;
+    rdfs:range xsd:string ;
+    rdfs:label "professional type"@en ;
+    rdfs:comment "Type of licensed professional (e.g., CFP, CPA, MD, JD, LCSW)."@en .
+
+ln:referralMessage a owl:DatatypeProperty ;
+    rdfs:domain ln:ProfessionalReferral ;
+    rdfs:range xsd:string ;
+    rdfs:label "referral message"@en ;
+    rdfs:comment "Standard message to display when referring user to this professional type."@en .
+
+ln:disclaimerText a owl:DatatypeProperty ;
+    rdfs:domain ln:RequiredDisclaimer ;
+    rdfs:range xsd:string ;
+    rdfs:label "disclaimer text"@en ;
+    rdfs:comment "The full disclaimer text that must be appended to responses."@en .
+
+ln:violationSeverity a owl:DatatypeProperty ;
+    rdfs:domain ln:ProhibitedAction ;
+    rdfs:range xsd:string ;
+    rdfs:label "violation severity"@en ;
+    rdfs:comment "Severity level if this action is violated: CRITICAL, HIGH, MEDIUM, LOW."@en .
+
+ln:actionDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:ProhibitedAction ;
+    rdfs:range xsd:string ;
+    rdfs:label "action description"@en ;
+    rdfs:comment "Human-readable description of the prohibited action."@en .
+
+ln:bodyName a owl:DatatypeProperty ;
+    rdfs:domain ln:RegulatoryBody ;
+    rdfs:range xsd:string ;
+    rdfs:label "body name"@en ;
+    rdfs:comment "Official name of the regulatory body."@en .
+
+ln:bodyAcronym a owl:DatatypeProperty ;
+    rdfs:domain ln:RegulatoryBody ;
+    rdfs:range xsd:string ;
+    rdfs:label "body acronym"@en ;
+    rdfs:comment "Acronym for the regulatory body (e.g., SEC, FDA)."@en .
+
+# --------------------------------------------------------------------------
+# Ontology metadata
+# --------------------------------------------------------------------------
+
+<https://ln.life/ontology/compliance/regulations> a owl:Ontology ;
+    dc:title "Life Navigator Compliance & Regulatory Ontology"@en ;
+    dc:description "Defines regulatory frameworks, prohibited actions, required disclaimers, escalation triggers, and professional referrals for AI-generated advice."@en ;
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

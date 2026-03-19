@@ -1,129 +1,34 @@
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
+import { NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 /**
- * NextAuth-compatible session endpoint.
- *
- * This endpoint integrates the custom JWT-based auth system with NextAuth's
- * SessionProvider, which expects a /api/auth/session endpoint.
- *
- * Returns a session object compatible with next-auth/react's useSession hook.
+ * Session endpoint — returns current user from Supabase session cookies.
  */
+export async function GET() {
+  const noSession = NextResponse.json(
+    { user: null, expires: null },
+    { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+  );
 
-interface JWTPayload {
-  sub: string;
-  email?: string;
-  name?: string;
-  role?: string;
-  tenant_id?: string;
-  exp: number;
-  iat: number;
-  type?: string;
-  // Pilot access fields
-  pilotRole?: string;
-  pilotEnabled?: boolean;
-  userType?: string;
-}
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return noSession;
 
-export async function GET(req: NextRequest) {
-  try {
-    // Try to get token from cookies first
-    const cookieStore = await cookies();
-    let token = cookieStore.get("access_token")?.value || null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return noSession;
 
-    // If not in cookies, try Authorization header
-    if (!token) {
-      const authHeader = req.headers.get("authorization");
-      if (authHeader?.startsWith("Bearer ")) {
-        token = authHeader.substring(7);
-      }
-    }
+  const session = {
+    user: {
+      id: user.id,
+      email: user.email || null,
+      name: user.user_metadata?.full_name || user.user_metadata?.name || null,
+      role: user.role || 'user',
+    },
+    expires: null,
+  };
 
-    // No token = no session (return empty session object, not null)
-    // NextAuth's SessionProvider expects an object, not null
-    if (!token) {
-      return NextResponse.json(
-        { user: null, expires: null },
-        {
-          headers: {
-            "Cache-Control": "no-store, max-age=0",
-          },
-        }
-      );
-    }
-
-    // Verify token
-    const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
-    if (!secret) {
-      console.error("JWT_SECRET not configured");
-      return NextResponse.json(
-        { user: null, expires: null },
-        {
-          headers: {
-            "Cache-Control": "no-store, max-age=0",
-          },
-        }
-      );
-    }
-
-    try {
-      const decoded = jwt.verify(token, secret) as JWTPayload;
-
-      // Verify it's an access token (not refresh token)
-      if (decoded.type && decoded.type !== "access") {
-        return NextResponse.json(
-          { user: null, expires: null },
-          {
-            headers: {
-              "Cache-Control": "no-store, max-age=0",
-            },
-          }
-        );
-      }
-
-      // Build NextAuth-compatible session response
-      const session = {
-        user: {
-          id: decoded.sub,
-          email: decoded.email || null,
-          name: decoded.name || null,
-          role: decoded.role || "user",
-          // Pilot access fields
-          pilotRole: decoded.pilotRole || null,
-          pilotEnabled: decoded.pilotEnabled || false,
-          userType: decoded.userType || null,
-        },
-        expires: new Date(decoded.exp * 1000).toISOString(),
-      };
-
-      return NextResponse.json(session, {
-        headers: {
-          "Cache-Control": "no-store, max-age=0",
-        },
-      });
-    } catch (jwtError) {
-      // Invalid or expired token
-      console.error("JWT verification failed:", jwtError);
-      return NextResponse.json(
-        { user: null, expires: null },
-        {
-          headers: {
-            "Cache-Control": "no-store, max-age=0",
-          },
-        }
-      );
-    }
-  } catch (error) {
-    console.error("Session endpoint error:", error);
-    return NextResponse.json(
-      { user: null, expires: null },
-      {
-        status: 500,
-        headers: {
-          "Cache-Control": "no-store, max-age=0",
-        },
-      }
-    );
-  }
+  return NextResponse.json(session, {
+    headers: { 'Cache-Control': 'no-store, max-age=0' },
+  });
 }

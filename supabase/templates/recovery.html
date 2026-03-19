@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Your Password - Life Navigator</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f0f4f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f0f4f8;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; width: 100%;">
+
+          <!-- Logo & Header -->
+          <tr>
+            <td align="center" style="padding-bottom: 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="padding-right: 12px; vertical-align: middle;">
+                    <div style="width: 40px; height: 40px; background: linear-gradient(135deg, #2563eb, #7c3aed); border-radius: 10px; display: inline-block; text-align: center; line-height: 40px; color: white; font-size: 20px; font-weight: bold;">L</div>
+                  </td>
+                  <td style="vertical-align: middle;">
+                    <span style="font-size: 24px; font-weight: 700; color: #1e293b; letter-spacing: -0.5px;">Life Navigator</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Card -->
+          <tr>
+            <td>
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); overflow: hidden;">
+
+                <!-- Gradient Banner -->
+                <tr>
+                  <td style="background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%); height: 8px; font-size: 0; line-height: 0;">&nbsp;</td>
+                </tr>
+
+                <!-- Icon -->
+                <tr>
+                  <td align="center" style="padding: 40px 40px 0 40px;">
+                    <div style="width: 72px; height: 72px; background: linear-gradient(135deg, #eff6ff, #f0e7ff); border-radius: 50%; display: inline-block; text-align: center; line-height: 72px; font-size: 36px;">
+                      &#128274;
+                    </div>
+                  </td>
+                </tr>
+
+                <!-- Headline -->
+                <tr>
+                  <td align="center" style="padding: 24px 40px 0 40px;">
+                    <h1 style="margin: 0; font-size: 26px; font-weight: 700; color: #1e293b; line-height: 1.3;">
+                      Reset your password
+                    </h1>
+                  </td>
+                </tr>
+
+                <!-- Body Text -->
+                <tr>
+                  <td align="center" style="padding: 16px 40px 0 40px;">
+                    <p style="margin: 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                      We received a request to reset the password for your Life Navigator account. Click the button below to choose a new password.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- CTA Button -->
+                <tr>
+                  <td align="center" style="padding: 32px 40px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td align="center" style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border-radius: 12px;">
+                          <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery"
+                             target="_blank"
+                             style="display: inline-block; padding: 16px 40px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; letter-spacing: 0.3px;">
+                            Reset Password
+                          </a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Security Notice -->
+                <tr>
+                  <td style="padding: 0 40px 32px 40px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fefce8; border-radius: 12px; border: 1px solid #fef08a;">
+                      <tr>
+                        <td style="padding: 20px 24px;">
+                          <p style="margin: 0; font-size: 14px; color: #854d0e; line-height: 1.5;">
+                            <strong>Security tip:</strong> This link expires in 1 hour. If you didn't request a password reset, no action is needed &mdash; your account is safe.
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Fallback Link -->
+                <tr>
+                  <td align="center" style="padding: 0 40px 32px 40px;">
+                    <p style="margin: 0; font-size: 13px; color: #94a3b8; line-height: 1.5;">
+                      If the button doesn't work, copy and paste this link into your browser:<br>
+                      <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery" style="color: #2563eb; word-break: break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery</a>
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding: 32px 20px;">
+              <p style="margin: 0 0 8px 0; font-size: 13px; color: #94a3b8;">
+                You received this email because a password reset was requested for your account.
+              </p>
+              <p style="margin: 16px 0 0 0; font-size: 12px; color: #cbd5e1;">
+                &copy; 2025 Life Navigator by NexLevel Intelligence. All rights reserved.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

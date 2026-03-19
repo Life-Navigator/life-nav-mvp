@@ -1,0 +1,45 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix ln: <https://ln.life/ontology#> .
+@prefix schema: <https://schema.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Person Shape - Validation Rules
+ln:PersonShape a sh:NodeShape ;
+  sh:targetClass ln:Person ;
+  sh:property [
+    sh:path schema:name ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:message "Person must have exactly one name"@en ;
+  ] ;
+  sh:property [
+    sh:path ln:tenantId ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:pattern "^[a-z0-9-]+$" ;
+    sh:message "Person must have valid tenant ID for HIPAA isolation"@en ;
+  ] ;
+  sh:property [
+    sh:path ln:email ;
+    sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:pattern "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" ;
+    sh:message "Email must be valid format"@en ;
+  ] .
+
+# Condition Shape
+ln:ConditionShape a sh:NodeShape ;
+  sh:targetClass ln:Condition ;
+  sh:property [
+    sh:path ln:tenantId ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:message "Condition must have tenant ID (HIPAA requirement)"@en ;
+  ] ;
+  sh:property [
+    sh:path ln:diagnosisDate ;
+    sh:datatype xsd:date ;
+    sh:maxCount 1 ;
+  ] .

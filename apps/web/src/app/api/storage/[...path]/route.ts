@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { downloadFile, StorageBucket } from '@/lib/storage/local-storage';
-import { verifyToken } from '@/lib/auth/jwt';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 const VALID_BUCKETS: StorageBucket[] = ['documents', 'avatars', 'exports', 'temp'];
 
@@ -28,16 +28,15 @@ export async function GET(
 
     // Check authentication for non-public buckets
     if (bucket !== 'avatars') {
-      const authHeader = request.headers.get('authorization');
-      const token = authHeader?.replace('Bearer ', '') || request.cookies.get('token')?.value;
-
-      if (!token) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      const supabase = await createServerSupabaseClient();
+      if (!supabase) {
+        return NextResponse.json({ error: 'Auth not configured' }, { status: 503 });
       }
-
-      const payload = await verifyToken(token);
-      if (!payload?.userId) {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     }
 

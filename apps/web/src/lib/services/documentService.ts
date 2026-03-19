@@ -40,10 +40,10 @@ export async function createDocumentRecord(
   supabase: SB,
   userId: string,
   doc: {
-    category: DocumentCategory;
+    document_type: DocumentCategory;
     storage_path: string;
-    file_name: string;
-    file_size: number;
+    name: string;
+    file_size_bytes: number;
     mime_type: string;
     tags?: string[];
     metadata?: Record<string, unknown>;
@@ -53,10 +53,10 @@ export async function createDocumentRecord(
     .from('documents')
     .insert({
       user_id: userId,
-      category: doc.category,
+      document_type: doc.document_type,
       storage_path: doc.storage_path,
-      file_name: doc.file_name,
-      file_size: doc.file_size,
+      name: doc.name,
+      file_size_bytes: doc.file_size_bytes,
       mime_type: doc.mime_type,
       tags: doc.tags || [],
       metadata: doc.metadata || {},

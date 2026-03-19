@@ -8,8 +8,8 @@ import { BenefitTag } from '@/lib/benefits/benefit-tags';
 import { RiskProfile } from '@/lib/risk/types';
 import { InsightDiscovery } from '@/lib/conversation/types';
 
-export type AgentType = 
-  | 'orchestrator'        // Master coordinator
+export type AgentType =
+  | 'orchestrator' // Master coordinator
   | 'financial_strategist'
   | 'career_architect'
   | 'health_optimizer'
@@ -18,15 +18,24 @@ export type AgentType =
   | 'life_coach'
   | 'education_advisor'
   | 'relationship_counselor'
-  | 'spiritual_guide';
+  | 'spiritual_guide'
+  | 'legal_advisor'
+  | 'compliance_officer'
+  | 'tax_strategist'
+  | 'insurance_advisor'
+  | 'nutrition_specialist'
+  | 'productivity_coach'
+  | 'resume_writer'
+  | 'degree_analyzer'
+  | 'benefits_specialist';
 
 export type ConversationPhase =
-  | 'synthesis'           // Synthesizing all data
-  | 'clarification'      // Clarifying contradictions
-  | 'deep_discovery'     // Uncovering hidden needs
-  | 'roadmap_creation'   // Building the plan
-  | 'commitment'         // Securing buy-in
-  | 'implementation';    // Action steps
+  | 'synthesis' // Synthesizing all data
+  | 'clarification' // Clarifying contradictions
+  | 'deep_discovery' // Uncovering hidden needs
+  | 'roadmap_creation' // Building the plan
+  | 'commitment' // Securing buy-in
+  | 'implementation'; // Action steps
 
 export interface Agent {
   id: string;
@@ -36,7 +45,7 @@ export interface Agent {
   personality: AgentPersonality;
   expertise: string[];
   communicationStyle: CommunicationStyle;
-  
+
   // Agent capabilities
   canAnalyze: DataSource[];
   canRecommend: RecommendationType[];
@@ -57,7 +66,7 @@ export interface CommunicationStyle {
   emotionalTone: 'warm' | 'neutral' | 'serious';
 }
 
-export type DataSource = 
+export type DataSource =
   | 'goals'
   | 'benefits'
   | 'risk_profile'
@@ -65,7 +74,15 @@ export type DataSource =
   | 'financial_data'
   | 'health_data'
   | 'career_data'
-  | 'relationship_data';
+  | 'relationship_data'
+  | 'legal_data'
+  | 'tax_data'
+  | 'insurance_data'
+  | 'nutrition_data'
+  | 'compliance_data'
+  | 'resume_data'
+  | 'education_program_data'
+  | 'benefits_data';
 
 export type RecommendationType =
   | 'goal_refinement'
@@ -76,32 +93,40 @@ export type RecommendationType =
   | 'risk_mitigation'
   | 'skill_development'
   | 'habit_formation'
-  | 'support_systems';
+  | 'support_systems'
+  | 'compliance_guidance'
+  | 'tax_planning'
+  | 'insurance_coverage'
+  | 'nutrition_plan'
+  | 'productivity_system'
+  | 'resume_optimization'
+  | 'program_selection'
+  | 'benefits_optimization';
 
 export interface MultiAgentSession {
   id: string;
   userId: string;
-  
+
   // User context
   userProfile: UserComprehensiveProfile;
-  
+
   // Session state
   phase: ConversationPhase;
   activeAgents: Agent[];
   leadAgent: Agent;
-  
+
   // Conversation
   messages: AgentMessage[];
-  
+
   // Analysis results
   synthesis: DataSynthesis;
   contradictions: Contradiction[];
   gaps: DataGap[];
   opportunities: Opportunity[];
-  
+
   // Output
   roadmap?: PersonalizedRoadmap;
-  
+
   // Metadata
   startedAt: Date;
   completedAt?: Date;
@@ -114,13 +139,13 @@ export interface UserComprehensiveProfile {
   benefitSelections: Record<string, string[]>;
   riskProfile: RiskProfile;
   conversationInsights: InsightDiscovery[];
-  
+
   // Derived insights
   primaryMotivations: string[];
   coreValues: string[];
   behavioralPatterns: string[];
   blindSpots: string[];
-  
+
   // Context
   lifeStage: string;
   constraints: Constraint[];
@@ -133,24 +158,24 @@ export interface AgentMessage {
   agentId: string;
   agentType: AgentType;
   timestamp: Date;
-  
+
   content: string;
   intent: MessageIntent;
-  
+
   // For questions
   question?: {
     type: 'open' | 'choice' | 'scale' | 'ranking';
     options?: string[];
     context?: string;
   };
-  
+
   // For insights
   insight?: {
     type: string;
     confidence: number;
     evidence: string[];
   };
-  
+
   // For recommendations
   recommendation?: {
     type: RecommendationType;
@@ -158,7 +183,7 @@ export interface AgentMessage {
     action: string;
     rationale: string;
   };
-  
+
   // User response
   userResponse?: {
     content: string;
@@ -182,23 +207,23 @@ export interface DataSynthesis {
   // Unified understanding
   lifeVision: string;
   coreObjectives: string[];
-  
+
   // Key patterns
   motivationalDrivers: {
     primary: string[];
     secondary: string[];
     hidden: string[];
   };
-  
+
   // Behavioral insights
   decisionMakingStyle: string;
   changeReadiness: number; // 0-100
   implementationCapability: number; // 0-100
-  
+
   // Risk analysis
   overallRiskTolerance: string;
   domainRiskProfiles: Record<string, number>;
-  
+
   // Success factors
   strengthsToLeverage: string[];
   weaknessesToAddress: string[];
@@ -209,14 +234,14 @@ export interface DataSynthesis {
 export interface Contradiction {
   id: string;
   type: 'goal_conflict' | 'value_mismatch' | 'resource_conflict' | 'timeline_conflict';
-  
+
   elements: {
     element1: { type: string; content: string; source: string };
     element2: { type: string; content: string; source: string };
   };
-  
+
   severity: 'critical' | 'significant' | 'minor';
-  
+
   resolution?: {
     approach: string;
     recommendation: string;
@@ -229,7 +254,7 @@ export interface DataGap {
   area: string;
   description: string;
   importance: 'critical' | 'important' | 'nice_to_have';
-  
+
   questions: string[];
   potentialImpact: string;
 }
@@ -237,22 +262,22 @@ export interface DataGap {
 export interface Opportunity {
   id: string;
   type: 'quick_win' | 'strategic' | 'transformational';
-  
+
   title: string;
   description: string;
-  
+
   alignment: {
     goals: string[];
     values: string[];
     riskTolerance: boolean;
   };
-  
+
   implementation: {
     difficulty: 'easy' | 'moderate' | 'hard';
     timeframe: string;
     resources: string[];
   };
-  
+
   expectedImpact: {
     area: string;
     magnitude: 'high' | 'medium' | 'low';
@@ -264,43 +289,43 @@ export interface PersonalizedRoadmap {
   id: string;
   userId: string;
   createdAt: Date;
-  
+
   // Vision & Mission
   lifeVision: {
     statement: string;
     timeHorizon: string;
     keyThemes: string[];
   };
-  
+
   personalMission: {
     statement: string;
     coreValues: string[];
     guidingPrinciples: string[];
   };
-  
+
   // Strategic Objectives
   objectives: StrategicObjective[];
-  
+
   // Phases
   phases: RoadmapPhase[];
-  
+
   // Milestones
   milestones: RoadmapMilestone[];
-  
+
   // Action Plan
   immediateActions: ActionItem[];
   habits: HabitFormation[];
-  
+
   // Support Structure
   accountability: AccountabilityPlan;
   resources: ResourcePlan;
-  
+
   // Risk Management
   riskMitigation: RiskMitigationPlan;
-  
+
   // Success Metrics
   successMetrics: SuccessMetric[];
-  
+
   // Review Schedule
   reviewSchedule: ReviewSchedule;
 }
@@ -310,19 +335,19 @@ export interface StrategicObjective {
   domain: string;
   title: string;
   description: string;
-  
+
   alignment: {
     values: string[];
     motivations: string[];
     riskTolerance: boolean;
   };
-  
+
   priority: number; // 1-10
   timeframe: 'immediate' | 'short_term' | 'medium_term' | 'long_term';
-  
+
   keyResults: string[];
   dependencies: string[];
-  
+
   status: 'not_started' | 'in_progress' | 'at_risk' | 'on_track' | 'completed';
 }
 
@@ -330,16 +355,16 @@ export interface RoadmapPhase {
   id: string;
   name: string;
   description: string;
-  
+
   startDate: Date;
   endDate: Date;
-  
+
   objectives: string[]; // Objective IDs
   focusAreas: string[];
-  
+
   successCriteria: string[];
   keyActivities: string[];
-  
+
   resources: string[];
   risks: string[];
 }
@@ -348,15 +373,15 @@ export interface RoadmapMilestone {
   id: string;
   title: string;
   description: string;
-  
+
   targetDate: Date;
   phase: string; // Phase ID
-  
+
   type: 'achievement' | 'checkpoint' | 'decision_point';
-  
+
   criteria: string[];
   celebration: string; // How to celebrate achievement
-  
+
   dependencies: string[];
   impact: 'critical' | 'major' | 'minor';
 }
@@ -365,19 +390,19 @@ export interface ActionItem {
   id: string;
   title: string;
   description: string;
-  
+
   category: string;
   priority: 'urgent' | 'important' | 'nice_to_have';
-  
+
   deadline: Date;
   effort: 'minimal' | 'moderate' | 'significant';
-  
+
   steps: string[];
   resources: string[];
-  
+
   expectedOutcome: string;
   successCriteria: string;
-  
+
   assignedTo?: string;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
 }
@@ -386,17 +411,17 @@ export interface HabitFormation {
   id: string;
   habit: string;
   rationale: string;
-  
+
   trigger: string;
   routine: string;
   reward: string;
-  
+
   frequency: 'daily' | 'weekly' | 'monthly';
   trackingMethod: string;
-  
+
   supportingGoals: string[];
   expectedImpact: string;
-  
+
   stages: {
     cue: string;
     craving: string;
@@ -412,14 +437,14 @@ export interface AccountabilityPlan {
     rewards: string[];
     consequences: string[];
   };
-  
+
   externalAccountability: {
     partners: string[];
     checkInSchedule: string;
     reportingMethod: string;
     supportType: string;
   };
-  
+
   professionalSupport?: {
     type: string;
     frequency: string;
@@ -433,18 +458,18 @@ export interface ResourcePlan {
     allocation: Record<string, number>;
     savingsTarget: number;
   };
-  
+
   time: {
     weeklyHours: number;
     allocation: Record<string, number>;
   };
-  
+
   learning: {
     courses: string[];
     books: string[];
     mentors: string[];
   };
-  
+
   tools: {
     apps: string[];
     services: string[];
@@ -460,7 +485,7 @@ export interface RiskMitigationPlan {
     mitigation: string;
     contingency: string;
   }[];
-  
+
   earlyWarningSignals: string[];
   reviewFrequency: string;
   adaptationStrategy: string;
@@ -470,16 +495,16 @@ export interface SuccessMetric {
   id: string;
   name: string;
   description: string;
-  
+
   type: 'quantitative' | 'qualitative';
   measurement: string;
-  
+
   baseline: any;
   target: any;
-  
+
   trackingFrequency: string;
   dataSource: string;
-  
+
   milestone: string; // Milestone ID
 }
 

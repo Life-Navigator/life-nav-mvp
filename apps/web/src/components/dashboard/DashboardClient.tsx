@@ -5,6 +5,7 @@ import Link from 'next/link';
 import LoadingSpinner from '@/components/ui/loaders/LoadingSpinner';
 import AddDataModal from '@/components/dashboard/AddDataModal';
 import PinnedScenarioWidget from '@/components/scenario-lab/PinnedScenarioWidget';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 interface DashboardData {
   financial: {
@@ -80,7 +81,9 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
   const [votedModules, setVotedModules] = useState<Set<string>>(new Set());
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
-  const [activeModal, setActiveModal] = useState<'financial' | 'health' | 'career' | 'education' | null>(null);
+  const [activeModal, setActiveModal] = useState<
+    'financial' | 'health' | 'career' | 'education' | null
+  >(null);
 
   // Calendar and Notifications state
   const [calendarTasks, setCalendarTasks] = useState<CalendarTask[]>([]);
@@ -91,94 +94,91 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
   const [unreadCount, setUnreadCount] = useState(0);
 
   const quickActions = [
-    { name: 'Benefits Discovery', icon: '🎨', href: '/discovery/benefits' },
-    { name: 'Create Goal', icon: '🎯', href: '/goals/create' },
-    { name: 'Discovery', icon: '💭', href: '/conversation' },
-    { name: 'Risk Assessment', icon: '📊', href: '/dashboard/goals' },
-    { name: 'Calculators', icon: '🧮', href: '/dashboard/calculators' },
-    { name: 'Family', icon: '👨‍👩‍👧‍👦', href: '/dashboard/family' }
+    { name: 'Finance', icon: '💰', href: '/dashboard/finance/overview' },
+    { name: 'Applications', icon: '💼', href: '/dashboard/career/applications' },
+    { name: 'Certifications', icon: '🎓', href: '/dashboard/education/certifications' },
+    { name: 'Integrations', icon: '🔗', href: '/dashboard/integrations' },
+    { name: 'Settings', icon: '⚙️', href: '/dashboard/settings' },
   ];
 
   const futureModules = [
-    { id: 'habit-tracker', name: 'Habit Tracker', description: 'Track daily habits and build consistent routines', votes: 127 },
-    { id: 'social-network', name: 'Social Network', description: 'Connect with like-minded individuals', votes: 95 },
-    { id: 'ai-coach', name: 'AI Life Coach', description: 'Get personalized coaching powered by AI', votes: 203 },
-    { id: 'milestone-celebrations', name: 'Milestone Celebrations', description: 'Celebrate achievements with friends', votes: 78 }
+    {
+      id: 'habit-tracker',
+      name: 'Habit Tracker',
+      description: 'Track daily habits and build consistent routines',
+      votes: 127,
+    },
+    {
+      id: 'social-network',
+      name: 'Social Network',
+      description: 'Connect with like-minded individuals',
+      votes: 95,
+    },
+    {
+      id: 'ai-coach',
+      name: 'AI Life Coach',
+      description: 'Get personalized coaching powered by AI',
+      votes: 203,
+    },
+    {
+      id: 'milestone-celebrations',
+      name: 'Milestone Celebrations',
+      description: 'Celebrate achievements with friends',
+      votes: 78,
+    },
   ];
 
-  // Fetch user profile
+  // Fetch user profile from Supabase session
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      const token = localStorage.getItem('access_token');
-      if (!token && !currentSession?.user?.name) return;
-
-      // Use NextAuth session name if available
-      if (currentSession?.user?.name) {
-        setUserName(currentSession.user.name);
-        return;
+    const supabase = getSupabaseClient();
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        const name =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.name ||
+          user.email?.split('@')[0] ||
+          'User';
+        setUserName(name);
       }
-
-      // Otherwise fetch from API
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1'}/users/me`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (response.ok) {
-          const userData = await response.json();
-          const firstName = userData.first_name || userData.name || 'User';
-          setUserName(firstName);
-        }
-      } catch (err) {
-        console.error('Error fetching user profile:', err);
-      }
-    };
-
-    fetchUserProfile();
-  }, [currentSession]);
+    });
+  }, []);
 
   // Fetch dashboard data
   useEffect(() => {
     const fetchDashboardData = async () => {
-      // Get token from localStorage (used by custom auth)
-      const token = localStorage.getItem('access_token');
-
-      if (!token && !currentSession?.user?.id) {
-        // No authentication at all - show empty dashboard
-        setDataLoading(false);
-        setDashboardData({
-          financial: { netWorth: 0, totalAssets: 0, totalLiabilities: 0, checking: 0, savings: 0, investments: 0, hasData: false },
-          health: { nextAppointment: null, wellnessScore: null, medicationsDue: 0, hasData: false },
-          career: { title: null, company: null, networkSize: 0, activeApplications: 0, hasData: false },
-          education: { activeCourses: 0, completionRate: 0, studyStreak: 0, hasData: false },
-          hasAnyData: false
-        });
-        return;
-      }
-
       try {
         setDataLoading(true);
-        const headers: HeadersInit = { 'Content-Type': 'application/json' };
-
-        // Add authorization header if we have a custom token
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch('/api/dashboard/summary', { headers });
+        const response = await fetch('/api/dashboard/summary');
 
         if (!response.ok) {
           // If API fails, show empty dashboard instead of error
           console.warn('Dashboard API returned error, showing empty dashboard');
           setDashboardData({
-            financial: { netWorth: 0, totalAssets: 0, totalLiabilities: 0, checking: 0, savings: 0, investments: 0, hasData: false },
-            health: { nextAppointment: null, wellnessScore: null, medicationsDue: 0, hasData: false },
-            career: { title: null, company: null, networkSize: 0, activeApplications: 0, hasData: false },
+            financial: {
+              netWorth: 0,
+              totalAssets: 0,
+              totalLiabilities: 0,
+              checking: 0,
+              savings: 0,
+              investments: 0,
+              hasData: false,
+            },
+            health: {
+              nextAppointment: null,
+              wellnessScore: null,
+              medicationsDue: 0,
+              hasData: false,
+            },
+            career: {
+              title: null,
+              company: null,
+              networkSize: 0,
+              activeApplications: 0,
+              hasData: false,
+            },
             education: { activeCourses: 0, completionRate: 0, studyStreak: 0, hasData: false },
-            hasAnyData: false
+            hasAnyData: false,
           });
           setDataLoading(false);
           return;
@@ -190,11 +190,25 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
         console.error('Error fetching dashboard data:', err);
         // Show empty dashboard on error instead of error message
         setDashboardData({
-          financial: { netWorth: 0, totalAssets: 0, totalLiabilities: 0, checking: 0, savings: 0, investments: 0, hasData: false },
+          financial: {
+            netWorth: 0,
+            totalAssets: 0,
+            totalLiabilities: 0,
+            checking: 0,
+            savings: 0,
+            investments: 0,
+            hasData: false,
+          },
           health: { nextAppointment: null, wellnessScore: null, medicationsDue: 0, hasData: false },
-          career: { title: null, company: null, networkSize: 0, activeApplications: 0, hasData: false },
+          career: {
+            title: null,
+            company: null,
+            networkSize: 0,
+            activeApplications: 0,
+            hasData: false,
+          },
           education: { activeCourses: 0, completionRate: 0, studyStreak: 0, hasData: false },
-          hasAnyData: false
+          hasAnyData: false,
         });
       } finally {
         setDataLoading(false);
@@ -202,76 +216,17 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
     };
 
     fetchDashboardData();
-  }, [currentSession]);
+  }, []);
 
-  // Fetch calendar tasks
+  // Beta: calendar tasks and notifications APIs are not yet implemented.
+  // Set loading to false immediately so the UI renders empty states.
   useEffect(() => {
-    const fetchCalendarTasks = async () => {
-      const token = localStorage.getItem('access_token');
-
-      if (!token && !currentSession?.user?.id) {
-        setTasksLoading(false);
-        return;
-      }
-
-      try {
-        const headers: HeadersInit = { 'Content-Type': 'application/json' };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch('/api/dashboard/tasks', { headers });
-
-        if (response.ok) {
-          const data = await response.json();
-          setCalendarTasks(data.tasks || []);
-          setHasCalendarConnection(data.hasCalendarConnection || false);
-        }
-      } catch (err) {
-        console.error('Error fetching calendar tasks:', err);
-      } finally {
-        setTasksLoading(false);
-      }
-    };
-
-    fetchCalendarTasks();
-  }, [currentSession]);
-
-  // Fetch notifications
-  useEffect(() => {
-    const fetchNotifications = async () => {
-      const token = localStorage.getItem('access_token');
-
-      if (!token && !currentSession?.user?.id) {
-        setNotificationsLoading(false);
-        return;
-      }
-
-      try {
-        const headers: HeadersInit = { 'Content-Type': 'application/json' };
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch('/api/dashboard/notifications', { headers });
-
-        if (response.ok) {
-          const data = await response.json();
-          setNotifications(data.notifications || []);
-          setUnreadCount(data.unreadCount || 0);
-        }
-      } catch (err) {
-        console.error('Error fetching notifications:', err);
-      } finally {
-        setNotificationsLoading(false);
-      }
-    };
-
-    fetchNotifications();
-  }, [currentSession]);
+    setTasksLoading(false);
+    setNotificationsLoading(false);
+  }, []);
 
   const handleVote = (moduleId: string) => {
-    setVotedModules(prev => {
+    setVotedModules((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(moduleId)) {
         newSet.delete(moduleId);
@@ -284,7 +239,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
 
   const handleMarkAllRead = async () => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = null; /* localStorage auth removed — Supabase cookies handle auth */
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -293,7 +248,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
       const response = await fetch('/api/dashboard/notifications', {
         method: 'PATCH',
         headers,
-        body: JSON.stringify({ markAllRead: true })
+        body: JSON.stringify({ markAllRead: true }),
       });
 
       if (response.ok) {
@@ -310,7 +265,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
     });
   };
 
@@ -327,7 +282,9 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="p-4 bg-red-50 dark:bg-red-900/30 rounded-lg text-red-800 dark:text-red-200 max-w-md text-center border border-red-200 dark:border-red-700">
           <p className="text-lg font-medium">{error}</p>
-          <p className="mt-2">Please try refreshing the page or contact support if the problem persists.</p>
+          <p className="mt-2">
+            Please try refreshing the page or contact support if the problem persists.
+          </p>
         </div>
       </div>
     );
@@ -348,8 +305,10 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
 
         {/* Quick Actions */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Quick Actions</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
             {quickActions.map((action) => (
               <Link
                 key={action.name}
@@ -357,7 +316,9 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                 className="flex flex-col items-center p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 shadow-md hover:shadow-xl hover:border-blue-400 dark:hover:border-blue-500 transition-all transform hover:scale-105"
               >
                 <div className="text-3xl mb-2">{action.icon}</div>
-                <p className="text-xs font-medium text-center text-gray-900 dark:text-white">{action.name}</p>
+                <p className="text-xs font-medium text-center text-gray-900 dark:text-white">
+                  {action.name}
+                </p>
               </Link>
             ))}
           </div>
@@ -386,9 +347,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                       <p className="text-lg font-bold text-gray-900 dark:text-white">
                         ${dashboardData.financial.netWorth.toLocaleString()}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Current
-                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Current</p>
                     </div>
                     <div>
                       <p className="text-xs mb-1 text-gray-600 dark:text-gray-400">Total Assets</p>
@@ -400,13 +359,13 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs mb-1 text-gray-600 dark:text-gray-400">Total Liabilities</p>
+                      <p className="text-xs mb-1 text-gray-600 dark:text-gray-400">
+                        Total Liabilities
+                      </p>
                       <p className="text-lg font-bold text-gray-900 dark:text-white">
                         ${dashboardData.financial.totalLiabilities.toLocaleString()}
                       </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Debts & Loans
-                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Debts & Loans</p>
                     </div>
                   </div>
                   <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
@@ -448,65 +407,21 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
             </div>
           </div>
 
-          {/* Healthcare Overview Card */}
+          {/* Healthcare Overview Card — coming soon */}
           <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden border-t-4 border-red-600 dark:border-red-500 shadow-md">
             <div className="p-6">
-              <Link href="/dashboard/healthcare">
-                <h3 className="text-base font-bold mb-4 hover:underline cursor-pointer text-gray-900 dark:text-white">
-                  Healthcare Overview
-                </h3>
-              </Link>
-              {dashboardData?.health.hasData ? (
-                <>
-                  {dashboardData.health.nextAppointment && (
-                    <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
-                      <p className="text-xs mb-1 text-gray-600 dark:text-gray-400">Next Appointment</p>
-                      <p className="text-sm font-bold text-gray-900 dark:text-white">
-                        {dashboardData.health.nextAppointment.title}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(dashboardData.health.nextAppointment.date).toLocaleDateString()} - {dashboardData.health.nextAppointment.provider}
-                      </p>
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-4">
-                    {dashboardData.health.wellnessScore !== null && (
-                      <div>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">Wellness Score</p>
-                        <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                          {dashboardData.health.wellnessScore}/100
-                        </p>
-                      </div>
-                    )}
-                    <div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">Meds Due</p>
-                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {dashboardData.health.medicationsDue}
-                      </p>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    No healthcare data yet. Add your health information.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Link
-                      href="/dashboard/healthcare"
-                      className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
-                    >
-                      Go to Healthcare
-                    </Link>
-                    <button
-                      onClick={() => setActiveModal('health')}
-                      className="inline-flex items-center justify-center px-4 py-2 border border-red-600 dark:border-red-500 text-sm font-medium rounded-md text-red-600 dark:text-red-400 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20"
-                    >
-                      Import Data
-                    </button>
-                  </div>
-                </div>
-              )}
+              <h3 className="text-base font-bold mb-4 text-gray-900 dark:text-white">
+                Healthcare Overview
+              </h3>
+              <div className="text-center py-8">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  Healthcare tracking is coming soon.
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
+                  We're building integrations for health records, appointments, and wellness
+                  tracking.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -605,7 +520,6 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
               )}
             </div>
           </div>
-
         </div>
 
         {/* Daily Tasks and Alerts Section */}
@@ -615,7 +529,10 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Today's Tasks</h3>
               {hasCalendarConnection && calendarTasks.length > 0 && (
-                <Link href="/dashboard/calendar" className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                <Link
+                  href="/dashboard/calendar"
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
                   View All
                 </Link>
               )}
@@ -644,7 +561,9 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                 <div className="text-center py-8">
                   <span className="text-5xl mb-2 block">✅</span>
                   <p className="text-gray-500 dark:text-gray-400">No tasks scheduled for today</p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Enjoy your free time!</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                    Enjoy your free time!
+                  </p>
                 </div>
               ) : (
                 calendarTasks.map((task) => (
@@ -724,7 +643,9 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                 <div className="text-center py-8">
                   <span className="text-5xl mb-2 block">🔔</span>
                   <p className="text-gray-500 dark:text-gray-400">No new alerts</p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">You're all up to date!</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                    You're all up to date!
+                  </p>
                 </div>
               ) : (
                 notifications.map((notification) => {
@@ -784,8 +705,12 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
         {/* Future Modules Voting Section */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-md">
           <div className="mb-4">
-            <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-white">Help Shape the Future</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Vote for the features you'd like to see next</p>
+            <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-white">
+              Help Shape the Future
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Vote for the features you'd like to see next
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {futureModules.map((module) => {
@@ -802,8 +727,12 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <h4 className="text-sm font-semibold mb-1 text-gray-900 dark:text-white">{module.name}</h4>
-                      <p className="text-xs mb-3 text-gray-600 dark:text-gray-400">{module.description}</p>
+                      <h4 className="text-sm font-semibold mb-1 text-gray-900 dark:text-white">
+                        {module.name}
+                      </h4>
+                      <p className="text-xs mb-3 text-gray-600 dark:text-gray-400">
+                        {module.description}
+                      </p>
                     </div>
                     <button
                       onClick={() => handleVote(module.id)}

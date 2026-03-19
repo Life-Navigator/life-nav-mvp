@@ -1,0 +1,590 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix schema: <https://schema.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ============================================================================
+# Goals Domain - Personal and Professional Goals, Milestones, Progress Tracking
+# ============================================================================
+
+# Core Goal Classes
+ln:Goal a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Goal"@en ;
+    rdfs:comment "A personal or professional objective with measurable outcomes"@en .
+
+ln:FinancialGoal a owl:Class ;
+    rdfs:subClassOf ln:Goal ;
+    rdfs:label "Financial Goal"@en ;
+    rdfs:comment "Goal related to finances (save $10k, pay off debt, etc.)"@en .
+
+ln:CareerGoal a owl:Class ;
+    rdfs:subClassOf ln:Goal ;
+    rdfs:label "Career Goal"@en ;
+    rdfs:comment "Goal related to career advancement"@en .
+
+ln:HealthGoal a owl:Class ;
+    rdfs:subClassOf ln:Goal ;
+    rdfs:label "Health Goal"@en ;
+    rdfs:comment "Goal related to health and wellness"@en .
+
+ln:EducationGoal a owl:Class ;
+    rdfs:subClassOf ln:Goal ;
+    rdfs:label "Education Goal"@en ;
+    rdfs:comment "Goal related to learning and education"@en .
+
+ln:PersonalGoal a owl:Class ;
+    rdfs:subClassOf ln:Goal ;
+    rdfs:label "Personal Goal"@en ;
+    rdfs:comment "Personal development or lifestyle goal"@en .
+
+ln:RelationshipGoal a owl:Class ;
+    rdfs:subClassOf ln:Goal ;
+    rdfs:label "Relationship Goal"@en ;
+    rdfs:comment "Goal related to personal relationships"@en .
+
+# Goal Time Horizons
+ln:ShortTermGoal a owl:Class ;
+    rdfs:subClassOf ln:Goal ;
+    rdfs:label "Short-Term Goal"@en ;
+    rdfs:comment "Goal achievable within 1-12 months"@en .
+
+ln:MidTermGoal a owl:Class ;
+    rdfs:subClassOf ln:Goal ;
+    rdfs:label "Mid-Term Goal"@en ;
+    rdfs:comment "Goal achievable within 1-3 years"@en .
+
+ln:LongTermGoal a owl:Class ;
+    rdfs:subClassOf ln:Goal ;
+    rdfs:label "Long-Term Goal"@en ;
+    rdfs:comment "Goal achievable in 3+ years"@en .
+
+# SMART Goal Framework
+ln:SMARTGoal a owl:Class ;
+    rdfs:subClassOf ln:Goal ;
+    rdfs:label "SMART Goal"@en ;
+    rdfs:comment "Goal following SMART criteria: Specific, Measurable, Achievable, Relevant, Time-bound"@en .
+
+# Milestone Classes
+ln:Milestone a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Milestone"@en ;
+    rdfs:comment "A significant checkpoint or sub-goal towards a larger goal"@en .
+
+ln:QuarterlyMilestone a owl:Class ;
+    rdfs:subClassOf ln:Milestone ;
+    rdfs:label "Quarterly Milestone"@en .
+
+ln:MonthlyMilestone a owl:Class ;
+    rdfs:subClassOf ln:Milestone ;
+    rdfs:label "Monthly Milestone"@en .
+
+ln:WeeklyMilestone a owl:Class ;
+    rdfs:subClassOf ln:Milestone ;
+    rdfs:label "Weekly Milestone"@en .
+
+# Action Item Classes
+ln:ActionItem a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Action Item"@en ;
+    rdfs:comment "Concrete task or action towards achieving a goal"@en .
+
+ln:RecurringAction a owl:Class ;
+    rdfs:subClassOf ln:ActionItem ;
+    rdfs:label "Recurring Action"@en ;
+    rdfs:comment "Action that repeats on a schedule (daily, weekly, etc.)"@en .
+
+# Progress Tracking Classes
+ln:ProgressUpdate a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Progress Update"@en ;
+    rdfs:comment "Record of progress made towards a goal"@en .
+
+ln:CheckIn a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Check-In"@en ;
+    rdfs:comment "Scheduled review of goal progress"@en .
+
+ln:Reflection a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Reflection"@en ;
+    rdfs:comment "Personal reflection on goal journey"@en .
+
+# Goal Properties
+ln:goalName a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:string ;
+    rdfs:label "goal name"@en .
+
+ln:goalDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:string ;
+    rdfs:label "goal description"@en ;
+    rdfs:comment "Detailed description of the goal"@en .
+
+ln:goalReason a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:string ;
+    rdfs:label "goal reason"@en ;
+    rdfs:comment "Why this goal matters (motivation)"@en .
+
+ln:goalStartDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:date ;
+    rdfs:label "goal start date"@en .
+
+ln:goalTargetDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:date ;
+    rdfs:label "goal target date"@en ;
+    rdfs:comment "Target completion date"@en .
+
+ln:goalCompletedDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:date ;
+    rdfs:label "goal completed date"@en .
+
+ln:goalStatus a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:string ;
+    rdfs:label "goal status"@en ;
+    rdfs:comment "NOT_STARTED, IN_PROGRESS, ON_TRACK, AT_RISK, BLOCKED, COMPLETED, ABANDONED"@en .
+
+ln:goalPriority a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:string ;
+    rdfs:label "goal priority"@en ;
+    rdfs:comment "LOW, MEDIUM, HIGH, CRITICAL"@en .
+
+ln:goalCategory a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:string ;
+    rdfs:label "goal category"@en ;
+    rdfs:comment "FINANCIAL, CAREER, HEALTH, EDUCATION, PERSONAL, RELATIONSHIP"@en .
+
+ln:isPublic a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is public"@en ;
+    rdfs:comment "Whether goal is shared with others"@en .
+
+ln:timeHorizon a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:string ;
+    rdfs:label "time horizon"@en ;
+    rdfs:comment "SHORT_TERM, MID_TERM, LONG_TERM"@en .
+
+# SMART Criteria Properties
+ln:isSpecific a owl:DatatypeProperty ;
+    rdfs:domain ln:SMARTGoal ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is specific"@en ;
+    rdfs:comment "Specific: clearly defined and unambiguous"@en .
+
+ln:isMeasurable a owl:DatatypeProperty ;
+    rdfs:domain ln:SMARTGoal ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is measurable"@en ;
+    rdfs:comment "Measurable: has concrete criteria for measuring progress"@en .
+
+ln:isAchievable a owl:DatatypeProperty ;
+    rdfs:domain ln:SMARTGoal ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is achievable"@en ;
+    rdfs:comment "Achievable: realistic and attainable"@en .
+
+ln:isRelevant a owl:DatatypeProperty ;
+    rdfs:domain ln:SMARTGoal ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is relevant"@en ;
+    rdfs:comment "Relevant: aligns with broader objectives"@en .
+
+ln:isTimeBound a owl:DatatypeProperty ;
+    rdfs:domain ln:SMARTGoal ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is time-bound"@en ;
+    rdfs:comment "Time-bound: has a deadline or timeframe"@en .
+
+# Measurement Properties
+ln:targetValue a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "target value"@en ;
+    rdfs:comment "Target numeric value (e.g., $10,000, 20 lbs, 5 certifications)"@en .
+
+ln:currentValue a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "current value"@en ;
+    rdfs:comment "Current progress value"@en .
+
+ln:startingValue a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "starting value"@en ;
+    rdfs:comment "Initial value at goal start"@en .
+
+ln:unit a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:string ;
+    rdfs:label "unit"@en ;
+    rdfs:comment "Unit of measurement (USD, lbs, hours, certifications, etc.)"@en .
+
+ln:progressPercentage a owl:DatatypeProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "progress percentage"@en ;
+    rdfs:comment "Calculated progress (0.0-100.0)"@en .
+
+# Milestone Properties
+ln:milestoneName a owl:DatatypeProperty ;
+    rdfs:domain ln:Milestone ;
+    rdfs:range xsd:string ;
+    rdfs:label "milestone name"@en .
+
+ln:milestoneDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:Milestone ;
+    rdfs:range xsd:string ;
+    rdfs:label "milestone description"@en .
+
+ln:milestoneTargetDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Milestone ;
+    rdfs:range xsd:date ;
+    rdfs:label "milestone target date"@en .
+
+ln:milestoneCompletedDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Milestone ;
+    rdfs:range xsd:date ;
+    rdfs:label "milestone completed date"@en .
+
+ln:milestoneStatus a owl:DatatypeProperty ;
+    rdfs:domain ln:Milestone ;
+    rdfs:range xsd:string ;
+    rdfs:label "milestone status"@en ;
+    rdfs:comment "NOT_STARTED, IN_PROGRESS, COMPLETED, SKIPPED"@en .
+
+ln:milestoneOrder a owl:DatatypeProperty ;
+    rdfs:domain ln:Milestone ;
+    rdfs:range xsd:integer ;
+    rdfs:label "milestone order"@en ;
+    rdfs:comment "Sequential order of milestone (1, 2, 3...)"@en .
+
+ln:milestoneValue a owl:DatatypeProperty ;
+    rdfs:domain ln:Milestone ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "milestone value"@en ;
+    rdfs:comment "Target value for this milestone"@en .
+
+# Action Item Properties
+ln:actionName a owl:DatatypeProperty ;
+    rdfs:domain ln:ActionItem ;
+    rdfs:range xsd:string ;
+    rdfs:label "action name"@en .
+
+ln:actionDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:ActionItem ;
+    rdfs:range xsd:string ;
+    rdfs:label "action description"@en .
+
+ln:actionDueDate a owl:DatatypeProperty ;
+    rdfs:domain ln:ActionItem ;
+    rdfs:range xsd:date ;
+    rdfs:label "action due date"@en .
+
+ln:actionCompletedDate a owl:DatatypeProperty ;
+    rdfs:domain ln:ActionItem ;
+    rdfs:range xsd:date ;
+    rdfs:label "action completed date"@en .
+
+ln:actionStatus a owl:DatatypeProperty ;
+    rdfs:domain ln:ActionItem ;
+    rdfs:range xsd:string ;
+    rdfs:label "action status"@en ;
+    rdfs:comment "TODO, IN_PROGRESS, DONE, CANCELLED"@en .
+
+ln:estimatedEffort a owl:DatatypeProperty ;
+    rdfs:domain ln:ActionItem ;
+    rdfs:range xsd:integer ;
+    rdfs:label "estimated effort"@en ;
+    rdfs:comment "Estimated time in minutes"@en .
+
+ln:actualEffort a owl:DatatypeProperty ;
+    rdfs:domain ln:ActionItem ;
+    rdfs:range xsd:integer ;
+    rdfs:label "actual effort"@en ;
+    rdfs:comment "Actual time spent in minutes"@en .
+
+# Recurring Action Properties
+ln:recurrencePattern a owl:DatatypeProperty ;
+    rdfs:domain ln:RecurringAction ;
+    rdfs:range xsd:string ;
+    rdfs:label "recurrence pattern"@en ;
+    rdfs:comment "DAILY, WEEKLY, BIWEEKLY, MONTHLY, QUARTERLY, ANNUALLY"@en .
+
+ln:recurrenceStartDate a owl:DatatypeProperty ;
+    rdfs:domain ln:RecurringAction ;
+    rdfs:range xsd:date ;
+    rdfs:label "recurrence start date"@en .
+
+ln:recurrenceEndDate a owl:DatatypeProperty ;
+    rdfs:domain ln:RecurringAction ;
+    rdfs:range xsd:date ;
+    rdfs:label "recurrence end date"@en .
+
+ln:completionCount a owl:DatatypeProperty ;
+    rdfs:domain ln:RecurringAction ;
+    rdfs:range xsd:integer ;
+    rdfs:label "completion count"@en ;
+    rdfs:comment "Number of times completed"@en .
+
+ln:targetCompletionCount a owl:DatatypeProperty ;
+    rdfs:domain ln:RecurringAction ;
+    rdfs:range xsd:integer ;
+    rdfs:label "target completion count"@en ;
+    rdfs:comment "Total target completions"@en .
+
+ln:currentStreak a owl:DatatypeProperty ;
+    rdfs:domain ln:RecurringAction ;
+    rdfs:range xsd:integer ;
+    rdfs:label "current streak"@en ;
+    rdfs:comment "Current consecutive completion streak"@en .
+
+ln:longestStreak a owl:DatatypeProperty ;
+    rdfs:domain ln:RecurringAction ;
+    rdfs:range xsd:integer ;
+    rdfs:label "longest streak"@en ;
+    rdfs:comment "Longest consecutive completion streak"@en .
+
+# Progress Update Properties
+ln:updateDate a owl:DatatypeProperty ;
+    rdfs:domain ln:ProgressUpdate ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "update date"@en .
+
+ln:updateNotes a owl:DatatypeProperty ;
+    rdfs:domain ln:ProgressUpdate ;
+    rdfs:range xsd:string ;
+    rdfs:label "update notes"@en ;
+    rdfs:comment "Notes about progress made"@en .
+
+ln:valueAtUpdate a owl:DatatypeProperty ;
+    rdfs:domain ln:ProgressUpdate ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "value at update"@en ;
+    rdfs:comment "Progress value at time of update"@en .
+
+ln:percentageAtUpdate a owl:DatatypeProperty ;
+    rdfs:domain ln:ProgressUpdate ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "percentage at update"@en .
+
+ln:challengesFaced a owl:DatatypeProperty ;
+    rdfs:domain ln:ProgressUpdate ;
+    rdfs:range xsd:string ;
+    rdfs:label "challenges faced"@en ;
+    rdfs:comment "Obstacles encountered"@en .
+
+ln:lessonsLearned a owl:DatatypeProperty ;
+    rdfs:domain ln:ProgressUpdate ;
+    rdfs:range xsd:string ;
+    rdfs:label "lessons learned"@en .
+
+ln:nextSteps a owl:DatatypeProperty ;
+    rdfs:domain ln:ProgressUpdate ;
+    rdfs:range xsd:string ;
+    rdfs:label "next steps"@en ;
+    rdfs:comment "Planned next actions"@en .
+
+# Check-In Properties
+ln:checkInDate a owl:DatatypeProperty ;
+    rdfs:domain ln:CheckIn ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "check-in date"@en .
+
+ln:checkInType a owl:DatatypeProperty ;
+    rdfs:domain ln:CheckIn ;
+    rdfs:range xsd:string ;
+    rdfs:label "check-in type"@en ;
+    rdfs:comment "DAILY, WEEKLY, MONTHLY, QUARTERLY"@en .
+
+ln:onTrack a owl:DatatypeProperty ;
+    rdfs:domain ln:CheckIn ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "on track"@en ;
+    rdfs:comment "Whether goal is on track at check-in"@en .
+
+ln:confidenceLevel a owl:DatatypeProperty ;
+    rdfs:domain ln:CheckIn ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "confidence level"@en ;
+    rdfs:comment "Confidence in achieving goal (0.0-1.0)"@en .
+
+ln:motivationLevel a owl:DatatypeProperty ;
+    rdfs:domain ln:CheckIn ;
+    rdfs:range xsd:integer ;
+    rdfs:label "motivation level"@en ;
+    rdfs:comment "Self-reported motivation (1-10 scale)"@en .
+
+ln:needsAdjustment a owl:DatatypeProperty ;
+    rdfs:domain ln:CheckIn ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "needs adjustment"@en ;
+    rdfs:comment "Whether goal needs revision"@en .
+
+ln:adjustmentNotes a owl:DatatypeProperty ;
+    rdfs:domain ln:CheckIn ;
+    rdfs:range xsd:string ;
+    rdfs:label "adjustment notes"@en .
+
+# Reflection Properties
+ln:reflectionDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Reflection ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "reflection date"@en .
+
+ln:reflectionText a owl:DatatypeProperty ;
+    rdfs:domain ln:Reflection ;
+    rdfs:range xsd:string ;
+    rdfs:label "reflection text"@en ;
+    rdfs:comment "Personal reflection on goal journey"@en .
+
+ln:whatWorked a owl:DatatypeProperty ;
+    rdfs:domain ln:Reflection ;
+    rdfs:range xsd:string ;
+    rdfs:label "what worked"@en ;
+    rdfs:comment "Strategies that were effective"@en .
+
+ln:whatDidntWork a owl:DatatypeProperty ;
+    rdfs:domain ln:Reflection ;
+    rdfs:range xsd:string ;
+    rdfs:label "what didn't work"@en ;
+    rdfs:comment "Strategies that were ineffective"@en .
+
+ln:keyInsights a owl:DatatypeProperty ;
+    rdfs:domain ln:Reflection ;
+    rdfs:range xsd:string ;
+    rdfs:label "key insights"@en .
+
+# Relationships - Person to Goals
+ln:hasGoal a owl:ObjectProperty ;
+    rdfs:domain ln:Person ;
+    rdfs:range ln:Goal ;
+    rdfs:label "has goal"@en ;
+    owl:inverseOf ln:goalOf .
+
+ln:goalOf a owl:ObjectProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range ln:Person ;
+    rdfs:label "goal of"@en ;
+    owl:inverseOf ln:hasGoal .
+
+# Relationships - Goal to Milestones
+ln:hasMilestone a owl:ObjectProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range ln:Milestone ;
+    rdfs:label "has milestone"@en ;
+    owl:inverseOf ln:milestoneFor .
+
+ln:milestoneFor a owl:ObjectProperty ;
+    rdfs:domain ln:Milestone ;
+    rdfs:range ln:Goal ;
+    rdfs:label "milestone for"@en ;
+    owl:inverseOf ln:hasMilestone .
+
+# Relationships - Goal/Milestone to Action Items
+ln:hasAction a owl:ObjectProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range ln:ActionItem ;
+    rdfs:label "has action"@en ;
+    rdfs:comment "Action item for goal or milestone"@en .
+
+ln:actionFor a owl:ObjectProperty ;
+    rdfs:domain ln:ActionItem ;
+    rdfs:range ln:Goal ;
+    rdfs:label "action for"@en .
+
+ln:actionForMilestone a owl:ObjectProperty ;
+    rdfs:domain ln:ActionItem ;
+    rdfs:range ln:Milestone ;
+    rdfs:label "action for milestone"@en .
+
+# Relationships - Goal to Progress Updates
+ln:hasProgressUpdate a owl:ObjectProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range ln:ProgressUpdate ;
+    rdfs:label "has progress update"@en ;
+    owl:inverseOf ln:updateFor .
+
+ln:updateFor a owl:ObjectProperty ;
+    rdfs:domain ln:ProgressUpdate ;
+    rdfs:range ln:Goal ;
+    rdfs:label "update for"@en ;
+    owl:inverseOf ln:hasProgressUpdate .
+
+# Relationships - Goal to Check-Ins
+ln:hasCheckIn a owl:ObjectProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range ln:CheckIn ;
+    rdfs:label "has check-in"@en ;
+    owl:inverseOf ln:checkInFor .
+
+ln:checkInFor a owl:ObjectProperty ;
+    rdfs:domain ln:CheckIn ;
+    rdfs:range ln:Goal ;
+    rdfs:label "check-in for"@en ;
+    owl:inverseOf ln:hasCheckIn .
+
+# Relationships - Goal to Reflections
+ln:hasReflection a owl:ObjectProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range ln:Reflection ;
+    rdfs:label "has reflection"@en ;
+    owl:inverseOf ln:reflectionOn .
+
+ln:reflectionOn a owl:ObjectProperty ;
+    rdfs:domain ln:Reflection ;
+    rdfs:range ln:Goal ;
+    rdfs:label "reflection on"@en ;
+    owl:inverseOf ln:hasReflection .
+
+# Relationships - Goal Dependencies
+ln:dependsOn a owl:ObjectProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range ln:Goal ;
+    rdfs:label "depends on"@en ;
+    rdfs:comment "This goal depends on completion of another goal"@en ;
+    owl:inverseOf ln:prerequisiteFor .
+
+ln:prerequisiteFor a owl:ObjectProperty ;
+    rdfs:domain ln:Goal ;
+    rdfs:range ln:Goal ;
+    rdfs:label "prerequisite for"@en ;
+    owl:inverseOf ln:dependsOn .
+
+# Relationships - Goal to Related Entities
+ln:relatedToAccount a owl:ObjectProperty ;
+    rdfs:domain ln:FinancialGoal ;
+    rdfs:range ln:FinancialAccount ;
+    rdfs:label "related to account"@en ;
+    rdfs:comment "Financial account related to this goal"@en .
+
+ln:relatedToEducation a owl:ObjectProperty ;
+    rdfs:domain ln:EducationGoal ;
+    rdfs:range ln:EducationRecord ;
+    rdfs:label "related to education"@en .
+
+ln:relatedToCondition a owl:ObjectProperty ;
+    rdfs:domain ln:HealthGoal ;
+    rdfs:range ln:Condition ;
+    rdfs:label "related to condition"@en ;
+    rdfs:comment "Health condition this goal addresses"@en .
+
+# Metadata
+<https://ln.life/ontology/goals/goal> a owl:Ontology ;
+    dc:title "Life Navigator Goals Ontology"@en ;
+    dc:description "Ontology for personal and professional goals, milestones, action items, and progress tracking"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

@@ -2,79 +2,76 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 function OAuthCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(true);
 
   useEffect(() => {
-    const handleOAuthCallback = async () => {
-      try {
-        // Check for errors from OAuth provider
-        const errorParam = searchParams.get('error');
-        const errorMessage = searchParams.get('message');
+    const handleCallback = async () => {
+      // Check for errors from OAuth/email provider
+      const errorParam = searchParams.get('error');
+      const errorMessage = searchParams.get('error_description') || searchParams.get('message');
 
-        if (errorParam) {
-          setError(errorMessage || 'OAuth authentication failed');
-          setIsProcessing(false);
-          return;
-        }
+      if (errorParam) {
+        setError(errorMessage || 'Authentication failed');
+        return;
+      }
 
-        // Extract tokens from URL
-        const accessToken = searchParams.get('access_token');
-        const refreshToken = searchParams.get('refresh_token');
-        const tokenType = searchParams.get('token_type');
+      // With Supabase SSR, the auth code exchange happens automatically
+      // via the Supabase client when it detects the hash fragment.
+      // We just need to wait for the session to be established.
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        setError('Auth service not configured');
+        return;
+      }
 
-        if (!accessToken || !refreshToken) {
-          setError('Missing authentication tokens');
-          setIsProcessing(false);
-          return;
-        }
+      // Check if we have a session (may take a moment for the code exchange)
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-        // Store tokens in localStorage
-        localStorage.setItem('access_token', accessToken);
-        localStorage.setItem('refresh_token', refreshToken);
-        localStorage.setItem('token_type', tokenType || 'bearer');
+      if (sessionError) {
+        setError(sessionError.message);
+        return;
+      }
 
-        // Set httpOnly cookie via API route
-        const cookieResponse = await fetch('/api/auth/set-cookie', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          }),
+      if (session) {
+        // Full page reload to ensure middleware picks up the session cookies
+        window.location.href = '/dashboard';
+      } else {
+        // Session not ready yet — the onAuthStateChange listener will catch it
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((event, s) => {
+          if (event === 'SIGNED_IN' && s) {
+            subscription.unsubscribe();
+            window.location.href = '/dashboard';
+          }
         });
 
-        if (!cookieResponse.ok) {
-          console.error('Failed to set cookie, but continuing anyway');
-        }
-
-        // Redirect to dashboard
-        router.push('/dashboard');
-      } catch (err) {
-        console.error('OAuth callback error:', err);
-        setError('An unexpected error occurred during authentication');
-        setIsProcessing(false);
+        // Timeout after 10 seconds
+        setTimeout(() => {
+          subscription.unsubscribe();
+          setError('Authentication timed out. Please try signing in again.');
+        }, 10000);
       }
     };
 
-    handleOAuthCallback();
+    handleCallback();
   }, [searchParams, router]);
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="max-w-md w-full space-y-8 p-8">
           <div className="text-center">
-            <h2 className="text-3xl font-bold text-red-600">
-              Authentication Failed
-            </h2>
-            <p className="mt-2 text-gray-600">{error}</p>
+            <h2 className="text-3xl font-bold text-red-600">Authentication Failed</h2>
+            <p className="mt-2 text-gray-600 dark:text-gray-400">{error}</p>
             <button
               onClick={() => router.push('/auth/login')}
               className="mt-6 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -88,14 +85,14 @@ function OAuthCallbackContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <h2 className="mt-6 text-2xl font-bold text-gray-900">
-            {isProcessing ? 'Completing authentication...' : 'Redirecting...'}
+          <h2 className="mt-6 text-2xl font-bold text-gray-900 dark:text-white">
+            Completing authentication...
           </h2>
-          <p className="mt-2 text-gray-600">
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
             Please wait while we set up your session.
           </p>
         </div>
@@ -106,20 +103,18 @@ function OAuthCallbackContent() {
 
 function LoadingFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <h2 className="mt-6 text-2xl font-bold text-gray-900">
-            Loading...
-          </h2>
+          <h2 className="mt-6 text-2xl font-bold text-gray-900 dark:text-white">Loading...</h2>
         </div>
       </div>
     </div>
   );
 }
 
-export default function OAuthCallbackPage() {
+export default function AuthCallbackPage() {
   return (
     <Suspense fallback={<LoadingFallback />}>
       <OAuthCallbackContent />

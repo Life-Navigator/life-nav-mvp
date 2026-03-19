@@ -1,0 +1,53 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix schema: <https://schema.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# Base Entity Class
+ln:LNEntity a owl:Class ;
+  rdfs:label "Life Navigator Entity"@en ;
+  rdfs:comment "Base class for all entities in the Life Navigator system"@en .
+
+# Person Class
+ln:Person a owl:Class ;
+  rdfs:subClassOf schema:Person ;
+  rdfs:subClassOf ln:LNEntity ;
+  rdfs:label "Person"@en ;
+  rdfs:comment "A person in the Life Navigator system"@en .
+
+# Multi-tenant Properties
+ln:tenantId a owl:DatatypeProperty ;
+  rdfs:domain ln:LNEntity ;
+  rdfs:range xsd:string ;
+  rdfs:label "Tenant ID"@en ;
+  rdfs:comment "Multi-tenant isolation identifier (HIPAA compliant)"@en .
+
+# Person Properties
+ln:userId a owl:DatatypeProperty ;
+  rdfs:domain ln:Person ;
+  rdfs:range xsd:string ;
+  rdfs:label "User ID"@en .
+
+ln:email a owl:DatatypeProperty ;
+  rdfs:domain ln:Person ;
+  rdfs:range xsd:string ;
+  rdfs:label "Email Address"@en .
+
+ln:dateOfBirth a owl:DatatypeProperty ;
+  rdfs:domain ln:Person ;
+  rdfs:range xsd:date ;
+  rdfs:label "Date of Birth"@en .
+
+# Embedding Annotations (for GraphRAG pipeline)
+ln:embeddingText a owl:AnnotationProperty ;
+  rdfs:label "Embedding text template"@en ;
+  rdfs:comment "Template for generating vector embedding text from entity properties"@en .
+
+# Metadata
+<https://ln.life/ontology/core/person> a owl:Ontology ;
+    dc:title "Life Navigator Core Person Ontology"@en ;
+    dc:description "Base classes and properties for all Life Navigator entities"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" .

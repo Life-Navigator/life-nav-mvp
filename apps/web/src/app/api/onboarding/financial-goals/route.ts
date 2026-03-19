@@ -21,10 +21,10 @@ export async function POST(request: NextRequest) {
     .map((g: Record<string, unknown>) => ({
       user_id: user.id,
       title: String(g.title || g.primaryGoal || g.savingsGoal || ''),
-      category: 'financial',
+      category: 'finance',
       description: String(g.description || ''),
       target_value: g.targetAmount ? Number(g.targetAmount) : null,
-      target_unit: g.targetUnit || 'USD',
+      unit: g.targetUnit || 'USD',
       priority: String(g.priority || 'medium'),
       status: 'active',
     }));

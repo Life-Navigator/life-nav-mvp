@@ -15,7 +15,11 @@ class Config:
     QDRANT_URL: str = os.environ.get("QDRANT_URL", "")
     QDRANT_API_KEY: str = os.environ.get("QDRANT_API_KEY", "")
     QDRANT_COLLECTION: str = os.environ.get("QDRANT_COLLECTION", "life_navigator")
+    QDRANT_COMPLIANCE_COLLECTION: str = os.environ.get("QDRANT_COMPLIANCE_COLLECTION", "compliance_knowledge")
     GRAPHRAG_WORKER_SECRET: str = os.environ.get("GRAPHRAG_WORKER_SECRET", "")
+
+    # Compliance config
+    COMPLIANCE_TRIGGER_DOMAINS: list[str] = ["finance", "health", "legal", "mental_health", "tax", "insurance"]
 
     # Gemini model config
     GEMINI_EMBED_MODEL: str = "gemini-embedding-001"

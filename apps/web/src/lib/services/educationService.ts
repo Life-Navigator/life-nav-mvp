@@ -133,7 +133,7 @@ export async function listCertifications(supabase: SB, userId: string) {
     .eq('user_id', userId)
     .eq('status', 'completed')
     .not('certificate_url', 'is', null)
-    .order('completed_at', { ascending: false });
+    .order('completion_date', { ascending: false });
 
   if (error) throw error;
   return data ?? [];
@@ -142,14 +142,14 @@ export async function listCertifications(supabase: SB, userId: string) {
 export function mapCourseToCertification(course: Record<string, any>) {
   return {
     id: course.id,
-    title: course.title,
+    title: course.course_name,
     provider: course.provider || 'Unknown',
-    platform: course.platform || null,
+    platform: course.level || null,
     certificateUrl: course.certificate_url || null,
-    certificateDate: course.completed_at || course.created_at,
+    certificateDate: course.completion_date || course.created_at,
     skills: course.skills_learned || [],
     status: course.status,
-    completedAt: course.completed_at,
+    completedAt: course.completion_date,
     isStandalone: false,
     source: course.provider || 'manual',
   };
@@ -167,7 +167,7 @@ export function computeCertificationStats(certifications: Record<string, any>[])
   }
 
   const thisYear = certifications.filter((c) => {
-    const d = c.completed_at || c.created_at;
+    const d = c.completion_date || c.created_at;
     return d && new Date(d).getFullYear() === currentYear;
   }).length;
 
@@ -184,7 +184,7 @@ export function computeCertificationStats(certifications: Record<string, any>[])
 export async function listStudyLogs(supabase: SB, userId: string) {
   const { data, error } = await supabase
     .from('study_logs')
-    .select('*, courses(title)')
+    .select('*, courses(course_name)')
     .eq('user_id', userId)
     .order('study_date', { ascending: false });
 

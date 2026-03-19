@@ -70,6 +70,24 @@ def delete_points(
     )
 
 
+def ensure_collection(
+    collection: str,
+    vector_size: int = 768,
+) -> None:
+    """Create a Qdrant collection if it does not already exist."""
+    client = get_client()
+    try:
+        client.get_collection(collection_name=collection)
+    except Exception:
+        client.create_collection(
+            collection_name=collection,
+            vectors_config=VectorParams(
+                size=vector_size,
+                distance=Distance.COSINE,
+            ),
+        )
+
+
 def search(
     vector: list[float],
     tenant_id: str,
@@ -89,6 +107,47 @@ def search(
             must=[FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id))]
         ),
         limit=k,
+        with_payload=True,
+        score_threshold=score_threshold,
+    )
+
+    return [
+        {
+            "id": str(hit.id),
+            "score": hit.score,
+            "payload": hit.payload or {},
+        }
+        for hit in results
+    ]
+
+
+def search_compliance(
+    vector: list[float],
+    domains: list[str] | None = None,
+    top_k: int = 5,
+    score_threshold: float = 0.3,
+) -> list[dict]:
+    """Search compliance_knowledge collection. NO tenant_id filter.
+
+    Optionally filters by domain(s). Returns list of {id, score, payload}.
+    """
+    client = get_client()
+    col = Config.QDRANT_COMPLIANCE_COLLECTION
+
+    query_filter = None
+    if domains:
+        query_filter = Filter(
+            should=[
+                FieldCondition(key="domain", match=MatchValue(value=d))
+                for d in domains
+            ]
+        )
+
+    results = client.search(
+        collection_name=col,
+        query_vector=vector,
+        query_filter=query_filter,
+        limit=top_k,
         with_payload=True,
         score_threshold=score_threshold,
     )

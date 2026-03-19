@@ -1,0 +1,345 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# ============================================================================
+# SHACL Validation Shapes for Health Domain
+# ============================================================================
+
+# Condition Shape
+ln:ConditionShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Condition ;
+    sh:property [
+        sh:path ln:conditionName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Condition must have exactly one non-empty conditionName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:diagnosedDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Condition can have at most one diagnosedDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:severity ;
+        sh:datatype xsd:string ;
+        sh:in ("MILD" "MODERATE" "SEVERE" "CRITICAL") ;
+        sh:maxCount 1 ;
+        sh:message "Severity must be one of: MILD, MODERATE, SEVERE, CRITICAL"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:status ;
+        sh:datatype xsd:string ;
+        sh:in ("ACTIVE" "RESOLVED" "MANAGED" "MONITORING") ;
+        sh:maxCount 1 ;
+        sh:message "Status must be one of: ACTIVE, RESOLVED, MANAGED, MONITORING"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:icdCode ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:pattern "^[A-Z][0-9]{2}(\\..*)?$" ;
+        sh:message "ICD code must follow ICD-10 format (e.g., E11.9)"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:conditionOf ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Condition must be associated with exactly one Person"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Condition must have exactly one non-empty tenantId (HIPAA compliance)"@en ;
+    ] .
+
+# Medication Shape
+ln:MedicationShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Medication ;
+    sh:property [
+        sh:path ln:medicationName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Medication must have exactly one non-empty medicationName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:dosage ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "Medication can have at most one dosage"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:frequency ;
+        sh:datatype xsd:string ;
+        sh:in ("ONCE_DAILY" "TWICE_DAILY" "THREE_TIMES_DAILY" "FOUR_TIMES_DAILY" "AS_NEEDED" "WEEKLY" "MONTHLY") ;
+        sh:maxCount 1 ;
+        sh:message "Frequency must be valid medication frequency"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:prescribedDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Medication can have at most one prescribedDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isActive ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Medication can have at most one isActive flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Medication must have exactly one non-empty tenantId (HIPAA compliance)"@en ;
+    ] .
+
+# Physician Shape
+ln:PhysicianShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Physician ;
+    sh:property [
+        sh:path ln:physicianName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Physician must have exactly one non-empty physicianName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:specialty ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "Physician can have at most one specialty"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:npiNumber ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:pattern "^[0-9]{10}$" ;
+        sh:message "NPI number must be exactly 10 digits"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:phoneNumber ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "Physician can have at most one phoneNumber"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:email ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:pattern "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" ;
+        sh:message "Email must be a valid email address"@en ;
+    ] .
+
+# HealthRecord Shape
+ln:HealthRecordShape
+    a sh:NodeShape ;
+    sh:targetClass ln:HealthRecord ;
+    sh:property [
+        sh:path ln:recordDate ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "HealthRecord must have exactly one recordDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:recordType ;
+        sh:datatype xsd:string ;
+        sh:in ("LAB_RESULT" "VITALS" "IMAGING" "CLINICAL_NOTE" "PROCEDURE" "IMMUNIZATION") ;
+        sh:maxCount 1 ;
+        sh:message "Record type must be valid health record type"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:recordOf ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "HealthRecord must be associated with exactly one Person"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "HealthRecord must have exactly one non-empty tenantId (HIPAA compliance)"@en ;
+    ] .
+
+# VitalSigns Shape
+ln:VitalSignsShape
+    a sh:NodeShape ;
+    sh:targetClass ln:VitalSigns ;
+    sh:property [
+        sh:path ln:measurementDate ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "VitalSigns must have exactly one measurementDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:bloodPressureSystolic ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 40 ;
+        sh:maxInclusive 300 ;
+        sh:message "Blood pressure systolic must be between 40 and 300 mmHg"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:bloodPressureDiastolic ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 20 ;
+        sh:maxInclusive 200 ;
+        sh:message "Blood pressure diastolic must be between 20 and 200 mmHg"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:heartRate ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 20 ;
+        sh:maxInclusive 250 ;
+        sh:message "Heart rate must be between 20 and 250 bpm"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:weight ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Weight must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:height ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Height must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:temperature ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 90.0 ;
+        sh:maxInclusive 115.0 ;
+        sh:message "Temperature must be between 90°F and 115°F"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "VitalSigns must have exactly one non-empty tenantId (HIPAA compliance)"@en ;
+    ] .
+
+# Appointment Shape
+ln:AppointmentShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Appointment ;
+    sh:property [
+        sh:path ln:appointmentDate ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Appointment must have exactly one appointmentDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:appointmentType ;
+        sh:datatype xsd:string ;
+        sh:in ("CHECKUP" "FOLLOW_UP" "CONSULTATION" "PROCEDURE" "EMERGENCY" "TELEHEALTH") ;
+        sh:maxCount 1 ;
+        sh:message "Appointment type must be valid appointment type"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:appointmentStatus ;
+        sh:datatype xsd:string ;
+        sh:in ("SCHEDULED" "CONFIRMED" "COMPLETED" "CANCELLED" "NO_SHOW" "RESCHEDULED") ;
+        sh:maxCount 1 ;
+        sh:message "Appointment status must be valid status"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:duration ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 5 ;
+        sh:maxInclusive 480 ;
+        sh:message "Appointment duration must be between 5 and 480 minutes"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:appointmentFor ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Appointment must be for exactly one Person"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Appointment must have exactly one non-empty tenantId (HIPAA compliance)"@en ;
+    ] .
+
+# LabResult Shape
+ln:LabResultShape
+    a sh:NodeShape ;
+    sh:targetClass ln:LabResult ;
+    sh:property [
+        sh:path ln:testName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "LabResult must have exactly one non-empty testName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:testDate ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "LabResult must have exactly one testDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:value ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "LabResult can have at most one value"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:unit ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "LabResult can have at most one unit"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:resultStatus ;
+        sh:datatype xsd:string ;
+        sh:in ("NORMAL" "ABNORMAL" "CRITICAL" "PENDING") ;
+        sh:maxCount 1 ;
+        sh:message "Result status must be valid lab result status"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "LabResult must have exactly one non-empty tenantId (HIPAA compliance)"@en ;
+    ] .

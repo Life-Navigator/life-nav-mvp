@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createGoogleOAuthService } from '@/lib/integrations/google/oauth';
 
 export async function GET(request: NextRequest) {
@@ -16,12 +17,14 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
+  const integrationRedirect = '/dashboard/integrations';
+
   // Handle OAuth errors
   if (error) {
     console.error('Google OAuth error:', error, errorDescription);
     return NextResponse.redirect(
       new URL(
-        `/settings/integrations?error=${encodeURIComponent(error)}&message=${encodeURIComponent(errorDescription || 'OAuth authorization failed')}`,
+        `${integrationRedirect}?error=${encodeURIComponent(error)}&message=${encodeURIComponent(errorDescription || 'OAuth authorization failed')}`,
         request.url
       )
     );
@@ -29,9 +32,7 @@ export async function GET(request: NextRequest) {
 
   // Validate required parameters
   if (!code) {
-    return NextResponse.redirect(
-      new URL('/settings/integrations?error=missing_code', request.url)
-    );
+    return NextResponse.redirect(new URL(`${integrationRedirect}?error=missing_code`, request.url));
   }
 
   // Validate state parameter (CSRF protection)
@@ -41,7 +42,25 @@ export async function GET(request: NextRequest) {
   if (!state || state !== storedState) {
     console.error('OAuth state mismatch', { received: state, stored: storedState });
     return NextResponse.redirect(
-      new URL('/settings/integrations?error=invalid_state', request.url)
+      new URL(`${integrationRedirect}?error=invalid_state`, request.url)
+    );
+  }
+
+  // Authenticate user via Supabase session
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) {
+    return NextResponse.redirect(
+      new URL('/auth/login?redirect=' + encodeURIComponent(integrationRedirect), request.url)
+    );
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.redirect(
+      new URL('/auth/login?redirect=' + encodeURIComponent(integrationRedirect), request.url)
     );
   }
 
@@ -53,46 +72,31 @@ export async function GET(request: NextRequest) {
     // Get user info to associate with tokens
     const userInfo = await oauthService.getUserInfo(tokens.accessToken);
 
-    // Get current session token for API authentication
-    const sessionToken = cookieStore.get('session_token')?.value;
-
-    if (!sessionToken) {
-      return NextResponse.redirect(
-        new URL('/login?redirect=/settings/integrations', request.url)
-      );
-    }
-
-    // Store tokens in backend
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const saveResponse = await fetch(`${backendUrl}/api/v1/integrations/google/tokens`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${sessionToken}`,
+    // Store tokens in user_metadata for now (until a dedicated integrations table is created)
+    const { error: updateError } = await supabase.auth.updateUser({
+      data: {
+        google_integration: {
+          connected: true,
+          google_email: userInfo.email,
+          google_user_id: userInfo.id,
+          connected_at: new Date().toISOString(),
+          scope: tokens.scope,
+        },
       },
-      body: JSON.stringify({
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
-        expires_at: tokens.expiresAt.toISOString(),
-        scope: tokens.scope,
-        google_user_id: userInfo.id,
-        google_email: userInfo.email,
-      }),
     });
 
-    if (!saveResponse.ok) {
-      const errorData = await saveResponse.json().catch(() => ({}));
-      console.error('Failed to save Google tokens:', errorData);
+    if (updateError) {
+      console.error('Failed to save Google integration:', updateError);
       return NextResponse.redirect(
         new URL(
-          `/settings/integrations?error=save_failed&message=${encodeURIComponent('Failed to save integration')}`,
+          `${integrationRedirect}?error=save_failed&message=${encodeURIComponent('Failed to save integration')}`,
           request.url
         )
       );
     }
 
     // Parse the state to get redirect info
-    let redirectPath = '/settings/integrations';
+    let redirectPath = integrationRedirect;
     try {
       const stateData = JSON.parse(atob(state.split('.')[0]));
       if (stateData.redirect) {
@@ -114,7 +118,7 @@ export async function GET(request: NextRequest) {
     console.error('Google OAuth callback error:', err);
     return NextResponse.redirect(
       new URL(
-        `/settings/integrations?error=exchange_failed&message=${encodeURIComponent((err as Error).message)}`,
+        `${integrationRedirect}?error=exchange_failed&message=${encodeURIComponent((err as Error).message)}`,
         request.url
       )
     );

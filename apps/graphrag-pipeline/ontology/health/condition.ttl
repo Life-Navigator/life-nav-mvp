@@ -1,0 +1,375 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix fhir: <http://hl7.org/fhir/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix snomed: <http://snomed.info/id/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ============================================================================
+# Health Domain - Conditions, Medications, Records, Appointments, Lab Results
+# ============================================================================
+
+# Condition Class (FHIR-aligned)
+ln:Condition a owl:Class ;
+  rdfs:subClassOf ln:LNEntity ;
+  rdfs:label "Medical Condition"@en ;
+  rdfs:comment "A health condition or diagnosis aligned with FHIR Condition resource"@en .
+
+# Physician Classes
+ln:Physician a owl:Class ;
+  rdfs:subClassOf ln:Person ;
+  rdfs:label "Physician"@en ;
+  rdfs:comment "A medical doctor"@en .
+
+ln:Cardiologist a owl:Class ;
+  rdfs:subClassOf ln:Physician ;
+  rdfs:label "Cardiologist"@en .
+
+ln:Dermatologist a owl:Class ;
+  rdfs:subClassOf ln:Physician ;
+  rdfs:label "Dermatologist"@en .
+
+# New Classes
+ln:Medication a owl:Class ;
+  rdfs:subClassOf ln:LNEntity ;
+  rdfs:label "Medication"@en ;
+  rdfs:comment "A prescribed or over-the-counter medication"@en .
+
+ln:HealthRecord a owl:Class ;
+  rdfs:subClassOf ln:LNEntity ;
+  rdfs:label "Health Record"@en ;
+  rdfs:comment "A health-related record (vital signs, lab results, etc.)"@en .
+
+ln:VitalSigns a owl:Class ;
+  rdfs:subClassOf ln:HealthRecord ;
+  rdfs:label "Vital Signs"@en ;
+  rdfs:comment "Recorded vital sign measurements"@en .
+
+ln:Appointment a owl:Class ;
+  rdfs:subClassOf ln:LNEntity ;
+  rdfs:label "Appointment"@en ;
+  rdfs:comment "A medical appointment or visit"@en .
+
+ln:LabResult a owl:Class ;
+  rdfs:subClassOf ln:HealthRecord ;
+  rdfs:label "Lab Result"@en ;
+  rdfs:comment "A laboratory test result"@en .
+
+# ============================================================================
+# Existing Object Properties
+# ============================================================================
+
+ln:hasCondition a owl:ObjectProperty ;
+  rdfs:domain ln:Person ;
+  rdfs:range ln:Condition ;
+  rdfs:label "has condition"@en .
+
+ln:treats a owl:ObjectProperty ;
+  rdfs:domain ln:Physician ;
+  rdfs:range ln:Condition ;
+  rdfs:label "treats"@en ;
+  owl:inverseOf ln:treatedBy .
+
+ln:treatedBy a owl:ObjectProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range ln:Physician ;
+  rdfs:label "treated by"@en ;
+  owl:inverseOf ln:treats .
+
+# ============================================================================
+# New Object Properties
+# ============================================================================
+
+ln:hasMedication a owl:ObjectProperty ;
+  rdfs:domain ln:Person ;
+  rdfs:range ln:Medication ;
+  rdfs:label "has medication"@en ;
+  owl:inverseOf ln:medicationOf .
+
+ln:medicationOf a owl:ObjectProperty ;
+  rdfs:domain ln:Medication ;
+  rdfs:range ln:Person ;
+  rdfs:label "medication of"@en ;
+  owl:inverseOf ln:hasMedication .
+
+ln:hasHealthRecord a owl:ObjectProperty ;
+  rdfs:domain ln:Person ;
+  rdfs:range ln:HealthRecord ;
+  rdfs:label "has health record"@en ;
+  owl:inverseOf ln:healthRecordOf .
+
+ln:healthRecordOf a owl:ObjectProperty ;
+  rdfs:domain ln:HealthRecord ;
+  rdfs:range ln:Person ;
+  rdfs:label "health record of"@en ;
+  owl:inverseOf ln:hasHealthRecord .
+
+ln:hasAppointment a owl:ObjectProperty ;
+  rdfs:domain ln:Person ;
+  rdfs:range ln:Appointment ;
+  rdfs:label "has appointment"@en ;
+  owl:inverseOf ln:appointmentOf .
+
+ln:appointmentOf a owl:ObjectProperty ;
+  rdfs:domain ln:Appointment ;
+  rdfs:range ln:Person ;
+  rdfs:label "appointment of"@en ;
+  owl:inverseOf ln:hasAppointment .
+
+ln:hasLabResult a owl:ObjectProperty ;
+  rdfs:domain ln:Person ;
+  rdfs:range ln:LabResult ;
+  rdfs:label "has lab result"@en ;
+  owl:inverseOf ln:labResultOf .
+
+ln:labResultOf a owl:ObjectProperty ;
+  rdfs:domain ln:LabResult ;
+  rdfs:range ln:Person ;
+  rdfs:label "lab result of"@en ;
+  owl:inverseOf ln:hasLabResult .
+
+ln:prescribedBy a owl:ObjectProperty ;
+  rdfs:domain ln:Medication ;
+  rdfs:range ln:Physician ;
+  rdfs:label "prescribed by"@en ;
+  owl:inverseOf ln:prescribed .
+
+ln:prescribed a owl:ObjectProperty ;
+  rdfs:domain ln:Physician ;
+  rdfs:range ln:Medication ;
+  rdfs:label "prescribed"@en ;
+  owl:inverseOf ln:prescribedBy .
+
+ln:recordOf a owl:ObjectProperty ;
+  rdfs:domain ln:HealthRecord ;
+  rdfs:range ln:Person ;
+  rdfs:label "record of"@en .
+
+ln:conditionOf a owl:ObjectProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range ln:Person ;
+  rdfs:label "condition of"@en .
+
+ln:appointmentFor a owl:ObjectProperty ;
+  rdfs:domain ln:Appointment ;
+  rdfs:range ln:Person ;
+  rdfs:label "appointment for"@en .
+
+ln:appointmentWith a owl:ObjectProperty ;
+  rdfs:domain ln:Appointment ;
+  rdfs:range ln:Physician ;
+  rdfs:label "appointment with"@en .
+
+# ============================================================================
+# Existing Data Properties
+# ============================================================================
+
+ln:diagnosisDate a owl:DatatypeProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range xsd:date ;
+  rdfs:label "Diagnosis Date"@en .
+
+ln:conditionCode a owl:DatatypeProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range xsd:string ;
+  rdfs:label "SNOMED CT Code"@en ;
+  rdfs:comment "SNOMED CT code for the condition"@en .
+
+# ============================================================================
+# New Data Properties - Condition
+# ============================================================================
+
+ln:conditionName a owl:DatatypeProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range xsd:string ;
+  rdfs:label "condition name"@en .
+
+ln:severity a owl:DatatypeProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range xsd:string ;
+  rdfs:label "severity"@en ;
+  rdfs:comment "MILD, MODERATE, SEVERE, CRITICAL"@en .
+
+ln:status a owl:DatatypeProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range xsd:string ;
+  rdfs:label "status"@en ;
+  rdfs:comment "ACTIVE, RESOLVED, CHRONIC, IN_REMISSION"@en .
+
+ln:icdCode a owl:DatatypeProperty ;
+  rdfs:domain ln:Condition ;
+  rdfs:range xsd:string ;
+  rdfs:label "ICD code"@en ;
+  rdfs:comment "ICD-10 code"@en .
+
+# ============================================================================
+# New Data Properties - Medication
+# ============================================================================
+
+ln:medicationName a owl:DatatypeProperty ;
+  rdfs:domain ln:Medication ;
+  rdfs:range xsd:string ;
+  rdfs:label "medication name"@en .
+
+ln:dosage a owl:DatatypeProperty ;
+  rdfs:domain ln:Medication ;
+  rdfs:range xsd:string ;
+  rdfs:label "dosage"@en .
+
+ln:frequency a owl:DatatypeProperty ;
+  rdfs:domain ln:Medication ;
+  rdfs:range xsd:string ;
+  rdfs:label "frequency"@en .
+
+ln:prescribedDate a owl:DatatypeProperty ;
+  rdfs:domain ln:Medication ;
+  rdfs:range xsd:date ;
+  rdfs:label "prescribed date"@en .
+
+ln:isActive a owl:DatatypeProperty ;
+  rdfs:domain ln:Medication ;
+  rdfs:range xsd:boolean ;
+  rdfs:label "is active"@en .
+
+# ============================================================================
+# New Data Properties - HealthRecord
+# ============================================================================
+
+ln:recordDate a owl:DatatypeProperty ;
+  rdfs:domain ln:HealthRecord ;
+  rdfs:range xsd:date ;
+  rdfs:label "record date"@en .
+
+ln:recordType a owl:DatatypeProperty ;
+  rdfs:domain ln:HealthRecord ;
+  rdfs:range xsd:string ;
+  rdfs:label "record type"@en .
+
+# ============================================================================
+# New Data Properties - VitalSigns
+# ============================================================================
+
+ln:measurementDate a owl:DatatypeProperty ;
+  rdfs:domain ln:VitalSigns ;
+  rdfs:range xsd:date ;
+  rdfs:label "measurement date"@en .
+
+ln:bloodPressureSystolic a owl:DatatypeProperty ;
+  rdfs:domain ln:VitalSigns ;
+  rdfs:range xsd:integer ;
+  rdfs:label "blood pressure systolic"@en .
+
+ln:bloodPressureDiastolic a owl:DatatypeProperty ;
+  rdfs:domain ln:VitalSigns ;
+  rdfs:range xsd:integer ;
+  rdfs:label "blood pressure diastolic"@en .
+
+ln:heartRate a owl:DatatypeProperty ;
+  rdfs:domain ln:VitalSigns ;
+  rdfs:range xsd:integer ;
+  rdfs:label "heart rate"@en .
+
+ln:weight a owl:DatatypeProperty ;
+  rdfs:domain ln:VitalSigns ;
+  rdfs:range xsd:decimal ;
+  rdfs:label "weight"@en .
+
+ln:height a owl:DatatypeProperty ;
+  rdfs:domain ln:VitalSigns ;
+  rdfs:range xsd:decimal ;
+  rdfs:label "height"@en .
+
+ln:temperature a owl:DatatypeProperty ;
+  rdfs:domain ln:VitalSigns ;
+  rdfs:range xsd:decimal ;
+  rdfs:label "temperature"@en .
+
+# ============================================================================
+# New Data Properties - Appointment
+# ============================================================================
+
+ln:appointmentDate a owl:DatatypeProperty ;
+  rdfs:domain ln:Appointment ;
+  rdfs:range xsd:dateTime ;
+  rdfs:label "appointment date"@en .
+
+ln:appointmentType a owl:DatatypeProperty ;
+  rdfs:domain ln:Appointment ;
+  rdfs:range xsd:string ;
+  rdfs:label "appointment type"@en .
+
+ln:appointmentStatus a owl:DatatypeProperty ;
+  rdfs:domain ln:Appointment ;
+  rdfs:range xsd:string ;
+  rdfs:label "appointment status"@en .
+
+ln:duration a owl:DatatypeProperty ;
+  rdfs:domain ln:Appointment ;
+  rdfs:range xsd:integer ;
+  rdfs:label "duration"@en ;
+  rdfs:comment "in minutes"@en .
+
+# ============================================================================
+# New Data Properties - LabResult
+# ============================================================================
+
+ln:testName a owl:DatatypeProperty ;
+  rdfs:domain ln:LabResult ;
+  rdfs:range xsd:string ;
+  rdfs:label "test name"@en .
+
+ln:testDate a owl:DatatypeProperty ;
+  rdfs:domain ln:LabResult ;
+  rdfs:range xsd:date ;
+  rdfs:label "test date"@en .
+
+ln:value a owl:DatatypeProperty ;
+  rdfs:domain ln:LabResult ;
+  rdfs:range xsd:string ;
+  rdfs:label "value"@en .
+
+ln:unit a owl:DatatypeProperty ;
+  rdfs:domain ln:LabResult ;
+  rdfs:range xsd:string ;
+  rdfs:label "unit"@en .
+
+ln:resultStatus a owl:DatatypeProperty ;
+  rdfs:domain ln:LabResult ;
+  rdfs:range xsd:string ;
+  rdfs:label "result status"@en .
+
+# ============================================================================
+# New Data Properties - Physician
+# ============================================================================
+
+ln:physicianName a owl:DatatypeProperty ;
+  rdfs:domain ln:Physician ;
+  rdfs:range xsd:string ;
+  rdfs:label "physician name"@en .
+
+ln:specialty a owl:DatatypeProperty ;
+  rdfs:domain ln:Physician ;
+  rdfs:range xsd:string ;
+  rdfs:label "specialty"@en .
+
+ln:npiNumber a owl:DatatypeProperty ;
+  rdfs:domain ln:Physician ;
+  rdfs:range xsd:string ;
+  rdfs:label "NPI number"@en .
+
+ln:phoneNumber a owl:DatatypeProperty ;
+  rdfs:domain ln:Physician ;
+  rdfs:range xsd:string ;
+  rdfs:label "phone number"@en .
+
+# ============================================================================
+# Metadata
+# ============================================================================
+
+<https://ln.life/ontology/health/condition> a owl:Ontology ;
+    dc:title "Life Navigator Health Ontology"@en ;
+    dc:description "Ontology for health conditions, medications, records, appointments, and lab results"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

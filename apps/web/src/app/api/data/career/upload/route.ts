@@ -43,10 +43,10 @@ export async function POST(request: NextRequest) {
       ? ('certificate' as const)
       : ('resume' as const);
     const doc = await createDocumentRecord(supabase, user.id, {
-      category: docCategory,
+      document_type: docCategory,
       storage_path: path,
-      file_name: file.name,
-      file_size: file.size,
+      name: file.name,
+      file_size_bytes: file.size,
       mime_type: file.type,
       tags: ['career'],
     });

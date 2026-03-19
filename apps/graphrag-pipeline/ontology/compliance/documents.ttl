@@ -1,0 +1,91 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ==========================================================================
+# Life Navigator — Compliance Document Ontology
+# Describes uploaded regulatory documents and their embedded chunks
+# in the compliance_knowledge Qdrant collection.
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+# Classes
+# --------------------------------------------------------------------------
+
+ln:RegulatoryDocument a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Regulatory Document"@en ;
+    rdfs:comment "An uploaded regulatory document (SEC filing, HIPAA rule, court ruling, CFPB guidance) stored in the compliance knowledge base."@en .
+
+ln:DocumentChunk a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Document Chunk"@en ;
+    rdfs:comment "An embedded chunk of a regulatory document, stored in the Qdrant compliance_knowledge collection for vector search."@en .
+
+# --------------------------------------------------------------------------
+# Object Properties (relationships)
+# --------------------------------------------------------------------------
+
+ln:hasChunk a owl:ObjectProperty ;
+    rdfs:domain ln:RegulatoryDocument ;
+    rdfs:range ln:DocumentChunk ;
+    rdfs:label "has chunk"@en ;
+    rdfs:comment "Links a regulatory document to one of its embedded chunks."@en .
+
+ln:belongsToDocument a owl:ObjectProperty ;
+    rdfs:domain ln:DocumentChunk ;
+    rdfs:range ln:RegulatoryDocument ;
+    rdfs:label "belongs to document"@en ;
+    rdfs:comment "Links a document chunk back to its parent regulatory document."@en .
+
+ln:appliesToDomain a owl:ObjectProperty ;
+    rdfs:domain ln:RegulatoryDocument ;
+    rdfs:range ln:ComplianceDomain ;
+    rdfs:label "applies to domain"@en ;
+    rdfs:comment "Links a regulatory document to the compliance domain it covers."@en .
+
+# --------------------------------------------------------------------------
+# Datatype Properties (attributes)
+# --------------------------------------------------------------------------
+
+ln:documentTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:RegulatoryDocument ;
+    rdfs:range xsd:string ;
+    rdfs:label "document title"@en ;
+    rdfs:comment "Title of the regulatory document."@en .
+
+ln:documentType a owl:DatatypeProperty ;
+    rdfs:domain ln:RegulatoryDocument ;
+    rdfs:range xsd:string ;
+    rdfs:label "document type"@en ;
+    rdfs:comment "Type of document: regulation, ruling, guidance, statute."@en .
+
+ln:chunkIndex a owl:DatatypeProperty ;
+    rdfs:domain ln:DocumentChunk ;
+    rdfs:range xsd:integer ;
+    rdfs:label "chunk index"@en ;
+    rdfs:comment "Sequential index of this chunk within its parent document."@en .
+
+ln:sectionTitle a owl:DatatypeProperty ;
+    rdfs:domain ln:DocumentChunk ;
+    rdfs:range xsd:string ;
+    rdfs:label "section title"@en ;
+    rdfs:comment "Title of the section this chunk belongs to, if detected."@en .
+
+ln:embeddingStatus a owl:DatatypeProperty ;
+    rdfs:domain ln:DocumentChunk ;
+    rdfs:range xsd:string ;
+    rdfs:label "embedding status"@en ;
+    rdfs:comment "Status of the chunk embedding: pending, embedded, failed."@en .
+
+# --------------------------------------------------------------------------
+# Ontology metadata
+# --------------------------------------------------------------------------
+
+<https://ln.life/ontology/compliance/documents> a owl:Ontology ;
+    dc:title "Life Navigator Compliance Document Ontology"@en ;
+    dc:description "Defines regulatory documents and their embedded chunks for the centralized compliance knowledge base."@en ;
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/compliance/regulations> .

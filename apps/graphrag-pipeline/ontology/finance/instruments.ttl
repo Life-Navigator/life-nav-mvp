@@ -1,0 +1,385 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix schema: <https://schema.org/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ============================================================================
+# Finance Domain - Investment Instruments (Stocks, Bonds, ETFs, Crypto)
+# ============================================================================
+
+# Core Instrument Classes
+ln:InvestmentInstrument a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Investment Instrument"@en ;
+    rdfs:comment "A tradeable financial asset (stock, bond, fund, crypto, etc.)"@en .
+
+ln:Stock a owl:Class ;
+    rdfs:subClassOf ln:InvestmentInstrument ;
+    rdfs:label "Stock"@en ;
+    rdfs:comment "Equity ownership in a public or private company"@en .
+
+ln:CommonStock a owl:Class ;
+    rdfs:subClassOf ln:Stock ;
+    rdfs:label "Common Stock"@en .
+
+ln:PreferredStock a owl:Class ;
+    rdfs:subClassOf ln:Stock ;
+    rdfs:label "Preferred Stock"@en .
+
+ln:Bond a owl:Class ;
+    rdfs:subClassOf ln:InvestmentInstrument ;
+    rdfs:label "Bond"@en ;
+    rdfs:comment "Fixed-income debt security"@en .
+
+ln:CorporateBond a owl:Class ;
+    rdfs:subClassOf ln:Bond ;
+    rdfs:label "Corporate Bond"@en .
+
+ln:GovernmentBond a owl:Class ;
+    rdfs:subClassOf ln:Bond ;
+    rdfs:label "Government Bond"@en .
+
+ln:MunicipalBond a owl:Class ;
+    rdfs:subClassOf ln:Bond ;
+    rdfs:label "Municipal Bond"@en .
+
+ln:TreasuryBond a owl:Class ;
+    rdfs:subClassOf ln:GovernmentBond ;
+    rdfs:label "Treasury Bond"@en ;
+    rdfs:comment "US Treasury Bond (T-Bond)"@en .
+
+ln:MutualFund a owl:Class ;
+    rdfs:subClassOf ln:InvestmentInstrument ;
+    rdfs:label "Mutual Fund"@en ;
+    rdfs:comment "Pooled investment fund managed by professionals"@en .
+
+ln:ETF a owl:Class ;
+    rdfs:subClassOf ln:InvestmentInstrument ;
+    rdfs:label "Exchange-Traded Fund"@en ;
+    rdfs:comment "Tradeable index fund that tracks a basket of assets"@en .
+
+ln:IndexFund a owl:Class ;
+    rdfs:subClassOf ln:MutualFund ;
+    rdfs:label "Index Fund"@en ;
+    rdfs:comment "Passively managed fund tracking a market index"@en .
+
+ln:Cryptocurrency a owl:Class ;
+    rdfs:subClassOf ln:InvestmentInstrument ;
+    rdfs:label "Cryptocurrency"@en ;
+    rdfs:comment "Digital or virtual currency using cryptography"@en .
+
+ln:RealEstate a owl:Class ;
+    rdfs:subClassOf ln:InvestmentInstrument ;
+    rdfs:label "Real Estate Investment"@en ;
+    rdfs:comment "Property investment (REIT, direct ownership)"@en .
+
+ln:REIT a owl:Class ;
+    rdfs:subClassOf ln:RealEstate ;
+    rdfs:label "Real Estate Investment Trust"@en .
+
+ln:Commodity a owl:Class ;
+    rdfs:subClassOf ln:InvestmentInstrument ;
+    rdfs:label "Commodity"@en ;
+    rdfs:comment "Raw material or primary agricultural product"@en .
+
+ln:Option a owl:Class ;
+    rdfs:subClassOf ln:InvestmentInstrument ;
+    rdfs:label "Option"@en ;
+    rdfs:comment "Derivative giving the right to buy/sell at a specific price"@en .
+
+ln:CallOption a owl:Class ;
+    rdfs:subClassOf ln:Option ;
+    rdfs:label "Call Option"@en .
+
+ln:PutOption a owl:Class ;
+    rdfs:subClassOf ln:Option ;
+    rdfs:label "Put Option"@en .
+
+# Instrument Identifiers and Metadata
+ln:tickerSymbol a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:string ;
+    rdfs:label "ticker symbol"@en ;
+    rdfs:comment "Exchange trading symbol (e.g., AAPL, TSLA)"@en .
+
+ln:cusip a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:string ;
+    rdfs:label "CUSIP"@en ;
+    rdfs:comment "Committee on Uniform Securities Identification Procedures number"@en .
+
+ln:isin a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:string ;
+    rdfs:label "ISIN"@en ;
+    rdfs:comment "International Securities Identification Number"@en .
+
+ln:instrumentName a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:string ;
+    rdfs:label "instrument name"@en ;
+    rdfs:comment "Full name of the investment instrument"@en .
+
+ln:instrumentDescription a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:string ;
+    rdfs:label "instrument description"@en .
+
+# Exchange and Issuer
+ln:exchange a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:string ;
+    rdfs:label "exchange"@en ;
+    rdfs:comment "Trading exchange (NYSE, NASDAQ, etc.)"@en .
+
+ln:issuer a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:string ;
+    rdfs:label "issuer"@en ;
+    rdfs:comment "Company or entity issuing the instrument"@en .
+
+ln:issuedBy a owl:ObjectProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range schema:Organization ;
+    rdfs:label "issued by"@en .
+
+# Price and Valuation
+ln:currentPrice a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "current price"@en ;
+    rdfs:comment "Current market price per unit"@en .
+
+ln:priceAsOfDate a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "price as of date"@en .
+
+ln:dayHigh a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "day high"@en .
+
+ln:dayLow a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "day low"@en .
+
+ln:fiftyTwoWeekHigh a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "52-week high"@en .
+
+ln:fiftyTwoWeekLow a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "52-week low"@en .
+
+ln:marketCap a owl:DatatypeProperty ;
+    rdfs:domain ln:Stock ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "market capitalization"@en ;
+    rdfs:comment "Total market value of outstanding shares"@en .
+
+# Yield and Returns
+ln:dividendYield a owl:DatatypeProperty ;
+    rdfs:domain ln:Stock ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "dividend yield"@en ;
+    rdfs:comment "Annual dividend as percentage of price"@en .
+
+ln:annualDividend a owl:DatatypeProperty ;
+    rdfs:domain ln:Stock ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "annual dividend"@en .
+
+ln:bondYield a owl:DatatypeProperty ;
+    rdfs:domain ln:Bond ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "bond yield"@en ;
+    rdfs:comment "Yield to maturity as percentage"@en .
+
+ln:couponRate a owl:DatatypeProperty ;
+    rdfs:domain ln:Bond ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "coupon rate"@en ;
+    rdfs:comment "Annual interest rate paid by bond"@en .
+
+ln:maturityDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Bond ;
+    rdfs:range xsd:date ;
+    rdfs:label "maturity date"@en .
+
+ln:expenseRatio a owl:DatatypeProperty ;
+    rdfs:domain ln:MutualFund ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "expense ratio"@en ;
+    rdfs:comment "Annual fee as percentage of assets"@en .
+
+# Performance Metrics
+ln:oneYearReturn a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "1-year return"@en ;
+    rdfs:comment "Total return over past year (%)"@en .
+
+ln:threeYearReturn a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "3-year return"@en .
+
+ln:fiveYearReturn a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "5-year return"@en .
+
+ln:yearToDateReturn a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "YTD return"@en .
+
+ln:beta a owl:DatatypeProperty ;
+    rdfs:domain ln:Stock ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "beta"@en ;
+    rdfs:comment "Volatility relative to market (1.0 = market average)"@en .
+
+ln:peRatio a owl:DatatypeProperty ;
+    rdfs:domain ln:Stock ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "P/E ratio"@en ;
+    rdfs:comment "Price-to-earnings ratio"@en .
+
+# Risk Classifications
+ln:riskRating a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:string ;
+    rdfs:label "risk rating"@en ;
+    rdfs:comment "Risk level: LOW, MEDIUM, HIGH, VERY_HIGH"@en .
+
+ln:creditRating a owl:DatatypeProperty ;
+    rdfs:domain ln:Bond ;
+    rdfs:range xsd:string ;
+    rdfs:label "credit rating"@en ;
+    rdfs:comment "Bond credit rating (AAA, AA, A, BBB, etc.)"@en .
+
+ln:volatility a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "volatility"@en ;
+    rdfs:comment "Standard deviation of returns"@en .
+
+# Sector and Industry Classifications
+ln:sector a owl:DatatypeProperty ;
+    rdfs:domain ln:Stock ;
+    rdfs:range xsd:string ;
+    rdfs:label "sector"@en ;
+    rdfs:comment "Economic sector (Technology, Healthcare, Finance, etc.)"@en .
+
+ln:industry a owl:DatatypeProperty ;
+    rdfs:domain ln:Stock ;
+    rdfs:range xsd:string ;
+    rdfs:label "industry"@en ;
+    rdfs:comment "Specific industry within sector"@en .
+
+ln:assetClass a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:string ;
+    rdfs:label "asset class"@en ;
+    rdfs:comment "Asset class: EQUITY, FIXED_INCOME, COMMODITY, REAL_ESTATE, CRYPTO"@en .
+
+# Crypto-specific Properties
+ln:blockchain a owl:DatatypeProperty ;
+    rdfs:domain ln:Cryptocurrency ;
+    rdfs:range xsd:string ;
+    rdfs:label "blockchain"@en ;
+    rdfs:comment "Underlying blockchain network (Bitcoin, Ethereum, etc.)"@en .
+
+ln:circulatingSupply a owl:DatatypeProperty ;
+    rdfs:domain ln:Cryptocurrency ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "circulating supply"@en .
+
+ln:maxSupply a owl:DatatypeProperty ;
+    rdfs:domain ln:Cryptocurrency ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "max supply"@en .
+
+# Fund-specific Properties
+ln:fundManager a owl:DatatypeProperty ;
+    rdfs:domain ln:MutualFund ;
+    rdfs:range xsd:string ;
+    rdfs:label "fund manager"@en .
+
+ln:inceptionDate a owl:DatatypeProperty ;
+    rdfs:domain ln:MutualFund ;
+    rdfs:range xsd:date ;
+    rdfs:label "inception date"@en .
+
+ln:totalAssets a owl:DatatypeProperty ;
+    rdfs:domain ln:MutualFund ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "total assets"@en ;
+    rdfs:comment "Total assets under management"@en .
+
+ln:trackedIndex a owl:DatatypeProperty ;
+    rdfs:domain ln:IndexFund ;
+    rdfs:range xsd:string ;
+    rdfs:label "tracked index"@en ;
+    rdfs:comment "Market index being tracked (S&P 500, NASDAQ, etc.)"@en .
+
+# Option-specific Properties
+ln:strikePrice a owl:DatatypeProperty ;
+    rdfs:domain ln:Option ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "strike price"@en .
+
+ln:expirationDate a owl:DatatypeProperty ;
+    rdfs:domain ln:Option ;
+    rdfs:range xsd:date ;
+    rdfs:label "expiration date"@en .
+
+ln:underlyingAsset a owl:ObjectProperty ;
+    rdfs:domain ln:Option ;
+    rdfs:range ln:InvestmentInstrument ;
+    rdfs:label "underlying asset"@en .
+
+# Relationships to Holdings
+ln:instrumentHeldIn a owl:ObjectProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range ln:InvestmentHolding ;
+    rdfs:label "instrument held in"@en ;
+    owl:inverseOf ln:holdsInstrument .
+
+ln:holdsInstrument a owl:ObjectProperty ;
+    rdfs:domain ln:InvestmentHolding ;
+    rdfs:range ln:InvestmentInstrument ;
+    rdfs:label "holds instrument"@en ;
+    owl:inverseOf ln:instrumentHeldIn .
+
+# Market Data Status
+ln:isActiveTrade a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:boolean ;
+    rdfs:label "is actively traded"@en .
+
+ln:volume a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:integer ;
+    rdfs:label "volume"@en ;
+    rdfs:comment "Trading volume (shares/units traded)"@en .
+
+ln:averageVolume a owl:DatatypeProperty ;
+    rdfs:domain ln:InvestmentInstrument ;
+    rdfs:range xsd:integer ;
+    rdfs:label "average volume"@en .
+
+# Metadata
+<https://ln.life/ontology/finance/instruments> a owl:Ontology ;
+    dc:title "Life Navigator Finance Instruments Ontology"@en ;
+    dc:description "Ontology for investment instruments: stocks, bonds, funds, crypto, real estate"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

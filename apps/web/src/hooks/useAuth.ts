@@ -1,5 +1,7 @@
+'use client';
+
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 interface UseAuthReturn {
   isAuthenticated: boolean;
@@ -8,45 +10,47 @@ interface UseAuthReturn {
 }
 
 /**
- * Custom hook for JWT authentication
- * Replaces useSession from next-auth for apps using custom JWT tokens
+ * Auth hook backed by Supabase session.
+ * Returns isAuthenticated/isLoading for backward compat with existing pages.
+ * Does NOT redirect — middleware handles that.
  */
 export function useAuth(): UseAuthReturn {
-  const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for JWT token in localStorage
-    const accessToken = localStorage.getItem('access_token');
-
-    if (!accessToken) {
-      router.push('/auth/login');
+    const supabase = getSupabaseClient();
+    if (!supabase) {
       setIsLoading(false);
       return;
     }
 
-    setToken(accessToken);
-    setIsAuthenticated(true);
-    setIsLoading(false);
-  }, [router]);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(!!session);
+      setToken(session?.access_token ?? null);
+      setIsLoading(false);
+    });
 
-  return {
-    isAuthenticated,
-    isLoading,
-    token,
-  };
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+      setToken(session?.access_token ?? null);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  return { isAuthenticated, isLoading, token };
 }
 
 /**
- * Helper to get auth headers for API requests
+ * Auth headers helper — Supabase cookies are sent automatically on same-origin
+ * fetch, so this just returns Content-Type. Kept for backward compat.
  */
 export function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('access_token');
-
-  return {
-    'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
-  };
+  return { 'Content-Type': 'application/json' };
 }

@@ -16,7 +16,6 @@ export async function POST(_request: NextRequest) {
     .from('profiles')
     .update({
       setup_completed: true,
-      setup_completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq('id', user.id);

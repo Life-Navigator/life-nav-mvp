@@ -1,0 +1,224 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# ==========================================================================
+# SHACL Validation Shapes — Compliance & Regulatory Ontology
+# ==========================================================================
+
+# --------------------------------------------------------------------------
+# RegulationShape
+# --------------------------------------------------------------------------
+
+ln:RegulationShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Regulation ;
+
+    sh:property [
+        sh:path ln:regulationName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Regulation must have exactly one non-empty regulationName"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:regulationCode ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "Regulation may have at most one regulationCode"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:jurisdictions ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:message "Regulation must specify at least one jurisdiction"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:governsDomain ;
+        sh:class ln:ComplianceDomain ;
+        sh:minCount 1 ;
+        sh:message "Regulation must govern at least one ComplianceDomain"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:enforcedBy ;
+        sh:class ln:RegulatoryBody ;
+        sh:minCount 1 ;
+        sh:message "Regulation must be enforced by at least one RegulatoryBody"@en ;
+    ] .
+
+# --------------------------------------------------------------------------
+# EscalationTriggerShape
+# --------------------------------------------------------------------------
+
+ln:EscalationTriggerShape
+    a sh:NodeShape ;
+    sh:targetClass ln:EscalationTrigger ;
+
+    sh:property [
+        sh:path ln:triggerPattern ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "EscalationTrigger must have exactly one non-empty triggerPattern"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:urgencyLevel ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in ("CRITICAL" "HIGH" "MEDIUM" "LOW") ;
+        sh:message "EscalationTrigger urgencyLevel must be one of: CRITICAL, HIGH, MEDIUM, LOW"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:triggersReferralTo ;
+        sh:class ln:ProfessionalReferral ;
+        sh:minCount 1 ;
+        sh:message "EscalationTrigger must reference at least one ProfessionalReferral"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:appliesInDomain ;
+        sh:class ln:ComplianceDomain ;
+        sh:minCount 1 ;
+        sh:message "EscalationTrigger must apply in at least one ComplianceDomain"@en ;
+    ] .
+
+# --------------------------------------------------------------------------
+# ProhibitedActionShape
+# --------------------------------------------------------------------------
+
+ln:ProhibitedActionShape
+    a sh:NodeShape ;
+    sh:targetClass ln:ProhibitedAction ;
+
+    sh:property [
+        sh:path ln:actionDescription ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "ProhibitedAction must have exactly one non-empty actionDescription"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:violationSeverity ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:in ("CRITICAL" "HIGH" "MEDIUM" "LOW") ;
+        sh:message "ProhibitedAction violationSeverity must be one of: CRITICAL, HIGH, MEDIUM, LOW"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:prohibitedInDomain ;
+        sh:class ln:ComplianceDomain ;
+        sh:minCount 1 ;
+        sh:message "ProhibitedAction must be linked to at least one ComplianceDomain"@en ;
+    ] .
+
+# --------------------------------------------------------------------------
+# RequiredDisclaimerShape
+# --------------------------------------------------------------------------
+
+ln:RequiredDisclaimerShape
+    a sh:NodeShape ;
+    sh:targetClass ln:RequiredDisclaimer ;
+
+    sh:property [
+        sh:path ln:disclaimerText ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 10 ;
+        sh:message "RequiredDisclaimer must have exactly one disclaimerText of at least 10 characters"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:requiredForDomain ;
+        sh:class ln:ComplianceDomain ;
+        sh:minCount 1 ;
+        sh:message "RequiredDisclaimer must be required for at least one ComplianceDomain"@en ;
+    ] .
+
+# --------------------------------------------------------------------------
+# ProfessionalReferralShape
+# --------------------------------------------------------------------------
+
+ln:ProfessionalReferralShape
+    a sh:NodeShape ;
+    sh:targetClass ln:ProfessionalReferral ;
+
+    sh:property [
+        sh:path ln:professionalType ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "ProfessionalReferral must have exactly one non-empty professionalType"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:referralMessage ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 10 ;
+        sh:message "ProfessionalReferral must have a referralMessage of at least 10 characters"@en ;
+    ] .
+
+# --------------------------------------------------------------------------
+# RegulatoryBodyShape
+# --------------------------------------------------------------------------
+
+ln:RegulatoryBodyShape
+    a sh:NodeShape ;
+    sh:targetClass ln:RegulatoryBody ;
+
+    sh:property [
+        sh:path ln:bodyName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "RegulatoryBody must have exactly one non-empty bodyName"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:bodyAcronym ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "RegulatoryBody may have at most one bodyAcronym"@en ;
+    ] ;
+
+    sh:property [
+        sh:path ln:regulatesBody ;
+        sh:class ln:ComplianceDomain ;
+        sh:minCount 1 ;
+        sh:message "RegulatoryBody must regulate at least one ComplianceDomain"@en ;
+    ] .
+
+# --------------------------------------------------------------------------
+# ComplianceDomainShape
+# --------------------------------------------------------------------------
+
+ln:ComplianceDomainShape
+    a sh:NodeShape ;
+    sh:targetClass ln:ComplianceDomain ;
+
+    sh:property [
+        sh:path rdfs:label ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "ComplianceDomain must have exactly one non-empty label"@en ;
+    ] .

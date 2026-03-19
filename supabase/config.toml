@@ -48,6 +48,25 @@ enable_signup = true
 double_confirm_changes = true
 enable_confirmations = true
 
+# Email Templates
+# These use {{ .ConfirmationURL }} which Supabase replaces with the full
+# verification URL (including token_hash & type) pointing to /auth/confirm.
+[auth.email.template.confirmation]
+subject = "Welcome to Life Navigator - Please Confirm Your Email"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset Your Life Navigator Password"
+content_path = "./supabase/templates/recovery.html"
+
+[auth.email.template.magic_link]
+subject = "Your Life Navigator Sign-In Link"
+content_path = "./supabase/templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "Confirm Your New Email Address - Life Navigator"
+content_path = "./supabase/templates/email_change.html"
+
 # OAuth Providers
 # Google OAuth is configured in the Supabase Dashboard, not here.
 # To use locally, set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET env vars.

@@ -1,0 +1,77 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix dc: <http://purl.org/dc/elements/1.1/> .
+
+# ============================================================================
+# Core Domain - Document Management
+# ============================================================================
+
+ln:Document a owl:Class ;
+    rdfs:subClassOf ln:LNEntity ;
+    rdfs:label "Document"@en ;
+    rdfs:comment "An uploaded or generated document in the Life Navigator system"@en .
+
+# Data Properties
+ln:documentName a owl:DatatypeProperty ;
+    rdfs:domain ln:Document ;
+    rdfs:range xsd:string ;
+    rdfs:label "document name"@en .
+
+ln:documentType a owl:DatatypeProperty ;
+    rdfs:domain ln:Document ;
+    rdfs:range xsd:string ;
+    rdfs:label "document type"@en ;
+    rdfs:comment "RESUME, TAX_FORM, MEDICAL_RECORD, CERTIFICATE, STATEMENT, OTHER"@en .
+
+ln:storagePath a owl:DatatypeProperty ;
+    rdfs:domain ln:Document ;
+    rdfs:range xsd:string ;
+    rdfs:label "storage path"@en ;
+    rdfs:comment "Path in object storage (Supabase Storage)"@en .
+
+ln:mimeType a owl:DatatypeProperty ;
+    rdfs:domain ln:Document ;
+    rdfs:range xsd:string ;
+    rdfs:label "MIME type"@en ;
+    rdfs:comment "File MIME type (application/pdf, image/png, etc.)"@en .
+
+ln:uploadedAt a owl:DatatypeProperty ;
+    rdfs:domain ln:Document ;
+    rdfs:range xsd:dateTime ;
+    rdfs:label "uploaded at"@en .
+
+ln:fileSize a owl:DatatypeProperty ;
+    rdfs:domain ln:Document ;
+    rdfs:range xsd:integer ;
+    rdfs:label "file size"@en ;
+    rdfs:comment "File size in bytes"@en .
+
+# Object Properties
+ln:belongsTo a owl:ObjectProperty ;
+    rdfs:domain ln:Document ;
+    rdfs:range ln:Person ;
+    rdfs:label "belongs to"@en ;
+    rdfs:comment "Person who owns this document"@en ;
+    owl:inverseOf ln:hasDocument .
+
+ln:hasDocument a owl:ObjectProperty ;
+    rdfs:domain ln:Person ;
+    rdfs:range ln:Document ;
+    rdfs:label "has document"@en ;
+    owl:inverseOf ln:belongsTo .
+
+ln:relatedToEntity a owl:ObjectProperty ;
+    rdfs:domain ln:Document ;
+    rdfs:range ln:LNEntity ;
+    rdfs:label "related to entity"@en ;
+    rdfs:comment "Any entity this document relates to"@en .
+
+# Metadata
+<https://ln.life/ontology/core/document> a owl:Ontology ;
+    dc:title "Life Navigator Document Ontology"@en ;
+    dc:description "Ontology for document management and file metadata"@en ;
+    dc:creator "Life Navigator"@en ;
+    owl:versionInfo "1.0.0" ;
+    owl:imports <https://ln.life/ontology/core/person> .

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { Suspense, useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 // Domain-specific questionnaire steps
 import BasicProfileQuestionnaire from '@/components/onboarding/BasicProfileQuestionnaire';
@@ -28,11 +29,10 @@ const STEPS = {
 
 function QuestionnaireContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const userId = searchParams.get('userId');
-  const userName = searchParams.get('name');
   const { addToast } = useToast();
 
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(STEPS.INTRO);
   const [formData, setFormData] = useState({
     basicProfile: {},
@@ -46,52 +46,71 @@ function QuestionnaireContent() {
 
   // Function to switch to enhanced onboarding
   const switchToEnhancedOnboarding = () => {
-    router.push(`/onboarding/interactive?userId=${userId}${userName ? `&name=${userName}` : ''}`);
+    router.push('/onboarding/interactive');
   };
 
-  // Redirect to login if no userId is provided or not authenticated
+  // Get authenticated user from Supabase session
   useEffect(() => {
-    if (!userId) {
-      addToast({
-        title: "Authentication Required",
-        description: "Please login to access the onboarding questionnaire.",
-        type: "error",
-      });
+    const supabase = getSupabaseClient();
+    if (!supabase) {
       router.push('/auth/login');
+      return;
     }
-  }, [userId, router, addToast]);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        addToast({
+          title: 'Authentication Required',
+          description: 'Please login to access the onboarding questionnaire.',
+          type: 'error',
+        });
+        router.push('/auth/login');
+      } else {
+        setUserId(user.id);
+        setUserName(user.user_metadata?.full_name || user.user_metadata?.name || null);
+      }
+    });
+  }, [router, addToast]);
 
   const handleStepDataChange = (step: string, data: any) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [step]: data,
     }));
   };
 
   const nextStep = () => {
-    setCurrentStep(prev => prev + 1);
+    setCurrentStep((prev) => prev + 1);
   };
 
   const prevStep = () => {
-    setCurrentStep(prev => prev - 1);
+    setCurrentStep((prev) => prev - 1);
   };
 
   const handleSubmit = async () => {
     if (!userId) return;
 
     setIsSubmitting(true);
+
+    async function postStep(url: string, body: Record<string, unknown>) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => res.statusText);
+        throw new Error(`${url} failed (${res.status}): ${msg}`);
+      }
+      return res;
+    }
+
     try {
-      // Submit basic profile data
+      // Submit basic profile data via onboarding route
       const basicProfile = formData.basicProfile as any;
       if (basicProfile && Object.keys(basicProfile).length > 0) {
-        const token = localStorage.getItem('access_token');
-        await fetch('/api/user/profile', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
+        await postStep('/api/onboarding', {
+          step: 'basic_profile',
+          data: {
             name: basicProfile.name,
             phoneNumber: basicProfile.phoneNumber,
             dateOfBirth: basicProfile.dateOfBirth,
@@ -99,68 +118,43 @@ function QuestionnaireContent() {
             city: basicProfile.city,
             state: basicProfile.state,
             country: basicProfile.country,
-          }),
+          },
         });
       }
 
       // Submit education goals
-      await fetch('/api/onboarding/education-goals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, goals: formData.education }),
-      });
+      await postStep('/api/onboarding/education-goals', { goals: formData.education });
 
       // Submit career goals
-      await fetch('/api/onboarding/career-goals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, goals: formData.career }),
-      });
+      await postStep('/api/onboarding/career-goals', { goals: formData.career });
 
       // Submit financial goals
-      await fetch('/api/onboarding/financial-goals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, goals: formData.financial }),
-      });
+      await postStep('/api/onboarding/financial-goals', { goals: formData.financial });
 
       // Submit health goals
-      await fetch('/api/onboarding/health-goals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, goals: formData.health }),
-      });
+      await postStep('/api/onboarding/health-goals', { goals: formData.health });
 
       // Submit risk profile
-      await fetch('/api/onboarding/risk-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          riskTheta: (formData.risk as any).riskTheta,
-          financialRiskTolerance: (formData.risk as any).financialRiskTolerance,
-          careerRiskTolerance: (formData.risk as any).careerRiskTolerance,
-          healthRiskTolerance: (formData.risk as any).healthRiskTolerance,
-          educationRiskTolerance: (formData.risk as any).educationRiskTolerance,
-          assessmentResponses: (formData.risk as any).responses
-        }),
+      await postStep('/api/onboarding/risk-profile', {
+        riskTheta: (formData.risk as any).riskTheta,
+        financialRiskTolerance: (formData.risk as any).financialRiskTolerance,
+        careerRiskTolerance: (formData.risk as any).careerRiskTolerance,
+        healthRiskTolerance: (formData.risk as any).healthRiskTolerance,
+        educationRiskTolerance: (formData.risk as any).educationRiskTolerance,
+        assessmentResponses: (formData.risk as any).responses,
       });
 
       // Mark user setup as complete
-      await fetch('/api/onboarding/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
-      });
+      await postStep('/api/onboarding/complete', {});
 
       // Move to completion step
       nextStep();
     } catch (error) {
       console.error('Error submitting questionnaire:', error);
       addToast({
-        title: "Error",
-        description: "Failed to save your information. Please try again.",
-        type: "error",
+        title: 'Error',
+        description: 'Failed to save your information. Please try again.',
+        type: 'error',
       });
     } finally {
       setIsSubmitting(false);
@@ -169,12 +163,14 @@ function QuestionnaireContent() {
 
   // Render current step
   const renderStep = () => {
-    switch(currentStep) {
+    switch (currentStep) {
       case STEPS.INTRO:
-        return <QuestionnaireIntro
-          onContinue={nextStep}
-          onSwitchToEnhanced={switchToEnhancedOnboarding}
-        />;
+        return (
+          <QuestionnaireIntro
+            onContinue={nextStep}
+            onSwitchToEnhanced={switchToEnhancedOnboarding}
+          />
+        );
 
       case STEPS.BASIC_PROFILE:
         return (
@@ -238,11 +234,15 @@ function QuestionnaireContent() {
         );
 
       case STEPS.COMPLETE:
-        return <QuestionnaireComplete onContinue={() => {
-          // Redirect to dashboard after completion
-          // Use window.location to force a full refresh and update the session
-          window.location.href = '/dashboard';
-        }} />;
+        return (
+          <QuestionnaireComplete
+            onContinue={() => {
+              // Redirect to dashboard after completion
+              // Use window.location to force a full refresh and update the session
+              window.location.href = '/dashboard';
+            }}
+          />
+        );
 
       default:
         return <QuestionnaireIntro onContinue={nextStep} />;

@@ -420,7 +420,9 @@ export default function RoadmapChatPage() {
                   </div>
                   {message.role === 'user' && (
                     <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-white flex-shrink-0">
-                      {session?.user?.name?.[0]?.toUpperCase() || 'U'}
+                      {(session?.user?.user_metadata?.full_name ||
+                        session?.user?.user_metadata?.name ||
+                        'U')[0]?.toUpperCase()}
                     </div>
                   )}
                 </div>

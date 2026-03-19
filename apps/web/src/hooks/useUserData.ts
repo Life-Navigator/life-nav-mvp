@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api/client';
 
-// JWT authentication helper
+// Auth check — middleware protects routes, this is a client-side guard
 function isAuthenticated(): boolean {
+  // Always return true for client-side — middleware handles auth redirect.
+  // The API calls will return 401 if session expired, which is handled gracefully.
   if (typeof window === 'undefined') return false;
-  return !!localStorage.getItem('access_token');
+  return true;
 }
 
 // Types for user data
@@ -67,7 +69,10 @@ export function useUserData() {
 }
 
 // Function to fetch domain-specific data
-export function useDomainData<T>(domain: 'financial' | 'career' | 'education' | 'health', endpoint: string) {
+export function useDomainData<T>(
+  domain: 'financial' | 'career' | 'education' | 'health',
+  endpoint: string
+) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);

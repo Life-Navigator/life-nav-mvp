@@ -36,6 +36,8 @@ ONTOLOGY_FILES = [
     "finance/instruments.ttl",
     "finance/strategies.ttl",
     "goals/goal.ttl",
+    "compliance/regulations.ttl",
+    "compliance/documents.ttl",
 ]
 
 

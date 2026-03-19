@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from '@/hooks/useSession';
 import Link from 'next/link';
 
+import WalletCredentialCard from '@/components/education/WalletCredentialCard';
+
 // Types
 interface Certification {
   id: string;
@@ -16,6 +18,7 @@ interface Certification {
   completedAt?: string | null;
   isStandalone: boolean;
   source: string;
+  certificateImagePath?: string | null;
 }
 
 interface CertificationStats {
@@ -170,109 +173,7 @@ function TrophyIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-// Certification Card Component
-function CertificationCard({
-  certification,
-  onDelete,
-}: {
-  certification: Certification;
-  onDelete: (id: string) => void;
-}) {
-  const formatDate = (date: string | null | undefined) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      year: 'numeric',
-    });
-  };
-
-  const getProviderColor = (provider: string) => {
-    const colors: Record<string, string> = {
-      Coursera: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      Udemy: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-      AWS: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-      Google: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-      Microsoft: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
-      LinkedIn: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    };
-    return colors[provider] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-  };
-
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-            <CertificateIcon className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2">
-              {certification.title}
-            </h3>
-            <span
-              className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getProviderColor(certification.provider)}`}
-            >
-              {certification.provider}
-            </span>
-          </div>
-        </div>
-        {!certification.isStandalone && (
-          <button
-            onClick={() => onDelete(certification.id)}
-            className="text-gray-400 hover:text-red-500 transition-colors"
-            title="Delete certification"
-          >
-            <XMarkIcon className="h-5 w-5" />
-          </button>
-        )}
-      </div>
-
-      {certification.platform && (
-        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-3">
-          <BuildingIcon className="h-4 w-4" />
-          <span>{certification.platform}</span>
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4">
-        <CalendarIcon className="h-4 w-4" />
-        <span>Earned {formatDate(certification.certificateDate)}</span>
-      </div>
-
-      {certification.skills && certification.skills.length > 0 && (
-        <div className="mb-4">
-          <div className="flex flex-wrap gap-1">
-            {certification.skills.slice(0, 4).map((skill, idx) => (
-              <span
-                key={idx}
-                className="px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-xs"
-              >
-                {skill}
-              </span>
-            ))}
-            {certification.skills.length > 4 && (
-              <span className="px-2 py-0.5 text-gray-500 dark:text-gray-400 text-xs">
-                +{certification.skills.length - 4} more
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {certification.certificateUrl && (
-        <a
-          href={certification.certificateUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          <LinkIcon className="h-4 w-4" />
-          View Certificate
-        </a>
-      )}
-    </div>
-  );
-}
+// CertificationCard is now replaced by WalletCredentialCard imported above
 
 // Add Certification Modal
 function AddCertificationModal({
@@ -282,7 +183,7 @@ function AddCertificationModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (data: Partial<Certification>) => void;
+  onAdd: (data: Partial<Certification> & { documentId?: string; storagePath?: string }) => void;
 }) {
   const [formData, setFormData] = useState({
     title: '',
@@ -293,11 +194,41 @@ function AddCertificationModal({
     skills: '',
     credentialId: '',
   });
+  const [certificateFile, setCertificateFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setUploadError(null);
+
+    let documentId: string | undefined;
+    let storagePath: string | undefined;
+
+    // Upload certificate file first if present
+    if (certificateFile) {
+      try {
+        const uploadForm = new FormData();
+        uploadForm.append('file', certificateFile);
+        const uploadRes = await fetch('/api/data/education/upload', {
+          method: 'POST',
+          body: uploadForm,
+        });
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json();
+          throw new Error(err.error || 'Upload failed');
+        }
+        const uploadData = await uploadRes.json();
+        documentId = uploadData.fileId;
+        storagePath = uploadData.storagePath;
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : 'File upload failed');
+        setIsSubmitting(false);
+        return;
+      }
+    }
 
     await onAdd({
       title: formData.title,
@@ -311,6 +242,8 @@ function AddCertificationModal({
             .map((s) => s.trim())
             .filter(Boolean)
         : [],
+      documentId,
+      storagePath,
     });
 
     setFormData({
@@ -322,8 +255,18 @@ function AddCertificationModal({
       skills: '',
       credentialId: '',
     });
+    setCertificateFile(null);
     setIsSubmitting(false);
     onClose();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && (file.type.startsWith('image/') || file.type === 'application/pdf')) {
+      setCertificateFile(file);
+    }
   };
 
   if (!isOpen) return null;
@@ -434,6 +377,62 @@ function AddCertificationModal({
             />
           </div>
 
+          {/* Certificate Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Certificate Scan (Optional)
+            </label>
+            <div
+              className={`relative border-2 border-dashed rounded-lg p-4 text-center transition-colors ${
+                isDragging
+                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+            >
+              {certificateFile ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-700 dark:text-gray-300 truncate">
+                    {certificateFile.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCertificateFile(null)}
+                    className="text-gray-400 hover:text-red-500 ml-2"
+                  >
+                    <XMarkIcon className="h-5 w-5" />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                    Drag & drop or click to upload
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setCertificateFile(file);
+                    }}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    JPG, PNG, or PDF up to 20MB
+                  </p>
+                </>
+              )}
+            </div>
+            {uploadError && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{uploadError}</p>
+            )}
+          </div>
+
           <div className="flex gap-3 pt-4">
             <button
               type="button"
@@ -521,7 +520,9 @@ export default function CertificationsPage() {
     }
   }, [status, fetchCertifications]);
 
-  const handleAddCertification = async (data: Partial<Certification>) => {
+  const handleAddCertification = async (
+    data: Partial<Certification> & { documentId?: string; storagePath?: string }
+  ) => {
     try {
       const response = await fetch('/api/education/certifications', {
         method: 'POST',
@@ -721,11 +722,11 @@ export default function CertificationsPage() {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredCertifications.map((certification) => (
-              <CertificationCard
+              <WalletCredentialCard
                 key={certification.id}
-                certification={certification}
+                credential={certification}
                 onDelete={handleDeleteCertification}
               />
             ))}

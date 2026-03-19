@@ -1,13 +1,15 @@
+import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from "next";
 
 // Get CSP directive values from environment variables or use defaults
-const cspConnectSrc = process.env.CSP_CONNECT_SRC || `'self'`;
+const cspConnectSrc = process.env.CSP_CONNECT_SRC || `'self' https://*.sentry.io https://*.ingest.us.sentry.io`;
 const cspDefaultSrc = process.env.CSP_DEFAULT_SRC || `'self'`;
 const cspFontSrc = process.env.CSP_FONT_SRC || `'self' https://fonts.gstatic.com`;
 const cspImgSrc = process.env.CSP_IMG_SRC || `'self' data: https: blob:`;
-const cspScriptSrc = process.env.CSP_SCRIPT_SRC || `'self'`;
-const cspStyleSrc = process.env.CSP_STYLE_SRC || `'self' https://fonts.googleapis.com`;
+const cspScriptSrc = process.env.CSP_SCRIPT_SRC || `'self' blob:`;
+const cspStyleSrc = process.env.CSP_STYLE_SRC || `'self' https://fonts.googleapis.com 'unsafe-inline'`;
 const cspFrameSrc = process.env.CSP_FRAME_SRC || `'self'`;
+const cspWorkerSrc = process.env.CSP_WORKER_SRC || `'self' blob:`;
 
 // Define security headers
 const securityHeaders = [
@@ -22,6 +24,7 @@ const securityHeaders = [
       font-src ${cspFontSrc};
       connect-src ${cspConnectSrc};
       frame-src ${cspFrameSrc};
+      worker-src ${cspWorkerSrc};
       base-uri 'self';
       form-action 'self';
       frame-ancestors 'none';
@@ -100,4 +103,27 @@ const nextConfig: NextConfig = {
   experimental: {}
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: 'lifenavigator-inc',
+  project: 'javascript-nextjs',
+
+  // Auth token for source map uploads
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Upload a larger set of source maps for prettier stack traces (Sentry default is 1000)
+  widenClientFileUpload: true,
+
+  // Tunnel Sentry events through this route to avoid ad blockers
+  tunnelRoute: '/monitoring',
+
+  // Only log during CI builds
+  silent: !process.env.CI,
+
+  // Hide source maps from client bundles
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+
+  // Disable Sentry SDK tree-shaking for dev builds
+  disableLogger: true,
+});

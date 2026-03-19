@@ -29,13 +29,14 @@ export async function POST(request: NextRequest) {
 
     switch (step) {
       case 'profile':
-        return handleProfile(supabase, user.id, body);
+      case 'basic_profile':
+        return handleProfile(supabase, user.id, body.data || body);
       case 'education-goals':
         return handleGoals(supabase, user.id, body, 'education');
       case 'career-goals':
         return handleGoals(supabase, user.id, body, 'career');
       case 'financial-goals':
-        return handleGoals(supabase, user.id, body, 'financial');
+        return handleGoals(supabase, user.id, body, 'finance');
       case 'health-goals':
         return handleGoals(supabase, user.id, body, 'health');
       case 'risk-profile':
@@ -56,21 +57,33 @@ async function handleProfile(
   userId: string,
   body: Record<string, unknown>
 ) {
-  const { error } = await (supabase as any)
+  // Update display_name in profiles table
+  const { error: profileError } = await (supabase as any)
     .from('profiles')
     .update({
       display_name: body.name as string,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (profileError) {
+    return NextResponse.json({ error: profileError.message }, { status: 400 });
+  }
+
+  // Store additional profile fields (PII) in auth user_metadata
+  const { error: metaError } = await supabase.auth.updateUser({
+    data: {
+      full_name: body.name as string,
       date_of_birth: body.dateOfBirth as string,
       phone_number: body.phoneNumber as string,
       city: body.city as string,
       state: body.state as string,
       country: body.country as string,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', userId);
+    },
+  });
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  if (metaError) {
+    return NextResponse.json({ error: metaError.message }, { status: 400 });
   }
 
   return NextResponse.json({ success: true });
@@ -100,7 +113,7 @@ async function handleGoals(
           category,
           description: (goal as Record<string, unknown>).description || '',
           target_value: (goal as Record<string, unknown>).targetValue || null,
-          target_unit: (goal as Record<string, unknown>).targetUnit || null,
+          unit: (goal as Record<string, unknown>).targetUnit || null,
           priority: (goal as Record<string, unknown>).priority || 'medium',
           status: 'active',
         });
@@ -119,7 +132,7 @@ async function handleGoals(
         category,
         description: String((goals as Record<string, unknown>).description || ''),
         target_value: (goals as Record<string, unknown>).targetValue || null,
-        target_unit: (goals as Record<string, unknown>).targetUnit || null,
+        unit: (goals as Record<string, unknown>).targetUnit || null,
         priority: String((goals as Record<string, unknown>).priority || 'medium'),
         status: 'active',
       });
@@ -154,15 +167,15 @@ async function handleRiskProfile(
   const { error } = await (supabase as any).from('risk_assessments').insert({
     user_id: userId,
     assessment_type: 'onboarding',
-    overall_score: overallScore,
-    risk_level: riskLevel,
-    status: 'completed',
-    responses: body.assessmentResponses || body.responses || {},
+    overall_risk_score: overallScore,
+    risk_tolerance: riskLevel,
+    completed_at: new Date().toISOString(),
     metadata: {
       financialRiskTolerance: financialRisk,
       careerRiskTolerance: careerRisk,
       educationRiskTolerance: educationRisk,
       riskTheta: body.riskTheta,
+      assessmentResponses: body.assessmentResponses || body.responses || {},
     },
   });
 
@@ -181,7 +194,6 @@ async function handleComplete(
     .from('profiles')
     .update({
       setup_completed: true,
-      setup_completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
     .eq('id', userId);

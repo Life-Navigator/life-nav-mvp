@@ -57,12 +57,10 @@ export async function middleware(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value),
-        );
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options as Record<string, unknown>),
+          response.cookies.set(name, value, options as Record<string, unknown>)
         );
       },
     },
@@ -92,10 +90,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ---- Onboarding check ----
-  if (
-    isAuthenticated &&
-    (path.startsWith('/dashboard') || path.startsWith('/admin'))
-  ) {
+  if (isAuthenticated && (path.startsWith('/dashboard') || path.startsWith('/admin'))) {
     // Check if user has completed onboarding
     const { data: profile } = await supabase
       .from('profiles')
@@ -104,9 +99,7 @@ export async function middleware(request: NextRequest) {
       .single();
 
     if (profile && !profile.setup_completed) {
-      return NextResponse.redirect(
-        new URL('/onboarding/questionnaire', request.url),
-      );
+      return NextResponse.redirect(new URL('/onboarding/questionnaire', request.url));
     }
   }
 
@@ -121,6 +114,6 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico, sitemap.xml, robots.txt (metadata files)
      */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|monitoring).*)',
   ],
 };

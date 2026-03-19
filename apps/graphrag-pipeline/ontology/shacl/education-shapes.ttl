@@ -1,0 +1,506 @@
+@prefix ln: <https://ln.life/ontology#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# ============================================================================
+# SHACL Validation Shapes for Education Domain
+# ============================================================================
+
+# Education Record Shape
+ln:EducationRecordShape
+    a sh:NodeShape ;
+    sh:targetClass ln:EducationRecord ;
+    sh:property [
+        sh:path ln:institutionName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Education record must have exactly one non-empty institutionName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:educationStartDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Education record can have at most one educationStartDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:educationEndDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Education record can have at most one educationEndDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isCurrentEducation ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Education record can have at most one isCurrentEducation flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:educationOf ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Education record must belong to exactly one Person"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tenantId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Education record must have exactly one non-empty tenantId"@en ;
+    ] .
+
+# Degree Shape
+ln:DegreeShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Degree ;
+    sh:property [
+        sh:path ln:degreeType ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:pattern "^(BS|BA|MS|MA|MBA|PhD|MD|JD|EdD|DDS|PharmD|DVM|AA|AS|AAS)$" ;
+        sh:message "Degree type must be valid degree abbreviation"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:majorField ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Degree must have exactly one non-empty majorField"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:gpa ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 4.0 ;
+        sh:message "GPA must be between 0.0 and 4.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:graduationDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Degree can have at most one graduationDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:honors ;
+        sh:datatype xsd:string ;
+        sh:in ("Summa Cum Laude" "Magna Cum Laude" "Cum Laude" "With Distinction" "With High Distinction") ;
+        sh:maxCount 1 ;
+        sh:message "Honors must be valid honors designation"@en ;
+    ] .
+
+# Course Shape
+ln:CourseShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Course ;
+    sh:property [
+        sh:path ln:courseName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Course must have exactly one non-empty courseName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:courseProvider ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "Course can have at most one courseProvider"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:courseDuration ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 1 ;
+        sh:maxInclusive 10000 ;
+        sh:message "Course duration must be between 1 and 10000 hours"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:courseLevel ;
+        sh:datatype xsd:string ;
+        sh:in ("BEGINNER" "INTERMEDIATE" "ADVANCED" "EXPERT") ;
+        sh:maxCount 1 ;
+        sh:message "Course level must be valid course level"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:credits ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 20.0 ;
+        sh:message "Credits must be between 0.0 and 20.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:hasCertificate ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Course can have at most one hasCertificate flag"@en ;
+    ] .
+
+# Professional Certification Shape
+ln:ProfessionalCertificationShape
+    a sh:NodeShape ;
+    sh:targetClass ln:ProfessionalCertification ;
+    sh:property [
+        sh:path ln:certificationName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Professional certification must have exactly one non-empty certificationName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:certificationIssuer ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:message "Certification can have at most one certificationIssuer"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:issueDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Certification can have at most one issueDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:expirationDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Certification can have at most one expirationDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isActive ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Certification can have at most one isActive flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:certificationLevel ;
+        sh:datatype xsd:string ;
+        sh:in ("ASSOCIATE" "PROFESSIONAL" "EXPERT" "SPECIALIST") ;
+        sh:maxCount 1 ;
+        sh:message "Certification level must be valid certification level"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:renewalRequired ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Certification can have at most one renewalRequired flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:renewalPeriod ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 1 ;
+        sh:maxInclusive 120 ;
+        sh:message "Renewal period must be between 1 and 120 months"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:certificationHeldBy ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Certification must be held by exactly one Person"@en ;
+    ] .
+
+# Enrollment Shape
+ln:EnrollmentShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Enrollment ;
+    sh:property [
+        sh:path ln:enrollmentDate ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Enrollment must have exactly one enrollmentDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:enrollmentStatus ;
+        sh:datatype xsd:string ;
+        sh:in ("ENROLLED" "IN_PROGRESS" "COMPLETED" "DROPPED" "DEFERRED") ;
+        sh:maxCount 1 ;
+        sh:message "Enrollment status must be valid enrollment status"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:progressPercentage ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message "Progress percentage must be between 0.0 and 100.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:expectedCompletionDate ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:message "Enrollment can have at most one expectedCompletionDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:studyHoursPerWeek ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:maxInclusive 168 ;
+        sh:message "Study hours per week must be between 0 and 168"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:enrollmentBy ;
+        sh:class ln:Person ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Enrollment must be by exactly one Person"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:enrollmentFor ;
+        sh:class ln:Course ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Enrollment must be for exactly one Course"@en ;
+    ] .
+
+# Course Completion Shape
+ln:CourseCompletionShape
+    a sh:NodeShape ;
+    sh:targetClass ln:CourseCompletion ;
+    sh:property [
+        sh:path ln:completionDate ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Course completion must have exactly one completionDate"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:gradePoints ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 4.0 ;
+        sh:message "Grade points must be between 0.0 and 4.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:certificateIssued ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Course completion can have at most one certificateIssued flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:passed ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Course completion can have at most one passed flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:completionOf ;
+        sh:class ln:Course ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:message "Course completion must be of exactly one Course"@en ;
+    ] .
+
+# Transcript Shape
+ln:TranscriptShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Transcript ;
+    sh:property [
+        sh:path ln:overallGpa ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 4.0 ;
+        sh:message "Overall GPA must be between 0.0 and 4.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:totalCredits ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Total credits must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isOfficial ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Transcript can have at most one isOfficial flag"@en ;
+    ] .
+
+# Educational Institution Shape
+ln:EducationalInstitutionShape
+    a sh:NodeShape ;
+    sh:targetClass ln:EducationalInstitution ;
+    sh:property [
+        sh:path ln:institutionName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Educational institution must have exactly one non-empty institutionName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:institutionType ;
+        sh:datatype xsd:string ;
+        sh:in ("PUBLIC" "PRIVATE" "FOR_PROFIT" "NON_PROFIT" "ONLINE") ;
+        sh:maxCount 1 ;
+        sh:message "Institution type must be valid institution type"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:foundingYear ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 1000 ;
+        sh:maxInclusive 2100 ;
+        sh:message "Founding year must be between 1000 and 2100"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:isAccredited ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Institution can have at most one isAccredited flag"@en ;
+    ] .
+
+# University Shape
+ln:UniversityShape
+    a sh:NodeShape ;
+    sh:targetClass ln:University ;
+    sh:property [
+        sh:path ln:ranking ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 1 ;
+        sh:maxInclusive 10000 ;
+        sh:message "University ranking must be between 1 and 10000"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:rankingSource ;
+        sh:datatype xsd:string ;
+        sh:in ("US_NEWS" "QS" "TIMES" "ARWU") ;
+        sh:maxCount 1 ;
+        sh:message "Ranking source must be valid ranking source"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:studentPopulation ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:message "Student population must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:acceptanceRate ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 1.0 ;
+        sh:message "Acceptance rate must be between 0.0 and 1.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:tuitionCost ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Tuition cost must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:campusType ;
+        sh:datatype xsd:string ;
+        sh:in ("URBAN" "SUBURBAN" "RURAL") ;
+        sh:maxCount 1 ;
+        sh:message "Campus type must be valid campus type"@en ;
+    ] .
+
+# Online Learning Platform Shape
+ln:OnlineLearningPlatformShape
+    a sh:NodeShape ;
+    sh:targetClass ln:OnlineLearningPlatform ;
+    sh:property [
+        sh:path ln:platformName ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:minLength 1 ;
+        sh:message "Platform must have exactly one non-empty platformName"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:totalCourses ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:message "Total courses must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:totalStudents ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0 ;
+        sh:message "Total students must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:subscriptionModel ;
+        sh:datatype xsd:string ;
+        sh:in ("FREE" "FREEMIUM" "SUBSCRIPTION" "PAY_PER_COURSE") ;
+        sh:maxCount 1 ;
+        sh:message "Subscription model must be valid subscription model"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:subscriptionPrice ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Subscription price must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:hasMobilApp ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Platform can have at most one hasMobilApp flag"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:offersCredentials ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Platform can have at most one offersCredentials flag"@en ;
+    ] .
+
+# Bootcamp Shape
+ln:BootcampShape
+    a sh:NodeShape ;
+    sh:targetClass ln:Bootcamp ;
+    sh:property [
+        sh:path ln:bootcampDuration ;
+        sh:datatype xsd:integer ;
+        sh:maxCount 1 ;
+        sh:minInclusive 1 ;
+        sh:maxInclusive 104 ;
+        sh:message "Bootcamp duration must be between 1 and 104 weeks"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:bootcampCost ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:message "Bootcamp cost must be non-negative"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:bootcampFormat ;
+        sh:datatype xsd:string ;
+        sh:in ("FULL_TIME" "PART_TIME" "ONLINE" "HYBRID") ;
+        sh:maxCount 1 ;
+        sh:message "Bootcamp format must be valid format"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:jobPlacementRate ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 1.0 ;
+        sh:message "Job placement rate must be between 0.0 and 1.0"@en ;
+    ] ;
+    sh:property [
+        sh:path ln:hasJobGuarantee ;
+        sh:datatype xsd:boolean ;
+        sh:maxCount 1 ;
+        sh:message "Bootcamp can have at most one hasJobGuarantee flag"@en ;
+    ] .
