@@ -24,7 +24,8 @@ def _check_qdrant(deep: bool = False) -> str | None:
             return "collection not found"
         if deep:
             # Write → delete probe to verify actual write permissions
-            probe_id = "__health_probe__"
+            # Qdrant requires UUID or unsigned int for point IDs
+            probe_id = "00000000-0000-0000-0000-000000000000"
             qdrant_client.upsert_points([{
                 "id": probe_id,
                 "vector": [0.0] * 768,
