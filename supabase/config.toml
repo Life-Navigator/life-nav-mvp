@@ -41,7 +41,6 @@ enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
-min_password_length = 8
 
 # Email settings
 [auth.email]
@@ -50,11 +49,10 @@ double_confirm_changes = true
 enable_confirmations = true
 
 # OAuth Providers
+# Google OAuth is configured in the Supabase Dashboard, not here.
+# To use locally, set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET env vars.
 [auth.external.google]
-enabled = true
-client_id = "env(GOOGLE_CLIENT_ID)"
-secret = "env(GOOGLE_CLIENT_SECRET)"
-redirect_uri = ""
+enabled = false
 
 [auth.external.apple]
 enabled = false
@@ -63,10 +61,7 @@ enabled = false
 enabled = false
 
 [auth.external.azure]
-enabled = true
-client_id = "env(SUPABASE_AZURE_CLIENT_ID)"
-secret = "env(SUPABASE_AZURE_CLIENT_SECRET)"
-url = "env(SUPABASE_AZURE_URL)"
+enabled = false
 
 # ============================================================================
 # Storage Configuration (Blob Storage)
