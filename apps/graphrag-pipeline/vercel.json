@@ -1,16 +1,6 @@
 {
-  "buildCommand": "mkdir -p ontology && cp -r ../../ontology/* ontology/",
+  "buildCommand": "echo 'ontology included in deploy'",
   "builds": [{ "src": "api/*.py", "use": "@vercel/python" }],
   "routes": [{ "src": "/api/(.*)", "dest": "/api/$1.py" }],
-  "env": {
-    "SUPABASE_URL": "@supabase-url",
-    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key",
-    "GEMINI_API_KEY": "@gemini-api-key",
-    "NEO4J_URI": "@neo4j-uri",
-    "NEO4J_USERNAME": "@neo4j-username",
-    "NEO4J_PASSWORD": "@neo4j-password",
-    "QDRANT_URL": "@qdrant-url",
-    "QDRANT_API_KEY": "@qdrant-api-key",
-    "GRAPHRAG_WORKER_SECRET": "@graphrag-worker-secret"
-  }
+  "regions": ["iad1"]
 }

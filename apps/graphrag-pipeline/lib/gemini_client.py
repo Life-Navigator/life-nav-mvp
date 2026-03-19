@@ -21,7 +21,7 @@ def embed_text(text: str) -> list[float]:
             "x-goog-api-key": Config.GEMINI_API_KEY,
         },
         json={
-            "model": Config.GEMINI_EMBED_MODEL,
+            "model": f"models/{Config.GEMINI_EMBED_MODEL}",
             "content": {"parts": [{"text": text}]},
             "outputDimensionality": Config.EMBEDDING_DIMENSIONS,
         },

@@ -18,7 +18,7 @@ class Config:
     GRAPHRAG_WORKER_SECRET: str = os.environ.get("GRAPHRAG_WORKER_SECRET", "")
 
     # Gemini model config
-    GEMINI_EMBED_MODEL: str = "models/gemini-embedding-001"
+    GEMINI_EMBED_MODEL: str = "gemini-embedding-001"
     GEMINI_GENERATE_MODEL: str = "gemini-2.5-flash"
     EMBEDDING_DIMENSIONS: int = 768  # Explicitly requested via output_dimensionality
 

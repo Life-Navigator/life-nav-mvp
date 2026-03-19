@@ -20,7 +20,7 @@ def get_client() -> QdrantClient:
     """Return a singleton Qdrant client."""
     global _client
     if _client is None:
-        _client = QdrantClient(url=Config.QDRANT_URL, api_key=Config.QDRANT_API_KEY)
+        _client = QdrantClient(url=Config.QDRANT_URL, api_key=Config.QDRANT_API_KEY, prefer_grpc=False)
     return _client
 
 
