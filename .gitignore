@@ -64,3 +64,4 @@ android/app/build/
 credentials.json
 service-account.json
 .env.supabase.prod
+.vercel
