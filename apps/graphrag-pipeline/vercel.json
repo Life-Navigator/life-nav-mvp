@@ -1,10 +1,4 @@
 {
-  "buildCommand": "echo 'ontology included in deploy'",
-  "functions": {
-    "api/*.py": {
-      "runtime": "@vercel/python"
-    }
-  },
   "rewrites": [{ "source": "/api/(.*)", "destination": "/api/$1.py" }],
   "regions": ["iad1"]
 }
