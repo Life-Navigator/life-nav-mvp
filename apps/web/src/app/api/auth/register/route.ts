@@ -45,7 +45,8 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Registration error:', error);
-    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Registration error:', message);
+    return NextResponse.json({ error: `Registration failed: ${message}` }, { status: 500 });
   }
 }
