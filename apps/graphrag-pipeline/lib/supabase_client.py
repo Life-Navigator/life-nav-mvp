@@ -40,20 +40,23 @@ def complete_sync_job(
 
 def check_query_cache(user_id: str, query_hash: str) -> dict | None:
     """Check the query cache for a cached response."""
-    from datetime import datetime, timezone
+    try:
+        from datetime import datetime, timezone
 
-    client = get_client()
-    resp = (
-        client.schema("graphrag")
-        .from_("query_cache")
-        .select("response, sources, confidence")
-        .eq("user_id", user_id)
-        .eq("query_hash", query_hash)
-        .gt("expires_at", datetime.now(timezone.utc).isoformat())
-        .maybe_single()
-        .execute()
-    )
-    return resp.data
+        client = get_client()
+        resp = (
+            client.schema("graphrag")
+            .from_("query_cache")
+            .select("response, sources, confidence")
+            .eq("user_id", user_id)
+            .eq("query_hash", query_hash)
+            .gt("expires_at", datetime.now(timezone.utc).isoformat())
+            .maybe_single()
+            .execute()
+        )
+        return resp.data
+    except Exception:
+        return None  # Cache miss on error — proceed to live query
 
 
 def write_query_cache(

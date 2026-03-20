@@ -198,7 +198,7 @@ class handler(BaseHTTPRequestHandler):
             client = supabase_client.get_client()
             risk_resp = (
                 client.from_("risk_assessments")
-                .select("overall_score, risk_level, assessment_type")
+                .select("overall_risk_score, risk_tolerance, assessment_type")
                 .eq("user_id", user_id)
                 .order("created_at", desc=True)
                 .limit(1)
@@ -207,7 +207,7 @@ class handler(BaseHTTPRequestHandler):
             )
             if risk_resp.data:
                 rp = risk_resp.data
-                context += f"\n\n## User Risk Profile\n- Risk Level: {rp['risk_level']}\n- Overall Score: {rp['overall_score']}/100\n- Assessment Type: {rp['assessment_type']}"
+                context += f"\n\n## User Risk Profile\n- Risk Tolerance: {rp['risk_tolerance']}\n- Overall Score: {rp['overall_risk_score']}/100\n- Assessment Type: {rp['assessment_type']}"
         except Exception:
             pass
 
