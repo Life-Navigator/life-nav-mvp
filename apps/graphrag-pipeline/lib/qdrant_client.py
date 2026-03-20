@@ -9,7 +9,6 @@ from qdrant_client.models import (
     PointStruct,
     PointIdsList,
     VectorParams,
-    SearchRequest,
 )
 from lib.config import Config
 
@@ -100,9 +99,9 @@ def search(
     col = collection or Config.QDRANT_COLLECTION
     k = top_k or Config.VECTOR_TOP_K
 
-    results = client.search(
+    response = client.query_points(
         collection_name=col,
-        query_vector=vector,
+        query=vector,
         query_filter=Filter(
             must=[FieldCondition(key="tenant_id", match=MatchValue(value=tenant_id))]
         ),
@@ -117,7 +116,7 @@ def search(
             "score": hit.score,
             "payload": hit.payload or {},
         }
-        for hit in results
+        for hit in response.points
     ]
 
 
@@ -143,9 +142,9 @@ def search_compliance(
             ]
         )
 
-    results = client.search(
+    response = client.query_points(
         collection_name=col,
-        query_vector=vector,
+        query=vector,
         query_filter=query_filter,
         limit=top_k,
         with_payload=True,
@@ -158,5 +157,5 @@ def search_compliance(
             "score": hit.score,
             "payload": hit.payload or {},
         }
-        for hit in results
+        for hit in response.points
     ]
