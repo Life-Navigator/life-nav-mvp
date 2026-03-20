@@ -83,7 +83,8 @@ BEGIN
     payload = EXCLUDED.payload,
     sync_status = 'pending',
     attempts = 0,
-    last_error = NULL
+    last_error = NULL,
+    processed_at = NULL
   RETURNING id INTO v_id;
 
   RETURN v_id;
