@@ -87,6 +87,21 @@ def ensure_collection(
         )
 
 
+def ensure_payload_indexes(collection: str | None = None) -> None:
+    """Create required payload indexes for filtered search."""
+    client = get_client()
+    col = collection or Config.QDRANT_COLLECTION
+    for field in ("tenant_id", "entity_type"):
+        try:
+            client.create_payload_index(
+                collection_name=col,
+                field_name=field,
+                field_schema="keyword",
+            )
+        except Exception:
+            pass  # Index may already exist
+
+
 def search(
     vector: list[float],
     tenant_id: str,

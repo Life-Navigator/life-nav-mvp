@@ -12,7 +12,7 @@ import os
 import re
 
 from lib.config import Config
-from lib import neo4j_client
+from lib import neo4j_client, qdrant_client
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -175,6 +175,9 @@ class handler(BaseHTTPRequestHandler):
         try:
             # Step 1: Create constraints and indexes (replaces n10s.graphconfig.init)
             neo4j_client.ensure_constraints()
+
+            # Step 1b: Ensure Qdrant payload indexes for filtered search
+            qdrant_client.ensure_payload_indexes()
 
             # Step 2: Parse and load each TTL file
             all_classes: list[dict] = []
