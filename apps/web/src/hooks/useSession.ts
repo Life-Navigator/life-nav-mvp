@@ -1,12 +1,50 @@
+import { useState, useEffect } from 'react';
+import { getSupabaseClient } from '@/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
+
 /**
- * Stubs for next-auth — replaced by Supabase auth.
- * Returns safe defaults so pages don't crash during SSR/prerender.
+ * Supabase-based session hook.
+ * Returns a next-auth compatible shape so existing consumers don't break.
  */
-export function useSession(): { data: any; status: string; update: () => Promise<any> } {
+export function useSession(): {
+  data: { user: User | null } | null;
+  status: 'loading' | 'authenticated' | 'unauthenticated';
+  update: () => Promise<any>;
+} {
+  const [user, setUser] = useState<User | null>(null);
+  const [status, setStatus] = useState<'loading' | 'authenticated' | 'unauthenticated'>('loading');
+
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setStatus('unauthenticated');
+      return;
+    }
+
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      setUser(u);
+      setStatus(u ? 'authenticated' : 'unauthenticated');
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setStatus(session?.user ? 'authenticated' : 'unauthenticated');
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   return {
-    data: null,
-    status: 'unauthenticated',
-    update: async () => null,
+    data: user ? { user } : null,
+    status,
+    update: async () => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return null;
+      const { data } = await supabase.auth.refreshSession();
+      return data;
+    },
   };
 }
 
@@ -15,7 +53,12 @@ export async function getCsrfToken(): Promise<string | undefined> {
 }
 
 export async function getSession(): Promise<any> {
-  return null;
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session;
 }
 
 export function signIn(..._args: any[]) {
@@ -23,6 +66,8 @@ export function signIn(..._args: any[]) {
 }
 
 export function signOut(..._args: any[]) {
+  const supabase = getSupabaseClient();
+  if (supabase) supabase.auth.signOut();
   return Promise.resolve(undefined);
 }
 

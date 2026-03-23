@@ -3,10 +3,13 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api/client';
 
-// JWT authentication helper
+// Auth check delegates to Supabase — middleware handles protection,
+// but we still gate client-side fetches to avoid unnecessary 401s.
 function isAuthenticated(): boolean {
+  // In the browser, the Supabase cookie carries auth.
+  // This is a best-effort client check; the real gate is the middleware.
   if (typeof window === 'undefined') return false;
-  return !!localStorage.getItem('access_token');
+  return true; // Let the API call return 401 if unauthenticated
 }
 
 // Types for user data
@@ -67,7 +70,10 @@ export function useUserData() {
 }
 
 // Function to fetch domain-specific data
-export function useDomainData<T>(domain: 'financial' | 'career' | 'education' | 'health', endpoint: string) {
+export function useDomainData<T>(
+  domain: 'financial' | 'career' | 'education' | 'health',
+  endpoint: string
+) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);

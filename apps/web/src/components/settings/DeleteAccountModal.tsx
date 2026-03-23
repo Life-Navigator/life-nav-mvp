@@ -15,26 +15,26 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
   const [confirmText, setConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   if (!isOpen) return null;
-  
+
   const handleDelete = async () => {
     // Reset error state
     setError(null);
-    
+
     // Validate inputs
     if (!password) {
       setError('Please enter your password');
       return;
     }
-    
+
     if (confirmText !== 'DELETE') {
       setError('Please type DELETE to confirm');
       return;
     }
-    
+
     setIsDeleting(true);
-    
+
     try {
       const response = await fetch('/api/user/delete', {
         method: 'POST',
@@ -46,17 +46,16 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
           confirmText,
         }),
       });
-      
+
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.message || 'Failed to delete account');
       }
 
-      // Clear authentication tokens
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-      }
+      // Sign out via Supabase
+      const { getSupabaseClient } = await import('@/lib/supabase/client');
+      const supabase = getSupabaseClient();
+      if (supabase) await supabase.auth.signOut();
 
       // Redirect to login page with a message
       router.push('/auth/login?accountDeleted=true');
@@ -66,7 +65,7 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
       setIsDeleting(false);
     }
   };
-  
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 relative">
@@ -77,17 +76,20 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
           disabled={isDeleting}
         >
           <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
-        
+
         <h2 className="text-xl font-bold text-red-600 dark:text-red-400 mb-4">Delete Account</h2>
-        
+
         <div className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 p-4 mb-4 rounded-md">
           <h3 className="font-semibold">Warning: This action cannot be undone</h3>
-          <p className="mt-1 text-sm">
-            Deleting your account will:
-          </p>
+          <p className="mt-1 text-sm">Deleting your account will:</p>
           <ul className="text-sm mt-2 list-disc list-inside">
             <li>Permanently delete all your personal data</li>
             <li>Remove all your settings and preferences</li>
@@ -96,16 +98,19 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
             <li>Cancel any active subscriptions</li>
           </ul>
         </div>
-        
+
         {error && (
           <div className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 p-3 rounded-md mb-4 text-sm">
             {error}
           </div>
         )}
-        
+
         <div className="space-y-4">
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               Enter your password to confirm
             </label>
             <input
@@ -120,9 +125,12 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
               placeholder="Your current password"
             />
           </div>
-          
+
           <div>
-            <label htmlFor="confirmText" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label
+              htmlFor="confirmText"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
               Type DELETE to confirm
             </label>
             <input
@@ -137,13 +145,9 @@ export function DeleteAccountModal({ isOpen, onClose }: DeleteAccountModalProps)
               placeholder="DELETE"
             />
           </div>
-          
+
           <div className="flex justify-end space-x-3 mt-6">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              disabled={isDeleting}
-            >
+            <Button variant="outline" onClick={onClose} disabled={isDeleting}>
               Cancel
             </Button>
             <Button

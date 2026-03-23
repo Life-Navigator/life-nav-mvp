@@ -2,65 +2,34 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import LoginForm from '../LoginForm';
 
-// Mock the toaster component
-jest.mock('@/components/ui/toaster', () => ({
-  toast: jest.fn(),
-  useToast: jest.fn(() => ({
-    toasts: [],
-    addToast: jest.fn(),
-    removeToast: jest.fn(),
-  })),
-}));
+// Mock Supabase client
+const mockSignInWithPassword = jest.fn();
+const mockSignInWithOAuth = jest.fn();
 
-// Mock fetch
-global.fetch = jest.fn();
-
-// Mock the useRouter hook
-const mockPush = jest.fn();
-jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
+jest.mock('@/lib/supabase/client', () => ({
+  getSupabaseClient: () => ({
+    auth: {
+      signInWithPassword: mockSignInWithPassword,
+      signInWithOAuth: mockSignInWithOAuth,
+    },
   }),
 }));
 
-// Helper to mock fetch responses by URL pattern
-function mockFetchResponses(overrides: Record<string, unknown> = {}) {
-  (global.fetch as jest.Mock).mockImplementation((url: string) => {
-    if (url.includes('/lockout-status')) {
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ locked: false, remainingTime: 0 }),
-      });
-    }
-    if (url.includes('/set-cookie')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-    }
-    if (url.includes('/api/auth/login')) {
-      return Promise.resolve({
-        ok: true,
-        headers: { get: () => 'application/json' },
-        json: () =>
-          Promise.resolve({
-            access_token: 'mock-access-token',
-            refresh_token: 'mock-refresh-token',
-            token_type: 'Bearer',
-            expires_in: 1800,
-            ...overrides,
-          }),
-      });
-    }
-    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
-  });
-}
+// Mock router
+const mockPush = jest.fn();
+const mockRefresh = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+    refresh: mockRefresh,
+  }),
+}));
 
 describe('LoginForm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Provide localStorage mock
-    Object.defineProperty(window, 'localStorage', {
-      value: { setItem: jest.fn(), getItem: jest.fn(), removeItem: jest.fn() },
-      writable: true,
-    });
+    mockSignInWithPassword.mockResolvedValue({ error: null });
+    mockSignInWithOAuth.mockResolvedValue({ error: null });
   });
 
   it('renders the login form correctly', () => {
@@ -69,103 +38,154 @@ describe('LoginForm', () => {
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /try demo account/i })).toBeInTheDocument();
     expect(screen.getByText(/don't have an account\?/i)).toBeInTheDocument();
     expect(screen.getByText(/register now/i)).toBeInTheDocument();
+    expect(screen.getByText(/forgot your password\?/i)).toBeInTheDocument();
   });
 
-  it('validates input fields before submission', async () => {
+  it('does not have a demo login button', () => {
+    render(<LoginForm />);
+    expect(screen.queryByText(/demo/i)).not.toBeInTheDocument();
+  });
+
+  it('calls supabase.auth.signInWithPassword on submit', async () => {
     render(<LoginForm />);
 
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
-    fireEvent.click(submitButton);
-
-    await waitFor(() => {
-      // HTML validation prevents submission — no fetch should be called
-      // (lockout-status may or may not fire depending on form validation)
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'user@example.com' },
     });
-  });
-
-  it('handles successful login', async () => {
-    mockFetchResponses();
-
-    render(<LoginForm />);
-
-    const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/password/i);
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
-
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: 'password123' } });
-    fireEvent.click(submitButton);
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'MyPassword123!' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/auth/login',
-        expect.objectContaining({
-          method: 'POST',
-        })
-      );
+      expect(mockSignInWithPassword).toHaveBeenCalledWith({
+        email: 'user@example.com',
+        password: 'MyPassword123!',
+      });
       expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      expect(mockRefresh).toHaveBeenCalled();
     });
   });
 
-  it('handles failed login', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes('/lockout-status')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ locked: false, remainingTime: 0 }),
-        });
-      }
-      if (url.includes('/api/auth/login')) {
-        return Promise.resolve({
-          ok: false,
-          json: () => Promise.resolve({ message: 'Invalid email or password. Please try again.' }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+  it('shows error message on login failure', async () => {
+    mockSignInWithPassword.mockResolvedValue({
+      error: { message: 'Invalid login credentials' },
     });
 
     render(<LoginForm />);
 
-    const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/password/i);
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
-
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: 'wrongpassword' } });
-    fireEvent.click(submitButton);
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'user@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'wrongpassword' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/invalid email or password/i)).toBeInTheDocument();
+      expect(screen.getByText(/invalid login credentials/i)).toBeInTheDocument();
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 
-  it('handles demo login', async () => {
-    mockFetchResponses();
-
-    // Mock window.location.href
-    Object.defineProperty(window, 'location', {
-      value: { href: '' },
-      writable: true,
-    });
+  it('shows error when supabase client is not configured', async () => {
+    // Temporarily override the mock
+    const originalModule = jest.requireMock('@/lib/supabase/client');
+    const originalFn = originalModule.getSupabaseClient;
+    originalModule.getSupabaseClient = () => null;
 
     render(<LoginForm />);
 
-    const demoButton = screen.getByRole('button', { name: /try demo account/i });
-    fireEvent.click(demoButton);
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'user@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/auth/login',
-        expect.objectContaining({
-          body: JSON.stringify({
-            email: 'demo@lifenavigator.app',
-            password: 'DemoUser2024!',
-          }),
-        })
-      );
+      expect(screen.getByText(/authentication service is not configured/i)).toBeInTheDocument();
     });
+
+    // Restore
+    originalModule.getSupabaseClient = originalFn;
+  });
+
+  it('calls supabase.auth.signInWithOAuth for Google', async () => {
+    render(<LoginForm />);
+
+    fireEvent.click(screen.getByRole('button', { name: /google/i }));
+
+    await waitFor(() => {
+      expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+        provider: 'google',
+        options: expect.objectContaining({
+          redirectTo: expect.stringContaining('/auth/callback'),
+        }),
+      });
+    });
+  });
+
+  it('calls supabase.auth.signInWithOAuth for LinkedIn', async () => {
+    render(<LoginForm />);
+
+    fireEvent.click(screen.getByRole('button', { name: /linkedin/i }));
+
+    await waitFor(() => {
+      expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+        provider: 'linkedin_oidc',
+        options: expect.objectContaining({
+          redirectTo: expect.stringContaining('/auth/callback'),
+        }),
+      });
+    });
+  });
+
+  it('disables buttons while loading', async () => {
+    // Make signIn hang
+    mockSignInWithPassword.mockReturnValue(new Promise(() => {}));
+
+    render(<LoginForm />);
+
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'user@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'password' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/signing in/i)).toBeInTheDocument();
+    });
+  });
+
+  it('does not store tokens in localStorage', async () => {
+    const setItemSpy = jest.spyOn(Storage.prototype, 'setItem');
+
+    render(<LoginForm />);
+
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'user@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/password/i), {
+      target: { value: 'MyPassword123!' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(mockSignInWithPassword).toHaveBeenCalled();
+    });
+
+    // Verify no auth tokens written to localStorage
+    const tokenWrites = setItemSpy.mock.calls.filter(
+      ([key]) => key === 'access_token' || key === 'refresh_token' || key === 'token_type'
+    );
+    expect(tokenWrites).toHaveLength(0);
+
+    setItemSpy.mockRestore();
   });
 });

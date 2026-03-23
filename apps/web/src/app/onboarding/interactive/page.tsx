@@ -1,8 +1,9 @@
 'use client';
 
 import React, { Suspense, useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
+import { getSupabaseClient } from '@/lib/supabase/client';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // Enhanced components
@@ -19,7 +20,6 @@ import HealthQuestionnaire from '@/components/onboarding/HealthQuestionnaire';
 import RiskAssessment from '@/components/onboarding/RiskAssessment';
 import QuestionnaireComplete from '@/components/onboarding/QuestionnaireComplete';
 
-// Define all steps in the enhanced questionnaire process
 const STEPS = {
   WELCOME: 0,
   PERSONA: 1,
@@ -35,11 +35,10 @@ const STEPS = {
 
 function InteractiveOnboardingContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const userId = searchParams.get('userId');
-  const userName = searchParams.get('name') || undefined;
   const { addToast } = useToast();
 
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | undefined>(undefined);
   const [currentStep, setCurrentStep] = useState(STEPS.WELCOME);
   const [formData, setFormData] = useState<{
     persona: string;
@@ -60,34 +59,35 @@ function InteractiveOnboardingContent() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Redirect to login if no userId is provided or not authenticated
+  // Get userId from Supabase session
   useEffect(() => {
-    if (!userId) {
-      addToast({
-        title: "Authentication Required",
-        description: "Please login to access the onboarding questionnaire.",
-        type: "error",
-      });
+    const supabase = getSupabaseClient();
+    if (!supabase) {
       router.push('/auth/login');
+      return;
     }
-  }, [userId, router, addToast]);
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
+      setUserId(user.id);
+      setUserName(user.user_metadata?.name);
+    });
+  }, [router]);
 
   const handleStepDataChange = (step: string, data: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [step]: data,
-    }));
+    setFormData((prev) => ({ ...prev, [step]: data }));
   };
 
   const nextStep = () => {
-    setCurrentStep(prev => prev + 1);
-    // Scroll to top when changing steps
+    setCurrentStep((prev) => prev + 1);
     window.scrollTo(0, 0);
   };
 
   const prevStep = () => {
-    setCurrentStep(prev => Math.max(0, prev - 1));
-    // Scroll to top when changing steps
+    setCurrentStep((prev) => Math.max(0, prev - 1));
     window.scrollTo(0, 0);
   };
 
@@ -96,46 +96,40 @@ function InteractiveOnboardingContent() {
 
     setIsSubmitting(true);
     try {
-      // Submit education goals
       await fetch('/api/onboarding/education-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, goals: formData.education }),
       });
 
-      // Submit career goals
       await fetch('/api/onboarding/career-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, goals: formData.career }),
       });
 
-      // Submit financial goals
       await fetch('/api/onboarding/financial-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, goals: formData.financial }),
       });
 
-      // Submit health goals
       await fetch('/api/onboarding/health-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, goals: formData.health }),
       });
 
-      // Submit persona and prioritized goals
       await fetch('/api/onboarding/persona-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
           persona: formData.persona,
-          prioritizedGoals: formData.goals
+          prioritizedGoals: formData.goals,
         }),
       });
 
-      // Submit risk profile
       await fetch('/api/onboarding/risk-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -146,37 +140,33 @@ function InteractiveOnboardingContent() {
           careerRiskTolerance: formData.risk.careerRiskTolerance,
           healthRiskTolerance: formData.risk.healthRiskTolerance,
           educationRiskTolerance: formData.risk.educationRiskTolerance,
-          assessmentResponses: formData.risk.responses
+          assessmentResponses: formData.risk.responses,
         }),
       });
 
-      // Mark user setup as complete
       await fetch('/api/onboarding/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       });
 
-      // Move to completion step
       nextStep();
     } catch (error) {
       console.error('Error submitting questionnaire:', error);
       addToast({
-        title: "Error",
-        description: "Failed to save your goals. Please try again.",
-        type: "error",
+        title: 'Error',
+        description: 'Failed to save your goals. Please try again.',
+        type: 'error',
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Render current step
   const renderStep = () => {
-    switch(currentStep) {
+    switch (currentStep) {
       case STEPS.WELCOME:
         return <EnhancedWelcome onContinue={nextStep} userName={userName} />;
-
       case STEPS.PERSONA:
         return (
           <PersonaSelection
@@ -187,7 +177,6 @@ function InteractiveOnboardingContent() {
             onBack={prevStep}
           />
         );
-
       case STEPS.GOALS:
         return (
           <GoalVisualization
@@ -199,7 +188,6 @@ function InteractiveOnboardingContent() {
             persona={formData.persona}
           />
         );
-
       case STEPS.EDUCATION:
         return (
           <EducationQuestionnaire
@@ -209,7 +197,6 @@ function InteractiveOnboardingContent() {
             onBack={prevStep}
           />
         );
-
       case STEPS.CAREER:
         return (
           <CareerQuestionnaire
@@ -219,7 +206,6 @@ function InteractiveOnboardingContent() {
             onBack={prevStep}
           />
         );
-
       case STEPS.FINANCIAL:
         return (
           <FinancialQuestionnaire
@@ -229,7 +215,6 @@ function InteractiveOnboardingContent() {
             onBack={prevStep}
           />
         );
-
       case STEPS.HEALTH:
         return (
           <HealthQuestionnaire
@@ -239,7 +224,6 @@ function InteractiveOnboardingContent() {
             onBack={prevStep}
           />
         );
-
       case STEPS.RISK:
         return (
           <RiskAssessment
@@ -250,33 +234,24 @@ function InteractiveOnboardingContent() {
             isSubmitting={isSubmitting}
           />
         );
-
       case STEPS.ACHIEVEMENTS:
-        return (
-          <AchievementUnlock
-            onContinue={nextStep}
-            onBack={prevStep}
-          />
-        );
-
+        return <AchievementUnlock onContinue={nextStep} onBack={prevStep} />;
       case STEPS.COMPLETE:
         return (
-          <QuestionnaireComplete onContinue={() => {
-            // Redirect to dashboard after completion
-            // Use window.location to force a full refresh and update the session
-            window.location.href = '/dashboard';
-          }} />
+          <QuestionnaireComplete
+            onContinue={() => {
+              router.push('/dashboard');
+              router.refresh();
+            }}
+          />
         );
-
       default:
         return <EnhancedWelcome onContinue={nextStep} userName={userName} />;
     }
   };
 
-  // Calculate progress percentage
   const progress = Math.round((currentStep / (Object.keys(STEPS).length - 1)) * 100);
 
-  // Step labels for the progress indicator
   const stepLabels = [
     'Welcome',
     'Persona',
@@ -287,27 +262,33 @@ function InteractiveOnboardingContent() {
     'Health',
     'Risk',
     'Rewards',
-    'Complete'
+    'Complete',
   ];
+
+  if (!userId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-900/20 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-900/20 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-xl shadow-lg">
-        {/* Progress indicator */}
         {currentStep > 0 && currentStep < STEPS.COMPLETE && (
           <div className="w-full">
             <div className="relative mb-6">
-              {/* Visual progress bar */}
               <div className="overflow-hidden h-2 text-xs flex rounded bg-blue-200 dark:bg-blue-900/30">
                 <motion.div
                   className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-blue-500 to-indigo-600"
-                  initial={{ width: `${(currentStep - 1) / (Object.keys(STEPS).length - 1) * 100}%` }}
+                  initial={{
+                    width: `${((currentStep - 1) / (Object.keys(STEPS).length - 1)) * 100}%`,
+                  }}
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.5 }}
                 />
               </div>
-
-              {/* Step markers */}
               <div className="flex justify-between text-xs mt-2">
                 {stepLabels.map((label, index) => (
                   <div
@@ -315,20 +296,24 @@ function InteractiveOnboardingContent() {
                     className={`relative ${index === stepLabels.length - 1 ? 'right-2' : index === 0 ? 'left-0' : ''}`}
                     style={{
                       visibility: [0, 2, 4, 6, 8, 9].includes(index) ? 'visible' : 'hidden',
-                      flex: index === 0 || index === stepLabels.length - 1 ? '0 0 auto' : '1 1 0'
+                      flex: index === 0 || index === stepLabels.length - 1 ? '0 0 auto' : '1 1 0',
                     }}
                   >
-                    <div className={`
+                    <div
+                      className={`
                       absolute top-[-20px] left-1/2 transform -translate-x-1/2
                       w-3 h-3 rounded-full
                       ${currentStep >= index ? 'bg-blue-600 dark:bg-blue-400' : 'bg-gray-300 dark:bg-gray-600'}
-                    `} />
+                    `}
+                    />
                     {[0, 2, 4, 6, 8, 9].includes(index) && (
-                      <span className={`
+                      <span
+                        className={`
                         absolute top-[-42px] left-1/2 transform -translate-x-1/2 whitespace-nowrap
                         font-medium text-[10px]
                         ${currentStep >= index ? 'text-blue-700 dark:text-blue-300' : 'text-gray-400 dark:text-gray-500'}
-                      `}>
+                      `}
+                      >
                         {label}
                       </span>
                     )}
@@ -338,8 +323,6 @@ function InteractiveOnboardingContent() {
             </div>
           </div>
         )}
-
-        {/* Current step */}
         <AnimatePresence mode="wait">
           <motion.div
             key={currentStep}

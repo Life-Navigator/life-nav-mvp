@@ -1,8 +1,9 @@
 'use client';
 
 import React, { Suspense, useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/toaster';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 // Domain-specific questionnaire steps
 import BasicProfileQuestionnaire from '@/components/onboarding/BasicProfileQuestionnaire';
@@ -14,7 +15,6 @@ import RiskAssessment from '@/components/onboarding/RiskAssessment';
 import QuestionnaireIntro from '@/components/onboarding/QuestionnaireIntro';
 import QuestionnaireComplete from '@/components/onboarding/QuestionnaireComplete';
 
-// Define all steps in the questionnaire process
 const STEPS = {
   INTRO: 0,
   BASIC_PROFILE: 1,
@@ -28,11 +28,10 @@ const STEPS = {
 
 function QuestionnaireContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const userId = searchParams.get('userId');
-  const userName = searchParams.get('name');
   const { addToast } = useToast();
 
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | undefined>(undefined);
   const [currentStep, setCurrentStep] = useState(STEPS.INTRO);
   const [formData, setFormData] = useState({
     basicProfile: {},
@@ -44,53 +43,45 @@ function QuestionnaireContent() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Function to switch to enhanced onboarding
-  const switchToEnhancedOnboarding = () => {
-    router.push(`/onboarding/interactive?userId=${userId}${userName ? `&name=${userName}` : ''}`);
-  };
-
-  // Redirect to login if no userId is provided or not authenticated
+  // Get userId from Supabase session — no query params needed
   useEffect(() => {
-    if (!userId) {
-      addToast({
-        title: "Authentication Required",
-        description: "Please login to access the onboarding questionnaire.",
-        type: "error",
-      });
+    const supabase = getSupabaseClient();
+    if (!supabase) {
       router.push('/auth/login');
+      return;
     }
-  }, [userId, router, addToast]);
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
+      setUserId(user.id);
+      setUserName(user.user_metadata?.name);
+    });
+  }, [router]);
+
+  const switchToEnhancedOnboarding = () => {
+    router.push('/onboarding/interactive');
+  };
 
   const handleStepDataChange = (step: string, data: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [step]: data,
-    }));
+    setFormData((prev) => ({ ...prev, [step]: data }));
   };
 
-  const nextStep = () => {
-    setCurrentStep(prev => prev + 1);
-  };
-
-  const prevStep = () => {
-    setCurrentStep(prev => prev - 1);
-  };
+  const nextStep = () => setCurrentStep((prev) => prev + 1);
+  const prevStep = () => setCurrentStep((prev) => prev - 1);
 
   const handleSubmit = async () => {
     if (!userId) return;
 
     setIsSubmitting(true);
     try {
-      // Submit basic profile data
       const basicProfile = formData.basicProfile as any;
       if (basicProfile && Object.keys(basicProfile).length > 0) {
-        const token = localStorage.getItem('access_token');
         await fetch('/api/user/profile', {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: basicProfile.name,
             phoneNumber: basicProfile.phoneNumber,
@@ -103,35 +94,30 @@ function QuestionnaireContent() {
         });
       }
 
-      // Submit education goals
       await fetch('/api/onboarding/education-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, goals: formData.education }),
       });
 
-      // Submit career goals
       await fetch('/api/onboarding/career-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, goals: formData.career }),
       });
 
-      // Submit financial goals
       await fetch('/api/onboarding/financial-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, goals: formData.financial }),
       });
 
-      // Submit health goals
       await fetch('/api/onboarding/health-goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, goals: formData.health }),
       });
 
-      // Submit risk profile
       await fetch('/api/onboarding/risk-profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -142,40 +128,39 @@ function QuestionnaireContent() {
           careerRiskTolerance: (formData.risk as any).careerRiskTolerance,
           healthRiskTolerance: (formData.risk as any).healthRiskTolerance,
           educationRiskTolerance: (formData.risk as any).educationRiskTolerance,
-          assessmentResponses: (formData.risk as any).responses
+          assessmentResponses: (formData.risk as any).responses,
         }),
       });
 
-      // Mark user setup as complete
+      // Mark setup as complete — this endpoint reads userId from Supabase session
       await fetch('/api/onboarding/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       });
 
-      // Move to completion step
       nextStep();
     } catch (error) {
       console.error('Error submitting questionnaire:', error);
       addToast({
-        title: "Error",
-        description: "Failed to save your information. Please try again.",
-        type: "error",
+        title: 'Error',
+        description: 'Failed to save your information. Please try again.',
+        type: 'error',
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Render current step
   const renderStep = () => {
-    switch(currentStep) {
+    switch (currentStep) {
       case STEPS.INTRO:
-        return <QuestionnaireIntro
-          onContinue={nextStep}
-          onSwitchToEnhanced={switchToEnhancedOnboarding}
-        />;
-
+        return (
+          <QuestionnaireIntro
+            onContinue={nextStep}
+            onSwitchToEnhanced={switchToEnhancedOnboarding}
+          />
+        );
       case STEPS.BASIC_PROFILE:
         return (
           <BasicProfileQuestionnaire
@@ -185,7 +170,6 @@ function QuestionnaireContent() {
             onBack={prevStep}
           />
         );
-
       case STEPS.EDUCATION:
         return (
           <EducationQuestionnaire
@@ -195,7 +179,6 @@ function QuestionnaireContent() {
             onBack={prevStep}
           />
         );
-
       case STEPS.CAREER:
         return (
           <CareerQuestionnaire
@@ -205,7 +188,6 @@ function QuestionnaireContent() {
             onBack={prevStep}
           />
         );
-
       case STEPS.FINANCIAL:
         return (
           <FinancialQuestionnaire
@@ -215,7 +197,6 @@ function QuestionnaireContent() {
             onBack={prevStep}
           />
         );
-
       case STEPS.HEALTH:
         return (
           <HealthQuestionnaire
@@ -225,7 +206,6 @@ function QuestionnaireContent() {
             onBack={prevStep}
           />
         );
-
       case STEPS.RISK:
         return (
           <RiskAssessment
@@ -236,26 +216,33 @@ function QuestionnaireContent() {
             isSubmitting={isSubmitting}
           />
         );
-
       case STEPS.COMPLETE:
-        return <QuestionnaireComplete onContinue={() => {
-          // Redirect to dashboard after completion
-          // Use window.location to force a full refresh and update the session
-          window.location.href = '/dashboard';
-        }} />;
-
+        return (
+          <QuestionnaireComplete
+            onContinue={() => {
+              router.push('/dashboard');
+              router.refresh();
+            }}
+          />
+        );
       default:
         return <QuestionnaireIntro onContinue={nextStep} />;
     }
   };
 
-  // Calculate progress percentage
   const progress = Math.round((currentStep / (Object.keys(STEPS).length - 1)) * 100);
+
+  if (!userId) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl w-full space-y-8 bg-white dark:bg-gray-800 p-8 rounded-xl shadow">
-        {/* Progress bar */}
         {currentStep > 0 && currentStep < STEPS.COMPLETE && (
           <div className="w-full">
             <div className="relative pt-1">
@@ -280,8 +267,6 @@ function QuestionnaireContent() {
             </div>
           </div>
         )}
-
-        {/* Current step */}
         {renderStep()}
       </div>
     </div>

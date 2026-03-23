@@ -4,7 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { downloadFile, StorageBucket } from '@/lib/storage/local-storage';
-import { verifyToken } from '@/lib/auth/jwt';
+import { getUserIdFromJWT } from '@/lib/auth/jwt';
 
 const VALID_BUCKETS: StorageBucket[] = ['documents', 'avatars', 'exports', 'temp'];
 
@@ -28,16 +28,9 @@ export async function GET(
 
     // Check authentication for non-public buckets
     if (bucket !== 'avatars') {
-      const authHeader = request.headers.get('authorization');
-      const token = authHeader?.replace('Bearer ', '') || request.cookies.get('token')?.value;
-
-      if (!token) {
+      const userId = await getUserIdFromJWT(request);
+      if (!userId) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-
-      const payload = await verifyToken(token);
-      if (!payload?.userId) {
-        return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
       }
     }
 

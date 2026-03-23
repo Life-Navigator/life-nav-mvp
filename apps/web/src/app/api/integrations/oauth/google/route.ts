@@ -8,16 +8,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
-import {
-  GoogleOAuthService,
-  SCOPE_BUNDLES,
-  GOOGLE_SCOPES,
-} from '@/lib/integrations/google/oauth';
+import { GoogleOAuthService, SCOPE_BUNDLES, GOOGLE_SCOPES } from '@/lib/integrations/google/oauth';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 type ScopeBundleKey = keyof typeof SCOPE_BUNDLES;
 type ScopeKey = keyof typeof GOOGLE_SCOPES;
 
 export async function GET(request: NextRequest) {
+  // Verify authenticated user before initiating OAuth
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   const searchParams = request.nextUrl.searchParams;
 
   // Get requested scope bundles (comma-separated)
@@ -81,10 +86,7 @@ export async function GET(request: NextRequest) {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    return NextResponse.json(
-      { error: 'Google OAuth not configured' },
-      { status: 503 }
-    );
+    return NextResponse.json({ error: 'Google OAuth not configured' }, { status: 503 });
   }
 
   const oauthService = new GoogleOAuthService(clientId, clientSecret);
@@ -99,6 +101,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Verify authenticated user before initiating OAuth
+  const supabasePost = await createServerSupabaseClient();
+  if (!supabasePost) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
+  const {
+    data: { user: postUser },
+  } = await supabasePost.auth.getUser();
+  if (!postUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   // Alternative POST method for programmatic initiation
   const body = await request.json();
   const { bundles = ['basic'], scopes = [], redirect = '/settings/integrations' } = body;
@@ -151,10 +161,7 @@ export async function POST(request: NextRequest) {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    return NextResponse.json(
-      { error: 'Google OAuth not configured' },
-      { status: 503 }
-    );
+    return NextResponse.json({ error: 'Google OAuth not configured' }, { status: 503 });
   }
 
   const oauthService = new GoogleOAuthService(clientId, clientSecret);

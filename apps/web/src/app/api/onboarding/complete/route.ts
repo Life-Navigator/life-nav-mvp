@@ -12,6 +12,29 @@ export async function POST(_request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Verify the user has submitted at least basic profile data and one goal
+  // before allowing onboarding completion. Prevents bypassing the flow.
+  const { data: profile } = await (supabase as any)
+    .from('profiles')
+    .select('display_name')
+    .eq('id', user.id)
+    .single();
+
+  const { count: goalCount } = await (supabase as any)
+    .from('goals')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id);
+
+  if (!profile?.display_name && (goalCount ?? 0) === 0) {
+    return NextResponse.json(
+      {
+        error:
+          'Please complete at least the basic profile or set a goal before finishing onboarding.',
+      },
+      { status: 400 }
+    );
+  }
+
   const { error } = await (supabase as any)
     .from('profiles')
     .update({

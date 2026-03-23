@@ -5,20 +5,23 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get session token for backend authentication
-    const cookieStore = await cookies();
-    const sessionToken = cookieStore.get('session_token')?.value;
+    // Verify authenticated user
+    const supabase = await createServerSupabaseClient();
+    if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    if (!sessionToken) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
-    }
+    // Get access token for backend call
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const sessionToken = session?.access_token;
 
     // Forward request to backend
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -40,9 +43,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Google disconnect error:', err);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

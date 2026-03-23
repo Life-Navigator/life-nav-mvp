@@ -3,49 +3,21 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { getSupabaseClient } from '@/lib/supabase/client';
+import { trackAuthEvent } from '@/lib/analytics/auth-events';
 
 export default function LoginForm() {
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    rememberMe: false,
-    mfaToken: '',
   });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [mfaRequired, setMfaRequired] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [isAccountLocked, setIsAccountLocked] = useState(false);
-  const [lockoutTimeRemaining, setLockoutTimeRemaining] = useState(0);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData({
-      ...formData,
-      [name]: type === 'checkbox' ? checked : value,
-    });
-  };
-
-  // Check account lockout status
-  const checkLockoutStatus = async (email: string) => {
-    try {
-      const response = await fetch('/api/auth/lockout-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      
-      const data = await response.json();
-      
-      setIsAccountLocked(data.locked);
-      setLockoutTimeRemaining(data.remainingTime);
-      
-      return data.locked;
-    } catch (error) {
-      console.error('Error checking lockout status:', error);
-      return false;
-    }
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -53,126 +25,55 @@ export default function LoginForm() {
     setIsLoading(true);
     setError(null);
 
-    try {
-      // Check if account is locked
-      const locked = await checkLockoutStatus(formData.email);
-      if (locked) {
-        const minutes = Math.floor(lockoutTimeRemaining / 60);
-        const seconds = lockoutTimeRemaining % 60;
-        setError(`Account is temporarily locked due to too many failed attempts. Try again in ${minutes}m ${seconds}s.`);
-        setIsLoading(false);
-        
-        // Setup a countdown timer to update the remaining time
-        const countdownInterval = setInterval(() => {
-          setLockoutTimeRemaining(prev => {
-            if (prev <= 1) {
-              clearInterval(countdownInterval);
-              setIsAccountLocked(false);
-              setError(null);
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
-        
-        return;
-      }
-
-      // Call backend login API
-      console.log('[LoginForm] Calling backend login API');
-
-      const loginResponse = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          mfaToken: mfaRequired ? formData.mfaToken : undefined,
-        }),
-      });
-
-      const loginData = await loginResponse.json();
-      console.log('[LoginForm] Backend login response:', loginResponse.status);
-
-      if (!loginResponse.ok) {
-        const errorMessage = loginData?.message || 'Invalid email or password. Please try again.';
-        setError(errorMessage);
-        // Check if account is now locked after this failed attempt
-        await checkLockoutStatus(formData.email);
-      } else {
-        // Successful login - store tokens
-        if (loginData.access_token) {
-          localStorage.setItem('access_token', loginData.access_token);
-          localStorage.setItem('refresh_token', loginData.refresh_token);
-          localStorage.setItem('token_type', loginData.token_type);
-
-          // Also set httpOnly cookie via API route
-          await fetch('/api/auth/set-cookie', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              token: loginData.access_token,
-              expiresIn: loginData.expires_in,
-            }),
-          });
-        }
-
-        // Redirect to dashboard
-        console.log('[LoginForm] Login successful, redirecting to dashboard');
-        router.push('/dashboard');
-      }
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again.');
-      console.error('Login error:', err);
-    } finally {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setError('Authentication service is not configured.');
       setIsLoading(false);
+      return;
     }
+
+    trackAuthEvent({ event: 'login_started', metadata: { method: 'password' } });
+
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: formData.email,
+      password: formData.password,
+    });
+
+    if (authError) {
+      trackAuthEvent({ event: 'login_error', error: authError.message });
+      setError(authError.message);
+      setIsLoading(false);
+      return;
+    }
+
+    trackAuthEvent({ event: 'login_success', metadata: { method: 'password' } });
+    router.push('/dashboard');
+    router.refresh();
   };
 
-  const handleDemoLogin = async () => {
+  const handleOAuthLogin = async (provider: 'google' | 'linkedin_oidc' | 'azure') => {
     setIsLoading(true);
     setError(null);
 
-    try {
-      // Call login API with demo credentials
-      const loginResponse = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: 'demo@lifenavigator.app',
-          password: 'DemoUser2024!',
-        }),
-      });
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      setError('Authentication service is not configured.');
+      setIsLoading(false);
+      return;
+    }
 
-      const contentType = loginResponse.headers.get('content-type');
-      let loginData;
+    trackAuthEvent({ event: 'oauth_started', provider });
 
-      if (contentType && contentType.includes('application/json')) {
-        loginData = await loginResponse.json();
-      } else {
-        throw new Error('Server returned an invalid response.');
-      }
+    const { error: authError } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
 
-      if (!loginResponse.ok) {
-        setError('Demo login failed. Please try again or contact support.');
-        console.error('Demo login error:', loginData?.message);
-      } else {
-        // Successful demo login - store tokens
-        if (loginData.access_token) {
-          localStorage.setItem('access_token', loginData.access_token);
-          localStorage.setItem('refresh_token', loginData.refresh_token);
-          localStorage.setItem('token_type', loginData.token_type);
-
-          // Also set a cookie for server-side middleware access
-          document.cookie = `auth_token=${loginData.access_token}; path=/; max-age=${loginData.expires_in || 1800}; SameSite=Lax`;
-        }
-        // Redirect to dashboard
-        window.location.href = '/dashboard';
-      }
-    } catch (err) {
-      setError('An unexpected error occurred. Please try again.');
-      console.error('Demo login error:', err);
-    } finally {
+    if (authError) {
+      trackAuthEvent({ event: 'login_error', provider, error: authError.message });
+      setError(authError.message);
       setIsLoading(false);
     }
   };
@@ -185,16 +86,19 @@ export default function LoginForm() {
           Sign in to access your Life Navigator dashboard
         </p>
       </div>
-      
+
       {error && (
         <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 text-sm rounded-md">
           {error}
         </div>
       )}
-      
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+          >
             Email address
           </label>
           <input
@@ -205,22 +109,28 @@ export default function LoginForm() {
             required
             value={formData.email}
             onChange={handleChange}
-            disabled={isLoading || mfaRequired}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 
+            disabled={isLoading}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400
             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
             bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-            placeholder="demo@example.com"
+            placeholder="you@example.com"
           />
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+            <label
+              htmlFor="password"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            >
               Password
             </label>
-            <a href="#" className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
+            <Link
+              href="/auth/forgot-password"
+              className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+            >
               Forgot your password?
-            </a>
+            </Link>
           </div>
           <input
             id="password"
@@ -230,63 +140,23 @@ export default function LoginForm() {
             required
             value={formData.password}
             onChange={handleChange}
-            disabled={isLoading || mfaRequired}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 
+            disabled={isLoading}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400
             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
             bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
             placeholder="password"
           />
         </div>
 
-        {mfaRequired && (
-          <div>
-            <label htmlFor="mfaToken" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Authentication Code
-            </label>
-            <input
-              id="mfaToken"
-              name="mfaToken"
-              type="text"
-              autoComplete="one-time-code"
-              required
-              value={formData.mfaToken}
-              onChange={handleChange}
-              disabled={isLoading}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400 
-              focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-              bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-              placeholder="Enter 6-digit code from your authenticator app"
-            />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Enter the 6-digit code from your authenticator app
-            </p>
-          </div>
-        )}
-
-        <div className="flex items-center">
-          <input
-            id="rememberMe"
-            name="rememberMe"
-            type="checkbox"
-            checked={formData.rememberMe}
-            onChange={handleChange}
-            disabled={isLoading}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-          <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-            Remember me
-          </label>
-        </div>
-
         <div>
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium
             text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
             disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
           >
-            {isLoading ? 'Signing in...' : mfaRequired ? 'Verify' : 'Sign in'}
+            {isLoading ? 'Signing in...' : 'Sign in'}
           </button>
         </div>
       </form>
@@ -297,15 +167,16 @@ export default function LoginForm() {
             <div className="w-full border-t border-gray-300 dark:border-gray-700" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">Or continue with</span>
+            <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+              Or continue with
+            </span>
           </div>
         </div>
 
         <div className="mt-6 grid grid-cols-2 gap-3">
-          {/* Google button */}
           <button
             type="button"
-            onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/oauth/google`}
+            onClick={() => handleOAuthLogin('google')}
             disabled={isLoading}
             className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm
             bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700
@@ -332,55 +203,29 @@ export default function LoginForm() {
             <span className="ml-2">Google</span>
           </button>
 
-          {/* LinkedIn button */}
           <button
             type="button"
-            onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/oauth/linkedin`}
+            onClick={() => handleOAuthLogin('linkedin_oidc')}
             disabled={isLoading}
             className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm
             bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700
             disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <svg className="h-5 w-5" aria-hidden="true" fill="#0A66C2" viewBox="0 0 24 24">
-              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
             </svg>
             <span className="ml-2">LinkedIn</span>
-          </button>
-
-          {/* Facebook button */}
-          <button
-            type="button"
-            onClick={() => window.location.href = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/auth/oauth/facebook`}
-            disabled={isLoading}
-            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm
-            bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700
-            disabled:opacity-50 disabled:cursor-not-allowed col-span-2"
-          >
-            <svg className="h-5 w-5" aria-hidden="true" fill="#1877F2" viewBox="0 0 24 24">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-            </svg>
-            <span className="ml-2">Facebook</span>
           </button>
         </div>
       </div>
 
-      <div className="mt-6">
-        <button
-          type="button"
-          onClick={handleDemoLogin}
-          disabled={isLoading}
-          className="w-full flex justify-center py-2 px-4 border border-blue-300 dark:border-blue-700 rounded-md shadow-sm text-sm font-medium 
-          text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-800 hover:bg-blue-50 dark:hover:bg-blue-900/20
-          focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-        >
-          Try demo account
-        </button>
-      </div>
-      
       <div className="mt-6 text-center">
         <p className="text-sm text-gray-600 dark:text-gray-400">
           Don't have an account?{' '}
-          <Link href="/auth/register" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">
+          <Link
+            href="/auth/register"
+            className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+          >
             Register now
           </Link>
         </p>

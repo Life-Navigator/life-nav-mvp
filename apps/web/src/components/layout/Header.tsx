@@ -68,9 +68,15 @@ const Header: FC = () => {
 
   // Close dropdowns when clicking outside
   useOnClickOutside(userMenuRef as React.RefObject<HTMLElement>, () => setShowUserMenu(false));
-  useOnClickOutside(notificationsRef as React.RefObject<HTMLElement>, () => setShowNotifications(false));
-  useOnClickOutside(emailDropdownRef as React.RefObject<HTMLElement>, () => setShowEmailDropdown(false));
-  useOnClickOutside(calendarDropdownRef as React.RefObject<HTMLElement>, () => setShowCalendarDropdown(false));
+  useOnClickOutside(notificationsRef as React.RefObject<HTMLElement>, () =>
+    setShowNotifications(false)
+  );
+  useOnClickOutside(emailDropdownRef as React.RefObject<HTMLElement>, () =>
+    setShowEmailDropdown(false)
+  );
+  useOnClickOutside(calendarDropdownRef as React.RefObject<HTMLElement>, () =>
+    setShowCalendarDropdown(false)
+  );
 
   // After mounting, we can safely show the UI that depends on client-side features
   useEffect(() => {
@@ -194,14 +200,12 @@ const Header: FC = () => {
     return date.toLocaleDateString();
   };
 
-  const handleSignOut = () => {
-    // Clear authentication tokens
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-    }
-    // Redirect to login page
+  const handleSignOut = async () => {
+    const { getSupabaseClient } = await import('@/lib/supabase/client');
+    const supabase = getSupabaseClient();
+    if (supabase) await supabase.auth.signOut();
     router.push('/auth/login');
+    router.refresh();
   };
 
   return (
@@ -211,7 +215,7 @@ const Header: FC = () => {
           {/* Left side - Title */}
           <div className="flex items-center">
             <h1 className="text-xl font-semibold text-gray-900 dark:text-white">
-            {getPageTitle()}
+              {getPageTitle()}
             </h1>
           </div>
 
@@ -241,7 +245,9 @@ const Header: FC = () => {
                 <div className="absolute right-0 mt-2 w-72 origin-top-right rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none">
                   <div className="py-1 divide-y divide-gray-200 dark:divide-gray-700">
                     <div className="px-4 py-2">
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">Calendars</h3>
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                        Calendars
+                      </h3>
                     </div>
                     {calendarConnections.length > 0 ? (
                       <>
@@ -254,14 +260,20 @@ const Header: FC = () => {
                             >
                               <div className="flex justify-between items-center">
                                 <div>
-                                  <p className="text-sm font-medium text-gray-900 dark:text-white">{connection.provider}</p>
-                                  <p className="text-xs text-gray-600 dark:text-gray-400">{connection.calendarName || 'Calendar'}</p>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {connection.provider}
+                                  </p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    {connection.calendarName || 'Calendar'}
+                                  </p>
                                 </div>
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                  connection.status === 'active'
-                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
-                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
-                                }`}>
+                                <span
+                                  className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                    connection.status === 'active'
+                                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                                      : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                                  }`}
+                                >
                                   {connection.status}
                                 </span>
                               </div>
@@ -269,14 +281,19 @@ const Header: FC = () => {
                           ))}
                         </div>
                         <div className="px-4 py-2">
-                          <Link href="/dashboard/integrations" className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                          <Link
+                            href="/dashboard/integrations"
+                            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
                             Manage calendars
                           </Link>
                         </div>
                       </>
                     ) : (
                       <div className="px-4 py-6 text-center">
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">No calendars connected</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                          No calendars connected
+                        </p>
                         <Link
                           href="/dashboard/integrations"
                           className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
@@ -303,7 +320,7 @@ const Header: FC = () => {
                 aria-label="Email Accounts"
               >
                 <EmailIcon />
-                {emailAccounts.some(account => account.unreadCount > 0) && (
+                {emailAccounts.some((account) => account.unreadCount > 0) && (
                   <span className="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-blue-500" />
                 )}
               </button>
@@ -313,7 +330,9 @@ const Header: FC = () => {
                 <div className="absolute right-0 mt-2 w-72 origin-top-right rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none">
                   <div className="py-1 divide-y divide-gray-200 dark:divide-gray-700">
                     <div className="px-4 py-2">
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">Email Accounts</h3>
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                        Email Accounts
+                      </h3>
                     </div>
                     {emailAccounts.length > 0 ? (
                       <>
@@ -326,8 +345,12 @@ const Header: FC = () => {
                             >
                               <div className="flex justify-between items-center">
                                 <div>
-                                  <p className="text-sm font-medium text-gray-900 dark:text-white">{account.provider}</p>
-                                  <p className="text-xs text-gray-600 dark:text-gray-400">{account.email}</p>
+                                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    {account.provider}
+                                  </p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                                    {account.email}
+                                  </p>
                                 </div>
                                 {account.unreadCount > 0 && (
                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
@@ -339,14 +362,19 @@ const Header: FC = () => {
                           ))}
                         </div>
                         <div className="px-4 py-2">
-                          <Link href="/dashboard/integrations" className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                          <Link
+                            href="/dashboard/integrations"
+                            className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
                             Manage email accounts
                           </Link>
                         </div>
                       </>
                     ) : (
                       <div className="px-4 py-6 text-center">
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">No email accounts connected</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                          No email accounts connected
+                        </p>
                         <Link
                           href="/dashboard/integrations"
                           className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
@@ -361,9 +389,7 @@ const Header: FC = () => {
             </div>
 
             {/* Theme toggle */}
-            <div>
-              {mounted && <DirectThemeToggle />}
-            </div>
+            <div>{mounted && <DirectThemeToggle />}</div>
 
             {/* Notifications */}
             <div ref={notificationsRef} className="relative">
@@ -388,7 +414,9 @@ const Header: FC = () => {
                 <div className="absolute right-0 mt-2 w-80 origin-top-right rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none">
                   <div className="py-1 divide-y divide-gray-200 dark:divide-gray-700">
                     <div className="px-4 py-2 flex justify-between items-center">
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">Notifications</h3>
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+                        Notifications
+                      </h3>
                       {unreadCount > 0 && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200">
                           {unreadCount}
@@ -406,19 +434,30 @@ const Header: FC = () => {
                               className="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 border-l-4 border-transparent hover:border-blue-500"
                             >
                               <div className="flex justify-between">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">{notification.title}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">{timeAgo}</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {notification.title}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                  {timeAgo}
+                                </p>
                               </div>
-                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{notification.message}</p>
+                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                {notification.message}
+                              </p>
                             </Link>
                           );
                         })
                       ) : (
-                        <p className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">No new notifications</p>
+                        <p className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                          No new notifications
+                        </p>
                       )}
                     </div>
                     <div className="px-4 py-2">
-                      <Link href="/dashboard" className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                      <Link
+                        href="/dashboard"
+                        className="text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                      >
                         View all notifications
                       </Link>
                     </div>
@@ -442,11 +481,7 @@ const Header: FC = () => {
                 >
                   <span className="sr-only">Open user menu</span>
                   {user.image ? (
-                    <img
-                      className="h-8 w-8 rounded-full"
-                      src={user.image}
-                      alt={user.name}
-                    />
+                    <img className="h-8 w-8 rounded-full" src={user.image} alt={user.name} />
                   ) : (
                     <div className="h-8 w-8 rounded-full flex items-center justify-center bg-blue-500 text-white">
                       {user.initials}
@@ -460,8 +495,12 @@ const Header: FC = () => {
                 <div className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none">
                   <div className="py-1">
                     <div className="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">{user.name}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">{user.email}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        {user.name}
+                      </p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                        {user.email}
+                      </p>
                     </div>
                     <Link
                       href="/dashboard/profile"
@@ -495,7 +534,16 @@ const Header: FC = () => {
 
 // Icon components
 const SunIcon: FC = () => (
-  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="h-5 w-5"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <circle cx="12" cy="12" r="5"></circle>
     <line x1="12" y1="1" x2="12" y2="3"></line>
     <line x1="12" y1="21" x2="12" y2="23"></line>
@@ -509,27 +557,63 @@ const SunIcon: FC = () => (
 );
 
 const MoonIcon: FC = () => (
-  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="h-5 w-5"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
   </svg>
 );
 
 const BellIcon: FC = () => (
-  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="h-5 w-5"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
     <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
   </svg>
 );
 
 const EmailIcon: FC = () => (
-  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="h-5 w-5"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
     <polyline points="22,6 12,13 2,6"></polyline>
   </svg>
 );
 
 const CalendarIcon: FC = () => (
-  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    className="h-5 w-5"
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
     <line x1="16" y1="2" x2="16" y2="6"></line>
     <line x1="8" y1="2" x2="8" y2="6"></line>

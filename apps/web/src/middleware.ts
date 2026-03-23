@@ -57,12 +57,10 @@ export async function middleware(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value }) =>
-          request.cookies.set(name, value),
-        );
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options as Record<string, unknown>),
+          response.cookies.set(name, value, options as Record<string, unknown>)
         );
       },
     },
@@ -92,21 +90,21 @@ export async function middleware(request: NextRequest) {
   }
 
   // ---- Onboarding check ----
-  if (
-    isAuthenticated &&
-    (path.startsWith('/dashboard') || path.startsWith('/admin'))
-  ) {
-    // Check if user has completed onboarding
-    const { data: profile } = await supabase
+  if (isAuthenticated && (path.startsWith('/dashboard') || path.startsWith('/admin'))) {
+    // Check if user has completed onboarding.
+    // Handle three cases:
+    //   1. profile exists, setup_completed = true  → allow through
+    //   2. profile exists, setup_completed = false → redirect to onboarding
+    //   3. profile doesn't exist (trigger lag/failure) → redirect to onboarding
+    //      The onboarding page will wait for the profile row to appear.
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('setup_completed')
       .eq('id', user!.id)
       .single();
 
-    if (profile && !profile.setup_completed) {
-      return NextResponse.redirect(
-        new URL('/onboarding/questionnaire', request.url),
-      );
+    if (profileError || !profile || !profile.setup_completed) {
+      return NextResponse.redirect(new URL('/onboarding/questionnaire', request.url));
     }
   }
 

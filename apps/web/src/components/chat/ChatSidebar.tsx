@@ -3,10 +3,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { agentApi } from '@/lib/api/agent';
 
-// Check if user is authenticated with JWT
+// Auth is handled by middleware — client-side check is best-effort
 function isAuthenticated(): boolean {
   if (typeof window === 'undefined') return false;
-  return !!localStorage.getItem('access_token');
+  return true; // Middleware gates access; sidebar renders optimistically
 }
 
 interface Message {
@@ -44,7 +44,13 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
           // Use agent_id field from the API response
           const firstAgent = agents[0] as any;
           setAgentId(firstAgent.agent_id || firstAgent.id);
-          setAgentName(firstAgent.agent_id?.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || firstAgent.name || 'AI Assistant');
+          setAgentName(
+            firstAgent.agent_id
+              ?.replace(/_/g, ' ')
+              .replace(/\b\w/g, (l: string) => l.toUpperCase()) ||
+              firstAgent.name ||
+              'AI Assistant'
+          );
         }
       } catch (error) {
         console.error('Failed to load agents:', error);
@@ -129,9 +135,7 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
           // Update final message
           setMessages((prev) =>
             prev.map((msg) =>
-              msg.id === assistantMessageId
-                ? { ...msg, content: accumulatedContent }
-                : msg
+              msg.id === assistantMessageId ? { ...msg, content: accumulatedContent } : msg
             )
           );
 
@@ -152,9 +156,7 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
         // Update message with accumulated content
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === assistantMessageId
-              ? { ...msg, content: accumulatedContent }
-              : msg
+            msg.id === assistantMessageId ? { ...msg, content: accumulatedContent } : msg
           )
         );
       }
@@ -170,7 +172,8 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
           msg.id === assistantMessageId
             ? {
                 ...msg,
-                content: 'Sorry, I encountered an error connecting to the AI service. Please try again.',
+                content:
+                  'Sorry, I encountered an error connecting to the AI service. Please try again.',
               }
             : msg
         )
@@ -195,11 +198,21 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
       >
         {isOpen ? (
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         ) : (
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
+            />
           </svg>
         )}
       </button>
@@ -214,7 +227,9 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600">
             <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${agentId ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}></div>
+              <div
+                className={`w-2 h-2 rounded-full ${agentId ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}
+              ></div>
               <h2 className="text-lg font-semibold text-white">{agentName}</h2>
             </div>
             <button
@@ -223,7 +238,12 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
               aria-label="Close chat"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>
@@ -231,9 +251,7 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
           {/* Context Info */}
           {context && (
             <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
-              <p className="text-xs text-blue-800 dark:text-blue-300">
-                💡 Context: {context}
-              </p>
+              <p className="text-xs text-blue-800 dark:text-blue-300">💡 Context: {context}</p>
             </div>
           )}
 
@@ -286,8 +304,14 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
                 <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-2">
                   <div className="flex space-x-2">
                     <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                    <div
+                      className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce"
+                      style={{ animationDelay: '0.2s' }}
+                    ></div>
+                    <div
+                      className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce"
+                      style={{ animationDelay: '0.4s' }}
+                    ></div>
                   </div>
                 </div>
               </div>
@@ -314,7 +338,12 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
                 title={!agentId ? 'Loading AI agent...' : 'Send message'}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                  />
                 </svg>
               </button>
             </div>

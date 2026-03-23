@@ -5,26 +5,7 @@ import { useRouter } from 'next/navigation';
 import { MyBlocksTimeline } from '@/components/goals/MyBlocksTimeline';
 import { Goal } from '@/lib/goals/types';
 import { v4 as uuidv4 } from 'uuid';
-
-function isAuthenticated(): boolean {
-  if (typeof window === 'undefined') return false;
-  return !!localStorage.getItem('access_token');
-}
-
-function getUserId(): string | null {
-  if (typeof window === 'undefined') return null;
-  const token = localStorage.getItem('access_token');
-  if (!token) return null;
-
-  try {
-    // Decode JWT token to get user ID
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.id || payload.sub || null;
-  } catch (error) {
-    console.error('Error decoding token:', error);
-    return null;
-  }
-}
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 export default function MyBlocksGoalsPage() {
   const router = useRouter();
@@ -34,39 +15,31 @@ export default function MyBlocksGoalsPage() {
   const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check authentication
-    if (!isAuthenticated()) {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
       router.push('/auth/login');
       return;
     }
 
-    const id = getUserId();
-    setUserId(id);
-    fetchUserData();
-  }, []);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        router.push('/auth/login');
+        return;
+      }
+      setUserId(user.id);
+      fetchUserData();
+    });
+  }, [router]);
 
   const fetchUserData = async () => {
     try {
-      const token = localStorage.getItem('access_token');
-      if (!token) return;
-
-      // Fetch user's benefit selections
-      const benefitsRes = await fetch('/api/discovery/benefits', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const benefitsRes = await fetch('/api/discovery/benefits');
       if (benefitsRes.ok) {
         const benefitsData = await benefitsRes.json();
         setUserBenefits(benefitsData.benefits || {});
       }
 
-      // Fetch existing goals
-      const goalsRes = await fetch('/api/goals', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const goalsRes = await fetch('/api/goals');
       if (goalsRes.ok) {
         const goalsData = await goalsRes.json();
         setGoals(goalsData.goals || []);
@@ -80,9 +53,6 @@ export default function MyBlocksGoalsPage() {
 
   const handleGoalCreate = async (goalData: Partial<Goal>) => {
     try {
-      const token = localStorage.getItem('access_token');
-      if (!token) return;
-
       const newGoal: Goal = {
         id: uuidv4(),
         userId: userId || '',
@@ -110,19 +80,15 @@ export default function MyBlocksGoalsPage() {
         updatedAt: new Date(),
       };
 
-      // Save to database
       const response = await fetch('/api/goals', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newGoal),
       });
 
       if (response.ok) {
         const savedGoal = await response.json();
-        setGoals(prev => [...prev, savedGoal.goal || newGoal]);
+        setGoals((prev) => [...prev, savedGoal.goal || newGoal]);
       }
     } catch (error) {
       console.error('Failed to create goal:', error);
@@ -131,20 +97,14 @@ export default function MyBlocksGoalsPage() {
 
   const handleGoalUpdate = async (updatedGoal: Goal) => {
     try {
-      const token = localStorage.getItem('access_token');
-      if (!token) return;
-
       const response = await fetch(`/api/goals/${updatedGoal.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedGoal),
       });
 
       if (response.ok) {
-        setGoals(prev => prev.map(g => g.id === updatedGoal.id ? updatedGoal : g));
+        setGoals((prev) => prev.map((g) => (g.id === updatedGoal.id ? updatedGoal : g)));
       }
     } catch (error) {
       console.error('Failed to update goal:', error);
@@ -153,18 +113,12 @@ export default function MyBlocksGoalsPage() {
 
   const handleGoalDelete = async (goalId: string) => {
     try {
-      const token = localStorage.getItem('access_token');
-      if (!token) return;
-
       const response = await fetch(`/api/goals/${goalId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
       });
 
       if (response.ok) {
-        setGoals(prev => prev.filter(g => g.id !== goalId));
+        setGoals((prev) => prev.filter((g) => g.id !== goalId));
       }
     } catch (error) {
       console.error('Failed to delete goal:', error);
@@ -182,8 +136,7 @@ export default function MyBlocksGoalsPage() {
     );
   }
 
-  // Check if user has completed benefits discovery
-  const hasBenefits = Object.keys(userBenefits).some(domain => userBenefits[domain]?.length > 0);
+  const hasBenefits = Object.keys(userBenefits).some((domain) => userBenefits[domain]?.length > 0);
 
   if (!hasBenefits) {
     return (
@@ -194,8 +147,8 @@ export default function MyBlocksGoalsPage() {
             Complete Benefits Discovery First
           </h2>
           <p className="text-gray-600 mb-6">
-            Before creating goals, we need to understand what truly motivates you.
-            This helps us create goals that align with your authentic drivers.
+            Before creating goals, we need to understand what truly motivates you. This helps us
+            create goals that align with your authentic drivers.
           </p>
           <button
             onClick={() => router.push('/discovery/benefits')}

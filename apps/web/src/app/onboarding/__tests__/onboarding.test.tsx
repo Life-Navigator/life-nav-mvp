@@ -106,17 +106,23 @@ global.fetch = jest.fn(() =>
   } as Response)
 );
 
-// Mock useRouter / useSearchParams
+// Mock Supabase client — authenticated user by default
+const mockGetUser = jest.fn();
+jest.mock('@/lib/supabase/client', () => ({
+  getSupabaseClient: () => ({
+    auth: {
+      getUser: mockGetUser,
+    },
+  }),
+}));
+
+// Mock useRouter
 const mockPush = jest.fn();
+const mockRefresh = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
-  }),
-  useSearchParams: () => ({
-    get: jest.fn().mockImplementation((param: string) => {
-      if (param === 'userId') return 'test-user-id';
-      return null;
-    }),
+    refresh: mockRefresh,
   }),
 }));
 
@@ -126,6 +132,16 @@ import QuestionnairePage from '../questionnaire/page';
 describe('Onboarding Flow', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default: authenticated user
+    mockGetUser.mockResolvedValue({
+      data: {
+        user: {
+          id: 'test-user-id',
+          email: 'test@example.com',
+          user_metadata: { name: 'Test User' },
+        },
+      },
+    });
     (global.fetch as jest.Mock).mockImplementation(() =>
       Promise.resolve({
         ok: true,
@@ -134,23 +150,21 @@ describe('Onboarding Flow', () => {
     );
   });
 
-  it('renders the questionnaire intro page by default', () => {
+  it('renders the questionnaire intro after loading user', async () => {
     render(<QuestionnairePage />);
 
-    expect(screen.getByText(/welcome to life navigator/i)).toBeInTheDocument();
-    expect(screen.getByText(/personalized life roadmap/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/welcome to life navigator/i)).toBeInTheDocument();
+      expect(screen.getByText(/personalized life roadmap/i)).toBeInTheDocument();
+    });
   });
 
-  it('redirects to login if userId is missing', async () => {
-    // Override useSearchParams to return null for userId
-    jest.spyOn(require('next/navigation'), 'useSearchParams').mockImplementation(() => ({
-      get: jest.fn().mockReturnValue(null),
-    }));
+  it('redirects to login if user is not authenticated', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
 
     render(<QuestionnairePage />);
 
     await waitFor(() => {
-      expect(mockAddToast).toHaveBeenCalled();
       expect(mockPush).toHaveBeenCalledWith('/auth/login');
     });
   });
@@ -158,9 +172,20 @@ describe('Onboarding Flow', () => {
   it('shows progress bar after starting questionnaire', async () => {
     render(<QuestionnairePage />);
 
-    const startButton = screen.getByText(/let's get started/i);
-    fireEvent.click(startButton);
+    await waitFor(() => {
+      expect(screen.getByText(/let's get started/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/let's get started/i));
 
     expect(screen.getByText(/progress/i)).toBeInTheDocument();
+  });
+
+  it('gets userId from Supabase session, not query params', async () => {
+    render(<QuestionnairePage />);
+
+    await waitFor(() => {
+      expect(mockGetUser).toHaveBeenCalled();
+    });
   });
 });

@@ -1,12 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  UserCircleIcon,
-  CameraIcon,
-  MapPinIcon,
-  PhoneIcon,
-} from '@heroicons/react/24/outline';
+import { UserCircleIcon, CameraIcon, MapPinIcon, PhoneIcon } from '@heroicons/react/24/outline';
 
 interface BasicProfileData {
   name: string;
@@ -74,12 +69,8 @@ export default function BasicProfileQuestionnaire({
         const formData = new FormData();
         formData.append('file', imageFile);
 
-        const token = localStorage.getItem('access_token');
         const response = await fetch('/api/user/profile/upload', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
           body: formData,
         });
 

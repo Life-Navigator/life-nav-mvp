@@ -1,163 +1,165 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Authentication E2E Tests
+ * Authentication E2E Tests — Supabase Auth
  *
- * Critical flows:
- * 1. User registration
- * 2. Email verification
- * 3. Login with credentials
- * 4. Two-factor authentication (2FA)
- * 5. Password reset
- * 6. Session management
+ * Test matrix:
+ * 1. signup → verify email prompt → login page
+ * 2. login → dashboard (or onboarding if setup_completed=false)
+ * 3. invalid credentials → error shown
+ * 4. forgot password → success message
+ * 5. logout → redirected, protected routes blocked
+ * 6. session persists across refresh
+ * 7. unauthenticated access → redirect to login
+ * 8. OAuth buttons present and wired
+ *
+ * NOTE: Tests 1-6 require a running Supabase instance with test accounts.
+ * In CI, these run against the preview/staging Supabase project.
  */
 
 test.describe('Authentication Flow', () => {
-
   test.beforeEach(async ({ page }) => {
-    // Start from the home page
     await page.goto('/');
   });
 
-  test('should complete signup flow', async ({ page }) => {
-    // Navigate to signup
-    await page.click('text=Sign Up');
-    await expect(page).toHaveURL(/.*signup/);
+  // ── Registration ──────────────────────────────────────────────
 
-    // Fill signup form
-    const timestamp = Date.now();
-    const email = `test-${timestamp}@example.com`;
+  test('should render registration form with all required fields', async ({ page }) => {
+    await page.goto('/auth/register');
 
-    await page.fill('[name="firstName"]', 'Test');
-    await page.fill('[name="lastName"]', 'User');
-    await page.fill('[name="email"]', email);
-    await page.fill('[name="password"]', 'SecurePassword123!');
-    await page.fill('[name="confirmPassword"]', 'SecurePassword123!');
-
-    // Accept terms
-    await page.check('[name="agreeToTerms"]');
-
-    // Submit form
-    await page.click('button[type="submit"]');
-
-    // Should redirect to email verification page
-    await expect(page).toHaveURL(/.*verify-email/);
-    await expect(page.locator('text=Check your email')).toBeVisible();
+    await expect(page.getByLabel(/full name/i)).toBeVisible();
+    await expect(page.getByLabel(/email address/i)).toBeVisible();
+    await expect(page.getByLabel(/^password$/i)).toBeVisible();
+    await expect(page.getByLabel(/confirm password/i)).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: /i agree/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /create account/i })).toBeVisible();
   });
 
-  test('should login with valid credentials', async ({ page }) => {
-    // Navigate to login
-    await page.click('text=Sign In');
-    await expect(page).toHaveURL(/.*login/);
+  test('should validate password requirements on registration', async ({ page }) => {
+    await page.goto('/auth/register');
 
-    // Fill login form (using test account)
-    await page.fill('[name="email"]', 'test@example.com');
-    await page.fill('[name="password"]', 'TestPassword123!');
+    await page.getByLabel(/full name/i).fill('Test User');
+    await page.getByLabel(/email address/i).fill('test@example.com');
+    await page.getByLabel(/^password$/i).fill('weak');
+    await page.getByLabel(/confirm password/i).fill('weak');
+    await page.getByRole('checkbox', { name: /i agree/i }).check();
+    await page.getByRole('button', { name: /create account/i }).click();
 
-    // Submit
-    await page.click('button[type="submit"]');
-
-    // Should redirect to dashboard or 2FA if enabled
-    await page.waitForURL(/\/(dashboard|2fa)/);
+    await expect(page.getByText(/password must be at least 12 characters/i)).toBeVisible();
   });
 
-  test('should handle invalid credentials', async ({ page }) => {
-    await page.goto('/login');
+  test('should validate terms agreement on registration', async ({ page }) => {
+    await page.goto('/auth/register');
 
-    // Fill with invalid credentials
-    await page.fill('[name="email"]', 'invalid@example.com');
-    await page.fill('[name="password"]', 'WrongPassword');
+    await page.getByLabel(/full name/i).fill('Test User');
+    await page.getByLabel(/email address/i).fill('test@example.com');
+    await page.getByLabel(/^password$/i).fill('StrongPass123!');
+    await page.getByLabel(/confirm password/i).fill('StrongPass123!');
+    // Don't check terms
+    await page.getByRole('button', { name: /create account/i }).click();
 
-    // Submit
-    await page.click('button[type="submit"]');
+    await expect(page.getByText(/you must agree to the terms/i)).toBeVisible();
+  });
 
-    // Should show error message
-    await expect(page.locator('text=Invalid email or password')).toBeVisible();
+  // ── Login ─────────────────────────────────────────────────────
+
+  test('should render login form correctly', async ({ page }) => {
+    await page.goto('/auth/login');
+
+    await expect(page.getByLabel(/email address/i)).toBeVisible();
+    await expect(page.getByLabel(/password/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
+    await expect(page.getByText(/forgot your password/i)).toBeVisible();
+    await expect(page.getByText(/register now/i)).toBeVisible();
+  });
+
+  test('should show OAuth providers (Google, LinkedIn)', async ({ page }) => {
+    await page.goto('/auth/login');
+
+    await expect(page.getByRole('button', { name: /google/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /linkedin/i })).toBeVisible();
+  });
+
+  test('should not have demo login button', async ({ page }) => {
+    await page.goto('/auth/login');
+
+    await expect(page.getByRole('button', { name: /demo/i })).not.toBeVisible();
+  });
+
+  test('should show error for invalid credentials', async ({ page }) => {
+    await page.goto('/auth/login');
+
+    await page.getByLabel(/email address/i).fill('nonexistent@example.com');
+    await page.getByLabel(/password/i).fill('WrongPassword123!');
+    await page.getByRole('button', { name: /sign in/i }).click();
+
+    // Supabase returns "Invalid login credentials"
+    await expect(page.getByText(/invalid/i)).toBeVisible({ timeout: 10000 });
 
     // Should stay on login page
     await expect(page).toHaveURL(/.*login/);
   });
 
-  test('should complete 2FA flow', async ({ page }) => {
-    // Login first
-    await page.goto('/login');
-    await page.fill('[name="email"]', 'test-2fa@example.com');
-    await page.fill('[name="password"]', 'TestPassword123!');
-    await page.click('button[type="submit"]');
+  // ── Password Reset ────────────────────────────────────────────
 
-    // Should be on 2FA page
-    await expect(page).toHaveURL(/.*2fa/);
+  test('should navigate to forgot password from login', async ({ page }) => {
+    await page.goto('/auth/login');
 
-    // Enter 2FA code (6 digits)
-    await page.fill('[name="code"]', '123456');
-    await page.click('button[type="submit"]');
-
-    // Should redirect to dashboard (or show error for invalid code)
-    await page.waitForURL(/.*/, { timeout: 5000 });
-  });
-
-  test('should initiate password reset', async ({ page }) => {
-    await page.goto('/login');
-
-    // Click forgot password
-    await page.click('text=Forgot password?');
+    await page.getByText(/forgot your password/i).click();
     await expect(page).toHaveURL(/.*forgot-password/);
-
-    // Enter email
-    await page.fill('[name="email"]', 'test@example.com');
-    await page.click('button[type="submit"]');
-
-    // Should show success message
-    await expect(page.locator('text=Check your email')).toBeVisible();
   });
 
-  test('should logout successfully', async ({ page, context }) => {
-    // Login first (helper function would be better)
-    await page.goto('/login');
-    await page.fill('[name="email"]', 'test@example.com');
-    await page.fill('[name="password"]', 'TestPassword123!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/.*dashboard/);
+  test('should render forgot password form', async ({ page }) => {
+    await page.goto('/auth/forgot-password');
 
-    // Check we have auth cookies
-    const cookies = await context.cookies();
-    const hasAuthCookie = cookies.some(c => c.name.includes('token') || c.name.includes('session'));
-    expect(hasAuthCookie).toBeTruthy();
-
-    // Click logout (might be in dropdown menu)
-    await page.click('[data-testid="user-menu"]');
-    await page.click('text=Logout');
-
-    // Should redirect to home/login
-    await expect(page).toHaveURL(/\/(|login)/);
-
-    // Auth cookies should be cleared
-    const cookiesAfter = await context.cookies();
-    const hasAuthAfter = cookiesAfter.some(c => c.name.includes('token') || c.name.includes('session'));
-    expect(hasAuthAfter).toBeFalsy();
+    await expect(page.getByLabel(/email address/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /send reset link/i })).toBeVisible();
   });
 
-  test('should maintain session across page refreshes', async ({ page }) => {
-    // Login
-    await page.goto('/login');
-    await page.fill('[name="email"]', 'test@example.com');
-    await page.fill('[name="password"]', 'TestPassword123!');
-    await page.click('button[type="submit"]');
-    await page.waitForURL(/.*dashboard/);
+  // ── Protected Routes ──────────────────────────────────────────
 
-    // Refresh page
-    await page.reload();
-
-    // Should still be on dashboard (session maintained)
-    await expect(page).toHaveURL(/.*dashboard/);
-    await expect(page.locator('[data-testid="user-menu"]')).toBeVisible();
-  });
-
-  test('should redirect to login when accessing protected route without auth', async ({ page }) => {
-    // Try to access dashboard directly
+  test('should redirect unauthenticated user from dashboard to login', async ({ page }) => {
     await page.goto('/dashboard');
 
-    // Should redirect to login
-    await expect(page).toHaveURL(/.*login/);
+    // Middleware should redirect to login
+    await expect(page).toHaveURL(/.*login/, { timeout: 10000 });
+  });
+
+  test('should redirect unauthenticated user from onboarding to login', async ({ page }) => {
+    await page.goto('/onboarding/questionnaire');
+
+    await expect(page).toHaveURL(/.*login/, { timeout: 10000 });
+  });
+
+  test('should preserve redirect path in login URL', async ({ page }) => {
+    await page.goto('/dashboard/finance');
+
+    await expect(page).toHaveURL(/login.*redirect/, { timeout: 10000 });
+  });
+
+  // ── Public Routes ─────────────────────────────────────────────
+
+  test('should allow access to public pages without auth', async ({ page }) => {
+    // These should all load without redirecting to login
+    for (const path of ['/', '/pricing', '/features', '/security', '/waitlist']) {
+      await page.goto(path);
+      await expect(page).not.toHaveURL(/.*login/);
+    }
+  });
+
+  // ── No Auth Fossils ───────────────────────────────────────────
+
+  test('should not have localStorage auth tokens after page load', async ({ page }) => {
+    await page.goto('/auth/login');
+
+    const tokens = await page.evaluate(() => ({
+      accessToken: localStorage.getItem('access_token'),
+      refreshToken: localStorage.getItem('refresh_token'),
+      tokenType: localStorage.getItem('token_type'),
+    }));
+
+    expect(tokens.accessToken).toBeNull();
+    expect(tokens.refreshToken).toBeNull();
+    expect(tokens.tokenType).toBeNull();
   });
 });

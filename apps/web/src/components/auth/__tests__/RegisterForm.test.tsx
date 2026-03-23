@@ -1,9 +1,19 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import RegisterForm from '../RegisterForm';
-import { toast } from '@/components/ui/toaster';
 
-// Mock the toast component
+// Mock Supabase client
+const mockSignUp = jest.fn();
+
+jest.mock('@/lib/supabase/client', () => ({
+  getSupabaseClient: () => ({
+    auth: {
+      signUp: mockSignUp,
+    },
+  }),
+}));
+
+// Mock toast
 const mockAddToast = jest.fn();
 jest.mock('@/components/ui/toaster', () => ({
   toast: jest.fn(),
@@ -14,10 +24,7 @@ jest.mock('@/components/ui/toaster', () => ({
   })),
 }));
 
-// Mock the fetch function
-global.fetch = jest.fn();
-
-// Mock the useRouter hook
+// Mock router
 const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -25,13 +32,12 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-// Strong password meeting new requirements (12+ chars, upper, lower, number, special)
 const STRONG_PASSWORD = 'StrongPass123!';
 
 describe('RegisterForm', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (global.fetch as jest.Mock).mockReset();
+    mockSignUp.mockResolvedValue({ error: null });
   });
 
   it('renders the registration form correctly', () => {
@@ -48,142 +54,138 @@ describe('RegisterForm', () => {
   it('validates matching passwords', async () => {
     render(<RegisterForm />);
 
-    const nameInput = screen.getByLabelText(/full name/i);
-    const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/^password$/i);
-    const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-    const termsCheckbox = screen.getByRole('checkbox', { name: /i agree to the/i });
-    const submitButton = screen.getByRole('button', { name: /create account/i });
-
-    fireEvent.change(nameInput, { target: { value: 'Test User' } });
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: STRONG_PASSWORD } });
-    fireEvent.change(confirmPasswordInput, { target: { value: 'DifferentPass123!' } });
-    fireEvent.click(termsCheckbox);
-    fireEvent.click(submitButton);
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Test User' } });
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'test@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: STRONG_PASSWORD } });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: 'DifferentPass123!' },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /i agree to the/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/passwords do not match/i)).toBeInTheDocument();
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockSignUp).not.toHaveBeenCalled();
     });
   });
 
   it('validates password strength', async () => {
     render(<RegisterForm />);
 
-    const nameInput = screen.getByLabelText(/full name/i);
-    const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/^password$/i);
-    const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-    const termsCheckbox = screen.getByRole('checkbox', { name: /i agree to the/i });
-    const submitButton = screen.getByRole('button', { name: /create account/i });
-
-    fireEvent.change(nameInput, { target: { value: 'Test User' } });
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: 'weak' } });
-    fireEvent.change(confirmPasswordInput, { target: { value: 'weak' } });
-    fireEvent.click(termsCheckbox);
-    fireEvent.click(submitButton);
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Test User' } });
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'test@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'weak' } });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'weak' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: /i agree to the/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/password must be at least 12 characters/i)).toBeInTheDocument();
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockSignUp).not.toHaveBeenCalled();
     });
   });
 
   it('validates terms agreement', async () => {
     render(<RegisterForm />);
 
-    const nameInput = screen.getByLabelText(/full name/i);
-    const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/^password$/i);
-    const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-    const submitButton = screen.getByRole('button', { name: /create account/i });
-
-    fireEvent.change(nameInput, { target: { value: 'Test User' } });
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: STRONG_PASSWORD } });
-    fireEvent.change(confirmPasswordInput, { target: { value: STRONG_PASSWORD } });
-    fireEvent.click(submitButton);
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Test User' } });
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'test@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: STRONG_PASSWORD } });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: STRONG_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/you must agree to the terms/i)).toBeInTheDocument();
-      expect(global.fetch).not.toHaveBeenCalled();
+      expect(mockSignUp).not.toHaveBeenCalled();
     });
   });
 
-  it('handles successful registration', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      headers: { get: () => 'application/json' },
-      json: () =>
-        Promise.resolve({
-          message: 'User created successfully',
-          user: { id: 'test-user-id' },
-        }),
-    });
-
+  it('calls supabase.auth.signUp with correct params', async () => {
     render(<RegisterForm />);
 
-    const nameInput = screen.getByLabelText(/full name/i);
-    const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/^password$/i);
-    const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-    const termsCheckbox = screen.getByRole('checkbox', { name: /i agree to the/i });
-    const submitButton = screen.getByRole('button', { name: /create account/i });
-
-    fireEvent.change(nameInput, { target: { value: 'Test User' } });
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: STRONG_PASSWORD } });
-    fireEvent.change(confirmPasswordInput, { target: { value: STRONG_PASSWORD } });
-    fireEvent.click(termsCheckbox);
-    fireEvent.click(submitButton);
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Test User' } });
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'test@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: STRONG_PASSWORD } });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: STRONG_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /i agree to the/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: 'Test User',
-          email: 'test@example.com',
-          password: STRONG_PASSWORD,
-        }),
+      expect(mockSignUp).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        password: STRONG_PASSWORD,
+        options: {
+          data: { name: 'Test User' },
+        },
       });
-
-      expect(mockAddToast).toHaveBeenCalled();
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'success' }));
       expect(mockPush).toHaveBeenCalledWith('/auth/login?registered=true');
     });
   });
 
-  it('handles registration failure', async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      headers: { get: () => 'application/json' },
-      json: () =>
-        Promise.resolve({
-          message: 'User already exists with this email',
-        }),
+  it('handles registration failure from Supabase', async () => {
+    mockSignUp.mockResolvedValue({
+      error: { message: 'User already registered' },
     });
 
     render(<RegisterForm />);
 
-    const nameInput = screen.getByLabelText(/full name/i);
-    const emailInput = screen.getByLabelText(/email address/i);
-    const passwordInput = screen.getByLabelText(/^password$/i);
-    const confirmPasswordInput = screen.getByLabelText(/confirm password/i);
-    const termsCheckbox = screen.getByRole('checkbox', { name: /i agree to the/i });
-    const submitButton = screen.getByRole('button', { name: /create account/i });
-
-    fireEvent.change(nameInput, { target: { value: 'Test User' } });
-    fireEvent.change(emailInput, { target: { value: 'existing@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: STRONG_PASSWORD } });
-    fireEvent.change(confirmPasswordInput, { target: { value: STRONG_PASSWORD } });
-    fireEvent.click(termsCheckbox);
-    fireEvent.click(submitButton);
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Test User' } });
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'existing@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: STRONG_PASSWORD } });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: STRONG_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /i agree to the/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalled();
-      expect(screen.getByText(/user already exists/i)).toBeInTheDocument();
+      expect(screen.getByText(/user already registered/i)).toBeInTheDocument();
+      expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }));
+      expect(mockPush).not.toHaveBeenCalled();
     });
+  });
+
+  it('does not call any /api/auth/ routes', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    render(<RegisterForm />);
+
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: 'Test User' } });
+    fireEvent.change(screen.getByLabelText(/email address/i), {
+      target: { value: 'test@example.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: STRONG_PASSWORD } });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), {
+      target: { value: STRONG_PASSWORD },
+    });
+    fireEvent.click(screen.getByRole('checkbox', { name: /i agree to the/i }));
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(mockSignUp).toHaveBeenCalled();
+    });
+
+    // No fetch calls to auth API routes
+    const authFetchCalls = fetchSpy.mock.calls.filter(
+      ([url]) => typeof url === 'string' && url.includes('/api/auth/')
+    );
+    expect(authFetchCalls).toHaveLength(0);
+
+    fetchSpy.mockRestore();
   });
 });

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 interface UseAuthReturn {
   isAuthenticated: boolean;
@@ -8,45 +8,57 @@ interface UseAuthReturn {
 }
 
 /**
- * Custom hook for JWT authentication
- * Replaces useSession from next-auth for apps using custom JWT tokens
+ * Module-level token cache so getAuthHeaders() can work synchronously.
+ * Updated by any mounted useAuth() hook and onAuthStateChange listener.
+ */
+let cachedToken: string | null = null;
+
+/**
+ * Hook for Supabase authentication state.
+ * Drop-in replacement for the old localStorage-based hook.
  */
 export function useAuth(): UseAuthReturn {
-  const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for JWT token in localStorage
-    const accessToken = localStorage.getItem('access_token');
-
-    if (!accessToken) {
-      router.push('/auth/login');
+    const supabase = getSupabaseClient();
+    if (!supabase) {
       setIsLoading(false);
       return;
     }
 
-    setToken(accessToken);
-    setIsAuthenticated(true);
-    setIsLoading(false);
-  }, [router]);
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      cachedToken = session?.access_token ?? null;
+      setToken(cachedToken);
+      setIsAuthenticated(!!session);
+      setIsLoading(false);
+    });
 
-  return {
-    isAuthenticated,
-    isLoading,
-    token,
-  };
+    // Listen for auth state changes (login, logout, token refresh)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      cachedToken = session?.access_token ?? null;
+      setToken(cachedToken);
+      setIsAuthenticated(!!session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  return { isAuthenticated, isLoading, token };
 }
 
 /**
- * Helper to get auth headers for API requests
+ * Synchronous helper for API request headers.
+ * Uses the cached Supabase access token.
  */
 export function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem('access_token');
-
   return {
     'Content-Type': 'application/json',
-    ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...(cachedToken && { Authorization: `Bearer ${cachedToken}` }),
   };
 }
