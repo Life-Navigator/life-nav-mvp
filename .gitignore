@@ -63,3 +63,18 @@ android/app/build/
 *.crt
 credentials.json
 service-account.json
+
+# Python
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+
+# Rust
+target/
+
+# Coverage
+.coverage
+htmlcov/
