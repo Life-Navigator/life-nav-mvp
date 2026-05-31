@@ -1,0 +1,46 @@
+# LifeNavigator FastAPI gateway — Fly.io app definition.
+#
+# Public HTTP service. Vercel (frontend) and the Rust ingestion worker
+# do NOT talk to this service for auth; Supabase Auth issues the JWT
+# and this service verifies it on every request.
+#
+#   fly apps create lifenavigator-api-gateway
+#   fly secrets set \
+#     SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_JWT_SECRET=... \
+#     SUPABASE_SERVICE_ROLE_KEY=... \
+#     GEMINI_API_KEY=... \
+#     QDRANT_URL=... QDRANT_API_KEY=... \
+#     QDRANT_PERSONAL_COLLECTION=life_navigator QDRANT_CENTRAL_COLLECTION=ln_central \
+#     NEO4J_URI=... NEO4J_USERNAME=neo4j NEO4J_PASSWORD=... \
+#     NEO4J_PERSONAL_DATABASE=neo4j NEO4J_CENTRAL_DATABASE=central
+#   fly deploy
+
+app = "lifenavigator-api-gateway"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  LOG_LEVEL = "info"
+  GEMINI_EMBEDDING_MODEL = "text-embedding-004"
+  GEMINI_GENERATION_MODEL = "gemini-2.0-flash"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  grace_period = "10s"
+  interval = "30s"
+  method = "GET"
+  path = "/healthz"
+  timeout = "5s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

@@ -1,0 +1,35 @@
+# LifeNavigator ingestion worker — Fly.io app definition.
+#
+# This is a long-running worker (no public HTTP service). Deploy with:
+#   fly apps create lifenavigator-ingestion-worker
+#   fly secrets set \
+#     SUPABASE_URL=...  SUPABASE_SERVICE_ROLE_KEY=... \
+#     GEMINI_API_KEY=... \
+#     QDRANT_URL=... QDRANT_API_KEY=... QDRANT_PERSONAL_COLLECTION=life_navigator \
+#     NEO4J_URI=... NEO4J_USERNAME=neo4j NEO4J_PASSWORD=... NEO4J_PERSONAL_DATABASE=neo4j
+#   fly deploy
+
+app = "lifenavigator-ingestion-worker"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  LOG_LEVEL = "info"
+  WORKER_POLL_INTERVAL_SECONDS = "5"
+  WORKER_BATCH_SIZE = "25"
+  WORKER_MAX_RETRIES = "5"
+  GEMINI_EMBEDDING_MODEL = "text-embedding-004"
+
+# Long-running worker process — no HTTP service, no autostop.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
+
+[processes]
+  worker = "ingestion-worker"
+
+[deploy]
+  strategy = "rolling"
