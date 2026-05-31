@@ -99,6 +99,211 @@ export type Database = {
         }
         Relationships: never[]
       }
+      // User Graph foundation (migration 060_user_graph_foundation.sql)
+      user_life_vision: {
+        Row: {
+          id: string
+          user_id: string
+          horizon: string
+          vision_text: string | null
+          domains: string[]
+          source: string
+          confidence_score: number | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: { user_id: string; horizon: string; [key: string]: unknown }
+        Update: { [key: string]: unknown }
+        Relationships: never[]
+      }
+      user_constraints: {
+        Row: {
+          id: string
+          user_id: string
+          dimension: string
+          severity: string
+          description: string
+          value_numeric: number | null
+          value_unit: string | null
+          starts_at: string | null
+          ends_at: string | null
+          is_active: boolean
+          source: string
+          confidence_score: number | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: { user_id: string; dimension: string; description: string; [key: string]: unknown }
+        Update: { [key: string]: unknown }
+        Relationships: never[]
+      }
+      user_decision_preferences: {
+        Row: {
+          id: string
+          user_id: string
+          axis: string
+          weight: number
+          notes: string | null
+          source: string
+          confidence_score: number | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: { user_id: string; axis: string; weight: number; [key: string]: unknown }
+        Update: { [key: string]: unknown }
+        Relationships: never[]
+      }
+      user_commitment_levels: {
+        Row: {
+          id: string
+          user_id: string
+          domain: string
+          hours_per_week: number | null
+          energy_level: string | null
+          duration_weeks: number | null
+          notes: string | null
+          source: string
+          confidence_score: number | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: { user_id: string; domain: string; [key: string]: unknown }
+        Update: { [key: string]: unknown }
+        Relationships: never[]
+      }
+      user_motivations: {
+        Row: {
+          id: string
+          user_id: string
+          goal_id: string | null
+          motivation_text: string
+          motivation_type: string | null
+          intensity: number | null
+          source: string
+          confidence_score: number | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: { user_id: string; motivation_text: string; [key: string]: unknown }
+        Update: { [key: string]: unknown }
+        Relationships: never[]
+      }
+      user_domain_risk_tolerance: {
+        Row: {
+          id: string
+          user_id: string
+          domain: string
+          tolerance_score: number
+          qualitative_level: string | null
+          notes: string | null
+          source: string
+          confidence_score: number | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: { user_id: string; domain: string; tolerance_score: number; [key: string]: unknown }
+        Update: { [key: string]: unknown }
+        Relationships: never[]
+      }
+      user_capabilities: {
+        Row: {
+          id: string
+          user_id: string
+          capability_name: string
+          domain: string | null
+          proficiency_level: string
+          self_assessed: boolean
+          evidence: string | null
+          last_used_at: string | null
+          source: string
+          confidence_score: number | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: { user_id: string; capability_name: string; [key: string]: unknown }
+        Update: { [key: string]: unknown }
+        Relationships: never[]
+      }
+      user_decisions: {
+        Row: {
+          id: string
+          user_id: string
+          goal_id: string | null
+          decision_type: string | null
+          title: string
+          description: string | null
+          options_considered: Json
+          chosen_option: Json | null
+          rationale: string | null
+          reversibility: string | null
+          status: string
+          made_at: string | null
+          source: string
+          confidence_score: number | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: { user_id: string; title: string; [key: string]: unknown }
+        Update: { [key: string]: unknown }
+        Relationships: never[]
+      }
+      user_recommendations: {
+        Row: {
+          id: string
+          user_id: string
+          goal_id: string | null
+          decision_id: string | null
+          source_agent: string
+          action: string
+          rationale: string | null
+          expected_impact: string | null
+          priority: number
+          status: string
+          expires_at: string | null
+          accepted_at: string | null
+          rejected_at: string | null
+          snoozed_until: string | null
+          source: string
+          confidence_score: number | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: { user_id: string; action: string; [key: string]: unknown }
+        Update: { [key: string]: unknown }
+        Relationships: never[]
+      }
+      user_outcomes: {
+        Row: {
+          id: string
+          user_id: string
+          goal_id: string | null
+          decision_id: string | null
+          recommendation_id: string | null
+          outcome_type: string
+          observed_value: number | null
+          observed_unit: string | null
+          observed_at: string
+          attribution_confidence: number | null
+          notes: string | null
+          source: string
+          confidence_score: number | null
+          metadata: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: { user_id: string; [key: string]: unknown }
+        Update: { [key: string]: unknown }
+        Relationships: never[]
+      }
     }
     Views: Record<string, never>
     Functions: Record<string, never>

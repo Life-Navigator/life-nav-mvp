@@ -18,7 +18,10 @@ import CareerQuestionnaire from '@/components/onboarding/CareerQuestionnaire';
 import FinancialQuestionnaire from '@/components/onboarding/FinancialQuestionnaire';
 import HealthQuestionnaire from '@/components/onboarding/HealthQuestionnaire';
 import RiskAssessment from '@/components/onboarding/RiskAssessment';
+import UserGraphQuestionnaire from '@/components/onboarding/UserGraphQuestionnaire';
 import QuestionnaireComplete from '@/components/onboarding/QuestionnaireComplete';
+import { EMPTY_USER_GRAPH_PAYLOAD, type UserGraphPayload } from '@/types/user-graph';
+import { saveUserGraph } from '@/lib/onboarding/save-user-graph';
 
 const STEPS = {
   WELCOME: 0,
@@ -29,8 +32,9 @@ const STEPS = {
   FINANCIAL: 5,
   HEALTH: 6,
   RISK: 7,
-  ACHIEVEMENTS: 8,
-  COMPLETE: 9,
+  USER_GRAPH: 8,
+  ACHIEVEMENTS: 9,
+  COMPLETE: 10,
 };
 
 function InteractiveOnboardingContent() {
@@ -48,6 +52,7 @@ function InteractiveOnboardingContent() {
     financial: any;
     health: any;
     risk: any;
+    userGraph: UserGraphPayload;
   }>({
     persona: '',
     goals: {},
@@ -56,6 +61,7 @@ function InteractiveOnboardingContent() {
     financial: {},
     health: {},
     risk: { riskTheta: 0.5 },
+    userGraph: { ...EMPTY_USER_GRAPH_PAYLOAD },
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -144,6 +150,13 @@ function InteractiveOnboardingContent() {
         }),
       });
 
+      // Persist the extended user-graph payload captured by the
+      // UserGraphQuestionnaire step. Non-blocking on partial failure.
+      const userGraphResult = await saveUserGraph(formData.userGraph);
+      if (!userGraphResult.ok) {
+        console.warn('Some user-graph sections failed to save', userGraphResult.sections);
+      }
+
       await fetch('/api/onboarding/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,6 +242,16 @@ function InteractiveOnboardingContent() {
           <RiskAssessment
             data={formData.risk}
             onChange={(data: any) => handleStepDataChange('risk', data)}
+            onNext={nextStep}
+            onBack={prevStep}
+            isSubmitting={false}
+          />
+        );
+      case STEPS.USER_GRAPH:
+        return (
+          <UserGraphQuestionnaire
+            data={formData.userGraph}
+            onChange={(data) => handleStepDataChange('userGraph', data)}
             onNext={handleSubmit}
             onBack={prevStep}
             isSubmitting={isSubmitting}
@@ -261,6 +284,7 @@ function InteractiveOnboardingContent() {
     'Finance',
     'Health',
     'Risk',
+    'Profile',
     'Rewards',
     'Complete',
   ];
