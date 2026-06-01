@@ -18,6 +18,7 @@ use ingestion_worker::gemini_client::GeminiClient;
 use ingestion_worker::neo4j_client::Neo4jClient;
 use ingestion_worker::processor::Processor;
 use ingestion_worker::qdrant_client::QdrantClient;
+use ingestion_worker::queue::AccessScope;
 use ingestion_worker::supabase_client::SupabaseClient;
 use ingestion_worker::telemetry;
 
@@ -34,13 +35,24 @@ async fn main() -> Result<()> {
 
     let supabase = SupabaseClient::new(&cfg)?;
     let gemini = GeminiClient::new(&cfg)?;
-    let qdrant = QdrantClient::new(&cfg)?;
-    let neo4j = Neo4jClient::new(&cfg)?;
+    let qdrant_personal = QdrantClient::with_scope(&cfg, AccessScope::Personal)?;
+    let qdrant_central = QdrantClient::with_scope(&cfg, AccessScope::Central)?;
+    let neo4j_personal = Neo4jClient::with_scope(&cfg, AccessScope::Personal)?;
+    let neo4j_central = Neo4jClient::with_scope(&cfg, AccessScope::Central)?;
+    info!(
+        qdrant_personal = %qdrant_personal.collection(),
+        qdrant_central  = %qdrant_central.collection(),
+        neo4j_personal  = %neo4j_personal.database(),
+        neo4j_central   = %neo4j_central.database(),
+        "routing configured"
+    );
     let processor = Processor {
         supabase: &supabase,
         gemini: &gemini,
-        qdrant: &qdrant,
-        neo4j: &neo4j,
+        qdrant_personal: &qdrant_personal,
+        qdrant_central: &qdrant_central,
+        neo4j_personal: &neo4j_personal,
+        neo4j_central: &neo4j_central,
     };
 
     let mut shutdown = std::pin::pin!(shutdown_signal());

@@ -106,6 +106,62 @@ pub enum EntityType {
     FinancingPreference,
     EducationIntake,
     Injury,
+    // Decision intelligence (migration 080)
+    GoalProgressSnapshot,
+    GoalProgressEvent,
+    GoalProgressScore,
+    GoalProgressPrediction,
+    CrossDomainImpact,
+    OutcomeAttribution,
+    PredictionCalibration,
+    RecommendationAccuracy,
+    AdvisorAccuracy,
+    RecommendationQualityMetric,
+    PathwayEffectiveness,
+    // Decision impact + probability distribution (migration 081)
+    GoalProbabilityDistribution,
+    GoalProbabilitySnapshot,
+    GoalDecisionImpact,
+    GoalPathwayProbability,
+    GoalFutureState,
+    DecisionMarginalImpact,
+    TrajectoryVarianceFactor,
+    // XAI + Trust Layer (migration 082)
+    RecommendationAuditTrail,
+    WhyChain,
+    EvidenceLink,
+    CounterfactualScenario,
+    RecommendationAssumption,
+    // Conversation Intelligence (migration 084)
+    DiscoverySession,
+    AssumptionChallenge,
+    ConversationTrace,
+    // Provider GraphRAG (migration 085)
+    ProviderProfile,
+    ProviderEngagement,
+    ProviderConsentScope,
+    ProviderRecommendation,
+    ProviderOutcome,
+    ProviderKnowledgeEntry,
+    ProviderAnalytics,
+    // Sprint C — Arcana Health & Performance Activation
+    ArcanaProfile,
+    ArcanaAssessment,
+    ArcanaGoal,
+    ArcanaConstraint,
+    ArcanaCapability,
+    ArcanaMotivation,
+    ArcanaReadiness,
+    SupplementProtocol,
+    TrainingProtocol,
+    HealthMilestone,
+    BiometricObservation,
+    LabResult,
+    WearableConnection,
+    ArcanaInsuranceDocument,
+    LeadPackageConsent,
+    ConciergePreference,
+    ArcanaMembership,
     /// Catch-all so a new sync-queue entity_type doesn't crash the worker;
     /// the normalizer skips unknown types.
     #[serde(other)]
@@ -189,6 +245,56 @@ impl EntityType {
             EntityType::FinancingPreference => "financing_preference",
             EntityType::EducationIntake => "education_intake",
             EntityType::Injury => "injury",
+            EntityType::GoalProgressSnapshot => "goal_progress_snapshot",
+            EntityType::GoalProgressEvent => "goal_progress_event",
+            EntityType::GoalProgressScore => "goal_progress_score",
+            EntityType::GoalProgressPrediction => "goal_progress_prediction",
+            EntityType::CrossDomainImpact => "cross_domain_impact",
+            EntityType::OutcomeAttribution => "outcome_attribution",
+            EntityType::PredictionCalibration => "prediction_calibration",
+            EntityType::RecommendationAccuracy => "recommendation_accuracy",
+            EntityType::AdvisorAccuracy => "advisor_accuracy",
+            EntityType::RecommendationQualityMetric => "recommendation_quality_metric",
+            EntityType::PathwayEffectiveness => "pathway_effectiveness",
+            EntityType::GoalProbabilityDistribution => "goal_probability_distribution",
+            EntityType::GoalProbabilitySnapshot => "goal_probability_snapshot",
+            EntityType::GoalDecisionImpact => "goal_decision_impact",
+            EntityType::GoalPathwayProbability => "goal_pathway_probability",
+            EntityType::GoalFutureState => "goal_future_state",
+            EntityType::DecisionMarginalImpact => "decision_marginal_impact",
+            EntityType::TrajectoryVarianceFactor => "trajectory_variance_factor",
+            EntityType::RecommendationAuditTrail => "recommendation_audit_trail",
+            EntityType::WhyChain => "why_chain",
+            EntityType::EvidenceLink => "evidence_link",
+            EntityType::CounterfactualScenario => "counterfactual_scenario",
+            EntityType::RecommendationAssumption => "recommendation_assumption",
+            EntityType::DiscoverySession => "discovery_session",
+            EntityType::AssumptionChallenge => "assumption_challenge",
+            EntityType::ConversationTrace => "conversation_trace",
+            EntityType::ProviderProfile => "provider_profile",
+            EntityType::ProviderEngagement => "provider_engagement",
+            EntityType::ProviderConsentScope => "provider_consent_scope",
+            EntityType::ProviderRecommendation => "provider_recommendation",
+            EntityType::ProviderOutcome => "provider_outcome",
+            EntityType::ProviderKnowledgeEntry => "provider_knowledge_entry",
+            EntityType::ProviderAnalytics => "provider_analytics",
+            EntityType::ArcanaProfile => "arcana_profile",
+            EntityType::ArcanaAssessment => "arcana_assessment",
+            EntityType::ArcanaGoal => "arcana_goal",
+            EntityType::ArcanaConstraint => "arcana_constraint",
+            EntityType::ArcanaCapability => "arcana_capability",
+            EntityType::ArcanaMotivation => "arcana_motivation",
+            EntityType::ArcanaReadiness => "arcana_readiness",
+            EntityType::SupplementProtocol => "supplement_protocol",
+            EntityType::TrainingProtocol => "training_protocol",
+            EntityType::HealthMilestone => "health_milestone",
+            EntityType::BiometricObservation => "biometric_observation",
+            EntityType::LabResult => "lab_result",
+            EntityType::WearableConnection => "wearable_connection",
+            EntityType::ArcanaInsuranceDocument => "arcana_insurance_document",
+            EntityType::LeadPackageConsent => "lead_package_consent",
+            EntityType::ConciergePreference => "concierge_preference",
+            EntityType::ArcanaMembership => "arcana_membership",
             EntityType::Unknown => "unknown",
         }
     }
@@ -253,6 +359,65 @@ impl EntityType {
                 "jobs"
             }
 
+            EntityType::GoalProgressSnapshot
+            | EntityType::GoalProgressEvent
+            | EntityType::GoalProgressScore
+            | EntityType::GoalProgressPrediction
+            | EntityType::PathwayEffectiveness => "goal_progress",
+
+            EntityType::CrossDomainImpact | EntityType::OutcomeAttribution => "attribution",
+
+            EntityType::PredictionCalibration
+            | EntityType::RecommendationAccuracy
+            | EntityType::AdvisorAccuracy
+            | EntityType::RecommendationQualityMetric => "calibration",
+
+            EntityType::GoalProbabilityDistribution
+            | EntityType::GoalProbabilitySnapshot
+            | EntityType::GoalPathwayProbability
+            | EntityType::GoalFutureState
+            | EntityType::TrajectoryVarianceFactor => "probability",
+
+            EntityType::GoalDecisionImpact | EntityType::DecisionMarginalImpact => {
+                "decision_impact"
+            }
+
+            EntityType::RecommendationAuditTrail
+            | EntityType::WhyChain
+            | EntityType::EvidenceLink
+            | EntityType::CounterfactualScenario
+            | EntityType::RecommendationAssumption => "xai",
+
+            EntityType::DiscoverySession
+            | EntityType::AssumptionChallenge
+            | EntityType::ConversationTrace => "conversation",
+
+            EntityType::ProviderProfile
+            | EntityType::ProviderEngagement
+            | EntityType::ProviderConsentScope
+            | EntityType::ProviderRecommendation
+            | EntityType::ProviderOutcome
+            | EntityType::ProviderKnowledgeEntry
+            | EntityType::ProviderAnalytics => "provider",
+
+            EntityType::ArcanaProfile
+            | EntityType::ArcanaAssessment
+            | EntityType::ArcanaGoal
+            | EntityType::ArcanaConstraint
+            | EntityType::ArcanaCapability
+            | EntityType::ArcanaMotivation
+            | EntityType::ArcanaReadiness
+            | EntityType::SupplementProtocol
+            | EntityType::TrainingProtocol
+            | EntityType::HealthMilestone
+            | EntityType::BiometricObservation
+            | EntityType::LabResult
+            | EntityType::WearableConnection
+            | EntityType::ArcanaInsuranceDocument
+            | EntityType::LeadPackageConsent
+            | EntityType::ConciergePreference
+            | EntityType::ArcanaMembership => "arcana",
+
             _ => "general",
         }
     }
@@ -275,7 +440,25 @@ impl EntityType {
             | EntityType::Injury
             | EntityType::HealthAlertEvent
             | EntityType::EstateProfile
-            | EntityType::EstateBeneficiary => SensitivityLevel::High,
+            | EntityType::EstateBeneficiary
+            // Sprint C — all Arcana child entities are High by default
+            | EntityType::ArcanaProfile
+            | EntityType::ArcanaAssessment
+            | EntityType::ArcanaGoal
+            | EntityType::ArcanaConstraint
+            | EntityType::ArcanaCapability
+            | EntityType::ArcanaMotivation
+            | EntityType::ArcanaReadiness
+            | EntityType::SupplementProtocol
+            | EntityType::TrainingProtocol
+            | EntityType::HealthMilestone
+            | EntityType::BiometricObservation
+            | EntityType::LabResult
+            | EntityType::WearableConnection
+            | EntityType::ArcanaInsuranceDocument
+            | EntityType::LeadPackageConsent
+            | EntityType::ConciergePreference
+            | EntityType::ArcanaMembership => SensitivityLevel::High,
 
             EntityType::FinancialAccount
             | EntityType::Debt

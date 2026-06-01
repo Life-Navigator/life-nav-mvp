@@ -13,27 +13,46 @@ use serde_json::{json, Map, Value};
 use crate::config::Config;
 use crate::entities::CanonicalGraphObject;
 use crate::errors::{Result, WorkerError};
+use crate::queue::AccessScope;
 
 pub struct Neo4jClient {
     http: Http,
     base_url: String,
     auth_header: String,
     database: String,
+    scope: AccessScope,
 }
 
 impl Neo4jClient {
     pub fn new(cfg: &Config) -> Result<Self> {
+        Self::with_scope(cfg, AccessScope::Personal)
+    }
+
+    pub fn with_scope(cfg: &Config, scope: AccessScope) -> Result<Self> {
         let http = Http::builder()
             .gzip(true)
             .timeout(std::time::Duration::from_secs(30))
             .build()?;
         let creds = base64_impl::encode(format!("{}:{}", cfg.neo4j_username, cfg.neo4j_password));
+        let database = match scope {
+            AccessScope::Personal => cfg.neo4j_personal_database.clone(),
+            AccessScope::Central => cfg.neo4j_central_database.clone(),
+        };
         Ok(Self {
             http,
             base_url: cfg.neo4j_uri.trim_end_matches('/').to_string(),
             auth_header: format!("Basic {creds}"),
-            database: cfg.neo4j_personal_database.clone(),
+            database,
+            scope,
         })
+    }
+
+    pub fn scope(&self) -> AccessScope {
+        self.scope
+    }
+
+    pub fn database(&self) -> &str {
+        &self.database
     }
 
     /// Build the parameter bag that `merge_cypher_for` consumes. Exposed

@@ -88,4 +88,39 @@ export interface RecommendationOutput {
     score?: number;
     note?: string;
   };
+  // ---- Transparency contract (sprint: goal progress + decision intelligence) ----
+  /** Concise label of the resolved pathway (e.g. "Income Growth First"). */
+  pathway_label?: string;
+  /** Forecast impact on the root goal score: { delta, score_before, score_after }. */
+  goal_progress_impact?: {
+    score_before: number;
+    score_after: number;
+    delta: number;
+    confidence: number;
+  };
+  /** `confidence_score` adjusted by the user's historical calibration
+   *  factor. Equals `confidence_score` when no calibration data exists. */
+  confidence_calibrated?: number;
+  /** Concrete citations: central ontology + provenance + acceptance history. */
+  supporting_evidence?: Array<{
+    kind:
+      | 'central_ontology'
+      | 'personal_history'
+      | 'pathway_effectiveness'
+      | 'recommendation_quality';
+    label: string;
+    central_entity_id?: string;
+    citation_reference?: string;
+    confidence: number;
+  }>;
+  /** Historical effectiveness of similar pathways for similar users. */
+  historical_effectiveness?: {
+    pathway_label: string;
+    sample_size: number;
+    success_rate?: number;
+    completion_rate?: number;
+    mean_duration_months?: number;
+    confidence?: number;
+    scope: 'personal' | 'cohort';
+  };
 }

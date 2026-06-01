@@ -16,7 +16,7 @@ use uuid::Uuid;
 use ingestion_worker::neo4j_client::Neo4jClient;
 use ingestion_worker::normalizer::normalize;
 use ingestion_worker::qdrant_client::QdrantClient;
-use ingestion_worker::queue::{SyncOperation, SyncQueueJob};
+use ingestion_worker::queue::{AccessScope, SyncOperation, SyncQueueJob};
 
 fn make() -> SyncQueueJob {
     SyncQueueJob {
@@ -33,6 +33,7 @@ fn make() -> SyncQueueJob {
             "skills": ["python", "sql"]
         }),
         attempts: 1,
+        access_scope: AccessScope::Personal,
         max_attempts: 5,
     }
 }

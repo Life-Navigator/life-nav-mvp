@@ -15,11 +15,13 @@ pub struct Config {
     pub qdrant_url: String,
     pub qdrant_api_key: String,
     pub qdrant_personal_collection: String,
+    pub qdrant_central_collection: String,
 
     pub neo4j_uri: String,
     pub neo4j_username: String,
     pub neo4j_password: String,
     pub neo4j_personal_database: String,
+    pub neo4j_central_database: String,
 
     pub worker_poll_interval_seconds: u64,
     pub worker_batch_size: usize,
@@ -42,12 +44,16 @@ impl Config {
             qdrant_api_key: required("QDRANT_API_KEY")?,
             qdrant_personal_collection: env::var("QDRANT_PERSONAL_COLLECTION")
                 .unwrap_or_else(|_| "life_navigator".to_string()),
+            qdrant_central_collection: env::var("QDRANT_CENTRAL_COLLECTION")
+                .unwrap_or_else(|_| "ln_central".to_string()),
 
             neo4j_uri: required("NEO4J_URI")?,
             neo4j_username: required("NEO4J_USERNAME")?,
             neo4j_password: required("NEO4J_PASSWORD")?,
             neo4j_personal_database: env::var("NEO4J_PERSONAL_DATABASE")
                 .unwrap_or_else(|_| "neo4j".to_string()),
+            neo4j_central_database: env::var("NEO4J_CENTRAL_DATABASE")
+                .unwrap_or_else(|_| "central".to_string()),
 
             worker_poll_interval_seconds: parse_or(env::var("WORKER_POLL_INTERVAL_SECONDS"), 5),
             worker_batch_size: parse_or(env::var("WORKER_BATCH_SIZE"), 25),

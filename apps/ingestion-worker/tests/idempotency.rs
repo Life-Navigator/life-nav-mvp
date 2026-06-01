@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 use ingestion_worker::neo4j_client::Neo4jClient;
 use ingestion_worker::normalizer::normalize;
-use ingestion_worker::queue::{SyncOperation, SyncQueueJob};
+use ingestion_worker::queue::{AccessScope, SyncOperation, SyncQueueJob};
 
 #[test]
 fn same_inputs_produce_same_qdrant_point_id() {
@@ -30,6 +30,7 @@ fn same_inputs_produce_same_qdrant_point_id() {
         }),
         attempts: 0,
         max_attempts: 5,
+        access_scope: AccessScope::Personal,
     };
     let now = Utc.with_ymd_and_hms(2026, 6, 1, 12, 0, 0).unwrap();
     let c1 = normalize(&mk(), now).unwrap();
@@ -50,6 +51,7 @@ fn same_inputs_produce_same_neo4j_merge_cypher() {
         payload: json!({"title": "Buy a home", "category": "financial"}),
         attempts: 0,
         max_attempts: 5,
+        access_scope: AccessScope::Personal,
     };
     let now = Utc.with_ymd_and_hms(2026, 6, 1, 12, 0, 0).unwrap();
     let c1 = normalize(&mk(), now).unwrap();
@@ -75,6 +77,7 @@ fn upsert_is_keyed_by_tenant_plus_entity_type_plus_entity_id() {
         payload: json!({"debt_name": "Card A", "current_balance": 1000}),
         attempts: 0,
         max_attempts: 5,
+        access_scope: AccessScope::Personal,
     };
     let job_v2 = SyncQueueJob {
         // payload changed (balance ↓ 200) but the same tenant + entity_id

@@ -11,6 +11,35 @@ pub enum SyncOperation {
     Delete,
 }
 
+/// Which sink a job's projections target.
+///
+///   * `Personal` — per-tenant point in the personal Qdrant collection
+///     and per-tenant node in the personal Neo4j database. tenant_id =
+///     the user_id.
+///   * `Central`  — global-knowledge point in the central Qdrant
+///     collection and global node in the central Neo4j database.
+///     tenant_id is the nil UUID; no user binding.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AccessScope {
+    #[default]
+    Personal,
+    Central,
+}
+
+impl AccessScope {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AccessScope::Personal => "personal",
+            AccessScope::Central => "central",
+        }
+    }
+
+    pub fn is_central(&self) -> bool {
+        matches!(self, AccessScope::Central)
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SyncQueueJob {
     pub id: Uuid,
@@ -28,6 +57,10 @@ pub struct SyncQueueJob {
     pub attempts: i32,
     #[serde(default = "default_max_attempts")]
     pub max_attempts: i32,
+    /// Added by migration 077. Defaults to `Personal` so jobs queued
+    /// before 077 deploy continue to route into the personal sinks.
+    #[serde(default)]
+    pub access_scope: AccessScope,
 }
 
 fn default_max_attempts() -> i32 {

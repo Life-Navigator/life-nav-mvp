@@ -13,7 +13,7 @@ use uuid::Uuid;
 use ingestion_worker::neo4j_client::Neo4jClient;
 use ingestion_worker::normalizer::normalize;
 use ingestion_worker::qdrant_client::QdrantClient;
-use ingestion_worker::queue::{SyncOperation, SyncQueueJob};
+use ingestion_worker::queue::{AccessScope, SyncOperation, SyncQueueJob};
 
 fn job_for(user_id: Uuid) -> SyncQueueJob {
     SyncQueueJob {
@@ -31,6 +31,7 @@ fn job_for(user_id: Uuid) -> SyncQueueJob {
         }),
         attempts: 0,
         max_attempts: 5,
+        access_scope: AccessScope::Personal,
     }
 }
 

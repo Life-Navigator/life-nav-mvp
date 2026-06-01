@@ -15,7 +15,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use ingestion_worker::normalizer::normalize;
-use ingestion_worker::queue::{SyncOperation, SyncQueueJob};
+use ingestion_worker::queue::{AccessScope, SyncOperation, SyncQueueJob};
 
 fn job_for(user_id: Uuid, entity_type: &str) -> SyncQueueJob {
     SyncQueueJob {
@@ -28,6 +28,7 @@ fn job_for(user_id: Uuid, entity_type: &str) -> SyncQueueJob {
         payload: json!({"title": "x"}),
         attempts: 0,
         max_attempts: 5,
+        access_scope: AccessScope::Personal,
     }
 }
 

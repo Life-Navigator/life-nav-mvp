@@ -17,7 +17,7 @@ use uuid::Uuid;
 use ingestion_worker::neo4j_client::Neo4jClient;
 use ingestion_worker::normalizer::normalize;
 use ingestion_worker::qdrant_client::QdrantClient;
-use ingestion_worker::queue::{SyncOperation, SyncQueueJob};
+use ingestion_worker::queue::{AccessScope, SyncOperation, SyncQueueJob};
 
 const SENSITIVE_NAMES: &[&str] = &[
     "member_id",
@@ -54,6 +54,7 @@ fn job_with_sensitive_payload() -> SyncQueueJob {
         payload: serde_json::Value::Object(payload),
         attempts: 0,
         max_attempts: 5,
+        access_scope: AccessScope::Personal,
     }
 }
 

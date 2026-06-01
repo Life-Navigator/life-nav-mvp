@@ -617,6 +617,20 @@ export async function reason(
     Math.max(0, 0.5 * root.confidence + 0.4 * linkConfidence + retrievalSignal)
   );
 
+  // -----------------------------------------------------------------------
+  // Transparency contract (Sprint: Goal Progress + Decision Intelligence
+  // Completion). Best-effort lookups; each block degrades gracefully so a
+  // call against a fresh user still returns a useful recommendation.
+  // -----------------------------------------------------------------------
+  const intel = await loadDecisionIntelligence(
+    supabase,
+    inputs.user_id,
+    root,
+    pathway,
+    actions,
+    confidence_score
+  );
+
   return {
     root_goal: root,
     supporting_goals: pathway?.supporting ?? [],
@@ -631,7 +645,146 @@ export async function reason(
     cross_domain_impacts: impacts,
     pathway,
     simulation_summary: undefined, // filled in by hierarchy-aware simulation pass (phase 5)
+    // Transparency-contract fields
+    pathway_label: intel.pathway_label,
+    goal_progress_impact: intel.goal_progress_impact,
+    confidence_calibrated: intel.confidence_calibrated ?? confidence_score,
+    supporting_evidence: intel.supporting_evidence,
+    historical_effectiveness: intel.historical_effectiveness,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Decision-intelligence augmentation — pure DB lookups, all best-effort.
+// ---------------------------------------------------------------------------
+import { buildCurveFromHistory, calibrateConfidence } from '@/lib/decision/calibration-service';
+import {
+  loadPathwayEffectiveness,
+  pathwayLabelFor,
+  pathwaySignature,
+  pickBestEffectiveness,
+} from '@/lib/decision/recommendation-quality-service';
+
+interface DecisionIntelAugmentation {
+  pathway_label?: string;
+  goal_progress_impact?: NonNullable<RecommendationOutput['goal_progress_impact']>;
+  confidence_calibrated?: number;
+  supporting_evidence?: NonNullable<RecommendationOutput['supporting_evidence']>;
+  historical_effectiveness?: NonNullable<RecommendationOutput['historical_effectiveness']>;
+}
+
+async function loadDecisionIntelligence(
+  supabase: SupabaseClient,
+  userId: string,
+  root: DiscoveredRootGoal,
+  pathway: GoalPathway | undefined,
+  actions: RecommendedAction[],
+  rawConfidence: number
+): Promise<DecisionIntelAugmentation> {
+  const out: DecisionIntelAugmentation = {};
+
+  // (1) Pathway label + historical effectiveness lookup.
+  if (pathway && pathway.edges.length > 0) {
+    out.pathway_label = pathwayLabelFor(pathway);
+    try {
+      const rows = await loadPathwayEffectiveness(
+        supabase,
+        userId,
+        root.inferred_true_goal,
+        pathwaySignature(pathway)
+      );
+      const best = pickBestEffectiveness(rows);
+      if (best) {
+        out.historical_effectiveness = {
+          pathway_label: best.pathway_label,
+          sample_size: best.sample_size,
+          success_rate: best.success_rate ?? undefined,
+          completion_rate: best.completion_rate ?? undefined,
+          mean_duration_months: best.mean_duration_months ?? undefined,
+          confidence: best.confidence ?? undefined,
+          scope: best.user_id == null ? 'cohort' : 'personal',
+        };
+      }
+    } catch {
+      /* swallow — best-effort */
+    }
+  }
+
+  // (2) Goal progress: load most recent snapshot to compute score_before.
+  if (root.goal_id) {
+    try {
+      const { data: snap } = await supabase
+        .from('goal_progress_snapshots')
+        .select('score, confidence')
+        .eq('user_id', userId)
+        .eq('goal_id', root.goal_id)
+        .order('snapshot_at', { ascending: false })
+        .limit(1);
+      const score_before = snap && snap.length > 0 ? Number(snap[0].score) : 0;
+      const snapConf = snap && snap.length > 0 ? Number(snap[0].confidence ?? 0.5) : 0.5;
+      // Projected delta: sum of action strengths discounted by base confidence,
+      // capped so we never claim a > 30% jump from a single batch.
+      const strengthSum = actions.reduce((a, b) => a + (b.expected_strength ?? 0), 0);
+      const projDelta = Math.max(-0.3, Math.min(0.3, strengthSum * 0.05 * snapConf));
+      const score_after = Math.max(0, Math.min(1, score_before + projDelta));
+      out.goal_progress_impact = {
+        score_before,
+        score_after,
+        delta: score_after - score_before,
+        confidence: snapConf,
+      };
+    } catch {
+      /* swallow */
+    }
+  }
+
+  // (3) Calibration: derive `confidence_calibrated` from history.
+  try {
+    const { data: hist } = await supabase
+      .from('prediction_calibration')
+      .select('*')
+      .eq('user_id', userId)
+      .not('validated_at', 'is', null)
+      .order('predicted_at', { ascending: false })
+      .limit(500);
+    const curve = buildCurveFromHistory(
+      (hist ?? []) as Parameters<typeof buildCurveFromHistory>[0]
+    );
+    if (curve.n > 0) {
+      out.confidence_calibrated = calibrateConfidence(rawConfidence, curve);
+    }
+  } catch {
+    /* swallow */
+  }
+
+  // (4) Supporting evidence: surface the action-attached central
+  // entity ids (already on each action). The route handler may
+  // hydrate canonical_name + citation_reference from the central
+  // views in a follow-up call; we emit the minimum viable shape here.
+  const seen = new Set<string>();
+  const evidence: NonNullable<RecommendationOutput['supporting_evidence']> = [];
+  for (const a of actions) {
+    for (const id of a.related_central_entity_ids ?? []) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      evidence.push({
+        kind: 'central_ontology',
+        label: a.title,
+        central_entity_id: id,
+        confidence: a.expected_strength ?? 0.5,
+      });
+    }
+  }
+  if (out.historical_effectiveness) {
+    evidence.push({
+      kind: 'pathway_effectiveness',
+      label: `${out.historical_effectiveness.pathway_label} (n=${out.historical_effectiveness.sample_size})`,
+      confidence: out.historical_effectiveness.confidence ?? 0.5,
+    });
+  }
+  if (evidence.length > 0) out.supporting_evidence = evidence;
+
+  return out;
 }
 
 // ---------------------------------------------------------------------------
