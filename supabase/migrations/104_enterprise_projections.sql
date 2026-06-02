@@ -101,9 +101,23 @@ CREATE TABLE IF NOT EXISTS projections.constitutional_layer_rules (
   tags            TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
   metadata        JSONB NOT NULL DEFAULT '{}',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (layer, COALESCE(industry, ''), COALESCE(tenant_id::TEXT, ''), COALESCE(user_id::TEXT, ''), entity_kind, slug, version)
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- Functional uniqueness on (layer, industry, tenant_id, user_id, entity_kind,
+-- slug, version) where COALESCE collapses NULLs into '' so duplicate rules at
+-- the same scope cannot exist. Postgres requires this as a CREATE UNIQUE INDEX
+-- rather than an in-table UNIQUE (...) constraint because the expression list
+-- contains function calls.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_clr_scope_kind_slug
+  ON projections.constitutional_layer_rules (
+    layer,
+    COALESCE(industry, ''),
+    COALESCE(tenant_id::TEXT, ''),
+    COALESCE(user_id::TEXT, ''),
+    entity_kind,
+    slug,
+    version
+  );
 CREATE INDEX IF NOT EXISTS idx_clr_layer_industry ON projections.constitutional_layer_rules(layer, industry);
 CREATE INDEX IF NOT EXISTS idx_clr_tenant         ON projections.constitutional_layer_rules(tenant_id) WHERE tenant_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_clr_user           ON projections.constitutional_layer_rules(user_id) WHERE user_id IS NOT NULL;
@@ -154,8 +168,10 @@ CREATE TABLE IF NOT EXISTS projections.industry_templates (
   description     TEXT,
   /** Number of rules currently seeded into the industry layer for this vertical. */
   rule_count      INT NOT NULL DEFAULT 0,
-  /** Regulatory references (e.g. 'SEC Rule 17a-4', 'HIPAA 45 CFR 164.312'). */
-  references      TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  /** Regulatory references (e.g. 'SEC Rule 17a-4', 'HIPAA 45 CFR 164.312').
+      `references` is a reserved Postgres keyword (used by FOREIGN KEY ...
+      REFERENCES) so the column name is double-quoted everywhere. */
+  "references"    TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
   status          TEXT NOT NULL DEFAULT 'active' CHECK (projections.is_projection_status(status)),
   metadata        JSONB NOT NULL DEFAULT '{}',
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -163,7 +179,7 @@ CREATE TABLE IF NOT EXISTS projections.industry_templates (
 );
 
 -- Seed the 6 named industries.
-INSERT INTO projections.industry_templates (industry, display_name, description, references) VALUES
+INSERT INTO projections.industry_templates (industry, display_name, description, "references") VALUES
   ('financial_services','Financial Services',  'SEC / FINRA / state-RIA aligned advisory + fiduciary rules', ARRAY['SEC IA-2204','FINRA 2210','Reg BI']),
   ('healthcare',        'Healthcare',          'HIPAA + clinical-safety + scope-of-practice rules',          ARRAY['HIPAA Privacy Rule','HIPAA Security Rule','HHS guidance']),
   ('payroll',           'Payroll',             'Wage-and-hour + tax-withholding + DOL guidance',             ARRAY['FLSA','IRS Pub 15','DOL Wage and Hour']),
@@ -173,7 +189,7 @@ INSERT INTO projections.industry_templates (industry, display_name, description,
 ON CONFLICT (industry) DO UPDATE
   SET display_name = EXCLUDED.display_name,
       description  = EXCLUDED.description,
-      references   = EXCLUDED.references,
+      "references" = EXCLUDED."references",
       updated_at   = NOW();
 
 -- ============================================================================

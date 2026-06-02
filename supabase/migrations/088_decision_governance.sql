@@ -286,7 +286,11 @@ GRANT EXECUTE ON FUNCTION governance.agent_is_registered(TEXT, TEXT) TO authenti
 -- ###########################################################################
 INSERT INTO governance.policy_versions (id, version, principles, rule_categories, policy_hash, notes)
 VALUES (
-  '00000000-0000-0000-0000-0000Govern0001',
+  -- Sentinel UUID for the v1.0.0 governance seed (was a vanity literal
+  -- "0000Govern0001" which is invalid hex; replaced 2026-06-02).
+  -- ON CONFLICT (version) DO NOTHING makes the row idempotent on version,
+  -- not id, so a sentinel is correct.
+  '00000000-0000-0000-0000-000000000001',
   '1.0.0',
   '[
     {"id": "user_advocacy",      "name": "User Advocacy",       "body": "Optimize for user well-being, user goals, user autonomy. Never optimize for government, employer, advertiser, partner, provider, vendor unless the user explicitly asked."},
