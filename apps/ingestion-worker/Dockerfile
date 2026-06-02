@@ -1,18 +1,16 @@
 # syntax=docker/dockerfile:1
 
 # ---- build stage ----
-FROM rust:1.83-slim AS builder
+# Rust 1.86+ required: getrandom 0.4 needs edition=2024 (Cargo 1.85+) and
+# icu_normalizer 2.2 + icu_properties_data require rustc 1.86.
+# Bumped 2026-06-02 during internal-beta deploy.
+FROM rust:1.86-slim AS builder
 WORKDIR /app
 
-# Pre-cache the dependency graph by building a dummy crate first.
+# Single-stage build. (Earlier two-stage pre-cache via dummy lib.rs left
+# stale crate metadata that broke module resolution; the pre-cache was
+# removed 2026-06-02. Buildkit cache mounts handle dep reuse instead.)
 COPY Cargo.toml ./
-RUN mkdir -p src && \
-    echo 'fn main() {}' > src/main.rs && \
-    echo '' > src/lib.rs && \
-    cargo build --release --bin ingestion-worker || true && \
-    rm -rf src target/release/deps/ingestion_worker* target/release/deps/ingestion-worker*
-
-# Real source build.
 COPY src ./src
 COPY tests ./tests
 RUN cargo build --release --bin ingestion-worker && \
