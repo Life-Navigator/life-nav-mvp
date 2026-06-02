@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getUserIdFromJWT } from '@/lib/jwt';
+import { safeApiError } from '@/lib/security/safe-error';
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -29,14 +30,14 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return safeApiError({ code: 'db_persistence_error', internal: error });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
       { error: (error as Error).message || 'Internal server error' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

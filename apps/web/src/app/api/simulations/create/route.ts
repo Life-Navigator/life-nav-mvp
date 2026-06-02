@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { ALL_LABELS } from '@/types/trajectory';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,7 +61,7 @@ export async function POST(request: NextRequest) {
     })
     .select('id')
     .single();
-  if (sErr) return NextResponse.json({ error: sErr.message }, { status: 400 });
+  if (sErr) return safeApiError({ code: 'validation_failed', internal: sErr });
 
   const versionRows = labels.map((label, i) => ({
     user_id: user.id,
@@ -74,7 +76,23 @@ export async function POST(request: NextRequest) {
     .from('life_scenario_versions')
     .insert(versionRows)
     .select('id, label, version_index, horizon_years, status');
-  if (vErr) return NextResponse.json({ error: vErr.message }, { status: 400 });
+  if (vErr) return safeApiError({ code: 'validation_failed', internal: vErr });
 
-  return NextResponse.json({ success: true, scenario_id: scenario.id, versions });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: {
+      kind: 'simulation_output',
+      text: subjectTextFromPayload({ title: p.title, versions }),
+    },
+    emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({
+    success: true,
+    scenario_id: scenario.id,
+    versions,
+    governance: { verdict: g.decision.verdict },
+  });
 }

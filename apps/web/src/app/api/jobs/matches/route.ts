@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,6 @@ export async function GET(request: NextRequest) {
     .limit(100);
   if (status) q = q.eq('status', status);
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ matches: data ?? [] });
 }

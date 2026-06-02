@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       if (error) {
         checks.supabase_connection = {
           status: 'fail',
-          message: `Supabase error: ${error.message}`,
+          message: 'Supabase connection failed',
         };
       } else {
         checks.supabase_connection = {
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       checks.supabase_connection = {
         status: 'fail',
-        message: `Connection error: ${err instanceof Error ? err.message : String(err)}`,
+        message: 'Connection check failed',
       };
     }
 
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       if (error) {
         checks.storage_buckets = {
           status: 'fail',
-          message: `Storage error: ${error.message}`,
+          message: 'Storage check failed',
         };
       } else {
         const scenarioBuckets = buckets.filter(
@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       checks.storage_buckets = {
         status: 'fail',
-        message: `Storage error: ${err instanceof Error ? err.message : String(err)}`,
+        message: 'Storage check failed',
       };
     }
 
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
       if (error) {
         checks.job_queue = {
           status: 'fail',
-          message: `Jobs table error: ${error.message}`,
+          message: 'Jobs table unavailable',
         };
       } else {
         checks.job_queue = {
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       checks.job_queue = {
         status: 'fail',
-        message: `Jobs table error: ${err instanceof Error ? err.message : String(err)}`,
+        message: 'Jobs table check failed',
       };
     }
 
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       checks.types = {
         status: 'fail',
-        message: `Types error: ${err instanceof Error ? err.message : String(err)}`,
+        message: 'Types check failed',
       };
     }
 
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       checks.validation = {
         status: 'fail',
-        message: `Validation error: ${err instanceof Error ? err.message : String(err)}`,
+        message: 'Validation check failed',
       };
     }
 
@@ -138,7 +138,7 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       checks.job_queue_helpers = {
         status: 'fail',
-        message: `Job queue error: ${err instanceof Error ? err.message : String(err)}`,
+        message: 'Job queue check failed',
       };
     }
 
@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
     } catch (err) {
       checks.rate_limiter = {
         status: 'fail',
-        message: `Rate limiter error: ${err instanceof Error ? err.message : String(err)}`,
+        message: 'Rate limiter check failed',
       };
     }
 
@@ -172,10 +172,11 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
+    console.error('[scenario-lab/health] failed', error);
     return NextResponse.json(
       {
         status: 'error',
-        error: error instanceof Error ? error.message : String(error),
+        error: 'health_check_failed',
         timestamp: new Date().toISOString(),
       },
       {

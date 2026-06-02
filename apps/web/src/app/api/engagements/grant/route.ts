@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -74,6 +75,6 @@ export async function POST(request: NextRequest) {
     .upsert(row, { onConflict: 'provider_id,patient_user_id' })
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return safeApiError({ code: 'db_persistence_error', internal: error });
   return NextResponse.json({ engagement: data }, { status: 201 });
 }

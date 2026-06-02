@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
       .delete()
       .eq('user_id', user.id)
       .eq('source', source);
-    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 });
+    if (delErr) return safeApiError({ code: 'validation_failed', internal: delErr });
   }
 
   if (parsed.data.debts.length === 0) return NextResponse.json({ success: true, created: 0 });
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     ...d,
   }));
   const { error } = await (supabase as any).schema('finance').from('debts').insert(rows);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ success: true, created: rows.length });
 }
 
@@ -95,6 +96,6 @@ export async function GET() {
     .eq('user_id', user.id)
     .eq('is_active', true)
     .order('current_balance', { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ debts: data ?? [] });
 }

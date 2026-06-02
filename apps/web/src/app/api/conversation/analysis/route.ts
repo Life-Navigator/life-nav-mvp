@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,9 +36,17 @@ export async function POST(request: NextRequest) {
       { onConflict: 'user_id' }
     );
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
 
-    return NextResponse.json({ success: true });
+    const g = await guardOutgoing({
+      supabase,
+      user_id: user.id,
+      subject: { kind: 'advisor_message', text: subjectTextFromPayload(analysis) },
+      emitter: { agent_kind: 'advisor', agent_name: 'advisor.core' },
+    });
+    if (!g.ok) return g.response;
+
+    return NextResponse.json({ success: true, governance: { verdict: g.decision.verdict } });
   } catch (err) {
     console.error('Conversation analysis POST error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

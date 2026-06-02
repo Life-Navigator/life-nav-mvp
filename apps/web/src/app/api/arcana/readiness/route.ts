@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { computeReadiness } from '@/lib/arcana/readiness-engine';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 import type {
   ArcanaCapability,
   ArcanaConstraint,
@@ -83,8 +84,21 @@ export async function POST(request: NextRequest) {
     })
     .eq('user_id', user.id);
 
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: {
+      kind: 'arcana_recommendation',
+      id: snapshot.data?.id ?? undefined,
+      text: subjectTextFromPayload(readiness),
+    },
+    emitter: { agent_kind: 'arcana_health', agent_name: 'arcana.health' },
+  });
+  if (!g.ok) return g.response;
+
   return NextResponse.json({
     readiness,
     snapshot: snapshot.data,
+    governance: { verdict: g.decision.verdict },
   });
 }

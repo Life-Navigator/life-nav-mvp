@@ -31,8 +31,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(
       new URL(
         `/settings/integrations?error=${encodeURIComponent(error)}&message=${encodeURIComponent(errorDescription || 'OAuth authorization failed')}`,
-        request.url,
-      ),
+        request.url
+      )
     );
   }
 
@@ -43,7 +43,9 @@ export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
   const storedState = cookieStore.get('microsoft_oauth_state')?.value;
   if (!state || state !== storedState) {
-    return NextResponse.redirect(new URL('/settings/integrations?error=invalid_state', request.url));
+    return NextResponse.redirect(
+      new URL('/settings/integrations?error=invalid_state', request.url)
+    );
   }
 
   const userId = await getUserIdFromJWT(request);
@@ -61,25 +63,22 @@ export async function GET(request: NextRequest) {
 
   if (!clientId || !clientSecret || !encryptionKey) {
     return NextResponse.redirect(
-      new URL('/settings/integrations?error=oauth_not_configured', request.url),
+      new URL('/settings/integrations?error=oauth_not_configured', request.url)
     );
   }
 
   try {
-    const tokenRes = await fetch(
-      `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          client_id: clientId,
-          client_secret: clientSecret,
-          grant_type: 'authorization_code',
-          code,
-          redirect_uri: redirectUri,
-        }).toString(),
-      },
-    );
+    const tokenRes = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+      }).toString(),
+    });
 
     if (!tokenRes.ok) {
       const text = await tokenRes.text().catch(() => '');
@@ -139,16 +138,13 @@ export async function GET(request: NextRequest) {
     }
 
     const response = NextResponse.redirect(
-      new URL(`${redirectPath}?success=microsoft_connected`, request.url),
+      new URL(`${redirectPath}?success=microsoft_connected`, request.url)
     );
     response.cookies.delete('microsoft_oauth_state');
     return response;
   } catch (err) {
     return NextResponse.redirect(
-      new URL(
-        `/settings/integrations?error=exchange_failed&message=${encodeURIComponent((err as Error).message)}`,
-        request.url,
-      ),
+      new URL(`/settings/integrations?error=exchange_failed`, request.url)
     );
   }
 }

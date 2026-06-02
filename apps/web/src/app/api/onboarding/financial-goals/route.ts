@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
 
   if (rows.length) {
     const { error } = await (supabase as any).from('goals').insert(rows);
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
   }
 
   return NextResponse.json({ success: true, created: rows.length });

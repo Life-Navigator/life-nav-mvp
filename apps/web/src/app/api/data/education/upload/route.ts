@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 import {
   uploadToStorage,
   createDocumentRecord,
@@ -70,6 +71,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error('Education upload error:', err);
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    return safeApiError({ code: 'internal_error', internal: err });
   }
 }

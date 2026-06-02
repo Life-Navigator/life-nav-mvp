@@ -11,6 +11,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 import { computeProbabilityDistribution } from '@/lib/decision/probability-engine';
 import { loadGoalContext } from '@/lib/decision/context-loader';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 import { TIME_HORIZONS_ORDER, type TimeHorizon } from '@/types/decision-impact';
 
 export const dynamic = 'force-dynamic';
@@ -68,5 +69,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     /* persistence is best-effort; surface the result regardless. */
   }
 
-  return NextResponse.json({ distribution });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: { kind: 'probability_output', text: subjectTextFromPayload(distribution) },
+    emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({ distribution, governance: { verdict: g.decision.verdict } });
 }

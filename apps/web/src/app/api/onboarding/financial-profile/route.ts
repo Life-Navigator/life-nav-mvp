@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,7 +101,7 @@ export async function PUT(request: NextRequest) {
       .schema('finance')
       .from('user_financial_profile')
       .upsert(row, { onConflict: 'user_id' });
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     profileUpdated = true;
   }
 
@@ -110,7 +111,7 @@ export async function PUT(request: NextRequest) {
       .schema('finance')
       .from('financing_preferences')
       .upsert(row, { onConflict: 'user_id' });
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     prefsUpdated = true;
   }
 

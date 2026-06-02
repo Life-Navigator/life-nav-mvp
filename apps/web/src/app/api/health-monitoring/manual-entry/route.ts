@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { runForUser } from '@/lib/health-monitoring/runner';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
         { status: 200 }
       );
     }
-    return NextResponse.json({ error: writeRes.error.message }, { status: 400 });
+    return safeApiError({ code: 'validation_failed', internal: writeRes.error });
   }
 
   const runnerOutcome = await runForUser(supabase, user.id);

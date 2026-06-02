@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { fetchBadges } from '@/lib/integrations/credly/client';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,6 @@ export async function GET() {
     const badges = await fetchBadges(username);
     return NextResponse.json({ badges });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    return safeApiError({ code: 'internal_error', internal: err });
   }
 }

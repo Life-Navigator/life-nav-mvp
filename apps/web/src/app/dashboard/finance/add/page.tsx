@@ -66,7 +66,20 @@ export default function AddFinancialDataPage() {
       let endpoint = '';
       let body = {};
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const env = (await import('@/lib/security/env-client')).clientEnvUrl(
+        'NEXT_PUBLIC_API_URL',
+        'http://localhost:8000'
+      );
+      if (env.ok === false) {
+        setError(
+          env.kind === 'loopback'
+            ? 'The backend API is not configured for this environment.'
+            : 'NEXT_PUBLIC_API_URL is not set.'
+        );
+        setLoading(false);
+        return;
+      }
+      const apiUrl = env.value;
 
       switch (dataType) {
         case 'account':
@@ -232,7 +245,9 @@ export default function AddFinancialDataPage() {
                     type="text"
                     required
                     value={accountData.institution}
-                    onChange={(e) => setAccountData({ ...accountData, institution: e.target.value })}
+                    onChange={(e) =>
+                      setAccountData({ ...accountData, institution: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
                     placeholder="e.g., Chase Bank"
                   />
@@ -264,7 +279,9 @@ export default function AddFinancialDataPage() {
                     type="text"
                     required
                     value={transactionData.description}
-                    onChange={(e) => setTransactionData({ ...transactionData, description: e.target.value })}
+                    onChange={(e) =>
+                      setTransactionData({ ...transactionData, description: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
                     placeholder="e.g., Grocery Shopping"
                   />
@@ -278,7 +295,9 @@ export default function AddFinancialDataPage() {
                     step="0.01"
                     required
                     value={transactionData.amount}
-                    onChange={(e) => setTransactionData({ ...transactionData, amount: e.target.value })}
+                    onChange={(e) =>
+                      setTransactionData({ ...transactionData, amount: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
                     placeholder="0.00"
                   />
@@ -289,7 +308,9 @@ export default function AddFinancialDataPage() {
                   </label>
                   <select
                     value={transactionData.category}
-                    onChange={(e) => setTransactionData({ ...transactionData, category: e.target.value })}
+                    onChange={(e) =>
+                      setTransactionData({ ...transactionData, category: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
                   >
                     <option value="">Select category...</option>
@@ -311,7 +332,9 @@ export default function AddFinancialDataPage() {
                     type="date"
                     required
                     value={transactionData.date}
-                    onChange={(e) => setTransactionData({ ...transactionData, date: e.target.value })}
+                    onChange={(e) =>
+                      setTransactionData({ ...transactionData, date: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
                   />
                 </div>
@@ -322,7 +345,8 @@ export default function AddFinancialDataPage() {
             {dataType === 'investment' && (
               <div className="text-center py-8">
                 <p className="text-gray-600 dark:text-gray-400">
-                  Investment entry form coming soon. For now, use the integrations to connect your brokerage account.
+                  Investment entry form coming soon. For now, use the integrations to connect your
+                  brokerage account.
                 </p>
               </div>
             )}
@@ -346,7 +370,7 @@ export default function AddFinancialDataPage() {
               </button>
               <button
                 type="submit"
-                disabled={loading || (dataType === 'investment') || (dataType === 'debt')}
+                disabled={loading || dataType === 'investment' || dataType === 'debt'}
                 className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Adding...' : 'Add Data'}

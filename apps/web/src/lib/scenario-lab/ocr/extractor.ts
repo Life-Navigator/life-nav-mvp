@@ -26,7 +26,8 @@ export interface DocumentExtractionResult {
 async function extractTextFromPDF(fileBuffer: Buffer): Promise<{ text: string; pages: number }> {
   try {
     // Dynamic import to avoid bundling issues
-    const pdfParseModule = await import('pdf-parse');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfParseModule = (await import('pdf-parse')) as any;
     const pdfParse = (pdfParseModule.default || pdfParseModule) as unknown as (
       buffer: Buffer
     ) => Promise<any>;

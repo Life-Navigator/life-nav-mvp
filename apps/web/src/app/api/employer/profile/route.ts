@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,7 +65,7 @@ export async function POST(request: NextRequest) {
       .from('employer_profiles')
       .update(parsed.data)
       .eq('id', membership.employer_id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     return NextResponse.json({ success: true, employer_id: membership.employer_id });
   }
 
@@ -75,7 +76,7 @@ export async function POST(request: NextRequest) {
     .insert({ ...parsed.data, status: 'pending_verification' })
     .select('id')
     .single();
-  if (profileErr) return NextResponse.json({ error: profileErr.message }, { status: 400 });
+  if (profileErr) return safeApiError({ code: 'validation_failed', internal: profileErr });
 
   const { error: linkErr } = await svc.from('employer_users').insert({
     employer_id: profile.id,
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     role: 'owner',
     is_active: true,
   });
-  if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 400 });
+  if (linkErr) return safeApiError({ code: 'validation_failed', internal: linkErr });
 
   return NextResponse.json({ success: true, employer_id: profile.id });
 }

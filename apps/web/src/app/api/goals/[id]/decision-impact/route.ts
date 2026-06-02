@@ -26,6 +26,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 import { computeDecisionImpact } from '@/lib/decision/decision-impact-engine';
 import { loadGoalContext } from '@/lib/decision/context-loader';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 import type { StructuralVariable } from '@/types/decision-impact';
 
 export const dynamic = 'force-dynamic';
@@ -127,5 +128,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
-  return NextResponse.json({ impact });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: {
+      kind: 'recommendation',
+      text: subjectTextFromPayload({ decision_label: parsed.data.decision_label, impact }),
+    },
+    emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({ impact, governance: { verdict: g.decision.verdict } });
 }

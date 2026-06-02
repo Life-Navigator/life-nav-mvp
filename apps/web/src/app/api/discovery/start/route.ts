@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 import { selectPrompt } from '@/lib/conversation/domain-prompts';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     .insert(row)
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return safeApiError({ code: 'db_persistence_error', internal: error });
 
   const text = selectPrompt(parsed.data.domain, 'what_accomplish');
 

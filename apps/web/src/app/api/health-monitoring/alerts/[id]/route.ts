@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,7 +47,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (/permission|policy|locked/i.test(error.message)) {
       return NextResponse.json({ success: false, feature_locked: true });
     }
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return safeApiError({ code: 'validation_failed', internal: error });
   }
   return NextResponse.json({ success: true });
 }

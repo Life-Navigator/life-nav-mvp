@@ -21,6 +21,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { buildLeadPackagePayload, verifyConsentAt } from '@/lib/arcana/lead-package-service';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
+import { safeApiError } from '@/lib/security/safe-error';
 import type {
   ArcanaConstraint,
   ArcanaGoal,
@@ -168,7 +170,28 @@ export async function POST(request: NextRequest) {
     .select('*')
     .single();
 
-  if (insert.error) return NextResponse.json({ error: insert.error.message }, { status: 500 });
+  if (insert.error) return safeApiError({ code: 'db_persistence_error', internal: insert.error });
 
-  return NextResponse.json({ lead_package: insert.data });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: {
+      kind: 'arcana_recommendation',
+      id: insert.data?.id ?? undefined,
+      text: subjectTextFromPayload({
+        key_risks: body.key_risks,
+        recommended_discussion_topics: body.recommended_discussion_topics,
+      }),
+    },
+    emitter: {
+      agent_kind: 'arcana_provider_coordination',
+      agent_name: 'arcana.provider_coordination',
+    },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({
+    lead_package: insert.data,
+    governance: { verdict: g.decision.verdict },
+  });
 }

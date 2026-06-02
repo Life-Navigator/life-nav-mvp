@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -88,7 +89,10 @@ export async function POST(request: NextRequest) {
     p_ttl_seconds: 86400,
   });
   if (replayError) {
-    return NextResponse.json({ error: `Replay guard failed: ${replayError.message}` }, { status: 500 });
+    return NextResponse.json(
+      { error: `Replay guard failed: ${replayError.message}` },
+      { status: 500 }
+    );
   }
   if (!accepted) {
     const { data: existing } = await supabase
@@ -112,7 +116,7 @@ export async function POST(request: NextRequest) {
     .eq('job_id', payload.job_id)
     .maybeSingle();
   if (existingError) {
-    return NextResponse.json({ error: existingError.message }, { status: 500 });
+    return safeApiError({ code: 'db_persistence_error', internal: existingError });
   }
 
   // Forwarding is optional for MVP; default is no external dependency.

@@ -9,6 +9,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
+import { recordUserEvent } from '@/lib/analytics/events';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +58,7 @@ export async function POST(request: NextRequest) {
       'scenario_version_id, final_net_worth, final_debt, final_annual_income, emergency_fund_months_final, health_cost_exposure_final, retirement_ready'
     )
     .in('scenario_version_id', [version_a_id, version_b_id]);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   if (!outs || outs.length !== 2) {
     return NextResponse.json(
       { error: 'Both versions must have outputs before comparing' },
@@ -105,7 +108,26 @@ export async function POST(request: NextRequest) {
     })
     .select('id')
     .single();
-  if (insErr) return NextResponse.json({ error: insErr.message }, { status: 400 });
+  if (insErr) return safeApiError({ code: 'validation_failed', internal: insErr });
+
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: {
+      kind: 'simulation_output',
+      text: subjectTextFromPayload({ summary, favored, diffs }),
+    },
+    emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+  });
+  if (!g.ok) return g.response;
+
+  await recordUserEvent(supabase, {
+    user_id: user.id,
+    event_type: 'simulation_compared',
+    event_metadata: { favored_version_id },
+    subject_kind: 'simulation_comparison',
+    subject_id: comparison.id,
+  });
 
   return NextResponse.json({
     success: true,
@@ -114,6 +136,7 @@ export async function POST(request: NextRequest) {
     favored,
     favored_version_id,
     diffs,
+    governance: { verdict: g.decision.verdict },
   });
 }
 

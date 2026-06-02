@@ -52,16 +52,24 @@ export class EmailService {
   }
 
   private configureNodemailer() {
-    // Use environment variables or defaults for development
+    // SMTP host must be set explicitly. The previous "localhost" default
+    // SSRF'd to the Vercel runtime in production. In development the
+    // operator may set SMTP_HOST=localhost explicitly for MailHog.
+    const isProd = process.env.NODE_ENV === 'production';
+    const host = process.env.SMTP_HOST;
+    if (isProd && !host) {
+      throw new Error('SMTP_HOST is required in production. Refusing to fall back to localhost.');
+    }
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'localhost',
+      host: host || 'localhost',
       port: parseInt(process.env.SMTP_PORT || '1025'),
       secure: process.env.SMTP_SECURE === 'true',
-      auth: process.env.SMTP_USER ? {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      } : undefined,
-      // For development with MailHog
+      auth: process.env.SMTP_USER
+        ? {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS,
+          }
+        : undefined,
       ignoreTLS: process.env.NODE_ENV === 'development',
     });
   }
@@ -107,7 +115,9 @@ export class EmailService {
     }
   }
 
-  private async sendWithSendGrid(options: EmailOptions & { html?: string; text?: string; from: string }) {
+  private async sendWithSendGrid(
+    options: EmailOptions & { html?: string; text?: string; from: string }
+  ) {
     const msg = {
       to: options.to,
       from: options.from,
@@ -115,7 +125,7 @@ export class EmailService {
       text: options.text || '',
       html: options.html || options.text || '',
       replyTo: options.replyTo,
-      attachments: options.attachments?.map(att => ({
+      attachments: options.attachments?.map((att) => ({
         filename: att.filename,
         content: typeof att.content === 'string' ? att.content : att.content.toString('base64'),
         type: att.contentType,
@@ -129,7 +139,9 @@ export class EmailService {
     }
   }
 
-  private async sendWithNodemailer(options: EmailOptions & { html?: string; text?: string; from: string }) {
+  private async sendWithNodemailer(
+    options: EmailOptions & { html?: string; text?: string; from: string }
+  ) {
     if (!this.transporter) {
       throw new Error('Email transporter not configured');
     }
@@ -141,7 +153,7 @@ export class EmailService {
       text: options.text,
       html: options.html,
       replyTo: options.replyTo,
-      attachments: options.attachments?.map(att => ({
+      attachments: options.attachments?.map((att) => ({
         filename: att.filename,
         content: att.content,
         contentType: att.contentType,
@@ -176,7 +188,10 @@ export class EmailService {
   /**
    * Send assessment complete email
    */
-  async sendAssessmentCompleteEmail(to: string, data: { name: string; score: number; recommendations: string[] }) {
+  async sendAssessmentCompleteEmail(
+    to: string,
+    data: { name: string; score: number; recommendations: string[] }
+  ) {
     await this.send({
       to,
       subject: 'Your Risk Assessment Results',
@@ -200,7 +215,11 @@ export class EmailService {
   /**
    * Send notification email
    */
-  async sendNotificationEmail(to: string, subject: string, data: { title: string; message: string; actionUrl?: string }) {
+  async sendNotificationEmail(
+    to: string,
+    subject: string,
+    data: { title: string; message: string; actionUrl?: string }
+  ) {
     await this.send({
       to,
       subject,
@@ -236,7 +255,11 @@ export const emailService = EmailService.getInstance();
 // Export convenience functions
 export const sendEmail = (options: EmailOptions) => emailService.send(options);
 export const sendWelcomeEmail = (to: string, data: any) => emailService.sendWelcomeEmail(to, data);
-export const sendPasswordResetEmail = (to: string, data: any) => emailService.sendPasswordResetEmail(to, data);
-export const sendAssessmentCompleteEmail = (to: string, data: any) => emailService.sendAssessmentCompleteEmail(to, data);
-export const sendGoalReminderEmail = (to: string, data: any) => emailService.sendGoalReminderEmail(to, data);
-export const sendNotificationEmail = (to: string, subject: string, data: any) => emailService.sendNotificationEmail(to, subject, data);
+export const sendPasswordResetEmail = (to: string, data: any) =>
+  emailService.sendPasswordResetEmail(to, data);
+export const sendAssessmentCompleteEmail = (to: string, data: any) =>
+  emailService.sendAssessmentCompleteEmail(to, data);
+export const sendGoalReminderEmail = (to: string, data: any) =>
+  emailService.sendGoalReminderEmail(to, data);
+export const sendNotificationEmail = (to: string, subject: string, data: any) =>
+  emailService.sendNotificationEmail(to, subject, data);

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
+import { recordUserEvent } from '@/lib/analytics/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +37,7 @@ export async function GET() {
     .from('user_onboarding_sections')
     .select('section, status, completed_at, fields_captured, updated_at')
     .eq('user_id', user.id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
 
   // Materialize an entry for every known section so the hub can render
   // a complete checklist regardless of whether the row already exists.
@@ -79,6 +81,18 @@ export async function PUT(request: NextRequest) {
     },
     { onConflict: 'user_id,section' }
   );
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
+
+  // Emit onboarding_started exactly once when any section moves from
+  // 'not_started' to anything else. The natural signal is the first
+  // 'in_progress' write — emit once per user per session.
+  if (parsed.data.status === 'in_progress' || parsed.data.status === 'completed') {
+    await recordUserEvent(supabase, {
+      user_id: user.id,
+      event_type: 'onboarding_started',
+      event_metadata: { section: parsed.data.section, status: parsed.data.status },
+    });
+  }
+
   return NextResponse.json({ success: true });
 }

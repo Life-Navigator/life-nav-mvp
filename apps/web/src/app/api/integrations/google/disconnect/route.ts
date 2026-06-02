@@ -6,43 +6,50 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { requireEnvUrl, MissingEnvError } from '@/lib/security/env';
+import { safeApiError } from '@/lib/security/safe-error';
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
+  // Verify authenticated user
+  const supabase = await createServerSupabaseClient();
+  if (!supabase) return safeApiError({ code: 'upstream_unavailable' });
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return safeApiError({ code: 'unauthorized' });
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const sessionToken = session?.access_token;
+
+  let backendUrl: string;
   try {
-    // Verify authenticated user
-    const supabase = await createServerSupabaseClient();
-    if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    // Get access token for backend call
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const sessionToken = session?.access_token;
-
-    // Forward request to backend
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    backendUrl = requireEnvUrl('NEXT_PUBLIC_API_URL');
+  } catch (err) {
+    if (err instanceof MissingEnvError) {
+      return safeApiError({ code: 'upstream_unavailable', internal: err });
+    }
+    throw err;
+  }
+  try {
     const response = await fetch(`${backendUrl}/api/v1/integrations/google`, {
       method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${sessionToken}`,
-      },
+      headers: { Authorization: `Bearer ${sessionToken}` },
     });
-
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      return NextResponse.json(
-        { error: error.detail || 'Failed to disconnect Google' },
-        { status: response.status }
-      );
+      return safeApiError({
+        code: response.status === 401 ? 'unauthorized' : 'upstream_unavailable',
+        internal: `upstream_${response.status}`,
+        context: { upstream: 'google-disconnect' },
+      });
     }
-
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error('Google disconnect error:', err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return safeApiError({
+      code: 'internal_error',
+      internal: err,
+      context: { route: 'google/disconnect' },
+    });
   }
 }

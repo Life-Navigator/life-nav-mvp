@@ -62,7 +62,6 @@ export async function GET(
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
@@ -183,7 +182,6 @@ export async function POST(
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
@@ -262,7 +260,6 @@ export async function DELETE(
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

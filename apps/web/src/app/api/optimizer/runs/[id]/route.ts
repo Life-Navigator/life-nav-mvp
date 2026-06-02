@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +62,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       .eq('run_id', id),
   ]);
 
-  if (hErr) return NextResponse.json({ error: hErr.message }, { status: 400 });
+  if (hErr) return safeApiError({ code: 'validation_failed', internal: hErr });
   if (!header) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   return NextResponse.json({

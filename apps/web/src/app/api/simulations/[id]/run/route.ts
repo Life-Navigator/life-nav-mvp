@@ -17,6 +17,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { buildBaseStateForUser } from '@/lib/trajectory/inputs';
 import { buildVariant } from '@/lib/trajectory/generator';
 import { project } from '@/lib/trajectory/projector';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
+import { recordUserEvent } from '@/lib/analytics/events';
 import type { ScenarioLabel } from '@/types/trajectory';
 
 export const dynamic = 'force-dynamic';
@@ -219,7 +221,28 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     });
   }
 
-  return NextResponse.json({ success: true, scenario_id: scenarioId, summaries });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: { kind: 'simulation_output', text: subjectTextFromPayload(summaries) },
+    emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+  });
+  if (!g.ok) return g.response;
+
+  await recordUserEvent(supabase, {
+    user_id: user.id,
+    event_type: 'simulation_run',
+    event_metadata: { summaries_count: summaries?.length ?? 0 },
+    subject_kind: 'simulation',
+    subject_id: scenarioId,
+  });
+
+  return NextResponse.json({
+    success: true,
+    scenario_id: scenarioId,
+    summaries,
+    governance: { verdict: g.decision.verdict },
+  });
 }
 
 function estimateSurplus(s: ReturnType<typeof emptySurplusFor>): number {

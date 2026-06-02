@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
       .upload(path, file, { upsert: true });
 
     if (uploadError) {
-      return NextResponse.json({ error: uploadError.message }, { status: 400 });
+      return safeApiError({ code: 'validation_failed', internal: uploadError });
     }
 
     const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ imageUrl: urlData.publicUrl });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    return safeApiError({ code: 'internal_error', internal: err });
   }
 }
 

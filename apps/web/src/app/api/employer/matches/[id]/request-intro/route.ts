@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     .from('job_candidate_matches')
     .update({ status: 'intro_requested' })
     .eq('id', matchId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ success: true });
 }

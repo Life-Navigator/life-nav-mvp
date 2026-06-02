@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,13 +72,13 @@ export async function PUT(request: NextRequest) {
     const { error } = await (supabase as any)
       .from('education_intake')
       .upsert({ user_id: user.id, source, ...parsed.data.intake }, { onConflict: 'user_id' });
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
   }
 
   if (parsed.data.credentials && parsed.data.credentials.length > 0) {
     const rows = parsed.data.credentials.map((c) => ({ user_id: user.id, source, ...c }));
     const { error } = await (supabase as any).from('education_credentials').insert(rows);
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
   }
 
   return NextResponse.json({ success: true });

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
+import { recordUserEvent } from '@/lib/analytics/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,8 +51,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     if (!goal) return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
+
+    await recordUserEvent(supabase, {
+      user_id: user.id,
+      event_type: 'goal_updated',
+      event_metadata: { fields: Object.keys(updateData) },
+      subject_kind: 'goal',
+      subject_id: id,
+    });
+
     return NextResponse.json({ goal });
   } catch (err) {
     console.error('Goal PUT error:', err);
@@ -77,7 +88,7 @@ export async function DELETE(
       .eq('id', id)
       .eq('user_id', user.id);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Goal DELETE error:', err);

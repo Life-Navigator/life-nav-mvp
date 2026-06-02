@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
 import type { AgentRegistration } from '@/types/governance';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
   };
   const r = await (sb as any).from('agent_registry').upsert(row).select('*').single();
   if (r.error) {
-    return NextResponse.json({ error: r.error.message }, { status: 500 });
+    return safeApiError({ code: 'db_persistence_error', internal: r.error });
   }
   return NextResponse.json({ agent: r.data });
 }

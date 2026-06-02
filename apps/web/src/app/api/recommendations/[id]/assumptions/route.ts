@@ -20,6 +20,7 @@ import {
   extractFromRecommendation,
 } from '@/lib/decision/assumption-engine';
 import { loadAuditRow } from '@/lib/decision/trust-route-helpers';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,5 +78,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     /* best effort */
   }
 
-  return NextResponse.json({ assumptions: items });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: { kind: 'recommendation', text: subjectTextFromPayload(items) },
+    emitter: { agent_kind: 'advisor', agent_name: 'advisor.core' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({ assumptions: items, governance: { verdict: g.decision.verdict } });
 }

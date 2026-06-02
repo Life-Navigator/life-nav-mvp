@@ -11,6 +11,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
+import { recordUserEvent } from '@/lib/analytics/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +56,19 @@ export async function POST(request: NextRequest) {
   }));
 
   const insert = await sb.from(table).insert(sanitized).select('*');
-  if (insert.error) return NextResponse.json({ error: insert.error.message }, { status: 500 });
+  if (insert.error) return safeApiError({ code: 'db_persistence_error', internal: insert.error });
+
+  // arcana_intake_completed fires when motivations are recorded — the
+  // motivation table is the last conventional step in the intake flow.
+  if (body.kind === 'motivation') {
+    await recordUserEvent(sb, {
+      user_id: user.id,
+      event_type: 'arcana_intake_completed',
+      event_metadata: { rows_inserted: insert.data?.length ?? 0 },
+      subject_kind: 'arcana_profile',
+      subject_id: prof.data.id,
+    });
+  }
+
   return NextResponse.json({ inserted: insert.data });
 }

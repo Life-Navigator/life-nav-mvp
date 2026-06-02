@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getCourse, updateCourse, deleteCourse } from '@/lib/services/educationService';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function GET(_request: NextRequest, ctx: Ctx) {
     const course = await getCourse(supabase, user.id, id);
     return NextResponse.json({ course });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 404 });
+    return safeApiError({ code: 'not_found', internal: err });
   }
 }
 
@@ -39,7 +40,7 @@ export async function PUT(request: NextRequest, ctx: Ctx) {
     const course = await updateCourse(supabase, user.id, id, body);
     return NextResponse.json({ course });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+    return safeApiError({ code: 'bad_request', internal: err });
   }
 }
 
@@ -57,6 +58,6 @@ export async function DELETE(_request: NextRequest, ctx: Ctx) {
     await deleteCourse(supabase, user.id, id);
     return NextResponse.json({ success: true });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+    return safeApiError({ code: 'bad_request', internal: err });
   }
 }

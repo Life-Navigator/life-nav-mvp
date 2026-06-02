@@ -18,6 +18,7 @@ import {
   counterfactualsForProbability,
 } from '@/lib/decision/counterfactual-engine';
 import { loadAuditRow } from '@/lib/decision/trust-route-helpers';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 import { TIME_HORIZONS_ORDER, type TimeHorizon } from '@/types/decision-impact';
 
 export const dynamic = 'force-dynamic';
@@ -85,5 +86,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
-  return NextResponse.json({ scenarios });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: { kind: 'recommendation', text: subjectTextFromPayload(scenarios) },
+    emitter: { agent_kind: 'advisor', agent_name: 'advisor.core' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({ scenarios, governance: { verdict: g.decision.verdict } });
 }

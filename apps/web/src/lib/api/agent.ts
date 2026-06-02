@@ -1,9 +1,33 @@
 /**
  * Agent/MCP Server API Client
- * Connects to Maverick AI backend at localhost:8080
+ *
+ * Connects to an external agent backend identified by
+ * `NEXT_PUBLIC_AGENT_API_URL`. This client is consumed by the
+ * `ChatSidebar` component rendered globally in `app/layout.tsx`.
+ *
+ * Sprint O.0 hardening: `NEXT_PUBLIC_AGENT_API_URL` is REQUIRED. The
+ * previous default of `http://localhost:8080` silently routed browser
+ * fetches to the user's local machine in any environment where the
+ * env var was unset — a confusing failure mode. Now:
+ *
+ *   * Production builds without the env var → `agentApiAvailable === false`,
+ *     and every method returns a rejected Promise with `agent_api_not_configured`.
+ *     The UI should detect unavailability and render a graceful notice.
+ *   * Development builds without the env var → fallback to localhost:8080
+ *     is preserved ONLY because dev tooling commonly runs the agent locally.
  */
 
-const AGENT_API_BASE_URL = process.env.NEXT_PUBLIC_AGENT_API_URL || 'http://localhost:8080';
+const PROD = process.env.NODE_ENV === 'production';
+const AGENT_API_BASE_URL =
+  process.env.NEXT_PUBLIC_AGENT_API_URL ?? (PROD ? '' : 'http://localhost:8080');
+
+export const agentApiAvailable: boolean = AGENT_API_BASE_URL.length > 0;
+
+function ensureConfigured(): void {
+  if (!agentApiAvailable) {
+    throw new Error('agent_api_not_configured');
+  }
+}
 
 // Types
 export interface Agent {
@@ -70,6 +94,7 @@ export const agentApi = {
    * Check API health status
    */
   health: async (): Promise<HealthResponse> => {
+    ensureConfigured();
     const response = await fetch(`${AGENT_API_BASE_URL}/health`);
     if (!response.ok) {
       throw new Error(`Health check failed: ${response.statusText}`);
@@ -81,18 +106,20 @@ export const agentApi = {
    * List all agents for a user
    */
   listAgents: async (userId: string = 'default_user'): Promise<Agent[]> => {
+    ensureConfigured();
     const response = await fetch(`${AGENT_API_BASE_URL}/agents?user_id=${userId}`);
     if (!response.ok) {
       throw new Error(`Failed to list agents: ${response.statusText}`);
     }
     const data = await response.json();
-    return data.agents || [];  // Extract agents array from response
+    return data.agents || []; // Extract agents array from response
   },
 
   /**
    * Get a specific agent by ID
    */
   getAgent: async (agentId: string): Promise<Agent> => {
+    ensureConfigured();
     const response = await fetch(`${AGENT_API_BASE_URL}/agents/${agentId}`);
     if (!response.ok) {
       throw new Error(`Failed to get agent: ${response.statusText}`);
@@ -104,6 +131,7 @@ export const agentApi = {
    * Create a new agent
    */
   createAgent: async (agent: Omit<Agent, 'id' | 'created_at' | 'updated_at'>): Promise<Agent> => {
+    ensureConfigured();
     const response = await fetch(`${AGENT_API_BASE_URL}/agents`, {
       method: 'POST',
       headers: {
@@ -121,6 +149,7 @@ export const agentApi = {
    * Update an existing agent
    */
   updateAgent: async (agentId: string, updates: Partial<Agent>): Promise<Agent> => {
+    ensureConfigured();
     const response = await fetch(`${AGENT_API_BASE_URL}/agents/${agentId}`, {
       method: 'PUT',
       headers: {
@@ -138,6 +167,7 @@ export const agentApi = {
    * Delete an agent
    */
   deleteAgent: async (agentId: string): Promise<void> => {
+    ensureConfigured();
     const response = await fetch(`${AGENT_API_BASE_URL}/agents/${agentId}`, {
       method: 'DELETE',
     });
@@ -175,6 +205,7 @@ export const agentApi = {
     onError: (error: Error) => void
   ): Promise<void> => {
     try {
+      ensureConfigured();
       const response = await fetch(`${AGENT_API_BASE_URL}/chat`, {
         method: 'POST',
         headers: {
@@ -225,6 +256,7 @@ export const agentApi = {
    * Execute a task with an agent
    */
   executeTask: async (request: TaskRequest): Promise<TaskResponse> => {
+    ensureConfigured();
     const response = await fetch(`${AGENT_API_BASE_URL}/tasks`, {
       method: 'POST',
       headers: {
@@ -242,6 +274,7 @@ export const agentApi = {
    * Get task status
    */
   getTaskStatus: async (taskId: string): Promise<TaskResponse> => {
+    ensureConfigured();
     const response = await fetch(`${AGENT_API_BASE_URL}/tasks/${taskId}`);
     if (!response.ok) {
       throw new Error(`Failed to get task status: ${response.statusText}`);
@@ -252,7 +285,11 @@ export const agentApi = {
   /**
    * Direct model inference (for advanced use)
    */
-  inference: async (prompt: string, context?: Record<string, any>): Promise<{ response: string }> => {
+  inference: async (
+    prompt: string,
+    context?: Record<string, any>
+  ): Promise<{ response: string }> => {
+    ensureConfigured();
     const response = await fetch(`${AGENT_API_BASE_URL}/inference`, {
       method: 'POST',
       headers: {
@@ -274,13 +311,17 @@ export const createDomainAgent = async (
   domain: Agent['agent_type'],
   userId: string = 'default_user'
 ): Promise<Agent> => {
-  const agentConfigs: Record<Agent['agent_type'], Omit<Agent, 'id' | 'created_at' | 'updated_at'>> = {
+  const agentConfigs: Record<
+    Agent['agent_type'],
+    Omit<Agent, 'id' | 'created_at' | 'updated_at'>
+  > = {
     financial: {
       name: 'Financial Advisor',
       description: 'AI assistant for financial planning and analysis',
       agent_type: 'financial',
       capabilities: ['financial_analysis', 'budgeting', 'investment_advice'],
-      system_prompt: 'You are a knowledgeable financial advisor specializing in personal finance, budgeting, and investment strategies. Provide clear, actionable advice.',
+      system_prompt:
+        'You are a knowledgeable financial advisor specializing in personal finance, budgeting, and investment strategies. Provide clear, actionable advice.',
       user_id: userId,
     },
     health: {
@@ -288,7 +329,8 @@ export const createDomainAgent = async (
       description: 'AI assistant for health and wellness guidance',
       agent_type: 'health',
       capabilities: ['health_tracking', 'wellness_advice', 'medical_research'],
-      system_prompt: 'You are a helpful health assistant providing wellness guidance, fitness advice, and health information. Always recommend consulting healthcare professionals for medical decisions.',
+      system_prompt:
+        'You are a helpful health assistant providing wellness guidance, fitness advice, and health information. Always recommend consulting healthcare professionals for medical decisions.',
       user_id: userId,
     },
     education: {
@@ -296,7 +338,8 @@ export const createDomainAgent = async (
       description: 'AI assistant for educational guidance and skill development',
       agent_type: 'education',
       capabilities: ['learning_paths', 'skill_recommendations', 'course_suggestions'],
-      system_prompt: 'You are an educational coach helping users learn new skills, find courses, and create personalized learning paths.',
+      system_prompt:
+        'You are an educational coach helping users learn new skills, find courses, and create personalized learning paths.',
       user_id: userId,
     },
     career: {
@@ -304,7 +347,8 @@ export const createDomainAgent = async (
       description: 'AI assistant for career development and job search',
       agent_type: 'career',
       capabilities: ['career_advice', 'resume_review', 'interview_prep'],
-      system_prompt: 'You are a career advisor providing guidance on professional development, job search strategies, and career transitions.',
+      system_prompt:
+        'You are a career advisor providing guidance on professional development, job search strategies, and career transitions.',
       user_id: userId,
     },
     research: {
@@ -312,7 +356,8 @@ export const createDomainAgent = async (
       description: 'AI assistant for research and information gathering',
       agent_type: 'research',
       capabilities: ['research', 'data_analysis', 'information_synthesis'],
-      system_prompt: 'You are a research assistant helping users gather, analyze, and synthesize information on various topics.',
+      system_prompt:
+        'You are a research assistant helping users gather, analyze, and synthesize information on various topics.',
       user_id: userId,
     },
     general: {
@@ -320,7 +365,8 @@ export const createDomainAgent = async (
       description: 'AI assistant for general tasks and questions',
       agent_type: 'general',
       capabilities: ['general_assistance', 'conversation', 'task_help'],
-      system_prompt: 'You are a helpful AI assistant ready to assist with a wide range of tasks and questions.',
+      system_prompt:
+        'You are a helpful AI assistant ready to assist with a wide range of tasks and questions.',
       user_id: userId,
     },
   };

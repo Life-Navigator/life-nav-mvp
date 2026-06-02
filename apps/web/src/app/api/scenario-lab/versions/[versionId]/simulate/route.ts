@@ -10,6 +10,9 @@ import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
 import { enqueueJob } from '@/lib/scenario-lab/job-queue';
 import { enforceRateLimit } from '@/lib/scenario-lab/rate-limiter';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +37,7 @@ export async function POST(
     try {
       await enforceRateLimit(userId, 'simulation');
     } catch (rateLimitError: any) {
-      return NextResponse.json({ error: rateLimitError.message }, { status: 429 });
+      return safeApiError({ code: 'rate_limited', internal: rateLimitError });
     }
 
     const { versionId } = await params;
@@ -92,6 +95,21 @@ export async function POST(
       metadata: { job_id: job.id, iterations, seed },
     });
 
+    // Sprint M Phase 4: governance gate on the user-facing message.
+    const supabase = await createServerSupabaseClient();
+    if (supabase) {
+      const g = await guardOutgoing({
+        supabase,
+        user_id: userId,
+        subject: {
+          kind: 'simulation_output',
+          text: subjectTextFromPayload({ job_id: job.id, iterations, seed }),
+        },
+        emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+      });
+      if (!g.ok) return g.response;
+    }
+
     return NextResponse.json(
       {
         job_id: job.id,
@@ -105,7 +123,6 @@ export async function POST(
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

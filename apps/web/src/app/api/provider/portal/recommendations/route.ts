@@ -13,7 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { issueRecommendation } from '@/lib/provider/recommendation-service';
 import { buildXAIBundle, validateDraft } from '@/lib/provider/recommendation-builder-service';
 import { loadEngagementGuard, loadPortalSession } from '@/lib/provider/portal-route-helpers';
-import { validateAndPersist } from '@/lib/governance/middleware';
+import { reviewAndPersist } from '@/lib/constitutional/middleware';
 import type { RecommendationDraft } from '@/types/provider-portal';
 
 export const dynamic = 'force-dynamic';
@@ -39,31 +39,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'domain_out_of_scope' }, { status: 403 });
   }
 
-  // ===== Sprint L: Governance gate =====
-  // Every recommendation must pass through the Decision Governance
-  // Engine before it reaches the user. We validate the draft and
-  // persist the audit row; if blocked, we do NOT insert the rec.
-  const { decision } = await validateAndPersist({
+  // ===== Sprint T: Constitutional + Character gate =====
+  // Migrated from Sprint L `validateAndPersist` to Sprint L2 + N.3
+  // `reviewAndPersist`. Every provider recommendation now goes through
+  // the same 13-step constitutional engine + character evaluator that
+  // the user-facing surfaces use. Blocked recs are not inserted.
+  const draft_text = `${draft.title}\n\n${draft.body}\n\n${draft.rationale ?? ''}`;
+  const reviewResult = await reviewAndPersist({
+    supabase: session!.supabase,
+    user_id: draft.patient_user_id,
+    draft_text,
     subject: {
       kind: 'provider_recommendation',
-      text: `${draft.title}\n\n${draft.body}\n\n${draft.rationale ?? ''}`,
+      text: draft_text,
       action: draft.title,
       citations: draft.citations,
       assumptions: draft.assumptions,
       risks: draft.risks,
       confidence: draft.expected_strength,
       tradeoffs: [],
-      metadata: {},
+      metadata: { emitter_agent_kind: 'provider', emitter_agent_name: 'provider.portal' },
       user_id: draft.patient_user_id,
     },
-    emitter: {
-      agent_kind: 'provider',
-      agent_name: 'provider.portal',
-      user_id: session!.user_id,
-    },
-    supabase: session!.supabase,
     now: new Date().toISOString(),
   });
+  const decision = reviewResult.final_decision.governance;
   if (!decision.approved) {
     return NextResponse.json({ error: 'governance_blocked', decision }, { status: 422 });
   }

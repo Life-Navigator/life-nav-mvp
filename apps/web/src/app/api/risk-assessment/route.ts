@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +22,7 @@ export async function GET() {
       .limit(1)
       .maybeSingle();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     return NextResponse.json({ assessment: assessment || null });
   } catch (err) {
     console.error('Risk assessment GET error:', err);
@@ -52,8 +54,20 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    return NextResponse.json({ assessment }, { status: 201 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
+
+    const g = await guardOutgoing({
+      supabase,
+      user_id: user.id,
+      subject: { kind: 'recommendation', text: subjectTextFromPayload(assessment) },
+      emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+    });
+    if (!g.ok) return g.response;
+
+    return NextResponse.json(
+      { assessment, governance: { verdict: g.decision.verdict } },
+      { status: 201 }
+    );
   } catch (err) {
     console.error('Risk assessment POST error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

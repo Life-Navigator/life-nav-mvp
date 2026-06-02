@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,14 +94,14 @@ export async function POST(request: NextRequest) {
       const { data, error } = await (supabase as any)
         .schema('core')
         .rpc('encrypt_with_app_key', { plaintext: member_id });
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      if (error) return safeApiError({ code: 'validation_failed', internal: error });
       if (data) member_id_encrypted = data as string;
     }
     if (group_number) {
       const { data, error } = await (supabase as any)
         .schema('core')
         .rpc('encrypt_with_app_key', { plaintext: group_number });
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      if (error) return safeApiError({ code: 'validation_failed', internal: error });
       if (data) group_number_encrypted = data as string;
     }
 
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
       })
       .select('id')
       .single();
-    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 400 });
+    if (insErr) return safeApiError({ code: 'validation_failed', internal: insErr });
     if (ins?.id) insertedIds.push(ins.id);
   }
 
@@ -141,6 +142,6 @@ export async function GET() {
     .eq('is_active', true)
     .order('plan_type', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ plans: data ?? [] });
 }

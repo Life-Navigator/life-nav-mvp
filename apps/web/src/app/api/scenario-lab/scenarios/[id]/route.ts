@@ -77,7 +77,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
@@ -161,7 +160,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
@@ -224,7 +222,6 @@ export async function DELETE(
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

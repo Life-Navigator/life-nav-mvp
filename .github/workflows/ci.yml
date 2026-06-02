@@ -33,6 +33,20 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
       - run: pnpm turbo type-check --filter=@life-navigator/web --filter=@life-navigator/supabase --filter=@life-navigator/ui-components
 
+  # ── Sprint T: Governance enforcement gate ───────────────────────────
+  # Static check that no AI-output-producing route can ship without
+  # runtime governance. See apps/web/scripts/verify-governance.ts.
+  # A failure here means a route was added or modified that emits
+  # LLM-generated text without going through createGovernedHandler,
+  # guardOutgoing, or reviewAndPersist.
+  verify-governance:
+    name: Verify Governance Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-pnpm
+      - run: pnpm --filter @life-navigator/web run verify:governance
+
   # ── Unit Tests ──────────────────────────────────────────────────────
   unit-tests:
     name: Unit Tests
@@ -67,7 +81,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, typecheck]
+    needs: [lint, typecheck, verify-governance]
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-node-pnpm

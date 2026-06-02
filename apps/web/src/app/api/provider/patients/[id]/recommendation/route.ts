@@ -13,10 +13,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 import { issueRecommendation, listRecommendations } from '@/lib/provider/recommendation-service';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,6 +77,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .maybeSingle();
   if (!profile) return NextResponse.json({ error: 'Not a registered provider' }, { status: 403 });
 
+  // Pre-generate the recommendation id so the lifecycle row registers
+  // before the persisted recommendation is written.
+  const provisional_id = randomUUID();
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: {
+      kind: 'provider_recommendation',
+      id: provisional_id,
+      text: subjectTextFromPayload(
+        `${parsed.data.title}\n\n${parsed.data.body}\n\n${parsed.data.rationale ?? ''}`
+      ),
+      citations: parsed.data.citations as
+        | Array<{ label: string; source?: string; citation_reference?: string }>
+        | undefined,
+      confidence: parsed.data.expected_strength,
+    },
+    emitter: { agent_kind: 'provider', agent_name: 'provider.portal' },
+  });
+  if (!g.ok) return g.response;
+
   const created = await issueRecommendation(sb, {
     provider_id: profile.id,
     patient_user_id: patientId,
@@ -91,7 +114,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       | undefined,
   });
   if (!created) return NextResponse.json({ error: 'Insert blocked or failed' }, { status: 403 });
-  return NextResponse.json({ recommendation: created }, { status: 201 });
+  return NextResponse.json(
+    { recommendation: created, governance: { verdict: g.decision.verdict } },
+    { status: 201 }
+  );
 }
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

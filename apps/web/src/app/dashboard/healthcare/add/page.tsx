@@ -70,7 +70,20 @@ export default function AddHealthcareDataPage() {
       let endpoint = '';
       let body = {};
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const env = (await import('@/lib/security/env-client')).clientEnvUrl(
+        'NEXT_PUBLIC_API_URL',
+        'http://localhost:8000'
+      );
+      if (env.ok === false) {
+        setError(
+          env.kind === 'loopback'
+            ? 'The backend API is not configured for this environment.'
+            : 'NEXT_PUBLIC_API_URL is not set.'
+        );
+        setLoading(false);
+        return;
+      }
+      const apiUrl = env.value;
 
       switch (dataType) {
         case 'insurance':
@@ -155,12 +168,8 @@ export default function AddHealthcareDataPage() {
           >
             ← Back
           </button>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Add Health Data
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manually enter your health information
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Add Health Data</h1>
+          <p className="text-gray-600 dark:text-gray-400">Manually enter your health information</p>
         </div>
 
         {/* Data Type Selector */}
@@ -205,7 +214,9 @@ export default function AddHealthcareDataPage() {
                     type="text"
                     required
                     value={insuranceData.provider}
-                    onChange={(e) => setInsuranceData({ ...insuranceData, provider: e.target.value })}
+                    onChange={(e) =>
+                      setInsuranceData({ ...insuranceData, provider: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
                     placeholder="e.g., Blue Cross Blue Shield"
                   />
@@ -218,7 +229,9 @@ export default function AddHealthcareDataPage() {
                     type="text"
                     required
                     value={insuranceData.policyNumber}
-                    onChange={(e) => setInsuranceData({ ...insuranceData, policyNumber: e.target.value })}
+                    onChange={(e) =>
+                      setInsuranceData({ ...insuranceData, policyNumber: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
                     placeholder="Policy/Member ID"
                   />
@@ -248,7 +261,9 @@ export default function AddHealthcareDataPage() {
                       type="number"
                       step="0.01"
                       value={insuranceData.premium}
-                      onChange={(e) => setInsuranceData({ ...insuranceData, premium: e.target.value })}
+                      onChange={(e) =>
+                        setInsuranceData({ ...insuranceData, premium: e.target.value })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
                       placeholder="0.00"
                     />
@@ -261,7 +276,9 @@ export default function AddHealthcareDataPage() {
                       type="number"
                       step="0.01"
                       value={insuranceData.deductible}
-                      onChange={(e) => setInsuranceData({ ...insuranceData, deductible: e.target.value })}
+                      onChange={(e) =>
+                        setInsuranceData({ ...insuranceData, deductible: e.target.value })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
                       placeholder="0.00"
                     />
@@ -273,7 +290,9 @@ export default function AddHealthcareDataPage() {
                   </label>
                   <textarea
                     value={insuranceData.coverage}
-                    onChange={(e) => setInsuranceData({ ...insuranceData, coverage: e.target.value })}
+                    onChange={(e) =>
+                      setInsuranceData({ ...insuranceData, coverage: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
                     rows={3}
                     placeholder="Describe what's covered..."
@@ -306,7 +325,9 @@ export default function AddHealthcareDataPage() {
                       type="text"
                       required
                       value={medicationData.dosage}
-                      onChange={(e) => setMedicationData({ ...medicationData, dosage: e.target.value })}
+                      onChange={(e) =>
+                        setMedicationData({ ...medicationData, dosage: e.target.value })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
                       placeholder="e.g., 100mg"
                     />
@@ -319,7 +340,9 @@ export default function AddHealthcareDataPage() {
                       type="text"
                       required
                       value={medicationData.frequency}
-                      onChange={(e) => setMedicationData({ ...medicationData, frequency: e.target.value })}
+                      onChange={(e) =>
+                        setMedicationData({ ...medicationData, frequency: e.target.value })
+                      }
                       className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
                       placeholder="e.g., Once daily"
                     />
@@ -332,7 +355,9 @@ export default function AddHealthcareDataPage() {
                   <input
                     type="text"
                     value={medicationData.prescribedBy}
-                    onChange={(e) => setMedicationData({ ...medicationData, prescribedBy: e.target.value })}
+                    onChange={(e) =>
+                      setMedicationData({ ...medicationData, prescribedBy: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
                     placeholder="Doctor's name"
                   />
@@ -343,7 +368,9 @@ export default function AddHealthcareDataPage() {
                   </label>
                   <textarea
                     value={medicationData.instructions}
-                    onChange={(e) => setMedicationData({ ...medicationData, instructions: e.target.value })}
+                    onChange={(e) =>
+                      setMedicationData({ ...medicationData, instructions: e.target.value })
+                    }
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 dark:bg-gray-700 dark:text-white"
                     rows={3}
                     placeholder="Special instructions..."
@@ -355,7 +382,8 @@ export default function AddHealthcareDataPage() {
             {dataType === 'appointment' && (
               <div className="text-center py-8">
                 <p className="text-gray-600 dark:text-gray-400">
-                  Appointment scheduling coming soon. For now, use your healthcare provider's portal.
+                  Appointment scheduling coming soon. For now, use your healthcare provider's
+                  portal.
                 </p>
               </div>
             )}
@@ -363,7 +391,8 @@ export default function AddHealthcareDataPage() {
             {dataType === 'vitals' && (
               <div className="text-center py-8">
                 <p className="text-gray-600 dark:text-gray-400">
-                  Vitals tracking coming soon. For now, connect Apple Health or Google Fit for automatic tracking.
+                  Vitals tracking coming soon. For now, connect Apple Health or Google Fit for
+                  automatic tracking.
                 </p>
               </div>
             )}

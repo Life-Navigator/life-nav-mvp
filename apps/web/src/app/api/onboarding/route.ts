@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,7 +71,7 @@ async function handleProfile(
     .eq('id', userId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return safeApiError({ code: 'validation_failed', internal: error });
   }
 
   return NextResponse.json({ success: true });
@@ -130,7 +131,7 @@ async function handleGoals(
     const { error } = await (supabase as any).from('goals').insert(goalsToInsert);
     if (error) {
       console.error(`Failed to insert ${category} goals:`, error);
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return safeApiError({ code: 'validation_failed', internal: error });
     }
   }
 
@@ -167,7 +168,7 @@ async function handleRiskProfile(
   });
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return safeApiError({ code: 'validation_failed', internal: error });
   }
 
   return NextResponse.json({ success: true, risk_level: riskLevel, overall_score: overallScore });
@@ -187,7 +188,7 @@ async function handleComplete(
     .eq('id', userId);
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return safeApiError({ code: 'validation_failed', internal: error });
   }
 
   return NextResponse.json({ success: true });

@@ -153,6 +153,32 @@ export const CONSTITUTIONAL_REVIEW_ORDER = [
 ] as const;
 export type ReviewStep = (typeof CONSTITUTIONAL_REVIEW_ORDER)[number];
 
+/**
+ * Sprint N.3 — Character review order (14 steps).
+ *
+ * Composes the existing 13-step constitutional review with character
+ * checks. The numbering is the spec's; the runtime engine maps
+ * lawfulness/safety/etc. to the Sprint L2 order above and runs the
+ * character-specific steps in between + at the end.
+ */
+export const CHARACTER_REVIEW_ORDER = [
+  'lawfulness',
+  'safety',
+  'life_preservation',
+  'privacy',
+  'future_preservation',
+  'truthfulness',
+  'realism',
+  'character_review',
+  'dignity_preservation',
+  'need_behind_need',
+  'long_term_outcome_analysis',
+  'goal_alignment',
+  'communication_quality',
+  'final_character_verification',
+] as const;
+export type CharacterReviewStep = (typeof CHARACTER_REVIEW_ORDER)[number];
+
 // ---------------------------------------------------------------------------
 // Emotional intelligence — primitive emotions
 // ---------------------------------------------------------------------------
@@ -350,6 +376,12 @@ export interface ConstitutionalDecision {
   retrieval_ok: boolean;
   /** Timestamp (deterministic in tests). */
   computed_at: string;
+  /** Sprint N.3 — character review (style, family table, trusted
+   *  advisor, flourishing, 8-dimensional score). Optional so older
+   *  consumers continue to work; populated by the engine when the
+   *  character module is wired (which it now is). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  character?: any;
 }
 
 // ---------------------------------------------------------------------------

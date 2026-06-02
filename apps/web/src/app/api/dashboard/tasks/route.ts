@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function GET() {
       .order('target_date', { ascending: true, nullsFirst: false })
       .limit(10);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     return NextResponse.json({ tasks: tasks || [] });
   } catch (err) {
     console.error('Dashboard tasks error:', err);

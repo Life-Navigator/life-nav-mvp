@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export async function PUT(request: NextRequest) {
   const { error } = await supabase.auth.updateUser({ password: newPassword });
 
   if (error) {
-    return NextResponse.json({ message: error.message }, { status: 400 });
+    return safeApiError({ code: 'validation_failed', internal: error });
   }
 
   return NextResponse.json({ success: true });

@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { refreshMatchesForJob } from '@/lib/marketplace/match-batch';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,7 +33,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     .from('employer_job_posts')
     .update({ status: 'published', published_at: new Date().toISOString() })
     .eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
 
   let scored = 0;
   try {

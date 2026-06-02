@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
       .delete()
       .eq('user_id', user.id)
       .eq('source', source);
-    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 });
+    if (delErr) return safeApiError({ code: 'validation_failed', internal: delErr });
   }
 
   if (parsed.data.constraints.length === 0) {
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
   }));
 
   const { error } = await (supabase as any).from('user_constraints').insert(rows);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
 
   return NextResponse.json({ success: true, created: rows.length });
 }
@@ -93,6 +94,6 @@ export async function GET() {
     .eq('is_active', true)
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ constraints: data ?? [] });
 }

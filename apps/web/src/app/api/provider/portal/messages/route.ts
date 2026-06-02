@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateCompose } from '@/lib/provider/message-service';
 import { loadPortalSession } from '@/lib/provider/portal-route-helpers';
 import type { MessageKind, MessageSenderRole } from '@/types/provider-portal';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +60,6 @@ export async function POST(req: NextRequest) {
     .insert(compose)
     .select('*')
     .single();
-  if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
+  if (ins.error) return safeApiError({ code: 'db_persistence_error', internal: ins.error });
   return NextResponse.json({ message: ins.data });
 }

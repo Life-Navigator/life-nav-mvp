@@ -133,10 +133,7 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     return NextResponse.redirect(
-      new URL(
-        `/settings/integrations?error=exchange_failed&message=${encodeURIComponent((err as Error).message)}`,
-        request.url
-      )
+      new URL(`/settings/integrations?error=exchange_failed`, request.url)
     );
   }
 }

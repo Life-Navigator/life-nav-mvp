@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { runForUser } from '@/lib/health-monitoring/runner';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
       metadata: ev.metadata ?? {},
     });
   if (raw.error && !/permission|policy|locked/i.test(raw.error.message)) {
-    return NextResponse.json({ error: raw.error.message }, { status: 400 });
+    return safeApiError({ code: 'validation_failed', internal: raw.error });
   }
   const featureLocked = !!raw.error;
 

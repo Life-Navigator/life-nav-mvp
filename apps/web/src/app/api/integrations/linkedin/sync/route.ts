@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getProfile, getEmail, mapToCareerProfile } from '@/lib/integrations/linkedin/client';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,6 +67,6 @@ export async function POST() {
       profile: careerData,
     });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    return safeApiError({ code: 'internal_error', internal: err });
   }
 }

@@ -80,6 +80,34 @@ export async function reviewAndPersist(inputs: PersistInputs): Promise<PreStream
       retrieved_rule_count: retrieved_rule_ids?.length ?? null,
       rule_set_version: rule_set_version ?? null,
     },
+
+    // Sprint Q character columns. The character review is attached to
+    // the decision by the engine; persist it onto the audit row for
+    // dashboard aggregation.
+    character_score_overall: decision.character?.score?.overall ?? null,
+    character_score_weakest: decision.character?.score?.weakest ?? null,
+    character_weakest_dimension: decision.character?.score
+      ? (Object.entries({
+          integrity: decision.character.score.integrity,
+          courage: decision.character.score.courage,
+          responsibility: decision.character.score.responsibility,
+          respect: decision.character.score.respect,
+          humility: decision.character.score.humility,
+          wisdom: decision.character.score.wisdom,
+          service: decision.character.score.service,
+          dignity_preservation: decision.character.score.dignity_preservation,
+        }).sort((a, b) => (a[1] as number) - (b[1] as number))[0]?.[0] ?? null)
+      : null,
+    character_needs_regeneration: decision.character?.needs_regeneration ?? null,
+    character_family_table_passes: decision.character?.family_table?.passes ?? null,
+    character_trusted_advisor_passes: decision.character?.trusted_advisor?.passes ?? null,
+    character_dignity_violation:
+      decision.character?.family_table?.contains_dignity_violation ?? null,
+    character_family_audiences_failed:
+      decision.character?.family_table?.failures?.map((f: { audience: string }) => f.audience) ??
+      null,
+    character_advisor_concern_count: decision.character?.trusted_advisor?.concerns?.length ?? null,
+    character_flourishing_harming_axes: decision.character?.flourishing?.harming_axes ?? null,
   };
 
   const auditRes = await inputs.supabase
@@ -91,6 +119,28 @@ export async function reviewAndPersist(inputs: PersistInputs): Promise<PreStream
     throw new Error(`constitutional audit insert failed: ${auditRes.error.message}`);
   }
   const audit_id = auditRes.data.id as string;
+
+  // Sprint Q — persist per-finding rows so the dashboard can aggregate
+  // weakest-dimension distribution and per-rule failure counts.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cf_findings: any[] = decision.character?.findings ?? [];
+  if (cf_findings.length > 0) {
+    const rows = cf_findings.map((f) => ({
+      audit_id,
+      user_id: inputs.user_id,
+      dimension: f.dimension,
+      rule_id: f.rule_id,
+      severity: f.severity,
+      reason: f.reason,
+      evidence: f.evidence ?? null,
+      metadata: {},
+    }));
+    try {
+      await inputs.supabase.from('character_findings').insert(rows);
+    } catch {
+      /* best-effort */
+    }
+  }
 
   // Iterations
   const iterRows = result.iterations.map((it) => ({

@@ -15,6 +15,7 @@ import { verifyConsentAt, isValidDeclineReason } from '@/lib/provider/lead-servi
 import { loadPortalSession, deny } from '@/lib/provider/portal-route-helpers';
 import type { LeadPackage, LeadPackageConsent } from '@/types/arcana';
 import type { LeadWorkflowEvent } from '@/types/provider-portal';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       .eq('id', existing.data.id)
       .select('id')
       .single();
-    if (upd.error) return NextResponse.json({ error: upd.error.message }, { status: 500 });
+    if (upd.error) return safeApiError({ code: 'db_persistence_error', internal: upd.error });
     engagementId = upd.data.id;
   } else {
     const ins = await session!.supabase
@@ -182,7 +183,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       })
       .select('id')
       .single();
-    if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
+    if (ins.error) return safeApiError({ code: 'db_persistence_error', internal: ins.error });
     engagementId = ins.data.id;
   }
 

@@ -18,7 +18,9 @@ function EmailVerificationContent() {
 
     if (!token) {
       setState('missing-token');
-      setMessage('No verification token provided. Please check your email for the verification link.');
+      setMessage(
+        'No verification token provided. Please check your email for the verification link.'
+      );
       return;
     }
 
@@ -39,14 +41,26 @@ function EmailVerificationContent() {
 
   const verifyEmail = async (token: string) => {
     try {
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1';
+      const env = (await import('@/lib/security/env-client')).clientEnvUrl(
+        'NEXT_PUBLIC_API_BASE_URL',
+        'http://localhost:8000/api/v1'
+      );
+      if (env.ok === false) {
+        setState('error');
+        setMessage('Email verification is not available right now. Please try again later.');
+        return;
+      }
+      const apiBaseUrl = env.value;
 
-      const response = await fetch(`${apiBaseUrl}/auth/verify-email?token=${encodeURIComponent(token)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(
+        `${apiBaseUrl}/auth/verify-email?token=${encodeURIComponent(token)}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       const contentType = response.headers.get('content-type');
       let data;
@@ -82,9 +96,7 @@ function EmailVerificationContent() {
       {state === 'loading' && (
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">
-            Verifying your email address...
-          </p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Verifying your email address...</p>
         </div>
       )}
 
@@ -94,9 +106,7 @@ function EmailVerificationContent() {
           <h3 className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
             Email Verified!
           </h3>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            {message}
-          </p>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">{message}</p>
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-500">
             Redirecting to login in {countdown} seconds...
           </p>
@@ -115,9 +125,7 @@ function EmailVerificationContent() {
           <h3 className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
             Verification Failed
           </h3>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            {message}
-          </p>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">{message}</p>
           <div className="mt-6 space-y-3">
             <button
               onClick={() => router.push('/auth/register')}
@@ -141,9 +149,7 @@ function EmailVerificationContent() {
           <h3 className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
             Invalid Verification Link
           </h3>
-          <p className="mt-2 text-gray-600 dark:text-gray-400">
-            {message}
-          </p>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">{message}</p>
           <button
             onClick={() => router.push('/auth/register')}
             className="mt-6 w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600"
@@ -161,9 +167,7 @@ function LoadingFallback() {
     <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-8">
       <div className="text-center">
         <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
-        <p className="mt-4 text-gray-600 dark:text-gray-400">
-          Loading...
-        </p>
+        <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
       </div>
     </div>
   );

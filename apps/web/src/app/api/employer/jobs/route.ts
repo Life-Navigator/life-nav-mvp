@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
     })
     .select('id')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
 
   if (requirements && requirements.length > 0) {
     await sb
@@ -144,6 +145,6 @@ export async function GET() {
       'id, title, employment_type, remote_mode, experience_level, salary_min, salary_max, status, published_at, expires_at, created_at'
     )
     .order('created_at', { ascending: false });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ jobs: data ?? [] });
 }

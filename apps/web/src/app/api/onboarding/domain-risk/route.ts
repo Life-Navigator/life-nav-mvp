@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
     .from('user_domain_risk_tolerance')
     .upsert(rows, { onConflict: 'user_id,domain' });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ success: true, count: rows.length });
 }
 
@@ -86,6 +87,6 @@ export async function GET() {
     .select('domain, tolerance_score, qualitative_level, notes, updated_at')
     .eq('user_id', user.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ tolerances: data ?? [] });
 }

@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createGoogleOAuthService } from '@/lib/integrations/google/oauth';
+import { requireEnvUrl, MissingEnvError } from '@/lib/security/env';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -29,9 +30,7 @@ export async function GET(request: NextRequest) {
 
   // Validate required parameters
   if (!code) {
-    return NextResponse.redirect(
-      new URL('/settings/integrations?error=missing_code', request.url)
-    );
+    return NextResponse.redirect(new URL('/settings/integrations?error=missing_code', request.url));
   }
 
   // Validate state parameter (CSRF protection)
@@ -57,13 +56,21 @@ export async function GET(request: NextRequest) {
     const sessionToken = cookieStore.get('session_token')?.value;
 
     if (!sessionToken) {
-      return NextResponse.redirect(
-        new URL('/login?redirect=/settings/integrations', request.url)
-      );
+      return NextResponse.redirect(new URL('/login?redirect=/settings/integrations', request.url));
     }
 
     // Store tokens in backend
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    let backendUrl: string;
+    try {
+      backendUrl = requireEnvUrl('NEXT_PUBLIC_API_URL');
+    } catch (cfg) {
+      if (cfg instanceof MissingEnvError) {
+        return NextResponse.redirect(
+          new URL('/settings/integrations?error=service_unavailable', request.url)
+        );
+      }
+      throw cfg;
+    }
     const saveResponse = await fetch(`${backendUrl}/api/v1/integrations/google/tokens`, {
       method: 'POST',
       headers: {
@@ -112,11 +119,10 @@ export async function GET(request: NextRequest) {
     return response;
   } catch (err) {
     console.error('Google OAuth callback error:', err);
+    // Never leak the internal error message into the redirect URL — it
+    // can contain provider tokens, SDK details, or other internals.
     return NextResponse.redirect(
-      new URL(
-        `/settings/integrations?error=exchange_failed&message=${encodeURIComponent((err as Error).message)}`,
-        request.url
-      )
+      new URL('/settings/integrations?error=exchange_failed', request.url)
     );
   }
 }

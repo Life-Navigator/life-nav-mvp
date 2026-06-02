@@ -20,6 +20,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { loadInputs, run } from '@/lib/optimizer/engine';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest) {
     })
     .select('id')
     .single();
-  if (interpErr) return NextResponse.json({ error: interpErr.message }, { status: 400 });
+  if (interpErr) return safeApiError({ code: 'validation_failed', internal: interpErr });
   const interpretation_id = interp?.id ?? null;
 
   // 2. Run header.
@@ -89,7 +91,7 @@ export async function POST(request: NextRequest) {
     })
     .select('id')
     .single();
-  if (runErr) return NextResponse.json({ error: runErr.message }, { status: 400 });
+  if (runErr) return safeApiError({ code: 'validation_failed', internal: runErr });
   const run_id: string = runRow.id;
 
   // 3. Inputs snapshot — write what we read so future re-runs can replay.
@@ -170,5 +172,22 @@ export async function POST(request: NextRequest) {
     confidence_score: output.confidence,
   });
 
-  return NextResponse.json({ success: true, run_id, output });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: {
+      kind: 'optimizer_recommendation',
+      id: run_id,
+      text: subjectTextFromPayload(output),
+    },
+    emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({
+    success: true,
+    run_id,
+    output,
+    governance: { verdict: g.decision.verdict },
+  });
 }

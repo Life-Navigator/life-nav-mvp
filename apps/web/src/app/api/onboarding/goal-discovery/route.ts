@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -125,14 +126,14 @@ export async function POST(request: NextRequest) {
       .update(goalUpsert)
       .eq('id', goalId)
       .eq('user_id', user.id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
   } else {
     const { data, error } = await (supabase as any)
       .from('goals')
       .insert(goalUpsert)
       .select('id')
       .single();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     goalId = data?.id ?? null;
   }
 
@@ -159,10 +160,10 @@ export async function POST(request: NextRequest) {
     .delete()
     .eq('user_id', user.id)
     .eq('session_id', p.session_id);
-  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 400 });
+  if (delErr) return safeApiError({ code: 'validation_failed', internal: delErr });
 
   const { error: insErr } = await (supabase as any).from('goal_discovery_turns').insert(turnRows);
-  if (insErr) return NextResponse.json({ error: insErr.message }, { status: 400 });
+  if (insErr) return safeApiError({ code: 'validation_failed', internal: insErr });
 
   return NextResponse.json({ success: true, goal_id: goalId, turn_count: turnRows.length });
 }
@@ -194,7 +195,7 @@ export async function GET(request: NextRequest) {
       .eq('id', goalId)
       .eq('user_id', user.id)
       .maybeSingle();
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     goal = data;
   }
 
@@ -208,7 +209,7 @@ export async function GET(request: NextRequest) {
   if (goalId) turnsQuery = turnsQuery.eq('goal_id', goalId);
   if (sessionId) turnsQuery = turnsQuery.eq('session_id', sessionId);
   const { data: turns, error: tErr } = await turnsQuery;
-  if (tErr) return NextResponse.json({ error: tErr.message }, { status: 400 });
+  if (tErr) return safeApiError({ code: 'validation_failed', internal: tErr });
 
   return NextResponse.json({ goal, turns: turns ?? [] });
 }

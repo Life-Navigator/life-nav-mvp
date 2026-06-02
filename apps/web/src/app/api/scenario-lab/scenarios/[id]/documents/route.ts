@@ -15,6 +15,7 @@ import {
 } from '@/lib/scenario-lab/validation';
 import { enforceRateLimit } from '@/lib/scenario-lab/rate-limiter';
 import crypto from 'crypto';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     try {
       await enforceRateLimit(userId, 'upload');
     } catch (rateLimitError: any) {
-      return NextResponse.json({ error: rateLimitError.message }, { status: 429 });
+      return safeApiError({ code: 'rate_limited', internal: rateLimitError });
     }
 
     const { id: scenarioId } = await params;
@@ -156,7 +157,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
@@ -210,7 +210,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

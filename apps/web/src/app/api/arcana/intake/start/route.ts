@@ -11,6 +11,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
+import { recordUserEvent } from '@/lib/analytics/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (existing.error) {
-    return NextResponse.json({ error: existing.error.message }, { status: 500 });
+    return safeApiError({ code: 'db_persistence_error', internal: existing.error });
   }
   if (existing.data) {
     return NextResponse.json({ profile: existing.data, created: false });
@@ -55,7 +57,16 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (insert.error) {
-    return NextResponse.json({ error: insert.error.message }, { status: 500 });
+    return safeApiError({ code: 'db_persistence_error', internal: insert.error });
   }
+
+  await recordUserEvent(sb, {
+    user_id: user.id,
+    event_type: 'arcana_intake_started',
+    event_metadata: { intake_source: body.intake_source ?? 'arcana' },
+    subject_kind: 'arcana_profile',
+    subject_id: insert.data.id,
+  });
+
   return NextResponse.json({ profile: insert.data, created: true });
 }

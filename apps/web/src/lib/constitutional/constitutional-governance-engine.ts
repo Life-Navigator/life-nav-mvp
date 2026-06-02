@@ -44,6 +44,7 @@ import { scoreFuturePreservation } from './engines/future-preservation-engine';
 import { detectRedirectionPattern } from './redirection/constructive-redirection-engine';
 
 import { CONSTITUTIONAL_REVIEW_ORDER, RISK_RANK } from '@/types/constitutional';
+import { reviewCharacter } from '@/lib/constitutional/character';
 import { SEVERITY_RANK } from '@/types/governance';
 import type {
   ConstitutionalDecision,
@@ -316,6 +317,38 @@ export function constitutionalReview(inputs: ConstitutionalReviewInputs): Consti
     final_text = composeCrisisEscalation(crisis.level) + '\n\n' + final_text;
   }
 
+  // ---- Sprint N.3 — Character Review (step 8) + Final Character
+  //                   Verification (step 14) -------------------------------
+  //
+  // Runs on the (possibly modified) final_text. If the character
+  // score fails the threshold AND the response is still in an APPROVE
+  // verdict, we either:
+  //   * apply the style-guard sanitized text (for low/moderate-severity
+  //     style violations), OR
+  //   * downgrade the verdict to APPROVE_WITH_MODIFICATION so callers
+  //     know the response was character-modified.
+  // Critical character failures combined with a CONSTITUTIONAL_REDIRECTION
+  // verdict already produced a constructive-redirection framing
+  // upstream; we don't override.
+  const character = reviewCharacter({ draft_text: final_text });
+  if (
+    character.needs_regeneration &&
+    (verdict === 'APPROVE' || verdict === 'APPROVE_WITH_MODIFICATION')
+  ) {
+    // If only low/moderate style findings produced the failure, use
+    // the style-sanitized text. Otherwise, mark APPROVE_WITH_MODIFICATION
+    // and keep the original text (the orchestrator's redraft loop
+    // gets another pass).
+    const onlySoftStyle = character.style.findings.every(
+      (f) => f.severity === 'low' || f.severity === 'moderate'
+    );
+    if (onlySoftStyle && character.style.sanitized_text.length > 0) {
+      final_text = character.style.sanitized_text;
+    } else {
+      verdict = 'APPROVE_WITH_MODIFICATION';
+    }
+  }
+
   const draft_hash = djb2(inputs.draft_text);
   const final_hash = djb2(final_text);
 
@@ -339,6 +372,7 @@ export function constitutionalReview(inputs: ConstitutionalReviewInputs): Consti
     latency_ms: inputs.latency_ms ?? 0,
     retrieval_ok: retrievalOk,
     computed_at: inputs.now ?? '1970-01-01T00:00:00.000Z',
+    character,
   };
 }
 

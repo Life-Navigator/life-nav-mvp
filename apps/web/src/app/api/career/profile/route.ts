@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getCareerProfile, upsertCareerProfile } from '@/lib/services/careerService';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export async function GET() {
     const profile = await getCareerProfile(supabase, user.id);
     return NextResponse.json({ profile });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    return safeApiError({ code: 'internal_error', internal: err });
   }
 }
 
@@ -35,6 +36,6 @@ export async function PUT(request: NextRequest) {
     const profile = await upsertCareerProfile(supabase, user.id, body);
     return NextResponse.json({ profile });
   } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+    return safeApiError({ code: 'bad_request', internal: err });
   }
 }

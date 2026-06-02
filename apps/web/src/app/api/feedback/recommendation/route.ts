@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 import {
   validateRecommendationFeedback,
   type RecommendationFeedbackInput,
@@ -35,6 +36,6 @@ export async function POST(request: NextRequest) {
     })
     .select('id')
     .single();
-  if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
+  if (ins.error) return safeApiError({ code: 'db_persistence_error', internal: ins.error });
   return NextResponse.json({ id: ins.data.id });
 }

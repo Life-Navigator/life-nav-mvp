@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { safeApiError } from '@/lib/security/safe-error';
+import { recordUserEvent } from '@/lib/analytics/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +45,7 @@ export async function GET(request: NextRequest) {
     if (status) query = query.eq('status', status);
 
     const { data: goals, error, count } = await query;
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
 
     return NextResponse.json({ goals: goals || [], total: count || 0 });
   } catch (err) {
@@ -77,7 +79,15 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
+
+    await recordUserEvent(supabase, {
+      user_id: user.id,
+      event_type: 'goal_created',
+      event_metadata: { category: parsed.data.category, priority: parsed.data.priority },
+      subject_kind: 'goal',
+      subject_id: goal?.id,
+    });
 
     return NextResponse.json({ goal }, { status: 201 });
   } catch (err) {

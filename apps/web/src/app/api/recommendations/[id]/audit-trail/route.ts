@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 import { auditToEntry, loadAuditRow } from '@/lib/decision/trust-route-helpers';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,11 +40,21 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     sb.from('counterfactual_scenarios').select('*').eq('user_id', user.id).eq('audit_id', auditId),
   ]);
 
+  const entry = auditToEntry(row);
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: { kind: 'recommendation', text: subjectTextFromPayload(entry) },
+    emitter: { agent_kind: 'advisor', agent_name: 'advisor.core' },
+  });
+  if (!g.ok) return g.response;
+
   return NextResponse.json({
-    entry: auditToEntry(row),
+    entry,
     why_chains: chains ?? [],
     evidence_links: evs ?? [],
     assumptions: assumps ?? [],
     counterfactual_scenarios: cfs ?? [],
+    governance: { verdict: g.decision.verdict },
   });
 }

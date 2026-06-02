@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
+import { recordUserEvent } from '@/lib/analytics/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +46,13 @@ export async function POST(_request: NextRequest) {
     })
     .eq('id', user.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
+
+  await recordUserEvent(supabase, {
+    user_id: user.id,
+    event_type: 'onboarding_completed',
+    event_metadata: { goal_count: goalCount ?? 0 },
+  });
 
   return NextResponse.json({ success: true });
 }

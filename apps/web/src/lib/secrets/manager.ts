@@ -36,6 +36,16 @@ export const SECRET_REGISTRY = {
     gsm: 'projects/lifenavigator-prod/secrets/anthropic-api-key',
     sensitive: true,
   },
+  AZURE_OPENAI_API_KEY: {
+    env: 'AZURE_OPENAI_API_KEY',
+    gsm: 'projects/lifenavigator-prod/secrets/azure-openai-api-key',
+    sensitive: true,
+  },
+  VIRUSTOTAL_API_KEY: {
+    env: 'VIRUSTOTAL_API_KEY',
+    gsm: 'projects/lifenavigator-prod/secrets/virustotal-api-key',
+    sensitive: true,
+  },
 
   // Supabase
   SUPABASE_URL: {

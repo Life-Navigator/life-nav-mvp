@@ -9,6 +9,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
+import { safeApiError } from '@/lib/security/safe-error';
+import { recordUserEvent } from '@/lib/analytics/events';
+import { transitionOutcome } from '@/lib/outcomes/decision-outcomes';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +39,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     .eq('id', run_id)
     .eq('user_id', user.id)
     .maybeSingle();
-  if (hErr) return NextResponse.json({ error: hErr.message }, { status: 400 });
+  if (hErr) return safeApiError({ code: 'validation_failed', internal: hErr });
   if (!header) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   // 2. Flip pending recommendations to accepted.
@@ -77,5 +81,32 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     source: 'optimizer',
   });
 
-  return NextResponse.json({ success: true });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: {
+      kind: 'optimizer_recommendation',
+      text: subjectTextFromPayload({
+        accepted_run_id: run_id,
+        next_best_action: header.next_best_action,
+      }),
+    },
+    emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+  });
+  if (!g.ok) return g.response;
+
+  // Lifecycle + telemetry — the run-acceptance flips the outcome state
+  // forward and emits a recommendation_accepted event.
+  await transitionOutcome(supabase, { user_id: user.id, recommendation_id: run_id }, 'accepted', {
+    trigger: 'optimizer.runs.accept',
+  });
+  await recordUserEvent(supabase, {
+    user_id: user.id,
+    event_type: 'recommendation_accepted',
+    event_metadata: { source: 'optimizer.runs.accept' },
+    subject_kind: 'optimizer_recommendation',
+    subject_id: run_id,
+  });
+
+  return NextResponse.json({ success: true, governance: { verdict: g.decision.verdict } });
 }

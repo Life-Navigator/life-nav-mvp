@@ -14,6 +14,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 import { computeAheadOfPlanPlan } from '@/lib/decision/ahead-of-plan-engine';
 import { loadGoalContext } from '@/lib/decision/context-loader';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,5 +55,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     hard_constraint_count: ctx.hard_constraint_count,
   });
 
-  return NextResponse.json({ plan });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: { kind: 'recommendation', text: subjectTextFromPayload(plan) },
+    emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({ plan, governance: { verdict: g.decision.verdict } });
 }

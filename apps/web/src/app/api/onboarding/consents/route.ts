@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
         user_agent: ua,
         expires_at: parsed.data.expires_at ?? null,
       });
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     return NextResponse.json({ success: true, kind: 'policy' });
   }
 
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
     p_user_agent: ua,
     p_expires_at: parsed.data.expires_at ?? null,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ success: true, kind: 'integration', id: data });
 }
 
@@ -130,7 +131,7 @@ export async function DELETE(request: NextRequest) {
     p_ip: ip,
     p_user_agent: ua,
   });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ success: true, revoked: data === true });
 }
 

@@ -547,3 +547,52 @@ CREATE TRIGGER trigger_scenario_jobs_updated_at
   BEFORE UPDATE ON public.scenario_jobs
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- ROW LEVEL SECURITY (fail-closed gate — policies follow in 006)
+-- ============================================================================
+-- Sprint N.2 retrofit: ENABLE RLS at table-creation time so the tables
+-- are fail-closed even if migration 006 has not yet been applied.
+-- 006 adds the per-policy grants; without those policies, all access is
+-- denied — which is the correct default.
+-- Idempotent: ALTER TABLE ... ENABLE ROW LEVEL SECURITY is a no-op when
+-- already enabled.
+-- ============================================================================
+
+ALTER TABLE public.scenario_labs              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_versions          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_documents         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_extracted_fields  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_inputs            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_sim_runs          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_goal_snapshots    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.plans                      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.plan_phases                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.plan_tasks                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_reports           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_pins              ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_audit_log         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.scenario_jobs              ENABLE ROW LEVEL SECURITY;
+
+-- Self-test: refuse to apply if any of these tables ended up RLS-disabled.
+DO $$
+DECLARE
+  bad TEXT[];
+BEGIN
+  SELECT array_agg(c.relname)
+    INTO bad
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public'
+    AND c.relkind = 'r'
+    AND c.relname IN (
+      'scenario_labs','scenario_versions','scenario_documents',
+      'scenario_extracted_fields','scenario_inputs','scenario_sim_runs',
+      'scenario_goal_snapshots','plans','plan_phases','plan_tasks',
+      'scenario_reports','scenario_pins','scenario_audit_log','scenario_jobs'
+    )
+    AND NOT c.relrowsecurity;
+  IF bad IS NOT NULL AND array_length(bad, 1) > 0 THEN
+    RAISE EXCEPTION '005 self-test: RLS missing on tables: %', bad;
+  END IF;
+END $$;

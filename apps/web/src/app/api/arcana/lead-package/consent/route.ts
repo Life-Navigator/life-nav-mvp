@@ -19,6 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
 
   const sb = supabase as any;
   const insert = await sb.from('lead_package_consents').insert(row).select('*').single();
-  if (insert.error) return NextResponse.json({ error: insert.error.message }, { status: 500 });
+  if (insert.error) return safeApiError({ code: 'db_persistence_error', internal: insert.error });
 
   await sb
     .from('arcana_profiles')
@@ -84,6 +85,6 @@ export async function PATCH(request: NextRequest) {
     .eq('user_id', user.id)
     .select('*')
     .single();
-  if (upd.error) return NextResponse.json({ error: upd.error.message }, { status: 500 });
+  if (upd.error) return safeApiError({ code: 'db_persistence_error', internal: upd.error });
   return NextResponse.json({ consent: upd.data });
 }

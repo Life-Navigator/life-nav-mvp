@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { exchangePublicToken, getAccounts } from '@/lib/integrations/plaid/client';
+import { safeApiError } from '@/lib/security/safe-error';
+import { recordUserEvent } from '@/lib/analytics/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +41,17 @@ export async function POST(request: NextRequest) {
     // Fetch linked accounts to return to client
     const accounts = await getAccounts(accessToken);
 
+    await recordUserEvent(supabase, {
+      user_id: user.id,
+      event_type: 'plaid_connected',
+      event_metadata: {
+        institution_id: institutionId ?? null,
+        accounts_linked: accounts.length,
+      },
+      subject_kind: 'plaid_item',
+      subject_id: itemId,
+    });
+
     return NextResponse.json({
       success: true,
       accountsLinked: accounts.length,
@@ -46,6 +59,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error('Plaid exchange error:', err);
-    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    return safeApiError({ code: 'internal_error', internal: err });
   }
 }

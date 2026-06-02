@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,7 +20,7 @@ export async function GET() {
       .order('created_at', { ascending: false })
       .limit(20);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     return NextResponse.json({ notifications: notifications || [] });
   } catch (err) {
     console.error('Notifications GET error:', err);
@@ -46,7 +47,7 @@ export async function PATCH(request: NextRequest) {
       .eq('id', id)
       .eq('user_id', user.id);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) return safeApiError({ code: 'validation_failed', internal: error });
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error('Notification PATCH error:', err);

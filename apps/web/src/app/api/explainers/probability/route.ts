@@ -4,13 +4,14 @@
  * Body: { distribution: ProbabilityDistribution, dominant_driver? }
  *
  * Returns the structured ProbabilityExplanation. Determinism contract:
- * same input → same output.
+ * same input → same output. Gated by `guardOutgoing` per Sprint M.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 import { explainProbability } from '@/lib/conversation/conversation-explainers';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 import type { ProbabilityDistribution } from '@/types/decision-impact';
 import type { DominantDriver } from '@/types/conversation-intel';
 
@@ -34,5 +35,14 @@ export async function POST(request: NextRequest) {
     distribution: body.distribution,
     dominant_driver: body.dominant_driver,
   });
-  return NextResponse.json({ explanation });
+
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: { kind: 'probability_output', text: subjectTextFromPayload(explanation) },
+    emitter: { agent_kind: 'advisor', agent_name: 'advisor.core' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({ explanation, governance: { verdict: g.decision.verdict } });
 }

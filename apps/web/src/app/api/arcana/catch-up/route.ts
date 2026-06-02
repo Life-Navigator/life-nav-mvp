@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { computeHealthCatchUpPlan } from '@/lib/arcana/health-catch-up-service';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 import type { ArcanaConstraint, ArcanaGoal } from '@/types/arcana';
 
 export const dynamic = 'force-dynamic';
@@ -66,5 +67,17 @@ export async function POST(request: NextRequest) {
     has_provider_clearance: body.has_provider_clearance ?? false,
   });
 
-  return NextResponse.json({ plan });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: {
+      kind: 'arcana_recommendation',
+      id: body.arcana_goal_id,
+      text: subjectTextFromPayload(plan),
+    },
+    emitter: { agent_kind: 'arcana_health', agent_name: 'arcana.health' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({ plan, governance: { verdict: g.decision.verdict } });
 }

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -24,7 +24,20 @@ export default function InsurancePage() {
       setLoading(true);
       setError(null);
       const headers = getAuthHeaders();
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const env = (await import('@/lib/security/env-client')).clientEnvUrl(
+        'NEXT_PUBLIC_API_URL',
+        'http://localhost:8000'
+      );
+      if (env.ok === false) {
+        setError(
+          env.kind === 'loopback'
+            ? 'The backend API is not configured for this environment.'
+            : 'NEXT_PUBLIC_API_URL is not set.'
+        );
+        setLoading(false);
+        return;
+      }
+      const apiUrl = env.value;
       const response = await fetch(`${apiUrl}/api/v1/health/insurance`, { headers });
 
       if (response.ok) {
@@ -53,14 +66,27 @@ export default function InsurancePage() {
   const handleDelete = async (id: string) => {
     try {
       const headers = getAuthHeaders();
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const env = (await import('@/lib/security/env-client')).clientEnvUrl(
+        'NEXT_PUBLIC_API_URL',
+        'http://localhost:8000'
+      );
+      if (env.ok === false) {
+        setError(
+          env.kind === 'loopback'
+            ? 'The backend API is not configured for this environment.'
+            : 'NEXT_PUBLIC_API_URL is not set.'
+        );
+        setLoading(false);
+        return;
+      }
+      const apiUrl = env.value;
       const response = await fetch(`${apiUrl}/api/v1/health/insurance/${id}`, {
         method: 'DELETE',
         headers,
       });
 
       if (response.ok) {
-        setInsurancePolicies(insurancePolicies.filter(ins => ins.id !== id));
+        setInsurancePolicies(insurancePolicies.filter((ins) => ins.id !== id));
       } else {
         const errorData = await response.json();
         alert(errorData.error || 'Failed to delete insurance policy');
@@ -105,9 +131,7 @@ export default function InsurancePage() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Health Insurance
-            </h1>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Health Insurance</h1>
             <p className="text-gray-600 dark:text-gray-400 mt-1">
               Manage your insurance policies, coverage, and claims
             </p>
@@ -126,11 +150,9 @@ export default function InsurancePage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Active Policies
-                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Active Policies</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  {insurancePolicies.filter(p => p.isActive).length}
+                  {insurancePolicies.filter((p) => p.isActive).length}
                 </p>
               </div>
               <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
@@ -154,11 +176,12 @@ export default function InsurancePage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Monthly Premium
-                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Monthly Premium</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  ${insurancePolicies.reduce((sum, p) => sum + (p.monthlyPremium || 0), 0).toLocaleString()}
+                  $
+                  {insurancePolicies
+                    .reduce((sum, p) => sum + (p.monthlyPremium || 0), 0)
+                    .toLocaleString()}
                 </p>
               </div>
               <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
@@ -182,11 +205,12 @@ export default function InsurancePage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Total Deductible
-                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Total Deductible</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  ${insurancePolicies.reduce((sum, p) => sum + (p.deductibleIndividual || 0), 0).toLocaleString()}
+                  $
+                  {insurancePolicies
+                    .reduce((sum, p) => sum + (p.deductibleIndividual || 0), 0)
+                    .toLocaleString()}
                 </p>
               </div>
               <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
@@ -210,12 +234,8 @@ export default function InsurancePage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Open Claims
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  0
-                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Open Claims</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">0</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
                 <svg
@@ -299,9 +319,7 @@ export default function InsurancePage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                  File a Claim
-                </h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">File a Claim</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Submit a new insurance claim
                 </p>
@@ -355,9 +373,7 @@ export default function InsurancePage() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                  View Benefits
-                </h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">View Benefits</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   Review coverage and benefits
                 </p>

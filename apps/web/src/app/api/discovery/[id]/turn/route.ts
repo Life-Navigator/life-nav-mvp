@@ -15,6 +15,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 import { buildDrillDown } from '@/lib/conversation/need-behind-need-engine';
 import { inferDrivers } from '@/lib/conversation/driver-inference-engine';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 import type { DiscoveryDomain, DriverScores, PromptKind } from '@/types/conversation-intel';
 
 export const dynamic = 'force-dynamic';
@@ -118,6 +119,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   };
   await sb.from('discovery_sessions').update(updates).eq('id', sessionId);
 
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: { kind: 'advisor_message', text: subjectTextFromPayload(drill.next_prompt ?? drill) },
+    emitter: { agent_kind: 'advisor', agent_name: 'advisor.core' },
+  });
+  if (!g.ok) return g.response;
+
   return NextResponse.json({
     next_prompt: drill.next_prompt,
     drill_down_so_far: drill,
@@ -128,6 +137,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       confidence: cumulative.confidence,
     },
     session_state: { ...session, ...updates },
+    governance: { verdict: g.decision.verdict },
   });
 }
 

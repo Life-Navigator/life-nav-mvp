@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -82,6 +83,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   const sb: any = supabase;
   // RLS already restricts updates to employer members.
   const { error } = await sb.from('employer_job_posts').update(parsed.data).eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return safeApiError({ code: 'validation_failed', internal: error });
   return NextResponse.json({ success: true });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { validateSimulationFeedback, type SimulationFeedbackInput } from '@/lib/feedback/service';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,6 @@ export async function POST(request: NextRequest) {
     })
     .select('id')
     .single();
-  if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
+  if (ins.error) return safeApiError({ code: 'db_persistence_error', internal: ins.error });
   return NextResponse.json({ id: ins.data.id });
 }

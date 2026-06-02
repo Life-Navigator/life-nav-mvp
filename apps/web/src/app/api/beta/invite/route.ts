@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { evaluateInvite } from '@/lib/ops/invite-service';
 import type { InviteRow } from '@/lib/ops/invite-service';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
     .eq('id', invite!.id)
     .select('*')
     .single();
-  if (upd.error) return NextResponse.json({ error: upd.error.message }, { status: 500 });
+  if (upd.error) return safeApiError({ code: 'db_persistence_error', internal: upd.error });
 
   // Join the cohort.
   await sb.from('ops_user_cohorts').upsert({

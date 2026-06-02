@@ -14,6 +14,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 import { rankMarginalImpact } from '@/lib/decision/marginal-impact-ranker';
 import { loadGoalContext } from '@/lib/decision/context-loader';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 import { TIME_HORIZONS_ORDER, type TimeHorizon, type DomainKey } from '@/types/decision-impact';
 
 export const dynamic = 'force-dynamic';
@@ -207,5 +208,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     /* best effort */
   }
 
-  return NextResponse.json({ ranking });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: { kind: 'recommendation', text: subjectTextFromPayload(ranking) },
+    emitter: { agent_kind: 'optimizer', agent_name: 'optimizer.dynamic_goal' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({ ranking, governance: { verdict: g.decision.verdict } });
 }

@@ -11,6 +11,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 import { buildWhyChain, type WhyChainTarget } from '@/lib/decision/why-chain-builder';
 import { loadAuditRow } from '@/lib/decision/trust-route-helpers';
+import { guardOutgoing, subjectTextFromPayload } from '@/lib/governance/route-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,5 +53,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     /* best effort */
   }
 
-  return NextResponse.json({ chain });
+  const g = await guardOutgoing({
+    supabase,
+    user_id: user.id,
+    subject: { kind: 'recommendation', text: subjectTextFromPayload(chain) },
+    emitter: { agent_kind: 'advisor', agent_name: 'advisor.core' },
+  });
+  if (!g.ok) return g.response;
+
+  return NextResponse.json({ chain, governance: { verdict: g.decision.verdict } });
 }
