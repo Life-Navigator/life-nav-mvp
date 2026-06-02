@@ -20,7 +20,9 @@ primary_region = "iad"
   WORKER_POLL_INTERVAL_SECONDS = "5"
   WORKER_BATCH_SIZE = "25"
   WORKER_MAX_RETRIES = "5"
-  GEMINI_EMBEDDING_MODEL = "text-embedding-004"
+  # text-embedding-004 was retired by Google. Replaced 2026-06-02
+  # with the GA successor (3072-dim default).
+  GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"
 
 # Long-running worker process — no HTTP service, no autostop.
 [[vm]]

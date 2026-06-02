@@ -41,7 +41,10 @@ enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 enable_signup = true
 enable_anonymous_sign_ins = false
-min_password_length = 8
+# Note: `min_password_length` was removed — it isn't valid at any
+# location in Supabase CLI 2.104's config schema. Set password
+# policy via the Supabase dashboard (Authentication → Policies)
+# on the linked project instead.
 
 # Email settings
 [auth.email]

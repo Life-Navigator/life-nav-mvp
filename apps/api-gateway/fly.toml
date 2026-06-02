@@ -23,7 +23,11 @@ primary_region = "iad"
 
 [env]
   LOG_LEVEL = "info"
-  GEMINI_EMBEDDING_MODEL = "text-embedding-004"
+  # text-embedding-004 was retired by Google (returns 404 from
+  # v1beta API). Replaced 2026-06-02 with the GA successor, which
+  # produces 3072-dim cosine vectors by default. Qdrant collections
+  # life_navigator and ln_central must be created at 3072 dim.
+  GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"
   GEMINI_GENERATION_MODEL = "gemini-2.0-flash"
 
 [http_service]
