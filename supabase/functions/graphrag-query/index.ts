@@ -342,18 +342,27 @@ async function neo4jExec(
   cypher: string,
   params: Record<string, unknown>,
 ): Promise<Array<Record<string, unknown>>> {
-  // Neo4j Aura forbids the legacy `/db/{db}/tx/commit` endpoint (403
-  // "Denied by administrative rules"). Use the Query API v2, and
-  // normalize the bolt-style URI Aura hands out to https.
-  const base = url
+  // Aura forbids the legacy `/db/{db}/tx/commit` endpoint (403 "Denied by
+  // administrative rules") — always target the Query API v2. Accept either
+  // a full Query API URL (NEO4J_QUERY_API_URL, e.g.
+  // https://<host>/db/<db>/query/v2) or a base/bolt URL (NEO4J_HTTP_URL /
+  // NEO4J_URI), normalizing the bolt scheme Aura hands out to https.
+  const normalized = url
     .replace(/\/+$/, '')
     .replace(/^(neo4j\+s|neo4j\+ssc|neo4j|bolt\+s|bolt\+ssc|bolt):\/\//, 'https://');
-  const host = base.split('://')[1] || '';
-  // This Aura instance's single database is named after the dbid, not
-  // "neo4j". Prefer the explicit secret, fall back to the host prefix.
-  const database = Deno.env.get('NEO4J_PERSONAL_DATABASE') || host.split('.')[0] || 'neo4j';
+  let endpoint: string;
+  if (/\/db\/[^/]+\/query\/v2$/.test(normalized)) {
+    endpoint = normalized;
+  } else {
+    // This Aura instance's single database is named after the dbid, not
+    // "neo4j". Prefer the explicit secret, fall back to the host prefix.
+    const host = normalized.split('://')[1] || '';
+    const database =
+      Deno.env.get('NEO4J_PERSONAL_DATABASE') || host.split('.')[0] || 'neo4j';
+    endpoint = `${normalized}/db/${database}/query/v2`;
+  }
 
-  const resp = await fetch(`${base}/db/${database}/query/v2`, {
+  const resp = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -503,7 +512,8 @@ serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const geminiKey = Deno.env.get('GEMINI_API_KEY');
-    const neo4jUrl = Deno.env.get('NEO4J_HTTP_URL');
+    const neo4jUrl =
+      Deno.env.get('NEO4J_QUERY_API_URL') || Deno.env.get('NEO4J_HTTP_URL');
     const neo4jUser = Deno.env.get('NEO4J_USERNAME');
     const neo4jPass = Deno.env.get('NEO4J_PASSWORD');
     const qdrantUrl = Deno.env.get('QDRANT_URL');
