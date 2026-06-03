@@ -11,6 +11,7 @@
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import { geminiFetch } from './retry.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -142,7 +143,7 @@ async function embedQuery(
   text: string,
   apiKey: string,
 ): Promise<number[]> {
-  const resp = await fetch(GEMINI_EMBED_URL, {
+  const resp = await geminiFetch(GEMINI_EMBED_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -152,7 +153,7 @@ async function embedQuery(
       model: 'models/gemini-embedding-001',
       content: { parts: [{ text }] },
     }),
-  });
+  }, 'embed');
   if (!resp.ok) {
     const t = await resp.text().catch(() => '');
     throw new Error(`Gemini embed ${resp.status}: ${t}`);
@@ -166,7 +167,7 @@ async function geminiGenerate(
   systemPrompt: string,
   userPrompt: string,
 ): Promise<string> {
-  const resp = await fetch(GEMINI_GENERATE_URL, {
+  const resp = await geminiFetch(GEMINI_GENERATE_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -177,7 +178,7 @@ async function geminiGenerate(
       contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
       generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
     }),
-  });
+  }, 'generate');
   if (!resp.ok) {
     const t = await resp.text().catch(() => '');
     throw new Error(`Gemini generate ${resp.status}: ${t}`);
@@ -199,7 +200,7 @@ function geminiStream(
   return new ReadableStream({
     async start(controller) {
       try {
-        const resp = await fetch(GEMINI_STREAM_URL, {
+        const resp = await geminiFetch(GEMINI_STREAM_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -214,7 +215,7 @@ function geminiStream(
               topP: 0.9,
             },
           }),
-        });
+        }, 'stream');
 
         if (!resp.ok || !resp.body) {
           const t = await resp.text().catch(() => '');
