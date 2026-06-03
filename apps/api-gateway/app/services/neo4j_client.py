@@ -65,9 +65,22 @@ class Neo4jClient:
     async def run_central(self, cypher: str, params: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
         return await self._tx_commit(self.central_database, cypher, params or {})
 
+    def _http_base(self) -> str:
+        """The Query API is HTTP(S). Normalize a bolt-style URI
+        (``neo4j+s://host``) — which is what Aura hands out — to the
+        equivalent ``https://host`` the HTTP endpoint expects.
+        """
+        base = self.base_url.rstrip("/")
+        for scheme in ("neo4j+s://", "neo4j+ssc://", "neo4j://", "bolt+s://", "bolt+ssc://", "bolt://"):
+            if base.startswith(scheme):
+                return "https://" + base[len(scheme):]
+        return base
+
     async def _tx_commit(self, database: str, cypher: str, params: dict[str, Any]) -> list[dict[str, Any]]:
-        url = f"{self.base_url.rstrip('/')}/db/{database}/tx/commit"
-        body = {"statements": [{"statement": cypher, "parameters": params}]}
+        # Neo4j Aura forbids the legacy ``/db/{db}/tx/commit`` endpoint
+        # (403 "Denied by administrative rules"). Use the Query API v2.
+        url = f"{self._http_base()}/db/{database}/query/v2"
+        body = {"statement": cypher, "parameters": params}
         headers = {
             "authorization": self._basic_auth_header(),
             "accept": "application/json",
@@ -77,12 +90,7 @@ class Neo4jClient:
             r = await client.post(url, headers=headers, json=body)
             r.raise_for_status()
             data = r.json()
-            results = data.get("results") or []
-            if results and isinstance(results[0], dict) and results[0].get("data"):
-                cols = results[0].get("columns") or []
-                out: list[dict[str, Any]] = []
-                for row in results[0]["data"]:
-                    rowvals = row.get("row") or []
-                    out.append({c: v for c, v in zip(cols, rowvals)})
-                return out
-            return []
+            block = data.get("data") or {}
+            fields = block.get("fields") or []
+            values = block.get("values") or []
+            return [{c: v for c, v in zip(fields, row)} for row in values]

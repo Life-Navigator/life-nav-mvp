@@ -40,7 +40,7 @@ impl Neo4jClient {
         };
         Ok(Self {
             http,
-            base_url: cfg.neo4j_uri.trim_end_matches('/').to_string(),
+            base_url: normalize_http_base(&cfg.neo4j_uri),
             auth_header: format!("Basic {creds}"),
             database,
             scope,
@@ -122,13 +122,11 @@ impl Neo4jClient {
     pub async fn upsert_node(&self, canon: &CanonicalGraphObject) -> Result<()> {
         let cypher = Self::merge_cypher_for(canon);
         let params = Self::build_params(canon);
-        let body = TxRequest {
-            statements: vec![Statement {
-                statement: cypher,
-                parameters: params,
-            }],
+        let body = QueryRequest {
+            statement: cypher,
+            parameters: params,
         };
-        let url = format!("{}/db/{}/tx/commit", self.base_url, self.database);
+        let url = format!("{}/db/{}/query/v2", self.base_url, self.database);
         let res = self
             .http
             .post(&url)
@@ -143,7 +141,8 @@ impl Neo4jClient {
         if !status.is_success() {
             return Err(WorkerError::Neo4j(format!("{status}: {text}")));
         }
-        // Neo4j returns 200 even on Cypher errors; surface them.
+        // Defensive: if the Query API ever returns a 2xx with an errors
+        // array (partial failure), surface it rather than silently passing.
         let v: Value = serde_json::from_str(&text)?;
         if let Some(errors) = v.get("errors").and_then(Value::as_array) {
             if !errors.is_empty() {
@@ -163,13 +162,11 @@ impl Neo4jClient {
         let cypher = format!(
             "MATCH (n:{label} {{ tenant_id: $tenant_id, entity_id: $entity_id }}) DETACH DELETE n"
         );
-        let body = TxRequest {
-            statements: vec![Statement {
-                statement: cypher,
-                parameters: json!({"tenant_id": tenant_id, "entity_id": entity_id}),
-            }],
+        let body = QueryRequest {
+            statement: cypher,
+            parameters: json!({"tenant_id": tenant_id, "entity_id": entity_id}),
         };
-        let url = format!("{}/db/{}/tx/commit", self.base_url, self.database);
+        let url = format!("{}/db/{}/query/v2", self.base_url, self.database);
         let res = self
             .http
             .post(&url)
@@ -188,14 +185,34 @@ impl Neo4jClient {
     }
 }
 
+/// Neo4j Aura Query API v2 request body. The legacy `/tx/commit`
+/// transactional endpoint is forbidden on Aura (403 "Denied by
+/// administrative rules"), so we POST a single statement to
+/// `/db/{db}/query/v2` instead.
 #[derive(Serialize)]
-struct TxRequest {
-    statements: Vec<Statement>,
-}
-#[derive(Serialize)]
-struct Statement {
+struct QueryRequest {
     statement: String,
     parameters: Value,
+}
+
+/// The Query API is HTTP(S). Aura hands out a bolt-style URI
+/// (`neo4j+s://host`); normalize it to the `https://host` the HTTP
+/// endpoint expects.
+fn normalize_http_base(uri: &str) -> String {
+    let trimmed = uri.trim_end_matches('/');
+    for scheme in [
+        "neo4j+s://",
+        "neo4j+ssc://",
+        "neo4j://",
+        "bolt+s://",
+        "bolt+ssc://",
+        "bolt://",
+    ] {
+        if let Some(rest) = trimmed.strip_prefix(scheme) {
+            return format!("https://{rest}");
+        }
+    }
+    trimmed.to_string()
 }
 
 /// PascalCase the snake_case entity_type for Neo4j labels.
