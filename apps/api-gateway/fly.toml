@@ -28,7 +28,9 @@ primary_region = "iad"
   # produces 3072-dim cosine vectors by default. Qdrant collections
   # life_navigator and ln_central must be created at 3072 dim.
   GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"
-  GEMINI_GENERATION_MODEL = "gemini-2.0-flash"
+  # gemini-2.0-flash has a free-tier generation quota of 0 on this key
+  # (429 RESOURCE_EXHAUSTED); gemini-2.5-flash works on the same key.
+  GEMINI_GENERATION_MODEL = "gemini-2.5-flash"
 
 [http_service]
   internal_port = 8080

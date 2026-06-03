@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # Gemini
     gemini_api_key: str = ""
     gemini_embedding_model: str = "text-embedding-004"
-    gemini_generation_model: str = "gemini-2.0-flash"
+    gemini_generation_model: str = "gemini-2.5-flash"
 
     # Qdrant
     qdrant_url: str = ""

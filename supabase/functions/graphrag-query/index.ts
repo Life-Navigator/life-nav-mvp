@@ -44,11 +44,11 @@ const CORS_HEADERS = {
 };
 
 const GEMINI_EMBED_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent';
 const GEMINI_GENERATE_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 const GEMINI_STREAM_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse';
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse';
 
 const VECTOR_TOP_K = 10;
 const RRF_K = 60; // Reciprocal Rank Fusion constant
@@ -149,7 +149,7 @@ async function embedQuery(
       'x-goog-api-key': apiKey,
     },
     body: JSON.stringify({
-      model: 'models/text-embedding-004',
+      model: 'models/gemini-embedding-001',
       content: { parts: [{ text }] },
     }),
   });
@@ -342,15 +342,24 @@ async function neo4jExec(
   cypher: string,
   params: Record<string, unknown>,
 ): Promise<Array<Record<string, unknown>>> {
-  const resp = await fetch(`${url}/db/neo4j/tx/commit`, {
+  // Neo4j Aura forbids the legacy `/db/{db}/tx/commit` endpoint (403
+  // "Denied by administrative rules"). Use the Query API v2, and
+  // normalize the bolt-style URI Aura hands out to https.
+  const base = url
+    .replace(/\/+$/, '')
+    .replace(/^(neo4j\+s|neo4j\+ssc|neo4j|bolt\+s|bolt\+ssc|bolt):\/\//, 'https://');
+  const host = base.split('://')[1] || '';
+  // This Aura instance's single database is named after the dbid, not
+  // "neo4j". Prefer the explicit secret, fall back to the host prefix.
+  const database = Deno.env.get('NEO4J_PERSONAL_DATABASE') || host.split('.')[0] || 'neo4j';
+
+  const resp = await fetch(`${base}/db/${database}/query/v2`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Basic ${btoa(`${user}:${pass}`)}`,
     },
-    body: JSON.stringify({
-      statements: [{ statement: cypher, parameters: params }],
-    }),
+    body: JSON.stringify({ statement: cypher, parameters: params }),
   });
 
   if (!resp.ok) {
@@ -359,22 +368,15 @@ async function neo4jExec(
   }
 
   const data = await resp.json();
-  if (data.errors?.length) {
-    throw new Error(`Neo4j: ${JSON.stringify(data.errors)}`);
-  }
-
-  // Flatten results into record array
-  const result = data.results?.[0];
-  if (!result) return [];
-
-  const columns: string[] = result.columns || [];
-  return (result.data || []).map(
-    (row: { row: unknown[] }) => {
-      const record: Record<string, unknown> = {};
-      columns.forEach((col, i) => (record[col] = row.row[i]));
-      return record;
-    },
-  );
+  // Query API v2 response shape: { data: { fields: [...], values: [[...]] } }
+  const block = data.data || {};
+  const fields: string[] = block.fields || [];
+  const values: unknown[][] = block.values || [];
+  return values.map((row) => {
+    const record: Record<string, unknown> = {};
+    fields.forEach((col, i) => (record[col] = row[i]));
+    return record;
+  });
 }
 
 async function graphSearch(

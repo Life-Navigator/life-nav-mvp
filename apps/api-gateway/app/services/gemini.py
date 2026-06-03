@@ -13,8 +13,8 @@ import httpx
 @dataclass
 class GeminiClient:
     api_key: str
-    embedding_model: str = "text-embedding-004"
-    generation_model: str = "gemini-2.0-flash"
+    embedding_model: str = "gemini-embedding-001"
+    generation_model: str = "gemini-2.5-flash"
     timeout_seconds: float = 30.0
 
     async def embed(self, text: str) -> list[float]:
