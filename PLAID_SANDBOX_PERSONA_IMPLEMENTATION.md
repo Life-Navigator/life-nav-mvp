@@ -83,9 +83,16 @@ Plaid creds were independently validated against `sandbox.plaid.com` (public_tok
 
 `/sandbox/public_token/create` `override_username` only accepts specific documented users — `user_good` ✅, `user_transactions_dynamic` ✅; `user_bank_income` and arbitrary names → `INVALID_CREDENTIALS`. The named dropdown personas (Yuppie, etc.) aren't addressable via `override_username` — they're Link-UI-only or need `user_custom` config JSON. Registry now uses valid users so **every persona activates**; true per-persona datasets need `user_custom` configs (or the operator's dashboard custom users) — a registry-only change.
 
-## Remaining follow-up (pre-existing, flagged)
+## Worker graph-promotion — FIXED (2026-06-04)
 
-**Worker graph-promotion processing fails for `financial_account` entities** (`graphrag.sync_queue` rows go `failed`, `last_error: "partial: qdrant=false neo4j=false"`). Root cause: the Rust worker's `normalize()` (`processor.rs:77`) produces an **empty `summary`** for the `financial_account` payload → it skips Qdrant and the Neo4j write also fails. This is a **pre-existing worker-normalizer bug** (affects ANY financial sync, not just personas) — the persona feature correctly _enqueues_ the jobs. Fix is in the worker's normalizer + a worker redeploy; tracked separately.
+The worker had **two latent bugs** (both swallowed by `.is_ok()`, so graph sync had _never_ worked for any entity type — `graphrag.sync_queue` rows went `failed` with `"partial: qdrant=false neo4j=false"`):
+
+1. **Qdrant point id** was a pipe-delimited string (`tenant|type|id`); Qdrant requires an unsigned int or **UUID** → every upsert 400'd. Now a stable **UUIDv5** (`qdrant_point_uuid`), used by upsert + delete.
+2. **Neo4j** `SET n += $attrs` included object/map values (the jsonb `metadata` column) which Neo4j rejects → the node write failed. `neo4j_safe_value` now stringifies objects/nested arrays; primitives pass through.
+
+Also: `process_upsert` now logs Qdrant/Neo4j failures (`warn`) instead of discarding them. Cargo lib tests 17/17. Worker redeployed.
+
+**Live-verified:** a persona activation's 12 `financial_account` jobs all went `completed` with `qdrant_synced=true neo4j_synced=true` (worker logged 12× `qdrant upsert ok` + 12× `neo4j upsert ok`). Graph promotion now works for every entity type — not just personas.
 
 ## Go-live prerequisites (DONE)
 
