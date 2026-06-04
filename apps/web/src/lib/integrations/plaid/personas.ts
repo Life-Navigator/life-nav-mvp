@@ -165,7 +165,10 @@ export const PLAID_PERSONAS: readonly PlaidPersona[] = [
     financial_complexity: 'moderate',
     expected_goals: ['Understand income patterns', 'Budget to deposits', 'Build savings'],
     plaid_profile_label: 'Bank Income',
-    plaid_sandbox_user: 'user_bank_income',
+    // NOTE: `user_bank_income` is INVALID for /sandbox/public_token/create
+    // override_username (verified). Use the universal sandbox user until a
+    // per-persona `user_custom` config (or real dashboard user) is supplied.
+    plaid_sandbox_user: 'user_good',
     plaid_sandbox_password: PASS,
     plaid_products: ['transactions'],
     institution_id: DEFAULT_INSTITUTION,
