@@ -144,8 +144,10 @@ export async function getFirstInsight(svc: Svc, userId: string): Promise<FirstIn
     };
   }
 
-  // 4. Idle cash earning less than inflation (well-reserved profiles).
-  if (runwayMonths !== null && runwayMonths > 9 && cash > 25000) {
+  // 4. Idle cash earning less than inflation (genuinely cash-heavy profiles).
+  //    Threshold is high so a normal family buffer doesn't read as "idle wealth";
+  //    this targets profiles sitting on large cash piles beside invested money.
+  if (runwayMonths !== null && runwayMonths > 9 && cash > 75000) {
     const idle = cash - (monthlyExpenses * 6 || 0);
     return {
       ...base,
@@ -157,18 +159,20 @@ export async function getFirstInsight(svc: Svc, userId: string): Promise<FirstIn
     };
   }
 
-  // 5. No retirement savings for an established earner.
-  if (
-    !hasRetirement &&
-    persona?.life_stage &&
-    !['early_career'].includes(persona.life_stage as string)
-  ) {
+  // 5. No retirement account showing up. Framing is stage-aware: for early
+  //    earners it's the single biggest opportunity (compounding), for
+  //    established earners it's a gap. Requires a little savings so we don't
+  //    nag someone with nothing to contribute yet.
+  if (!hasRetirement && persona?.life_stage && assets >= 2000) {
+    const earlyStage = ['early_career', 'mid_career'].includes(persona.life_stage as string);
     return {
       ...base,
-      severity: 'caution',
+      severity: earlyStage ? 'neutral' : 'caution',
       metric: '0',
-      headline: `No retirement savings detected for your income.`,
-      detail: `Tax-advantaged contributions are the highest-leverage move at your stage and aren't showing up yet.`,
+      headline: `No retirement account is showing up yet.`,
+      detail: earlyStage
+        ? `Starting now is your single biggest advantage — decades of compounding work in your favor.`
+        : `Tax-advantaged contributions are the highest-leverage move at your stage and aren't showing up yet.`,
       recommendation: `Open or fund a tax-advantaged retirement account (401(k)/IRA) this month.`,
     };
   }
@@ -178,13 +182,14 @@ export async function getFirstInsight(svc: Svc, userId: string): Promise<FirstIn
     Array.isArray(persona?.primary_goals) && persona!.primary_goals.length
       ? (persona!.primary_goals[0] as string)
       : 'reach your next financial goal';
+  const assetAccounts = accounts.filter((a) => ASSET_TYPES.has(a.account_type)).length;
   return {
     ...base,
     severity: 'positive',
     metric: usd(assets),
     headline: hasMortgage
       ? `You're managing ${usd(assets)} in savings & investments alongside a ${usd(mortgageBalance)} mortgage.`
-      : `${usd(assets)} in savings & investments across ${accounts.length} accounts.`,
+      : `${usd(assets)} in savings & investments across ${assetAccounts} account${assetAccounts === 1 ? '' : 's'}.`,
     detail: `Your office has read your accounts and is ready to help you ${String(goal).toLowerCase()}.`,
     recommendation: `Ask your advisor how to ${String(goal).toLowerCase()} from here.`,
   };
