@@ -83,6 +83,40 @@ describe('CostEstimator — unknown models use conservative ceiling', () => {
   });
 });
 
+describe('Regression — governed chat must not trip the unmodeled ceiling', () => {
+  // Beta-20: governed-route estimated chat cost with the alias `gemini-default`,
+  // which is NOT a RATE_TABLE key → modeled:false → ~$0.39/turn ceiling →
+  // the $1.00/day per-user budget was exhausted in ~2 turns (110/130 live
+  // chat calls returned 429 budget_exceeded). The fix estimates with the
+  // concrete model the edge function actually runs (gemini-2.5-flash).
+  const DAILY_BUDGET_MICROS = 1_000_000; // $1.00, BETA_USER_BUDGET_DEFAULTS.daily_micros
+
+  test('the OLD `gemini-default` alias was unmodeled and ~1000x too expensive', () => {
+    const bug = estimateCost({
+      provider: 'gemini',
+      model: 'gemini-default', // the pre-fix alias
+      units: { text_input: 1500, text_output: 800 },
+    });
+    expect(bug.modeled).toBe(false);
+    expect(bug.total_micros).toBeGreaterThan(300_000); // ~$0.39 ceiling
+    // Only ~2 turns fit in the daily budget — the observed 429 wall.
+    expect(Math.floor(DAILY_BUDGET_MICROS / bug.total_micros)).toBeLessThanOrEqual(3);
+  });
+
+  test('the FIXED chat-path model (gemini-2.5-flash) is modeled and sub-cent per turn', () => {
+    const fixed = estimateCost({
+      provider: 'gemini',
+      model: 'gemini-2.5-flash', // matches graphrag-query/index.ts generation model
+      units: { text_input: 1500, text_output: 800 },
+    });
+    expect(fixed.modeled).toBe(true);
+    // 1500/1000*75 + 800/1000*300 = 112.5→113 + 240 = ~353 micros
+    expect(fixed.total_micros).toBeLessThan(1_000);
+    // A real beta conversation (hundreds of turns/day) now fits comfortably.
+    expect(Math.floor(DAILY_BUDGET_MICROS / fixed.total_micros)).toBeGreaterThan(500);
+  });
+});
+
 describe('projectCost', () => {
   test('sums multiple estimates', () => {
     const a = estimateCost({

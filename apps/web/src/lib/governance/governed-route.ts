@@ -49,6 +49,24 @@ import { evaluateBudget, evaluateBreaker, recordUsage, estimateCost } from '@/li
 import type { ProviderId } from '@/lib/economic';
 import type { SubjectEmitter, GovernanceSubject } from '@/types/governance';
 
+/**
+ * Cheapest rate-table-modeled model per provider. Used as the cost-estimation
+ * fallback when a route does not pass an explicit `model`. These MUST be real
+ * keys in cost-estimator's RATE_TABLE — otherwise estimateCost returns
+ * `modeled:false` and applies its ~$0.39/turn conservative ceiling, which
+ * silently exhausts the $1/day per-user beta budget after ~2 turns.
+ * (Root cause of the Beta-20 chat 429 wall: the prior `${provider}-default`
+ * string matched no table entry.)
+ */
+const DEFAULT_MODELED_MODEL: Record<ProviderId, string> = {
+  gemini: 'gemini-2.5-flash',
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-3-5-haiku',
+  azure_openai: 'gpt-4o-mini',
+  local: 'local',
+  other: 'other',
+};
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -75,6 +93,13 @@ export interface GovernedRouteOptions<TBody = unknown> {
   feature_key: string;
   /** Provider for cost estimation. Defaults to 'gemini'. */
   model_provider?: ProviderId;
+  /**
+   * Concrete, rate-table-modeled model id used for cost estimation
+   * (e.g. 'gemini-2.5-pro'). If omitted, falls back to the provider's
+   * cheapest modeled model — NEVER an unmodeled alias, which would trip
+   * estimateCost's conservative ceiling and exhaust the per-user budget.
+   */
+  model?: string;
   /** Pre-call cost estimate (micros). If omitted we use a conservative default. */
   estimated_micros?: number;
   /** Optional JSON-body parser. If omitted, body is read as Record<string, unknown>. */
@@ -173,11 +198,12 @@ export function createGovernedHandler<TBody = Record<string, unknown>>(
 
     // ---- Economic gate (BEFORE model call) ---------------------------------
     const provider: ProviderId = options.model_provider ?? 'gemini';
+    const model = options.model ?? DEFAULT_MODELED_MODEL[provider];
     const estimated_micros =
       options.estimated_micros ??
       estimateCost({
         provider,
-        model: `${provider}-default`,
+        model,
         units: { text_input: 1500, text_output: 800 },
       }).total_micros;
 

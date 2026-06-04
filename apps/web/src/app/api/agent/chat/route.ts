@@ -27,6 +27,11 @@ export const POST = createGovernedHandler<ChatBody>({
   subjectKind: 'advisor_message',
   feature_key: 'chat',
   model_provider: 'gemini',
+  // The graphrag-query edge function generates with gemini-2.5-flash
+  // (supabase/functions/graphrag-query/index.ts:50). Declaring it here keeps
+  // the pre-call cost estimate accurate (~352 micros/turn) instead of falling
+  // back to the unmodeled ~$0.39 ceiling that exhausted the $1/day budget.
+  model: 'gemini-2.5-flash',
   async produce({ request, body, user, accumulator }) {
     if (!body?.message) {
       throw new Error('message is required');
