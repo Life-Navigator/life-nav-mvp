@@ -51,6 +51,8 @@ export interface PlaidAccountLike {
     iso_currency_code?: string | null;
     limit?: number | null;
   };
+  /** APR as a decimal (e.g. 0.2199). Merged from Plaid liabilities when present. */
+  interest_rate?: number | null;
 }
 
 export interface PlaidTxnLike {
@@ -127,6 +129,21 @@ export async function persistPlaidItem(
   if (error) throw new Error(`persistPlaidItem: ${error.message}`);
 }
 
+/**
+ * Remove a user's existing Plaid-sourced finance data before activating a new
+ * sample persona. Without this, re-activating a different persona MERGES both
+ * datasets (sandbox mints fresh account_ids each time, so the upsert never
+ * collides), poisoning every balance-derived surface (First Insight, accounts,
+ * net worth). Deletes in FK-safe order: transactions → accounts → items.
+ * Best-effort per table so a missing-grant on one doesn't strand the others.
+ */
+export async function clearPriorFinanceData(svc: Svc, userId: string): Promise<void> {
+  for (const table of ['transactions', 'financial_accounts', 'plaid_items']) {
+    const { error } = await svc.schema('finance').from(table).delete().eq('user_id', userId);
+    if (error) console.warn(`clearPriorFinanceData(${table}): ${error.message}`);
+  }
+}
+
 /** Upsert accounts; returns a map of plaid_account_id → finance.financial_accounts.id. */
 export async function persistAccounts(
   svc: Svc,
@@ -142,6 +159,7 @@ export async function persistAccounts(
     available_balance: a.balances?.available ?? null,
     currency: a.balances?.iso_currency_code || 'USD',
     credit_limit: a.balances?.limit ?? null,
+    interest_rate: a.interest_rate ?? null,
     is_active: true,
     is_manual: false,
     plaid_account_id: a.account_id,

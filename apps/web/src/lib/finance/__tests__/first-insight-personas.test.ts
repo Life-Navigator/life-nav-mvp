@@ -14,12 +14,18 @@ import { mapAccountType } from '@/lib/integrations/plaid/persist';
 // persist.ts: amount = abs(plaid), transaction_type = plaid >= 0 ? expense : income.
 function rowsFor(personaId: string) {
   const cfg = PLAID_CUSTOM_CONFIGS[personaId];
-  const accounts = cfg.override_accounts.map((a) => ({
-    account_type: mapAccountType(a.type, a.subtype),
-    current_balance: a.starting_balance,
-    available_balance: a.starting_balance,
-    credit_limit: a.meta.limit ?? null,
-  }));
+  const accounts = cfg.override_accounts.map((a) => {
+    // Mirror activate-persona: APR comes from Plaid liabilities (percentage),
+    // persisted as a decimal on finance.financial_accounts.interest_rate.
+    const aprPct = (a as any).liability?.credit?.aprs?.[0]?.apr_percentage;
+    return {
+      account_type: mapAccountType(a.type, a.subtype),
+      current_balance: a.starting_balance,
+      available_balance: a.starting_balance,
+      credit_limit: a.meta.limit ?? null,
+      interest_rate: typeof aprPct === 'number' ? aprPct / 100 : null,
+    };
+  });
   const transactions = cfg.override_accounts.flatMap((a) =>
     a.transactions.map((t) => ({
       amount: Math.abs(t.amount),
@@ -102,16 +108,25 @@ describe('First Insight — per-persona quality', () => {
     expect(i.headline.toLowerCase()).toMatch(/retirement/);
   });
 
-  it('flags credit_rebuilding on high card utilization', async () => {
+  it('flags credit_rebuilding with the debt-vs-invest (APR) trade-off', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const i = await getFirstInsight(mockSvc('credit_rebuilding') as any, 'u');
     expect(i.severity).toBe('risk');
-    expect(i.headline.toLowerCase()).toMatch(/credit card|used/);
+    expect(i.headline.toLowerCase()).toMatch(/card|paying off/);
+    expect(i.metric.toLowerCase()).toMatch(/apr/);
   });
 
-  it('flags high_income_executive idle cash', async () => {
+  it('surfaces idle/spare cash for high_income_executive', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const i = await getFirstInsight(mockSvc('high_income_executive') as any, 'u');
     expect(i.headline.toLowerCase()).toMatch(/cash/);
+  });
+
+  it('quantifies the retirement opportunity (future dollars), not a flat "not found"', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const i = await getFirstInsight(mockSvc('young_professional') as any, 'u');
+    expect(i.headline.toLowerCase()).toMatch(/retirement|worth about/);
+    expect(i.headline.toLowerCase()).not.toContain('no retirement account is showing up');
+    expect(i.metric).toMatch(/\$/); // a real future-value dollar figure
   });
 });

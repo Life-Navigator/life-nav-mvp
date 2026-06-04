@@ -30,6 +30,19 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Open (and optionally pre-fill) when another surface — e.g. the First
+  // Insight "Ask your advisor about this" button — requests the governed
+  // advisor. See AskAdvisorButton / OPEN_ADVISOR_EVENT.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      setIsOpen(true);
+      const prefill = (e as CustomEvent).detail?.prefill;
+      if (typeof prefill === 'string' && prefill) setInput(prefill);
+    };
+    window.addEventListener('lifenav:open-advisor', onOpen);
+    return () => window.removeEventListener('lifenav:open-advisor', onOpen);
+  }, []);
+
   // Load available agent on mount (only if authenticated)
   useEffect(() => {
     // Don't try to load agents if user is not authenticated
@@ -369,6 +382,9 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               Press Enter to send, Shift+Enter for new line
+            </p>
+            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+              General information, not financial, tax, or legal advice.
             </p>
           </div>
         </div>

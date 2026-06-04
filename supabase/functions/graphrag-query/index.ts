@@ -397,12 +397,16 @@ async function graphSearch(
   neo4jUser: string,
   neo4jPass: string,
 ): Promise<SearchResult[]> {
-  // Step 1: NL → Cypher via Gemini
-  const cypherJson = await geminiGenerate(
-    geminiKey,
-    CYPHER_SYSTEM,
-    query,
-  );
+  // Step 1: NL → Cypher via Gemini. Graph context is OPTIONAL — if this Gemini
+  // call transiently fails, degrade to no graph results rather than failing the
+  // whole request (this was a leading cause of the chat 502s).
+  let cypherJson: string;
+  try {
+    cypherJson = await geminiGenerate(geminiKey, CYPHER_SYSTEM, query);
+  } catch (err) {
+    console.warn('NL→Cypher generation failed; skipping graph search:', safeError(err));
+    return [];
+  }
 
   let parsed: { cypher: string | null; params: Record<string, unknown> };
   try {
@@ -642,12 +646,21 @@ serve(async (req: Request) => {
     // --- Hybrid search (inline fallback) ---
     const startMs = Date.now();
 
-    // Embed query
-    const queryVector = await embedQuery(query, geminiKey);
+    // Embed query — OPTIONAL. If embedding transiently fails, degrade to graph-
+    // only (or no) context instead of failing the whole request with a 500.
+    let queryVector: number[] | null = null;
+    try {
+      queryVector = await embedQuery(query, geminiKey);
+    } catch (embedErr) {
+      console.warn('Query embedding failed; skipping vector search:', safeError(embedErr));
+    }
 
-    // Parallel: vector search + graph search
+    // Parallel: vector search (if embedded) + graph search. Both are individually
+    // resilient and return [] on failure, so neither can 500 the request.
     const [vectorResults, graphResults] = await Promise.all([
-      qdrantSearch(qdrantUrl, qdrantKey, qdrantCollection, queryVector, userId),
+      queryVector
+        ? qdrantSearch(qdrantUrl, qdrantKey, qdrantCollection, queryVector, userId)
+        : Promise.resolve([]),
       graphSearch(query, userId, geminiKey, neo4jUrl, neo4jUser, neo4jPass),
     ]);
 
@@ -711,12 +724,23 @@ serve(async (req: Request) => {
       });
     }
 
-    // Non-streaming: single response
-    const answer = await geminiGenerate(
-      geminiKey,
-      ANSWER_SYSTEM,
-      `${fullContext}\n\n---\n\nUser question: ${query}`,
-    );
+    // Non-streaming: single response. Degrade gracefully instead of 500ing if
+    // the (already-retried) generation fails, so the caller never sees a bare
+    // upstream error.
+    let answer = '';
+    try {
+      answer = await geminiGenerate(
+        geminiKey,
+        ANSWER_SYSTEM,
+        `${fullContext}\n\n---\n\nUser question: ${query}`,
+      );
+    } catch (genErr) {
+      console.warn('Answer generation failed after retries:', safeError(genErr));
+    }
+    if (!answer) {
+      answer =
+        "I'm having trouble reaching my reasoning engine at the moment. Your accounts are loaded and your dashboard brief is up to date — please ask again in a few seconds and I'll pick up right where we left off.";
+    }
 
     const durationMs = Date.now() - startMs;
 

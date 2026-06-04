@@ -34,7 +34,12 @@ export type UserEventType =
   | 'arcana_intake_started'
   | 'arcana_intake_completed'
   | 'provider_referral_generated'
-  | 'provider_referral_accepted';
+  | 'provider_referral_accepted'
+  // 110: observability funnel anchor + error/retention events
+  | 'user_signed_up'
+  | 'session_started'
+  | 'persona_activation_failed'
+  | 'model_call_failed';
 
 export interface RecordUserEventInputs {
   user_id: string;
@@ -42,7 +47,7 @@ export interface RecordUserEventInputs {
   event_type: UserEventType;
   event_metadata?: Record<string, unknown>;
   subject_kind?: string;
-  subject_id?: string;
+  subject_id?: string | null;
   context?: Record<string, unknown>;
   occurred_at?: string;
 }

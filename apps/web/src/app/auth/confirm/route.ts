@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { recordUserEvent } from '@/lib/analytics/events';
 import type { EmailOtpType } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
@@ -42,10 +43,23 @@ export async function GET(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const isOnboarded = user?.user_metadata?.onboarding_completed;
 
+    // Funnel anchor: every time-to-X metric measures from here. Best-effort.
+    if (user) {
+      await recordUserEvent(supabase, {
+        user_id: user.id,
+        event_type: 'user_signed_up',
+        event_metadata: { method: 'email' },
+        subject_kind: 'auth',
+        subject_id: null,
+      }).catch(() => {});
+    }
+
+    const isOnboarded = user?.user_metadata?.onboarding_completed;
     if (!isOnboarded) {
-      return NextResponse.redirect(new URL('/onboarding/questionnaire', request.url));
+      // Beta fast-path: send new users straight to the sample-profile picker
+      // (matches middleware), not the long questionnaire.
+      return NextResponse.redirect(new URL('/onboarding/financial-profile', request.url));
     }
   }
 

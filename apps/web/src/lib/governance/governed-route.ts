@@ -44,6 +44,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { guardOutgoing, subjectTextFromPayload } from './route-guard';
+import { recordUserEvent } from '@/lib/analytics/events';
 import { evaluateBudget, evaluateBreaker, recordUsage, estimateCost } from '@/lib/economic';
 import type { ProviderId } from '@/lib/economic';
 import type { SubjectEmitter, GovernanceSubject } from '@/types/governance';
@@ -221,9 +222,42 @@ export function createGovernedHandler<TBody = Record<string, unknown>>(
         tenant_id,
       });
     } catch (e) {
+      // The model/upstream failed. Make the failure COUNTABLE (it was previously
+      // invisible — returned before any usage/event write) and NEVER surface a
+      // bare 502 to a non-technical user: degrade to a deterministic, safe reply.
+      const message = e instanceof Error ? e.message : 'unknown';
+      try {
+        await recordUsage({
+          supabase,
+          user_id: user.id,
+          tenant_id,
+          feature: options.feature_key,
+          provider,
+          model: `${provider}-${options.feature_key}`,
+          cost_dimension: 'text_output',
+          units: 0,
+          cost_usd_micros: 0,
+          estimated_micros,
+          metadata: { outcome: 'model_call_failed', message },
+        });
+      } catch {
+        /* best-effort */
+      }
+      await recordUserEvent(supabase, {
+        user_id: user.id,
+        event_type: 'model_call_failed',
+        event_metadata: { feature: options.feature_key, provider, message },
+        subject_kind: options.subjectKind,
+        subject_id: null,
+      }).catch(() => {});
       return NextResponse.json(
-        { error: 'model_call_failed', message: e instanceof Error ? e.message : 'unknown' },
-        { status: 502 }
+        {
+          message:
+            "I'm having trouble reaching my reasoning engine right now. Your dashboard and accounts are all up to date — please ask me again in a few seconds.",
+          fallback: true,
+          conversation_id: `conv_${Date.now()}`,
+        },
+        { status: 200 }
       );
     }
 
@@ -267,6 +301,20 @@ export function createGovernedHandler<TBody = Record<string, unknown>>(
 
     if (!g.ok) {
       return g.response;
+    }
+
+    // ---- Funnel: first (and subsequent) advisor chats ----------------------
+    // The funnel view uses MIN(occurred_at) for "time to first chat", so emitting
+    // on every successful advisor turn yields a correct first-chat anchor and a
+    // chat-volume signal. Server-side + best-effort.
+    if (options.subjectKind === 'advisor_message') {
+      await recordUserEvent(supabase, {
+        user_id: user.id,
+        event_type: 'first_chat_message',
+        event_metadata: { feature: options.feature_key, provider },
+        subject_kind: options.subjectKind,
+        subject_id: produced.subject_id ?? null,
+      }).catch(() => {});
     }
 
     // ---- Release output -----------------------------------------------------

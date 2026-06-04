@@ -31,6 +31,44 @@ export async function GET() {
   try {
     const sb = supabase as any;
 
+    // Fetch persisted finance accounts (RLS-scoped). Mirrors the First Insight
+    // engine's classification so the Financial Overview card and the brief
+    // never contradict ("$242,200 …" above "No financial data" below).
+    const ASSET = new Set(['checking', 'savings', 'investment', 'retirement']);
+    const DEBT = new Set(['credit_card', 'loan', 'mortgage']);
+    let financial = { ...emptyDashboard.financial };
+    try {
+      const { data: accts } = await sb
+        .schema('finance')
+        .from('financial_accounts')
+        .select('account_type, current_balance')
+        .eq('user_id', user.id)
+        .eq('is_active', true);
+      const rows = (accts || []) as Array<{ account_type: string; current_balance: number | null }>;
+      if (rows.length) {
+        const sum = (pred: (t: string) => boolean) =>
+          rows
+            .filter((r) => pred(r.account_type))
+            .reduce((n, r) => n + Number(r.current_balance ?? 0), 0);
+        const checking = sum((t) => t === 'checking');
+        const savings = sum((t) => t === 'savings');
+        const investments = sum((t) => t === 'investment' || t === 'retirement');
+        const totalAssets = sum((t) => ASSET.has(t));
+        const totalLiabilities = sum((t) => DEBT.has(t));
+        financial = {
+          netWorth: totalAssets - totalLiabilities,
+          totalAssets,
+          totalLiabilities,
+          checking,
+          savings,
+          investments,
+          hasData: true,
+        };
+      }
+    } catch (finErr) {
+      console.warn('Dashboard finance read failed:', (finErr as Error)?.message);
+    }
+
     // Fetch career profile
     const { data: careerProfile } = await sb
       .from('career_profiles')
@@ -65,6 +103,7 @@ export async function GET() {
       totalCourses > 0 ? Math.round((completedCourses / totalCourses) * 100) : 0;
 
     const hasAnyData = !!(
+      financial.hasData ||
       careerProfile ||
       (activeApplications && activeApplications > 0) ||
       totalCourses > 0
@@ -72,6 +111,7 @@ export async function GET() {
 
     return NextResponse.json({
       ...emptyDashboard,
+      financial,
       career: {
         title: careerProfile?.current_title || null,
         company: careerProfile?.current_company || null,

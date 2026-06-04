@@ -8,7 +8,12 @@ jest.mock('@/lib/supabase/server', () => ({
     from: () => ({ insert: jest.fn(async () => ({ error: null })) }),
   })),
   createServiceRoleClient: jest.fn(() => ({
-    from: () => ({ update: () => ({ eq: jest.fn(async () => ({ error: null })) }) }),
+    // profiles.update(...).eq(...).select('id') → returns the updated row.
+    from: () => ({
+      update: () => ({
+        eq: () => ({ select: jest.fn(async () => ({ data: [{ id: 'user-1' }], error: null })) }),
+      }),
+    }),
   })),
 }));
 
@@ -16,22 +21,26 @@ const mockCreateSandbox = jest.fn();
 const mockExchange = jest.fn();
 const mockGetAccounts = jest.fn();
 const mockGetTransactions = jest.fn();
+const mockGetLiabilities = jest.fn();
 jest.mock('@/lib/integrations/plaid/client', () => ({
   createSandboxPublicToken: (...a: unknown[]) => mockCreateSandbox(...a),
   exchangePublicToken: (...a: unknown[]) => mockExchange(...a),
   getAccounts: (...a: unknown[]) => mockGetAccounts(...a),
   getTransactions: (...a: unknown[]) => mockGetTransactions(...a),
+  getLiabilities: (...a: unknown[]) => mockGetLiabilities(...a),
 }));
 
 const mockPersistItem = jest.fn();
 const mockPersistAccounts = jest.fn();
 const mockPersistTxns = jest.fn();
 const mockPersistPersonaProfile = jest.fn();
+const mockClearPrior = jest.fn();
 jest.mock('@/lib/integrations/plaid/persist', () => ({
   persistPlaidItem: (...a: unknown[]) => mockPersistItem(...a),
   persistAccounts: (...a: unknown[]) => mockPersistAccounts(...a),
   persistTransactions: (...a: unknown[]) => mockPersistTxns(...a),
   persistPersonaProfile: (...a: unknown[]) => mockPersistPersonaProfile(...a),
+  clearPriorFinanceData: (...a: unknown[]) => mockClearPrior(...a),
 }));
 
 const mockRecordEvent = jest.fn();
@@ -87,6 +96,8 @@ it('valid persona: exchanges sandbox token, syncs accounts, writes audit event',
   ]);
   mockPersistItem.mockResolvedValue(undefined);
   mockPersistAccounts.mockResolvedValue({ 'acct-1': 'fa-1' });
+  mockClearPrior.mockResolvedValue(undefined);
+  mockGetLiabilities.mockResolvedValue({ credit: [] });
   mockGetTransactions.mockResolvedValue({ transactions: [], totalTransactions: 0 });
   mockPersistTxns.mockResolvedValue(0);
   mockPersistPersonaProfile.mockResolvedValue(undefined);
@@ -107,7 +118,13 @@ it('valid persona: exchanges sandbox token, syncs accounts, writes audit event',
   expect(mockPersistAccounts).toHaveBeenCalledTimes(1);
   // persona metadata persisted (dashboard/recs + graph promotion)
   expect(mockPersistPersonaProfile).toHaveBeenCalledTimes(1);
-  // audit event written
+  // prior persona data cleared FIRST (kills the persona-merge corruption)
+  expect(mockClearPrior).toHaveBeenCalledTimes(1);
+  // funnel: selection recorded + activation recorded
+  expect(mockRecordEvent).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ event_type: 'sample_financial_profile_selected' })
+  );
   expect(mockRecordEvent).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({ event_type: 'sample_financial_profile_activated' })

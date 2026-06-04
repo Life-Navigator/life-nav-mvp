@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { FirstInsight } from '@/lib/finance/first-insight';
+import AskAdvisorButton from '@/components/chat/AskAdvisorButton';
 
 const TONE: Record<string, { ring: string; chip: string; bar: string }> = {
   risk: {
@@ -32,7 +33,9 @@ const TONE: Record<string, { ring: string; chip: string; bar: string }> = {
 export default function FirstInsightCard({ insight }: { insight: FirstInsight | null }) {
   if (!insight) return null;
   const tone = TONE[insight.severity] ?? TONE.neutral;
-  const chatHref = '/conversation';
+  const advisorPrefill = insight.headline
+    ? `About my brief: "${insight.headline}" — what should I do about this?`
+    : undefined;
 
   return (
     <section
@@ -61,7 +64,14 @@ export default function FirstInsightCard({ insight }: { insight: FirstInsight | 
           </span>
         </div>
 
-        <p className="mt-3 text-xl sm:text-2xl font-semibold leading-snug text-gray-900 dark:text-white">
+        {insight.metric && (
+          <p className="mt-3 text-3xl sm:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
+            {insight.metric}
+          </p>
+        )}
+        <p
+          className={`${insight.metric ? 'mt-1' : 'mt-3'} text-xl sm:text-2xl font-semibold leading-snug text-gray-900 dark:text-white`}
+        >
           {insight.headline}
         </p>
         {insight.detail && (
@@ -79,12 +89,12 @@ export default function FirstInsightCard({ insight }: { insight: FirstInsight | 
 
         {insight.has_data ? (
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Link
-              href={chatHref}
+            <AskAdvisorButton
+              prefill={advisorPrefill}
               className="inline-flex items-center rounded-lg bg-gray-900 dark:bg-white px-4 py-2 text-sm font-medium text-white dark:text-gray-900 hover:opacity-90 transition"
             >
               Ask your advisor about this
-            </Link>
+            </AskAdvisorButton>
             <Link
               href="/dashboard/finance"
               className="text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
@@ -101,6 +111,12 @@ export default function FirstInsightCard({ insight }: { insight: FirstInsight | 
               Choose a sample profile
             </Link>
           </div>
+        )}
+
+        {insight.has_data && (
+          <p className="mt-4 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+            General information based on your sample profile — not financial, tax, or legal advice.
+          </p>
         )}
       </div>
     </section>

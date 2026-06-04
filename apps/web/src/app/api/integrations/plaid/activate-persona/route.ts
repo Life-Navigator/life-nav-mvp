@@ -5,6 +5,7 @@ import {
   exchangePublicToken,
   getAccounts,
   getTransactions,
+  getLiabilities,
 } from '@/lib/integrations/plaid/client';
 import {
   getPersona,
@@ -17,6 +18,7 @@ import {
   persistAccounts,
   persistTransactions,
   persistPersonaProfile,
+  clearPriorFinanceData,
 } from '@/lib/integrations/plaid/persist';
 import { recordUserEvent } from '@/lib/analytics/events';
 import { safeApiError } from '@/lib/security/safe-error';
@@ -64,7 +66,22 @@ export async function POST(request: NextRequest) {
   const svc = createServiceRoleClient();
   if (!svc) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
 
+  // Funnel: the user committed to a sample profile (counts even if activation
+  // later fails). Server-side + best-effort.
+  await recordUserEvent(svc, {
+    user_id: user.id,
+    event_type: 'sample_financial_profile_selected',
+    event_metadata: { persona_id: persona.persona_id },
+    subject_kind: 'plaid_persona',
+    subject_id: null,
+  });
+
   try {
+    // 0) Clear any prior persona's finance data FIRST. Without this, switching
+    //    profiles merges both datasets (sandbox mints fresh account_ids, so the
+    //    upsert never collides) and poisons every balance-derived surface.
+    await clearPriorFinanceData(svc, user.id);
+
     // 1) Sandbox token flow (no Link UI; credentials stay server-side). Uses a
     //    distinct user_custom dataset when the persona defines one, else a
     //    documented sandbox user (graceful fallback).
@@ -88,7 +105,29 @@ export async function POST(request: NextRequest) {
     });
 
     const accounts = await getAccounts(accessToken);
-    const accountIdMap = await persistAccounts(svc, user.id, accounts);
+
+    // Merge credit-card APR (from Plaid liabilities) onto the accounts so the
+    // First Insight engine can compute the debt-vs-invest trade-off. Best-effort
+    // — liabilities can lag in sandbox; never fail activation over it.
+    const aprByAccount: Record<string, number> = {};
+    try {
+      const liabilities = await getLiabilities(accessToken);
+      for (const c of liabilities?.credit ?? []) {
+        const aprPct =
+          c.aprs?.find((a) => a.apr_type === 'purchase_apr')?.apr_percentage ??
+          c.aprs?.[0]?.apr_percentage;
+        if (c.account_id && typeof aprPct === 'number') {
+          aprByAccount[c.account_id] = aprPct / 100; // store as decimal
+        }
+      }
+    } catch (liErr) {
+      console.warn('persona liabilities sync deferred:', (liErr as Error)?.message);
+    }
+    const accountsWithApr = accounts.map((a) => ({
+      ...a,
+      interest_rate: aprByAccount[a.account_id] ?? null,
+    }));
+    const accountIdMap = await persistAccounts(svc, user.id, accountsWithApr);
 
     // 3) Transactions (last 30 days).
     const end = new Date();
@@ -108,12 +147,34 @@ export async function POST(request: NextRequest) {
     await persistPersonaProfile(svc, user.id, personaMetadata(persona));
 
     // 3c) Beta fast-path: activating a sample profile counts as setup, so the
-    //     dashboard is reachable without the long questionnaire.
-    const { error: profileErr } = await (svc as any)
+    //     dashboard is reachable without the long questionnaire. Verify the row
+    //     was actually updated — if the handle_new_user trigger hasn't created
+    //     the profile yet (trigger lag), a silent 0-row update would leave the
+    //     user stuck redirecting to onboarding forever. Surface it as a
+    //     retryable failure instead (activation persistence is idempotent now).
+    const { data: updatedRows, error: profileErr } = await (svc as any)
       .from('profiles')
       .update({ setup_completed: true, updated_at: new Date().toISOString() })
-      .eq('id', user.id);
-    if (profileErr) console.warn('persona setup_completed update failed:', profileErr.message);
+      .eq('id', user.id)
+      .select('id');
+    if (profileErr || !updatedRows || updatedRows.length === 0) {
+      console.warn('persona setup_completed update affected 0 rows:', profileErr?.message);
+      await recordUserEvent(svc, {
+        user_id: user.id,
+        event_type: 'persona_activation_failed',
+        event_metadata: {
+          persona_id: persona.persona_id,
+          stage: 'setup_completed',
+          message: profileErr?.message ?? 'profile row not found',
+        },
+        subject_kind: 'plaid_persona',
+        subject_id: null,
+      });
+      return NextResponse.json(
+        { error: 'Your profile is still being set up. Please try again in a moment.' },
+        { status: 409 }
+      );
+    }
 
     // 4) Audit event (service role: server-side audit, bypasses RLS).
     await recordUserEvent(svc, {
@@ -163,6 +224,17 @@ export async function POST(request: NextRequest) {
     });
   } catch (err) {
     console.error('Persona activation error:', (err as Error)?.message);
+    await recordUserEvent(svc, {
+      user_id: user.id,
+      event_type: 'persona_activation_failed',
+      event_metadata: {
+        persona_id: persona.persona_id,
+        stage: 'persist',
+        message: (err as Error)?.message ?? 'unknown',
+      },
+      subject_kind: 'plaid_persona',
+      subject_id: null,
+    }).catch(() => {});
     return safeApiError({ code: 'internal_error', internal: err });
   }
 }

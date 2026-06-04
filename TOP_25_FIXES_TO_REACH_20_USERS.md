@@ -1,0 +1,31 @@
+# TOP_25_FIXES_TO_REACH_20_USERS.md
+
+Ranked best-first by impact-per-effort. Impact / Effort / Risk-Reduction (RR) / UX-Improvement (UX) scored High/Med/Low.
+
+| #   | Fix (one-line action)                                                                                                                                          | Impact | Effort | RR   | UX   | Owner report           |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------ | ---- | ---- | ---------------------- |
+| 1   | Re-route First Insight CTA + Discovery action off /conversation to the governed ChatSidebar/advisor (FirstInsightCard.tsx:35, DashboardClient.tsx:99)          | High   | Low    | High | High | Red Team / Trust       |
+| 2   | Populate financial totals + hasData in dashboard/summary/route.ts from finance.financial_accounts (kill the "$242k / No data" contradiction)                   | High   | Low    | High | High | Red Team               |
+| 3   | Fix Footer hrefs to /legal/privacy and /legal/terms (or add redirects); remove/route /about + /contact (Footer.tsx:11-16)                                      | High   | Low    | High | High | Trust                  |
+| 4   | Guard doFetch in geminiFetch with try/catch + retry thrown errors; add AbortSignal.timeout(~20s) to embed/Cypher/answer calls (retry.ts)                       | High   | Low    | High | High | Chat                   |
+| 5   | Correct /security copy: state Postgres-only deletion + actual export scope, OR implement Neo4j/Qdrant delete + finance export (security/page.tsx:90,99)        | High   | Low    | High | Med  | Trust                  |
+| 6   | Record chat failures: call recordUsage/user_event in governed-route.ts:223 catch before returning 502; also count 429 (observability of the known bug)         | High   | Low    | High | Low  | Observability          |
+| 7   | On edge/model failure, return a deterministic First-Insight fallback line instead of bare 502 (chat route)                                                     | High   | Low    | High | High | Recommendations / Chat |
+| 8   | Deactivate/delete prior persona's plaid_items + financial_accounts + transactions in activate-persona before persisting new persona (persist.ts:153 merge bug) | High   | Med    | High | High | Red Team               |
+| 9   | Fix first-recommendation call: send `{query, domain:'finance'}` (or remove the dead call); log non-2xx (activate-persona/route.ts:149)                         | High   | Low    | Med  | Med  | Activation / Reco      |
+| 10  | Add persistent "general information, not financial/legal/tax advice" disclaimer under First Insight recommendation + bottom of ChatSidebar                     | High   | Low    | High | Med  | Trust                  |
+| 11  | Use profiles.upsert(setup_completed) and return non-200 on error (fix permanent onboarding redirect loop) (activate-persona/route.ts:112)                      | High   | Low    | High | High | Red Team               |
+| 12  | Add persistent "Sample data" banner on dashboard + finance views while a persona is active                                                                     | High   | Low    | High | High | Trust                  |
+| 13  | Emit first_chat_message server-side on first successful chat (enum already whitelisted)                                                                        | Med    | Low    | Med  | Low  | Observability          |
+| 14  | Rewrite Rule 5 ("No retirement account…") to quantified future-value opportunity-cost copy for the 4 affected personas (first-insight.ts:166)                  | High   | Med    | Med  | High | First Insight          |
+| 15  | Inject user_persona_profile (income_type/spending_pattern/primary_goals/profession) into chat fullContext in graphrag-query (like risk_assessments read)       | High   | Med    | Med  | High | Chat                   |
+| 16  | Make /auth/confirm redirect to /onboarding/financial-profile (match middleware fast-path) (auth/confirm/route.ts:47)                                           | Med    | Low    | Med  | High | Red Team               |
+| 17  | Hide/disable Notifications settings page or relabel every toggle "Coming soon" (no silent dead controls)                                                       | Med    | Low    | High | High | Retention              |
+| 18  | Render insight.metric prominently in FirstInsightCard.tsx; remove dead metric:'0'                                                                              | Med    | Low    | Low  | High | First Insight          |
+| 19  | Exclude dynamic_transactions persona from the beta picker (unverified, unpredictable insight)                                                                  | Med    | Low    | High | Med  | Activation / Reco      |
+| 20  | Emit sample_financial_profile_selected (server-side at top of activate-persona) — select→activate drop-off (enum whitelisted)                                  | Med    | Low    | Low  | Low  | Observability          |
+| 21  | Add user_signed_up event + migration; emit in auth/confirm — TTX anchor                                                                                        | Med    | Low    | Med  | Low  | Observability          |
+| 22  | Fix SSE: make ChatSidebar parse `data:` lines / read .message (stop rendering raw wire text); add `text` to route.ts accumulator                               | Med    | Med    | Med  | High | Chat                   |
+| 23  | Wrap the 3 Plaid token/account calls in retry-with-backoff (absorb transient sandbox failures → activation reliability)                                        | Med    | Low    | High | Low  | Activation             |
+| 24  | Rotate First Insight across all matching rules by day/visit + add "welcome back, day N" line (per-visit-varying brief)                                         | Med    | Med    | Low  | High | Retention              |
+| 25  | Qualify SOC2/SLA claims ("built on Supabase SOC2 infra"; remove 99.9% SLA); remove fake hardcoded vote counts (DashboardClient.tsx:108)                        | Med    | Low    | High | Med  | Trust                  |
