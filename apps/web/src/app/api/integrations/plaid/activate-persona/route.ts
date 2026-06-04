@@ -107,6 +107,17 @@ export async function POST(request: NextRequest) {
     //     + recommendation engine; the table trigger promotes it to the graph.
     await persistPersonaProfile(svc, user.id, personaMetadata(persona));
 
+    // 3c) Beta fast-path: activating a sample profile counts as setup, so the
+    //     dashboard is reachable without the long questionnaire.
+    await (svc as any)
+      .from('profiles')
+      .update({
+        setup_completed: true,
+        setup_completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', user.id);
+
     // 4) Audit event (service role: server-side audit, bypasses RLS).
     await recordUserEvent(svc, {
       user_id: user.id,

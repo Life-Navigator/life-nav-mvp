@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/ui/loaders/LoadingSpinner';
 import AddDataModal from '@/components/dashboard/AddDataModal';
+import FirstInsightCard from '@/components/dashboard/FirstInsightCard';
 import PinnedScenarioWidget from '@/components/scenario-lab/PinnedScenarioWidget';
 
 interface DashboardData {
@@ -69,9 +70,10 @@ interface Notification {
 
 interface DashboardClientProps {
   initialSession?: any;
+  firstInsight?: import('@/lib/finance/first-insight').FirstInsight | null;
 }
 
-export default function DashboardClient({ initialSession }: DashboardClientProps) {
+export default function DashboardClient({ initialSession, firstInsight }: DashboardClientProps) {
   const currentSession = initialSession;
   const [userName, setUserName] = useState<string>('User');
 
@@ -412,6 +414,9 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
             Here's your life overview for today
           </p>
         </div>
+
+        {/* Today's brief — server-computed First Insight from persisted finance data */}
+        <FirstInsightCard insight={firstInsight ?? null} />
 
         {/* Quick Actions */}
         <div className="mb-8">

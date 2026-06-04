@@ -7,7 +7,9 @@ jest.mock('@/lib/supabase/server', () => ({
     auth: { getUser: mockGetUser, getSession: mockGetSession },
     from: () => ({ insert: jest.fn(async () => ({ error: null })) }),
   })),
-  createServiceRoleClient: jest.fn(() => ({ __svc: true })),
+  createServiceRoleClient: jest.fn(() => ({
+    from: () => ({ update: () => ({ eq: jest.fn(async () => ({ error: null })) }) }),
+  })),
 }));
 
 const mockCreateSandbox = jest.fn();

@@ -104,7 +104,9 @@ export async function middleware(request: NextRequest) {
       .single();
 
     if (profileError || !profile || !profile.setup_completed) {
-      return NextResponse.redirect(new URL('/onboarding/questionnaire', request.url));
+      // Beta fast-path: send new users to pick a sample financial profile
+      // (activation marks setup_completed=true), not the long questionnaire.
+      return NextResponse.redirect(new URL('/onboarding/financial-profile', request.url));
     }
   }
 

@@ -67,18 +67,19 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = async () => {
-    if (!input.trim() || isLoading || !agentId) return;
+  const handleSendMessage = async (preset?: string) => {
+    const text = (typeof preset === 'string' ? preset : input).trim();
+    if (!text || isLoading || !agentId) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input.trim(),
+      content: text,
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    const userInput = input.trim();
+    const userInput = text;
     setInput('');
     setIsLoading(true);
 
@@ -265,9 +266,28 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xs">
                   {agentId
-                    ? 'Ask me anything about your life goals, finances, health, career, or education! Powered by Maverick AI.'
+                    ? 'Your advisor knows your accounts and goals. Ask anything — or start here:'
                     : 'Loading AI agent...'}
                 </p>
+                {agentId && (
+                  <div className="mt-4 flex flex-col gap-2 w-full max-w-xs">
+                    {[
+                      'What should I do with my money this month?',
+                      'Can I afford a $30,000 car?',
+                      'Should I pay down debt or invest first?',
+                    ].map((starter) => (
+                      <button
+                        key={starter}
+                        type="button"
+                        onClick={() => handleSendMessage(starter)}
+                        disabled={isLoading}
+                        className="text-left rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                      >
+                        {starter}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               messages.map((message) => (
@@ -332,7 +352,7 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
                 disabled={isLoading}
               />
               <button
-                onClick={handleSendMessage}
+                onClick={() => handleSendMessage()}
                 disabled={!input.trim() || isLoading || !agentId}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={!agentId ? 'Loading AI agent...' : 'Send message'}
