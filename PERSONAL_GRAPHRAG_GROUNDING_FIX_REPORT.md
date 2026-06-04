@@ -6,10 +6,22 @@ be refused. **Deployed** to the `graphrag-query` edge function.
 
 ---
 
-## VERDICT: ✅ PERSONAL_FINANCIAL_CHAT_SAFE (with non-blocking follow-ups)
+## VERDICT: ✅ PERSONAL_CHAT_SAFE (with non-blocking follow-ups)
 
 Across all 10 grounded personas, the chat now cites **the user's real accounts, balances, APRs, and net
 worth** and **refuses** when data is absent. The "Bank of America $3,250.75" fabrication is **eliminated**.
+
+### Generalized to ALL personal domains (commit `06373a8`)
+
+The same fail-closed grounding now covers **everything the user has**, not just finance:
+`fetchAuthoritativePersonal()` reads (in parallel, bounded) financial accounts, **transactions, employer
+benefits, retirement plans, goals, career profile, job applications, education, courses, simulations,
+persona profile, and prior chat sessions** directly from their systems of record, into one labeled
+`AUTHORITATIVE_PERSONAL_FACTS` section (per-domain sub-blocks; empty domains render "NONE on file — do not
+invent"). The `ANSWER_SYSTEM` rules apply to **any** personal fact — never invent goals, employers,
+schools, simulation results, or what was said in a prior chat. Verified live (young_professional):
+transactions grounded, goals + career _refused_ (no invention), persona profession grounded, finance
+intact.
 
 ---
 
@@ -42,10 +54,10 @@ worth** and **refuses** when data is absent. The "Bank of America $3,250.75" fab
 
 **Examples (real, post-fix):**
 
-- young_professional: _"Everyday Checking $3,200.00 · Cash Rewards Card $640.00 owed · Emergency Savings
+- young*professional: *"Everyday Checking $3,200.00 · Cash Rewards Card $640.00 owed · Emergency Savings
   $4,800.00 · Student Loan $25,000.00 owed"_; _"APR … 21.99% on your Cash Rewards Card"_; _"net worth
-  −$17,640.00 … assets $8,000.00 minus debt $25,640.00."_
-- small_business_owner: _"You owe $6,240.00 on your Business Card, APR 18.49%."_
+  −$17,640.00 … assets $8,000.00 minus debt $25,640.00."\_
+- small*business_owner: *"You owe $6,240.00 on your Business Card, APR 18.49%."\_
 - **no-account user:** _"You haven't connected any financial accounts yet. I don't have any information
   about your accounts or balances… want me to help you connect them?"_
 
