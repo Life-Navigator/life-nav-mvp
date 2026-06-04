@@ -32,6 +32,46 @@ export async function createLinkToken(userId: string, products?: string[]) {
   };
 }
 
+/**
+ * Create a sandbox public token directly (no Link UI), driven by a sandbox
+ * test username/password. Used by the beta "sample financial profile" flow so
+ * a persona can be activated server-side without the user touching Plaid.
+ */
+export async function createSandboxPublicToken(opts: {
+  institutionId: string;
+  products?: string[];
+  username?: string;
+  password?: string;
+}) {
+  const client = getPlaidClient();
+  const productList = (opts.products || ['transactions']).map((p) => p as Products);
+  const response = await client.sandboxPublicTokenCreate({
+    institution_id: opts.institutionId,
+    initial_products: productList,
+    options: {
+      override_username: opts.username || 'user_good',
+      override_password: opts.password || 'pass_good',
+    },
+  });
+  return { publicToken: response.data.public_token };
+}
+
+export async function getInvestments(accessToken: string) {
+  const client = getPlaidClient();
+  const response = await client.investmentsHoldingsGet({ access_token: accessToken });
+  return {
+    holdings: response.data.holdings,
+    securities: response.data.securities,
+    accounts: response.data.accounts,
+  };
+}
+
+export async function getLiabilities(accessToken: string) {
+  const client = getPlaidClient();
+  const response = await client.liabilitiesGet({ access_token: accessToken });
+  return response.data.liabilities;
+}
+
 export async function exchangePublicToken(publicToken: string) {
   const client = getPlaidClient();
   const response = await client.itemPublicTokenExchange({

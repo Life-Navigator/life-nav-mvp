@@ -19,6 +19,7 @@ export type UserEventType =
   | 'goal_updated'
   | 'document_uploaded'
   | 'plaid_connected'
+  | 'sample_financial_profile_activated'
   | 'recommendation_generated'
   | 'recommendation_viewed'
   | 'recommendation_accepted'

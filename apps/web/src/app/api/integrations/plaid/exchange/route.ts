@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { exchangePublicToken, getAccounts } from '@/lib/integrations/plaid/client';
+import { persistPlaidItem } from '@/lib/integrations/plaid/persist';
 import { safeApiError } from '@/lib/security/safe-error';
 import { recordUserEvent } from '@/lib/analytics/events';
 
@@ -23,20 +24,16 @@ export async function POST(request: NextRequest) {
 
     const { accessToken, itemId } = await exchangePublicToken(publicToken);
 
-    // Store in plaid_items table via Supabase
-    const { error: insertError } = await (supabase as any).from('plaid_items').upsert(
-      {
-        user_id: user.id,
-        item_id: itemId,
-        access_token: accessToken,
-        institution_id: institutionId || null,
-        institution_name: institutionName || null,
-        status: 'active',
-      },
-      { onConflict: 'item_id' }
-    );
-
-    if (insertError) throw insertError;
+    // Store in finance.plaid_items (service role; correct schema + columns).
+    const svc = createServiceRoleClient();
+    if (!svc) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
+    await persistPlaidItem(svc, {
+      userId: user.id,
+      itemId,
+      accessToken,
+      institutionId: institutionId || '',
+      institutionName: institutionName || undefined,
+    });
 
     // Fetch linked accounts to return to client
     const accounts = await getAccounts(accessToken);
