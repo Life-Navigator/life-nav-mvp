@@ -7,13 +7,10 @@ const footerLinks = {
     { label: 'Pricing', href: '/pricing' },
     { label: 'Security', href: '/security' },
   ],
-  Company: [
-    { label: 'About', href: '/about' },
-    { label: 'Contact', href: '/contact' },
-  ],
+  Company: [{ label: 'Contact', href: 'mailto:hello@lifenavigator.ai' }],
   Legal: [
-    { label: 'Privacy Policy', href: '/privacy' },
-    { label: 'Terms of Service', href: '/terms' },
+    { label: 'Privacy Policy', href: '/legal/privacy' },
+    { label: 'Terms of Service', href: '/legal/terms' },
   ],
 };
 

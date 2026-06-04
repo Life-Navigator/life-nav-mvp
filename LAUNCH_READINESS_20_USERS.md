@@ -1,3 +1,36 @@
+# Wave 0 Execution Status — appended 2026-06-04
+
+The 9-part audit verdict was **READY_WITH_P0_FIXES**. This sprint then _implemented and
+verified on production_ the Wave 0 functional P0 blockers + the explicit asks. The
+detailed audit + scoring follows below; this header records what is now SHIPPED.
+
+## Shipped & verified live (commits e06c0bc…3ea0539, +footer)
+
+| Area                   | Fix                                                                                                                                                                                                                                           | Verified                                                          |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| First Insight          | Rewrote engine to Good/Great bar across all 10 personas: APR debt-vs-invest Rule 0, quantified future-value retirement rule (kills the banned "No retirement account detected"), dollar-drag idle-cash, goal-aware fallback, rendered metric. | ✅ real-engine test (5/5) + live dashboard HTML shows "$284,621…" |
+| Activation integrity   | Clear prior persona finance data before re-activating (kills silent persona-merge corruption); checked setup_completed (409 not silent stuck); selected/activation_failed events.                                                             | ✅ live persona switch shows ONLY new data (3 accts, not 8)       |
+| Activation reliability | Fixed credit_rebuilding 500 — `loan/personal` is an invalid Plaid sandbox subtype → `consumer`. Validated all 10 personas' subtypes.                                                                                                          | ✅ all 10 activate                                                |
+| Dashboard              | summary route now reads finance.financial_accounts; net worth excludes mortgage/loan-without-asset (no more "$242k / No data" contradiction, no −$376k).                                                                                      | ✅ live netWorth=+$28,560, hasData=true                           |
+| Hero CTA               | "Ask your advisor about this" opens the governed ChatSidebar (event) instead of dead-ending on /conversation's goals/benefits wall.                                                                                                           | ✅                                                                |
+| Chat 502               | Hardened geminiFetch (retry thrown errors + per-attempt timeouts), made embed + NL→Cypher non-fatal, edge + governed-route deterministic fallback.                                                                                            | ✅ 0 bare 502 across repeated chats (budget 429 still enforced)   |
+| Observability          | Migration 110 (user_signed_up/session_started/persona_activation_failed/model_call_failed); emit signup, first_chat_message, model_call_failed, selected/failed. Funnel now anchorable.                                                       | ✅ migration applied; events whitelisted                          |
+| Trust                  | "not financial advice" disclaimer on First Insight + ChatSidebar; footer Privacy/Terms now resolve (→ /legal/\*), dead /about+/contact removed.                                                                                               | ✅                                                                |
+
+## NOT done this sprint (Wave 1 / trust-copy / retention — see TOP_25)
+
+- #5 /security copy honesty, #12 Sample-data banner, #25 SOC2/SLA claims + fake module vote counts (127/95/203/78 in DashboardClient).
+- #15 inject persona into chat context, #22 SSE parse fix, #17 notifications page honesty.
+- Retention engine build (daily brief / alerts / goal tracking) — designed, not built.
+- Plaid sandbox doesn't honor override credit APR (credit_rebuilding shows 13% not 28%); insight still correct, fidelity follow-up.
+- Minor: deleting an auth user with finance data 500s (cascade) until finance rows are cleared first — operational, not user-facing.
+
+## Current readiness call
+
+Wave 0 functional blockers (activation, insight, dashboard, chat, observability, persona-switch) are **cleared and verified on prod**. Remaining to declare READY_FOR_20_USERS: the trust-copy P0s (#5, #12, #25) and Wave 1 quality items above. Recommend: clear trust-copy (≈half a day), then invite the first 10 per the Sprint Sequence GATE 1.
+
+---
+
 ## PART 9 — 20-USER LAUNCH READINESS
 
 **Overall Verdict: READY_WITH_P0_FIXES.** The product has a genuinely strong spine — a deterministic, server-rendered First Insight that produces a true, specific, money-relevant fact for all 9 verified personas even when sandbox transactions don't persist (first-insight.ts; verified by the persona test matrix). But for a 20-user, _no-operator-present_ beta, several P0s would strand or actively mislead a non-technical user within the first 90 seconds. None are architecturally hard; all are bounded, code-local fixes. That is the precise definition of READY_WITH_P0_FIXES, not READY and not NOT_READY.
@@ -16,7 +49,7 @@ Two contradictory paths: /auth/confirm sends verified signups to the long /onboa
 
 ### Trust — 38 (lowest, and decisive)
 
-This is the dimension that pushes the verdict toward "with P0 fixes." Verified, user-visible, trust-destroying defects: (1) Footer Privacy/Terms link to /privacy and /terms which **404** — pages live at /legal/privacy and /legal/terms (Footer.tsx:15-16 verified). (2) The /security page claims **graph + vector-store cascading deletion** that the code never performs — delete path only does Postgres FK cascade, no Neo4j/Qdrant deletion exists. (3) Security page claims export **includes financial records**, but the export route selects only profiles/goals/courses/job_applications/documents/risk_assessments — **no finance.\* at all** (verified at export/route.ts:26-31). On a _financial_ product these are false GDPR/security claims. (4) The Financial Overview card says "No financial data yet" directly beneath a First Insight quoting "$242,200 in savings" — api/dashboard/summary/route.ts:23 hardcodes financial.hasData=false and never overwrites it (verified). (5) No "not financial advice" disclaimer on any advice surface. A non-technical beta is fundamentally a trust pitch; these must ship fixed.
+This is the dimension that pushes the verdict toward "with P0 fixes." Verified, user-visible, trust-destroying defects: (1) Footer Privacy/Terms link to /privacy and /terms which **404** — pages live at /legal/privacy and /legal/terms (Footer.tsx:15-16 verified). (2) The /security page claims **graph + vector-store cascading deletion** that the code never performs — delete path only does Postgres FK cascade, no Neo4j/Qdrant deletion exists. (3) Security page claims export **includes financial records**, but the export route selects only profiles/goals/courses/job*applications/documents/risk_assessments — **no finance.\* at all** (verified at export/route.ts:26-31). On a \_financial* product these are false GDPR/security claims. (4) The Financial Overview card says "No financial data yet" directly beneath a First Insight quoting "$242,200 in savings" — api/dashboard/summary/route.ts:23 hardcodes financial.hasData=false and never overwrites it (verified). (5) No "not financial advice" disclaimer on any advice surface. A non-technical beta is fundamentally a trust pitch; these must ship fixed.
 
 ### Recommendation Quality — 30
 
