@@ -82,14 +82,20 @@ export async function getFirstInsight(svc: Svc, userId: string): Promise<FirstIn
 
   const cash = sumWhere((a) => a.account_type === 'checking' || a.account_type === 'savings');
   const assets = sumWhere((a) => ASSET_TYPES.has(a.account_type));
-  const debt = sumWhere((a) => DEBT_TYPES.has(a.account_type));
-  const netWorth = assets - debt;
+  const mortgageBalance = sumWhere((a) => a.account_type === 'mortgage');
+  const loanBalance = sumWhere((a) => a.account_type === 'loan');
   const cards = accounts.filter((a) => a.account_type === 'credit_card');
   const cardBalance = cards.reduce((n, a) => n + bal(a), 0);
   const cardLimit = cards.reduce((n, a) => n + Number(a.credit_limit ?? 0), 0);
   const utilization = cardLimit > 0 ? cardBalance / cardLimit : 0;
   const hasRetirement = accounts.some((a) => a.account_type === 'retirement');
   const hasMortgage = accounts.some((a) => a.account_type === 'mortgage');
+  // Plaid returns loan/mortgage LIABILITIES but not the backing assets (home,
+  // education, business), so counting them makes net worth misleadingly
+  // negative. Judge solvency on credit-card ("consumer") debt; surface loans
+  // separately.
+  const consumerDebt = cardBalance;
+  const netWorth = assets - consumerDebt;
 
   // Monthly outflow estimate from persisted expense transactions.
   const expenses = transactions.filter((t) => t.transaction_type === 'expense');
@@ -126,14 +132,14 @@ export async function getFirstInsight(svc: Svc, userId: string): Promise<FirstIn
     };
   }
 
-  // 3. Net worth is negative / debt-heavy.
-  if (netWorth < 0) {
+  // 3. Consumer (non-mortgage) debt exceeds savings/assets.
+  if (netWorth < 0 && consumerDebt > 0) {
     return {
       ...base,
       severity: 'risk',
       metric: usd(netWorth),
-      headline: `Your debts currently exceed your assets by ${usd(Math.abs(netWorth))}.`,
-      detail: `You hold ${usd(assets)} in assets against ${usd(debt)} in debt. There's a clear fastest path back to positive.`,
+      headline: `Your non-mortgage debt exceeds your savings by ${usd(Math.abs(netWorth))}.`,
+      detail: `You hold ${usd(assets)} in assets against ${usd(consumerDebt)} in consumer debt${mortgageBalance > 0 ? ` (plus a ${usd(mortgageBalance)} mortgage)` : ''}. There's a clear fastest path to positive.`,
       recommendation: `Attack the highest-interest balance first while protecting a small cash buffer.`,
     };
   }
@@ -174,9 +180,11 @@ export async function getFirstInsight(svc: Svc, userId: string): Promise<FirstIn
       : 'reach your next financial goal';
   return {
     ...base,
-    severity: netWorth >= 0 ? 'positive' : 'neutral',
-    metric: usd(netWorth),
-    headline: `Net worth ≈ ${usd(netWorth)} across ${accounts.length} accounts${hasMortgage ? ', including your home' : ''}.`,
+    severity: 'positive',
+    metric: usd(assets),
+    headline: hasMortgage
+      ? `You're managing ${usd(assets)} in savings & investments alongside a ${usd(mortgageBalance)} mortgage.`
+      : `${usd(assets)} in savings & investments across ${accounts.length} accounts.`,
     detail: `Your office has read your accounts and is ready to help you ${String(goal).toLowerCase()}.`,
     recommendation: `Ask your advisor how to ${String(goal).toLowerCase()} from here.`,
   };
