@@ -80,11 +80,20 @@ export interface RateBucket {
 /** Constants used by helpers + tests. */
 export const MICROS_PER_USD = 1_000_000;
 
-/** Internal-beta default caps (per user). */
+/**
+ * Internal-beta default caps (per user).
+ *
+ * Raised from $1/$5/$20 after the cost-estimator alias fix: at the corrected
+ * ~$0.00035/turn for gemini-2.5-flash, $4/day = ~11,400 chat turns/day of
+ * headroom so a heavy beta session never hits a premature 429, while the
+ * per-user weekly/monthly ceilings and the $500 platform cap (unchanged)
+ * remain as runaway backstops. The original 1:5:20 daily:weekly:monthly
+ * ratio is preserved so the daily cap stays the meaningful per-session limit.
+ */
 export const BETA_USER_BUDGET_DEFAULTS = Object.freeze({
-  daily_micros: 1 * MICROS_PER_USD, // $1
-  weekly_micros: 5 * MICROS_PER_USD, // $5
-  monthly_micros: 20 * MICROS_PER_USD, // $20
+  daily_micros: 4 * MICROS_PER_USD, // $4
+  weekly_micros: 20 * MICROS_PER_USD, // $20
+  monthly_micros: 80 * MICROS_PER_USD, // $80
 });
 
 /** Internal-beta default platform cap. */

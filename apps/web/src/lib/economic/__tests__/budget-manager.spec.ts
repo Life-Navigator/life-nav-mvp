@@ -30,11 +30,14 @@ function makeSupabase(seed: {
   };
 }
 
+// Explicit literal caps (1M/5M/20M) so the percentage-threshold cases below
+// stay readable and independent of the business default (now $4/$20/$80). The
+// default values themselves are locked by the 'beta cap policy' test instead.
 const USER_BASE = {
   user_id: 'u1',
-  daily_budget_micros: BETA_USER_BUDGET_DEFAULTS.daily_micros,
-  weekly_budget_micros: BETA_USER_BUDGET_DEFAULTS.weekly_micros,
-  monthly_budget_micros: BETA_USER_BUDGET_DEFAULTS.monthly_micros,
+  daily_budget_micros: 1_000_000,
+  weekly_budget_micros: 5_000_000,
+  monthly_budget_micros: 20_000_000,
   current_daily_micros: 0,
   current_weekly_micros: 0,
   current_monthly_micros: 0,
@@ -48,6 +51,34 @@ const PLATFORM_BASE = {
   status: 'NORMAL',
   operator_override: false,
 };
+
+describe('beta cap policy — raised to $4/day after the alias fix', () => {
+  test('per-user defaults are $4 / $20 / $80 (1:5:20 ratio preserved)', () => {
+    expect(BETA_USER_BUDGET_DEFAULTS.daily_micros).toBe(4 * MICROS_PER_USD);
+    expect(BETA_USER_BUDGET_DEFAULTS.weekly_micros).toBe(20 * MICROS_PER_USD);
+    expect(BETA_USER_BUDGET_DEFAULTS.monthly_micros).toBe(80 * MICROS_PER_USD);
+    // Daily must stay the binding per-session limit: weekly > daily, monthly > weekly.
+    expect(BETA_USER_BUDGET_DEFAULTS.weekly_micros).toBeGreaterThan(
+      BETA_USER_BUDGET_DEFAULTS.daily_micros
+    );
+    expect(BETA_USER_BUDGET_DEFAULTS.monthly_micros).toBeGreaterThan(
+      BETA_USER_BUDGET_DEFAULTS.weekly_micros
+    );
+  });
+
+  test('$4/day still blocks runaway usage (cap is real, not removed)', async () => {
+    const sb = makeSupabase({
+      user: {
+        ...USER_BASE,
+        daily_budget_micros: BETA_USER_BUDGET_DEFAULTS.daily_micros,
+        current_daily_micros: BETA_USER_BUDGET_DEFAULTS.daily_micros, // exactly at cap
+      },
+      platform: PLATFORM_BASE,
+    });
+    const r = await evaluate({ supabase: sb, user_id: 'u1', estimated_micros: 1_000 });
+    expect(['BLOCK', 'HARD_STOP']).toContain(r.verdict);
+  });
+});
 
 describe('evaluate — user-budget gates', () => {
   test('small cost → ALLOW', async () => {

@@ -89,7 +89,11 @@ describe('Regression — governed chat must not trip the unmodeled ceiling', () 
   // the $1.00/day per-user budget was exhausted in ~2 turns (110/130 live
   // chat calls returned 429 budget_exceeded). The fix estimates with the
   // concrete model the edge function actually runs (gemini-2.5-flash).
-  const DAILY_BUDGET_MICROS = 1_000_000; // $1.00, BETA_USER_BUDGET_DEFAULTS.daily_micros
+  // The original $1/day cap is what exposed the bug; the raised $4/day cap is
+  // the current policy. The estimator facts hold against both — the per-turn
+  // cost is what matters, not the cap.
+  const OLD_DAILY = 1_000_000; // $1/day (pre-raise)
+  const NEW_DAILY = 4_000_000; // $4/day (current, BETA_USER_BUDGET_DEFAULTS.daily_micros)
 
   test('the OLD `gemini-default` alias was unmodeled and ~1000x too expensive', () => {
     const bug = estimateCost({
@@ -99,8 +103,10 @@ describe('Regression — governed chat must not trip the unmodeled ceiling', () 
     });
     expect(bug.modeled).toBe(false);
     expect(bug.total_micros).toBeGreaterThan(300_000); // ~$0.39 ceiling
-    // Only ~2 turns fit in the daily budget — the observed 429 wall.
-    expect(Math.floor(DAILY_BUDGET_MICROS / bug.total_micros)).toBeLessThanOrEqual(3);
+    // ~2 turns under the old $1 cap (the observed 429 wall); still a paltry
+    // ~10 even under the raised $4 cap — the alias, not the cap, was the bug.
+    expect(Math.floor(OLD_DAILY / bug.total_micros)).toBeLessThanOrEqual(3);
+    expect(Math.floor(NEW_DAILY / bug.total_micros)).toBeLessThanOrEqual(11);
   });
 
   test('the FIXED chat-path model (gemini-2.5-flash) is modeled and sub-cent per turn', () => {
@@ -112,8 +118,8 @@ describe('Regression — governed chat must not trip the unmodeled ceiling', () 
     expect(fixed.modeled).toBe(true);
     // 1500/1000*75 + 800/1000*300 = 112.5→113 + 240 = ~353 micros
     expect(fixed.total_micros).toBeLessThan(1_000);
-    // A real beta conversation (hundreds of turns/day) now fits comfortably.
-    expect(Math.floor(DAILY_BUDGET_MICROS / fixed.total_micros)).toBeGreaterThan(500);
+    // The raised $4/day cap now supports thousands of normal beta turns.
+    expect(Math.floor(NEW_DAILY / fixed.total_micros)).toBeGreaterThan(5_000);
   });
 });
 

@@ -4,14 +4,18 @@
 
 import { __test } from '../usage-meter';
 import { recordUsage } from '../usage-meter';
-import { BETA_USER_BUDGET_DEFAULTS, MICROS_PER_USD } from '../types';
+import { MICROS_PER_USD } from '../types';
 
 const { applyWindows, nextUserStatus, nextPlatformStatus } = __test;
 
+// Explicit literal caps so the percentage-threshold assertions below test the
+// status LOGIC, not the business default (which changed to $4/$20/$80). The
+// numbers here intentionally stay 1M/5M/20M so the 70/80/95/100% inputs are
+// easy to read.
 const SAMPLE_ROW = {
-  daily_budget_micros: BETA_USER_BUDGET_DEFAULTS.daily_micros,
-  weekly_budget_micros: BETA_USER_BUDGET_DEFAULTS.weekly_micros,
-  monthly_budget_micros: BETA_USER_BUDGET_DEFAULTS.monthly_micros,
+  daily_budget_micros: 1_000_000,
+  weekly_budget_micros: 5_000_000,
+  monthly_budget_micros: 20_000_000,
   current_daily_micros: 0,
   current_weekly_micros: 0,
   current_monthly_micros: 0,
