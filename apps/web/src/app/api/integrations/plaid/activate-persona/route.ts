@@ -104,7 +104,9 @@ export async function POST(request: NextRequest) {
         transactions_synced: txnCount,
       },
       subject_kind: 'plaid_persona',
-      subject_id: persona.persona_id,
+      // subject_id is a uuid column; persona_id is a string, so keep it in
+      // event_metadata above and leave subject_id null.
+      subject_id: null,
     });
 
     // 5) Best-effort: kick off a first recommendation via the gateway. Never
