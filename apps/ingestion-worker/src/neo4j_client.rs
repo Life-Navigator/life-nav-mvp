@@ -58,7 +58,14 @@ impl Neo4jClient {
     /// Build the parameter bag that `merge_cypher_for` consumes. Exposed
     /// so the tenant-isolation integration test can inspect it.
     pub fn build_params(canon: &CanonicalGraphObject) -> Value {
-        let mut attrs = canon.attributes.clone();
+        // Neo4j node properties must be primitives or arrays of primitives;
+        // it rejects map/object values (e.g. a jsonb `metadata` column), which
+        // would fail the whole SET n += $attrs. Stringify objects/nested arrays.
+        let mut attrs: Map<String, Value> = canon
+            .attributes
+            .iter()
+            .map(|(k, v)| (k.clone(), neo4j_safe_value(v)))
+            .collect();
         // Always include the canonical identity columns so the property
         // bag is self-describing on the node.
         attrs.insert(
@@ -215,6 +222,19 @@ fn normalize_http_base(uri: &str) -> String {
     trimmed.to_string()
 }
 
+/// Neo4j node properties must be primitives or arrays of primitives. Stringify
+/// any object/map or nested array so a jsonb column (e.g. `metadata`) doesn't
+/// fail the whole node write.
+fn neo4j_safe_value(v: &Value) -> Value {
+    match v {
+        Value::Object(_) => Value::String(v.to_string()),
+        Value::Array(arr) if arr.iter().any(|x| x.is_object() || x.is_array()) => {
+            Value::String(v.to_string())
+        }
+        other => other.clone(),
+    }
+}
+
 /// PascalCase the snake_case entity_type for Neo4j labels.
 fn pascalize(s: &str) -> String {
     s.split('_')
@@ -337,5 +357,31 @@ mod tests {
         assert_eq!(pascalize("user_profile"), "UserProfile");
         assert_eq!(pascalize("financial_account"), "FinancialAccount");
         assert_eq!(pascalize("goal"), "Goal");
+    }
+
+    #[test]
+    fn neo4j_safe_value_stringifies_objects() {
+        use serde_json::json;
+        // primitives pass through unchanged
+        assert_eq!(neo4j_safe_value(&json!("x")), json!("x"));
+        assert_eq!(neo4j_safe_value(&json!(42)), json!(42));
+        assert_eq!(neo4j_safe_value(&json!(true)), json!(true));
+        // arrays of primitives pass through (Neo4j allows these)
+        assert_eq!(neo4j_safe_value(&json!(["a", "b"])), json!(["a", "b"]));
+        // objects (e.g. a jsonb `metadata` column) become a string
+        assert!(neo4j_safe_value(&json!({"k": 1})).is_string());
+        // arrays containing objects become a string
+        assert!(neo4j_safe_value(&json!([{"k": 1}])).is_string());
+    }
+
+    #[test]
+    fn build_params_makes_metadata_neo4j_safe() {
+        let mut c = sample_canon();
+        c.attributes
+            .insert("metadata".into(), serde_json::json!({"mode": "subscription"}));
+        let p = Neo4jClient::build_params(&c);
+        let attrs = p.get("attrs").and_then(|a| a.as_object()).unwrap();
+        // the object value must have been stringified, not left as a map
+        assert!(attrs.get("metadata").unwrap().is_string());
     }
 }

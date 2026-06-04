@@ -510,10 +510,40 @@ pub struct CanonicalGraphObject {
 }
 
 impl CanonicalGraphObject {
-    /// Stable Qdrant point id (UUID v5-style derived deterministically
-    /// from tenant + entity_type + entity_id so that re-runs are
-    /// idempotent without us having to remember the previous Qdrant id).
+    /// Stable Qdrant point id, derived deterministically from tenant +
+    /// entity_type + entity_id so re-runs are idempotent.
     pub fn qdrant_point_id(&self) -> String {
-        format!("{}|{}|{}", self.tenant_id, self.entity_type, self.entity_id)
+        qdrant_point_uuid(&self.tenant_id.to_string(), &self.entity_type, &self.entity_id)
+    }
+}
+
+/// Qdrant point IDs must be an unsigned integer or a UUID — a composite
+/// string like `tenant|type|id` is rejected (HTTP 400). Derive a stable
+/// UUIDv5 from that composite key so upserts and deletes address the same
+/// point deterministically.
+pub fn qdrant_point_uuid(tenant_id: &str, entity_type: &str, entity_id: &str) -> String {
+    let key = format!("{tenant_id}|{entity_type}|{entity_id}");
+    uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_URL, key.as_bytes()).to_string()
+}
+
+#[cfg(test)]
+mod point_id_tests {
+    use super::qdrant_point_uuid;
+
+    #[test]
+    fn point_id_is_a_valid_uuid() {
+        let id = qdrant_point_uuid("11111111-1111-1111-1111-111111111111", "financial_account", "abc");
+        // Qdrant requires int or UUID — must parse as a UUID, not a pipe string.
+        assert!(uuid::Uuid::parse_str(&id).is_ok(), "not a uuid: {id}");
+        assert!(!id.contains('|'));
+    }
+
+    #[test]
+    fn point_id_is_deterministic_and_distinct() {
+        let a = qdrant_point_uuid("t", "financial_account", "1");
+        let b = qdrant_point_uuid("t", "financial_account", "1");
+        let c = qdrant_point_uuid("t", "financial_account", "2");
+        assert_eq!(a, b); // stable across runs → idempotent upsert/delete
+        assert_ne!(a, c); // different entity → different point
     }
 }

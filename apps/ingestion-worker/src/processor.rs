@@ -29,7 +29,7 @@
 use chrono::Utc;
 use tracing::{info, warn};
 
-use crate::entities::EntityType;
+use crate::entities::{qdrant_point_uuid, EntityType};
 use crate::errors::Result;
 use crate::gemini_client::GeminiClient;
 use crate::neo4j_client::Neo4jClient;
@@ -92,28 +92,50 @@ impl<'a> Processor<'a> {
         let vector = self.gemini.embed(&canon.summary).await?;
 
         // 2. Qdrant upsert (routed by access_scope).
-        let qdrant_ok = qdrant.upsert(&canon, vector).await.is_ok();
-        if qdrant_ok {
-            info!(
-                entity_type = %job.entity_type,
-                entity_id = %job.entity_id,
-                access_scope = %job.access_scope.as_str(),
-                collection = %qdrant.collection(),
-                "qdrant upsert ok"
-            );
-        }
+        let qdrant_ok = match qdrant.upsert(&canon, vector).await {
+            Ok(()) => {
+                info!(
+                    entity_type = %job.entity_type,
+                    entity_id = %job.entity_id,
+                    access_scope = %job.access_scope.as_str(),
+                    collection = %qdrant.collection(),
+                    "qdrant upsert ok"
+                );
+                true
+            }
+            Err(e) => {
+                warn!(
+                    entity_type = %job.entity_type,
+                    entity_id = %job.entity_id,
+                    error = %e,
+                    "qdrant upsert failed"
+                );
+                false
+            }
+        };
 
         // 3. Neo4j upsert (routed by access_scope).
-        let neo4j_ok = neo4j.upsert_node(&canon).await.is_ok();
-        if neo4j_ok {
-            info!(
-                entity_type = %job.entity_type,
-                entity_id = %job.entity_id,
-                access_scope = %job.access_scope.as_str(),
-                database = %neo4j.database(),
-                "neo4j upsert ok"
-            );
-        }
+        let neo4j_ok = match neo4j.upsert_node(&canon).await {
+            Ok(()) => {
+                info!(
+                    entity_type = %job.entity_type,
+                    entity_id = %job.entity_id,
+                    access_scope = %job.access_scope.as_str(),
+                    database = %neo4j.database(),
+                    "neo4j upsert ok"
+                );
+                true
+            }
+            Err(e) => {
+                warn!(
+                    entity_type = %job.entity_type,
+                    entity_id = %job.entity_id,
+                    error = %e,
+                    "neo4j upsert failed"
+                );
+                false
+            }
+        };
 
         Ok(ProcessOutcome {
             qdrant_synced: qdrant_ok,
@@ -124,7 +146,8 @@ impl<'a> Processor<'a> {
     async fn process_delete(&self, job: &SyncQueueJob) -> Result<ProcessOutcome> {
         let entity_type = EntityType::from_queue_str(&job.entity_type);
         let (qdrant, neo4j) = self.route(job.access_scope);
-        let point_id = format!("{}|{}|{}", job.user_id, entity_type.as_str(), job.entity_id);
+        let point_id =
+            qdrant_point_uuid(&job.user_id.to_string(), entity_type.as_str(), &job.entity_id);
         let q = qdrant.delete(&point_id).await.is_ok();
         let n = neo4j
             .delete_node(
