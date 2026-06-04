@@ -106,9 +106,27 @@ export async function POST(request: NextRequest) {
 
     const accounts = await getAccounts(accessToken);
 
-    // Merge credit-card APR (from Plaid liabilities) onto the accounts so the
-    // First Insight engine can compute the debt-vs-invest trade-off. Best-effort
-    // — liabilities can lag in sandbox; never fail activation over it.
+    // --- APR sourcing (debt-cost logic depends on this) -----------------------
+    // The persona config encodes the INTENDED APR per account (e.g. the
+    // credit_rebuilding secured card at 27.99%). Plaid sandbox does NOT honor the
+    // override APR — its /liabilities endpoint returns a generic default (~13%),
+    // which would silently understate every debt recommendation. So we treat the
+    // persona config as the source of truth, matched by account name, and only
+    // fall back to live liabilities for non-sample (real) accounts.
+    const configAprByName: Record<string, number> = {};
+    for (const acc of activation.customConfig?.override_accounts ?? []) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const aprPct = (acc as any)?.liability?.credit?.aprs?.[0]?.apr_percentage;
+      const name = acc?.meta?.name;
+      if (name && typeof aprPct === 'number') {
+        configAprByName[name.trim().toLowerCase()] = aprPct / 100; // store as decimal
+      }
+    }
+    // Single-credit-card fallback: if exactly one config APR exists and exactly
+    // one credit card came back, map directly (covers any name mismatch).
+    const configAprValues = Object.values(configAprByName);
+    const liveCards = accounts.filter((a) => (a.type || '').toLowerCase() === 'credit');
+
     const aprByAccount: Record<string, number> = {};
     try {
       const liabilities = await getLiabilities(accessToken);
@@ -117,16 +135,25 @@ export async function POST(request: NextRequest) {
           c.aprs?.find((a) => a.apr_type === 'purchase_apr')?.apr_percentage ??
           c.aprs?.[0]?.apr_percentage;
         if (c.account_id && typeof aprPct === 'number') {
-          aprByAccount[c.account_id] = aprPct / 100; // store as decimal
+          aprByAccount[c.account_id] = aprPct / 100;
         }
       }
     } catch (liErr) {
       console.warn('persona liabilities sync deferred:', (liErr as Error)?.message);
     }
-    const accountsWithApr = accounts.map((a) => ({
-      ...a,
-      interest_rate: aprByAccount[a.account_id] ?? null,
-    }));
+
+    const accountsWithApr = accounts.map((a) => {
+      const byName = configAprByName[(a.name || '').trim().toLowerCase()];
+      const single =
+        configAprValues.length === 1 &&
+        liveCards.length === 1 &&
+        a.account_id === liveCards[0].account_id
+          ? configAprValues[0]
+          : undefined;
+      // Intended config APR wins; live liabilities only fill gaps.
+      const interest_rate = byName ?? single ?? aprByAccount[a.account_id] ?? null;
+      return { ...a, interest_rate };
+    });
     const accountIdMap = await persistAccounts(svc, user.id, accountsWithApr);
 
     // 3) Transactions (last 30 days).

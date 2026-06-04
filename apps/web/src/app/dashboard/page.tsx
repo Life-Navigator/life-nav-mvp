@@ -1,18 +1,23 @@
 import DashboardClient from '@/components/dashboard/DashboardClient';
 import FirstInsightCard from '@/components/dashboard/FirstInsightCard';
+import RecommendationsCard from '@/components/dashboard/RecommendationsCard';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { getFirstInsight, type FirstInsight } from '@/lib/finance/first-insight';
+import type { FirstInsight } from '@/lib/finance/first-insight';
+import { getRecommendations, type Recommendation } from '@/lib/finance/recommendations';
 import { recordUserEvent } from '@/lib/analytics/events';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * Dashboard page. Auth + onboarding gating happen in middleware. We
- * server-compute the "First Insight" from the user's persisted finance data so
- * the dashboard shows a specific, true, money-relevant fact on first paint.
+ * server-compute the persona-aware recommendation set from the user's persisted
+ * finance data; the top one renders as "Today's brief" and the full set (>=3
+ * categorized moves) renders below it. One DB read for both. Deterministic — no
+ * model call, no 502 surface.
  */
 export default async function DashboardPage() {
   let firstInsight: FirstInsight | null = null;
+  let recommendations: Recommendation[] = [];
 
   try {
     const supabase = await createServerSupabaseClient();
@@ -22,8 +27,19 @@ export default async function DashboardPage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        firstInsight = await getFirstInsight(svc, user.id);
-        if (firstInsight?.has_data) {
+        const set = await getRecommendations(svc, user.id);
+        if (set.has_data && set.recommendations.length > 0) {
+          recommendations = set.recommendations;
+          const top = set.recommendations[0];
+          firstInsight = {
+            headline: top.title,
+            detail: top.detail,
+            recommendation: top.action,
+            severity: top.severity,
+            metric: top.metric,
+            persona_id: set.persona_id,
+            has_data: true,
+          };
           await recordUserEvent(svc, {
             user_id: user.id,
             event_type: 'first_insight_viewed',
@@ -31,6 +47,7 @@ export default async function DashboardPage() {
               persona_id: firstInsight.persona_id ?? null,
               severity: firstInsight.severity,
               metric: firstInsight.metric,
+              recommendation_count: recommendations.length,
             },
             subject_kind: 'first_insight',
             subject_id: null,
@@ -47,6 +64,7 @@ export default async function DashboardPage() {
       {firstInsight?.has_data && (
         <div className="px-6 pt-6 max-w-[1400px] mx-auto w-full">
           <FirstInsightCard insight={firstInsight} />
+          <RecommendationsCard recommendations={recommendations} />
         </div>
       )}
       <DashboardClient firstInsight={firstInsight} />

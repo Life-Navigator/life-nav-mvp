@@ -102,18 +102,18 @@ describe('First Insight — per-persona quality', () => {
     }
   });
 
-  it('gives married_family a retirement-gap insight, not an idle-cash or underwater one', async () => {
+  it('gives married_family a retirement/match insight as the top action', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const i = await getFirstInsight(mockSvc('married_family') as any, 'u');
-    expect(i.headline.toLowerCase()).toMatch(/retirement/);
+    expect(i.headline.toLowerCase()).toMatch(/retirement|401|match/);
   });
 
-  it('flags credit_rebuilding with the debt-vs-invest (APR) trade-off', async () => {
+  it('leads credit_rebuilding with STABILIZATION, never invest/pay-card tone-deafness', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const i = await getFirstInsight(mockSvc('credit_rebuilding') as any, 'u');
     expect(i.severity).toBe('risk');
-    expect(i.headline.toLowerCase()).toMatch(/card|paying off/);
-    expect(i.metric.toLowerCase()).toMatch(/apr/);
+    expect(i.headline.toLowerCase()).toMatch(/cash flow|steady|stabil|reserve/);
+    expect(`${i.headline} ${i.recommendation}`.toLowerCase()).not.toMatch(/invest|brokerage/);
   });
 
   it('surfaces idle/spare cash for high_income_executive', async () => {
