@@ -1,4 +1,5 @@
 import DashboardClient from '@/components/dashboard/DashboardClient';
+import FirstInsightCard from '@/components/dashboard/FirstInsightCard';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { getFirstInsight, type FirstInsight } from '@/lib/finance/first-insight';
 import { recordUserEvent } from '@/lib/analytics/events';
@@ -41,5 +42,14 @@ export default async function DashboardPage() {
     // Never block the dashboard on the insight; it degrades to null.
   }
 
-  return <DashboardClient firstInsight={firstInsight} />;
+  return (
+    <>
+      {firstInsight?.has_data && (
+        <div className="px-6 pt-6 max-w-[1400px] mx-auto w-full">
+          <FirstInsightCard insight={firstInsight} />
+        </div>
+      )}
+      <DashboardClient firstInsight={firstInsight} />
+    </>
+  );
 }

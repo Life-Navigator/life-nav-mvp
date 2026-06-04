@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/ui/loaders/LoadingSpinner';
 import AddDataModal from '@/components/dashboard/AddDataModal';
-import FirstInsightCard from '@/components/dashboard/FirstInsightCard';
 import PinnedScenarioWidget from '@/components/scenario-lab/PinnedScenarioWidget';
 
 interface DashboardData {
@@ -73,7 +72,7 @@ interface DashboardClientProps {
   firstInsight?: import('@/lib/finance/first-insight').FirstInsight | null;
 }
 
-export default function DashboardClient({ initialSession, firstInsight }: DashboardClientProps) {
+export default function DashboardClient({ initialSession }: DashboardClientProps) {
   const currentSession = initialSession;
   const [userName, setUserName] = useState<string>('User');
 
@@ -415,8 +414,8 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
           </p>
         </div>
 
-        {/* Today's brief — server-computed First Insight from persisted finance data */}
-        <FirstInsightCard insight={firstInsight ?? null} />
+        {/* Today's brief (First Insight) is server-rendered in dashboard/page.tsx
+            above this client tree so it shows on first paint, before data load. */}
 
         {/* Quick Actions */}
         <div className="mb-8">
