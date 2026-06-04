@@ -7,11 +7,20 @@ import {
 } from 'https://deno.land/std@0.224.0/assert/mod.ts';
 import {
   type FinanceAccount,
+  type PersonalData,
   isDebtType,
   fmtMoney,
   formatAuthoritativeFinance,
+  formatAuthoritativePersonal,
   buildMissingData,
 } from './grounding.ts';
+
+// All-empty personal data (every domain present-but-empty → fail closed).
+const EMPTY: PersonalData = {
+  accounts: [], goals: [], transactions: [], benefits: [], retirement: [],
+  career: [], jobApplications: [], education: [], courses: [], simulations: [],
+  persona: [], sessions: [],
+};
 
 const YP: FinanceAccount[] = [
   { account_name: 'Everyday Checking', account_type: 'checking', institution_name: null, current_balance: 3200, available_balance: 3200, interest_rate: null, credit_limit: null, currency: 'USD' },
@@ -50,11 +59,37 @@ Deno.test('null accounts → unavailable, do not estimate', () => {
   assert(!/\$\d/.test(out), 'must contain no dollar amounts');
 });
 
-// MISSING_DATA anchors refusals for absent categories
-Deno.test('missing-data lists accounts when none present', () => {
-  assertStringIncludes(buildMissingData([]), 'none connected yet');
-  assertStringIncludes(buildMissingData(null), 'temporarily unreadable');
-  assertStringIncludes(buildMissingData(YP), 'Income / salary');
+// MISSING_DATA anchors refusals across ALL domains when empty
+Deno.test('missing-data lists every empty personal domain', () => {
+  const md = buildMissingData(EMPTY);
+  for (const label of ['financial accounts', 'goals', 'career profile', 'education', 'job applications', 'prior chat sessions']) {
+    assertStringIncludes(md, label);
+  }
+});
+
+// (1) central-only / no personal data → every domain renders a fail-closed note
+Deno.test('all-empty personal data → NONE on file for every domain, no invented values', () => {
+  const out = formatAuthoritativePersonal(EMPTY);
+  // each domain must explicitly say none + never-invent
+  assertStringIncludes(out, 'NO financial accounts are on file');
+  assert((out.match(/NONE on file/g) || []).length >= 8, 'most domains say NONE on file');
+  assert(!/\$\d/.test(out), 'no dollar amounts when everything is empty');
+});
+
+// generalized: a populated non-finance domain (goals + career) renders facts
+Deno.test('authoritative personal renders goals + career facts', () => {
+  const d: PersonalData = {
+    ...EMPTY,
+    accounts: YP,
+    goals: [{ title: 'Buy a house', category: 'finance', status: 'active', progress_percent: 35, target_value: 60000, current_value: 21000, unit: 'USD', target_date: '2028-01-01' }],
+    career: [{ current_title: 'Software Engineer', current_company: 'Acme', industry: 'Tech', years_of_experience: 4, desired_title: 'Senior Engineer', desired_salary_min: 160000, desired_salary_max: 190000 }],
+  };
+  const out = formatAuthoritativePersonal(d);
+  assertStringIncludes(out, 'AUTHORITATIVE_PERSONAL_FACTS');
+  assertStringIncludes(out, 'Buy a house');
+  assertStringIncludes(out, 'Software Engineer');
+  assertStringIncludes(out, 'Acme');
+  assertStringIncludes(out, '$3,200.00'); // finance still grounded within the personal block
 });
 
 // debt vs asset classification drives net-worth sign

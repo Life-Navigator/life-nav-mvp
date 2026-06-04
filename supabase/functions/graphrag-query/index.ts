@@ -13,7 +13,8 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
 import {
   type FinanceAccount,
-  formatAuthoritativeFinance,
+  type PersonalData,
+  formatAuthoritativePersonal,
   buildMissingData,
 } from './grounding.ts';
 import { geminiFetch } from './retry.ts';
@@ -108,33 +109,36 @@ different jobs and different authority:
   constraints. It governs HOW you answer (framing, allowed language, advice
   principles). It is the SAME for every user and NEVER contains this user's
   personal facts.
-- AUTHORITATIVE_FINANCIAL_FACTS — the user's ACTUAL accounts, balances, APRs,
-  institutions and liabilities, read directly from their secure system of
-  record. This is the ONLY source of truth for the user's personal financial
-  numbers.
-- PERSONAL_CONTEXT — other user-specific facts retrieved from their personal
-  knowledge graph (goals, profile, risk tolerance). Enrichment; it is NOT the
-  primary source for balances/APRs.
+- AUTHORITATIVE_PERSONAL_FACTS — the user's ACTUAL situation across ALL domains,
+  read directly from their secure systems of record: financial accounts,
+  balances, APRs, institutions and liabilities; transactions; employer benefits
+  and salary; retirement plans; goals; career profile and job applications;
+  education and courses; simulation/scenario results; and prior chat sessions.
+  This is the ONLY source of truth for ANY personal fact about the user.
+- PERSONAL_CONTEXT — additional user-specific facts retrieved from their personal
+  knowledge graph (enrichment). It is NOT the primary source; prefer
+  AUTHORITATIVE_PERSONAL_FACTS for any concrete value.
 - MISSING_DATA — categories of the user's data that are NOT available right now.
 
 HARD RULES — you MUST follow these exactly:
-1. Central guidance tells you HOW to answer. AUTHORITATIVE_FINANCIAL_FACTS and
+1. Central guidance tells you HOW to answer. AUTHORITATIVE_PERSONAL_FACTS and
    PERSONAL_CONTEXT tell you WHAT is true about this user. Never mix these up.
-2. Any factual statement about this user's money — balances, account names,
-   institutions/banks, APR/interest rates, debts/liabilities, income, net worth,
-   or transactions — MUST come verbatim from AUTHORITATIVE_FINANCIAL_FACTS (or,
-   if explicitly present there, PERSONAL_CONTEXT). Do not change the numbers,
-   add accounts, or invent institutions.
-3. If the user asks for a personal financial fact that is NOT in those sections
-   (or is listed under MISSING_DATA), you MUST say you don't have that
-   information for them yet and offer to help them connect/add it. Do NOT
-   estimate it, infer it, or fill it in from an example.
-4. NEVER fabricate personal financial data. Never use sample numbers, generic
-   figures, well-known bank names, or amounts from CENTRAL_CONTEXT or your own
-   training as if they were this user's real accounts. If you are not certain a
-   number came from AUTHORITATIVE_FINANCIAL_FACTS, do not state it.
-5. Never derive a personal financial fact from CENTRAL_CONTEXT. Central content
-   is policy/education only — it never reports what this user has.
+2. ANY factual statement about this user's situation — money (balances, accounts,
+   institutions, APRs, debts, income, net worth, transactions), goals, benefits,
+   retirement, career/job applications, education/courses, simulation results, or
+   what was said in prior chats — MUST come verbatim from AUTHORITATIVE_PERSONAL_FACTS
+   (or, if explicitly present there, PERSONAL_CONTEXT). Do not change values, add
+   items, or invent names/institutions/employers/schools.
+3. If the user asks for ANY personal fact that is NOT in those sections (or is
+   listed under MISSING_DATA, including a domain marked "NONE on file"), you MUST
+   say you don't have that information for them yet and offer to help them add or
+   connect it. Do NOT estimate it, infer it, or fill it in from an example.
+4. NEVER fabricate personal data of ANY kind. Never use sample values, generic
+   figures, well-known company/bank/school names, or details from CENTRAL_CONTEXT
+   or your own training as if they were this user's. If you are not certain a
+   detail came from AUTHORITATIVE_PERSONAL_FACTS, do not state it.
+5. Never derive a personal fact from CENTRAL_CONTEXT. Central content is
+   policy/education only — it never reports what this user has or did.
 6. Use CENTRAL_CONTEXT for methodology and compliant, non-guaranteeing language
    (no "guaranteed", "will earn", "risk-free"). Be encouraging, realistic, and
    give concrete next steps grounded ONLY in the user's real data.`;
@@ -578,33 +582,104 @@ function buildCentralContext(results: SearchResult[]): string {
 // Deterministic, authoritative read from the finance system of record. Independent
 // of async graph promotion, so personal balances are ALWAYS grounded when present.
 // Returns null on fetch error (distinct from [] = user genuinely has no accounts).
-async function fetchAuthoritativeFinance(
+// Generic bounded read of one user-scoped domain table. Returns null on error
+// (distinct from [] = genuinely none), so the formatter can fail closed.
+async function fetchDomain(
   // deno-lint-ignore no-explicit-any
   supabase: any,
+  schema: string,
+  table: string,
+  fields: string,
   userId: string,
-): Promise<FinanceAccount[] | null> {
+  opts: { orderBy?: string; limit?: number; eq?: Record<string, unknown> } = {},
+  // deno-lint-ignore no-explicit-any
+): Promise<any[] | null> {
   try {
-    const { data, error } = await supabase
-      .schema('finance')
-      .from('financial_accounts')
-      .select(
-        'account_name, account_type, institution_name, current_balance, available_balance, interest_rate, credit_limit, currency',
-      )
-      .eq('user_id', userId)
-      .eq('is_active', true);
+    let q = supabase.schema(schema).from(table).select(fields).eq('user_id', userId);
+    if (opts.eq) for (const [k, v] of Object.entries(opts.eq)) q = q.eq(k, v);
+    if (opts.orderBy) q = q.order(opts.orderBy, { ascending: false });
+    if (opts.limit) q = q.limit(opts.limit);
+    const { data, error } = await q;
     if (error) {
-      console.warn('Authoritative finance fetch error:', error.message);
+      console.warn(`Authoritative ${schema}.${table} error:`, error.message);
       return null;
     }
-    return (data ?? []) as FinanceAccount[];
+    return data ?? [];
   } catch (e) {
-    console.warn('Authoritative finance fetch threw:', safeError(e));
+    console.warn(`Authoritative ${schema}.${table} threw:`, safeError(e));
     return null;
   }
 }
 
-// Pure finance-formatting helpers (formatAuthoritativeFinance, buildMissingData,
-// isDebtType, fmtMoney) live in ./grounding.ts so they can be unit-tested.
+// Read EVERY authoritative personal domain in parallel (each bounded). This is
+// the system of record for any personal fact — finances, goals, transactions,
+// benefits, career, education, simulations, prior chats — so the model never
+// has to (and is told never to) invent one.
+async function fetchAuthoritativePersonal(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  userId: string,
+): Promise<PersonalData> {
+  const [
+    accounts,
+    goals,
+    transactions,
+    benefits,
+    retirement,
+    career,
+    jobApplications,
+    education,
+    courses,
+    simulations,
+    persona,
+    sessions,
+  ] = await Promise.all([
+    fetchDomain(supabase, 'finance', 'financial_accounts',
+      'account_name, account_type, institution_name, current_balance, available_balance, interest_rate, credit_limit, currency',
+      userId, { eq: { is_active: true } }),
+    fetchDomain(supabase, 'public', 'goals',
+      'title, category, status, progress_percent, target_value, current_value, unit, target_date, priority',
+      userId, { orderBy: 'updated_at', limit: 12 }),
+    fetchDomain(supabase, 'finance', 'transactions',
+      'transaction_date, amount, currency, description, merchant, category, transaction_type',
+      userId, { orderBy: 'transaction_date', limit: 12 }),
+    fetchDomain(supabase, 'finance', 'employer_benefits',
+      'employer_name, salary, bonus_target, stock_grants, retirement_match_percent, health_benefits, is_current',
+      userId, { orderBy: 'updated_at', limit: 4 }),
+    fetchDomain(supabase, 'finance', 'retirement_plans',
+      'plan_name, target_retirement_age, current_savings, monthly_contribution',
+      userId, { orderBy: 'updated_at', limit: 3 }),
+    fetchDomain(supabase, 'public', 'career_profiles',
+      'current_title, current_company, industry, years_of_experience, desired_title, desired_salary_min, desired_salary_max, skills',
+      userId, { orderBy: 'updated_at', limit: 2 }),
+    fetchDomain(supabase, 'public', 'job_applications',
+      'company, position, status, applied_date',
+      userId, { orderBy: 'applied_date', limit: 8 }),
+    fetchDomain(supabase, 'public', 'education_records',
+      'institution_name, degree_type, field_of_study, gpa, status',
+      userId, { orderBy: 'updated_at', limit: 5 }),
+    fetchDomain(supabase, 'public', 'courses',
+      'course_name, provider, status, progress_percent',
+      userId, { orderBy: 'updated_at', limit: 8 }),
+    fetchDomain(supabase, 'public', 'scenario_sim_runs',
+      'created_at, status, overall_robustness_score, market_adjusted_probability, goals_simulated',
+      userId, { orderBy: 'created_at', limit: 5 }),
+    fetchDomain(supabase, 'public', 'user_persona_profile',
+      'display_name, life_stage, profession, income_type',
+      userId, { orderBy: 'updated_at', limit: 1 }),
+    fetchDomain(supabase, 'public', 'ai_sessions',
+      'title, session_type, message_count, last_message_at',
+      userId, { orderBy: 'last_message_at', limit: 5 }),
+  ]);
+  return {
+    accounts: accounts as FinanceAccount[] | null,
+    goals, transactions, benefits, retirement, career,
+    jobApplications, education, courses, simulations, persona, sessions,
+  };
+}
+
+// Pure formatting helpers (formatAuthoritativePersonal, formatAuthoritativeFinance,
+// buildMissingData, …) live in ./grounding.ts so they can be unit-tested.
 
 // ---------------------------------------------------------------------------
 // Main handler
@@ -788,12 +863,13 @@ serve(async (req: Request) => {
       : [];
     const centralContext = buildCentralContext(centralResults);
 
-    // AUTHORITATIVE_FINANCIAL_FACTS — deterministic, direct from the finance
-    // system of record. Independent of async graph promotion, so personal
-    // balances/APRs are grounded whenever they exist. THIS is what prevents
-    // the model from inventing accounts when the graph hasn't been populated.
-    const financeAccounts = await fetchAuthoritativeFinance(supabase, userId);
-    const authoritativeFinance = formatAuthoritativeFinance(financeAccounts);
+    // AUTHORITATIVE_PERSONAL_FACTS — deterministic, direct from the systems of
+    // record across EVERY personal domain (finances, goals, transactions,
+    // benefits, career, education, simulations, prior chats). Independent of
+    // async graph promotion, so personal facts are grounded whenever they
+    // exist. THIS is what prevents the model from inventing ANY personal fact.
+    const personalData = await fetchAuthoritativePersonal(supabase, userId);
+    const authoritativePersonal = formatAuthoritativePersonal(personalData);
 
     // --- Fetch user risk profile for personalization (part of PERSONAL_CONTEXT) ---
     const { data: riskProfile } = await supabase
@@ -809,13 +885,13 @@ serve(async (req: Request) => {
       riskContext = `\n- Risk Level: ${riskProfile.risk_level}; Overall Score: ${riskProfile.overall_score}/100; Assessment: ${riskProfile.assessment_type}`;
     }
 
-    const missingData = buildMissingData(financeAccounts);
+    const missingData = buildMissingData(personalData);
 
     // Assemble the four labeled sections. Order: policy (how) → authoritative
     // facts (what) → personal enrichment → what's missing.
     const fullContext = [
       centralContext,
-      authoritativeFinance,
+      authoritativePersonal,
       personalContext + riskContext,
       missingData,
     ].join('\n\n');
