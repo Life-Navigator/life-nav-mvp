@@ -59,7 +59,35 @@ Beta users select a friendly "sample financial profile." The server looks up tha
 
 Mapped to the requested test list: ✅ frontend never contains sandbox passwords · ✅ invalid persona_id rejected · ✅ persona selection creates financial activation job (persistAccounts → sync trigger) · ✅ sandbox token exchange works · ✅ account sync works · ✅ audit event written. Live-only (post-Plaid-creds smoke): dashboard has financial data, economic usage event on model call.
 
-## Go-live prerequisites (still required)
+## Live verification — DONE (2026-06-04)
+
+Plaid sandbox creds set on Vercel (`PLAID_CLIENT_ID`/`PLAID_CLIENT_SECRET`/`PLAID_ENV=sandbox`), `life-nav-mvp-web` redeployed from `mvp`, and an authenticated activation smoke run end-to-end on **production**:
+
+```
+GET  /api/integrations/plaid/personas         → 200, 10 personas, NO credentials in payload
+POST /api/integrations/plaid/activate-persona → 200 {accounts_linked:12, graph_promotion:"enqueued"}
+finance.financial_accounts                    → 12 rows (checking/savings/credit_card/loan/mortgage/retirement)
+graphrag.sync_queue                           → 12 financial_account jobs enqueued (graph promotion)
+analytics.user_events                         → audit row: sample_financial_profile_activated (persona, accounts, plaid_persona)
+```
+
+Plaid creds were independently validated against `sandbox.plaid.com` (public_token/create → exchange → accounts/get = 12 accounts). Test user + data cleaned up afterward.
+
+### Extra foundation fixes the live smoke surfaced (applied + committed)
+
+- **migration 106** — unique indexes on `finance.financial_accounts.plaid_account_id` + `finance.transactions.plaid_transaction_id` (the upserts' `ON CONFLICT` had no matching constraint → 500).
+- **migration 107** — `analytics` schema API grants + added `sample_financial_profile_activated` to the `analytics.is_event_type()` whitelist + an RLS INSERT policy on `analytics.user_events`. **No user events had EVER written app-wide** (schema ungranted + event type rejected + no insert policy) — this fixes audit for the whole app, not just personas.
+- `subject_id` is a `uuid` column; the audit now passes `null` (persona_id lives in `event_metadata`). The audit write uses the service-role client.
+
+### Empirical Plaid finding
+
+`/sandbox/public_token/create` `override_username` only accepts specific documented users — `user_good` ✅, `user_transactions_dynamic` ✅; `user_bank_income` and arbitrary names → `INVALID_CREDENTIALS`. The named dropdown personas (Yuppie, etc.) aren't addressable via `override_username` — they're Link-UI-only or need `user_custom` config JSON. Registry now uses valid users so **every persona activates**; true per-persona datasets need `user_custom` configs (or the operator's dashboard custom users) — a registry-only change.
+
+## Remaining follow-up (pre-existing, flagged)
+
+**Worker graph-promotion processing fails for `financial_account` entities** (`graphrag.sync_queue` rows go `failed`, `last_error: "partial: qdrant=false neo4j=false"`). Root cause: the Rust worker's `normalize()` (`processor.rs:77`) produces an **empty `summary`** for the `financial_account` payload → it skips Qdrant and the Neo4j write also fails. This is a **pre-existing worker-normalizer bug** (affects ANY financial sync, not just personas) — the persona feature correctly _enqueues_ the jobs. Fix is in the worker's normalizer + a worker redeploy; tracked separately.
+
+## Go-live prerequisites (DONE)
 
 1. **Plaid sandbox credentials on Vercel** (`life-nav-mvp-web`): `PLAID_CLIENT_ID`, `PLAID_CLIENT_SECRET`, `PLAID_ENV=sandbox`. They are NOT currently set; the values live only in Supabase Edge Function secrets and can't be read back. Until set, `activate-persona` returns a clean 503 ("Sample financial profiles are not available yet").
 2. **Redeploy `life-nav-mvp-web`** from `mvp` so the new routes/page ship to production.
