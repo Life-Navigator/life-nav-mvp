@@ -24,10 +24,12 @@ jest.mock('@/lib/integrations/plaid/client', () => ({
 const mockPersistItem = jest.fn();
 const mockPersistAccounts = jest.fn();
 const mockPersistTxns = jest.fn();
+const mockPersistPersonaProfile = jest.fn();
 jest.mock('@/lib/integrations/plaid/persist', () => ({
   persistPlaidItem: (...a: unknown[]) => mockPersistItem(...a),
   persistAccounts: (...a: unknown[]) => mockPersistAccounts(...a),
   persistTransactions: (...a: unknown[]) => mockPersistTxns(...a),
+  persistPersonaProfile: (...a: unknown[]) => mockPersistPersonaProfile(...a),
 }));
 
 const mockRecordEvent = jest.fn();
@@ -85,6 +87,7 @@ it('valid persona: exchanges sandbox token, syncs accounts, writes audit event',
   mockPersistAccounts.mockResolvedValue({ 'acct-1': 'fa-1' });
   mockGetTransactions.mockResolvedValue({ transactions: [], totalTransactions: 0 });
   mockPersistTxns.mockResolvedValue(0);
+  mockPersistPersonaProfile.mockResolvedValue(undefined);
   mockRecordEvent.mockResolvedValue(undefined);
 
   const res = await POST(req({ persona_id: 'young_professional' }));
@@ -100,6 +103,8 @@ it('valid persona: exchanges sandbox token, syncs accounts, writes audit event',
   // "financial activation job")
   expect(mockPersistItem).toHaveBeenCalledTimes(1);
   expect(mockPersistAccounts).toHaveBeenCalledTimes(1);
+  // persona metadata persisted (dashboard/recs + graph promotion)
+  expect(mockPersistPersonaProfile).toHaveBeenCalledTimes(1);
   // audit event written
   expect(mockRecordEvent).toHaveBeenCalledWith(
     expect.anything(),

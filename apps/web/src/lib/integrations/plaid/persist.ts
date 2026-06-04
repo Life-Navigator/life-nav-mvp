@@ -64,6 +64,39 @@ export interface PlaidTxnLike {
   iso_currency_code?: string | null;
 }
 
+/** Persist the persona's LifeNavigator metadata (one row per user). Writing it
+ *  fires the persona_profile sync trigger → graph promotion of the metadata. */
+export async function persistPersonaProfile(
+  svc: AnySupabase,
+  userId: string,
+  meta: Record<string, unknown>
+): Promise<void> {
+  const { error } = await svc.from('user_persona_profile').upsert(
+    {
+      user_id: userId,
+      persona_id: meta.persona_id,
+      display_name: meta.display_name ?? null,
+      life_stage: meta.life_stage ?? null,
+      profession: meta.profession ?? null,
+      family: meta.family ?? null,
+      income_type: meta.income_type ?? null,
+      spending_pattern: meta.spending_pattern ?? null,
+      asset_profile: meta.asset_profile ?? null,
+      liability_profile: meta.liability_profile ?? null,
+      investment_profile: meta.investment_profile ?? null,
+      risk_profile: meta.risk_profile ?? null,
+      financial_complexity: meta.financial_complexity ?? null,
+      config_source: meta.config_source ?? null,
+      primary_goals: meta.primary_goals ?? [],
+      expected_insights: meta.expected_insights ?? [],
+      metadata: meta,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id' }
+  );
+  if (error) throw new Error(`persistPersonaProfile: ${error.message}`);
+}
+
 export async function persistPlaidItem(
   svc: Svc,
   args: {

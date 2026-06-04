@@ -42,16 +42,22 @@ export async function createSandboxPublicToken(opts: {
   products?: string[];
   username?: string;
   password?: string;
+  // When provided, generates a distinct dataset via Plaid's `user_custom`
+  // mechanism: override_username="user_custom", override_password=JSON config.
+  customConfig?: Record<string, unknown> | null;
 }) {
   const client = getPlaidClient();
   const productList = (opts.products || ['transactions']).map((p) => p as Products);
+  const override = opts.customConfig
+    ? { override_username: 'user_custom', override_password: JSON.stringify(opts.customConfig) }
+    : {
+        override_username: opts.username || 'user_good',
+        override_password: opts.password || 'pass_good',
+      };
   const response = await client.sandboxPublicTokenCreate({
     institution_id: opts.institutionId,
     initial_products: productList,
-    options: {
-      override_username: opts.username || 'user_good',
-      override_password: opts.password || 'pass_good',
-    },
+    options: override,
   });
   return { publicToken: response.data.public_token };
 }

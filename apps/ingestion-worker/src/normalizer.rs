@@ -165,6 +165,18 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "root_goal",
             "dominant_driver",
         ]),
+        EntityType::PersonaProfile => parts_for(&[
+            "display_name",
+            "profession",
+            "life_stage",
+            "family",
+            "income_type",
+            "spending_pattern",
+            "asset_profile",
+            "liability_profile",
+            "investment_profile",
+            "risk_profile",
+        ]),
         EntityType::FinancialAccount => parts_for(&[
             "account_name",
             "account_type",
@@ -983,5 +995,27 @@ mod tests {
         let canon = normalize(&job, Utc::now()).unwrap();
         assert_eq!(canon.entity_type, "unknown");
         assert_eq!(canon.domain, "general");
+    }
+
+    #[test]
+    fn persona_profile_summary_is_populated() {
+        let job = job_with(
+            "persona_profile",
+            json!({
+                "display_name": "Young Professional",
+                "profession": "Software Analyst",
+                "life_stage": "early_career",
+                "income_type": "W-2 salary",
+                "spending_pattern": "rent + subscriptions",
+                "risk_profile": "moderate",
+                "asset_profile": "starter emergency fund",
+            }),
+        );
+        let canon = normalize(&job, Utc::now()).unwrap();
+        assert_eq!(canon.entity_type, "persona_profile");
+        // build_summary must produce embeddable text (not the empty-summary path)
+        assert!(!canon.summary.trim().is_empty());
+        assert!(canon.summary.contains("Software Analyst"));
+        assert!(canon.summary.contains("moderate"));
     }
 }

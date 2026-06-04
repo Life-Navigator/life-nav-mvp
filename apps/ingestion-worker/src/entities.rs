@@ -162,6 +162,9 @@ pub enum EntityType {
     LeadPackageConsent,
     ConciergePreference,
     ArcanaMembership,
+    /// LifeNavigator beta "sample financial profile" metadata (career, income,
+    /// risk, goals) — promoted to the graph alongside Plaid-derived data.
+    PersonaProfile,
     /// Catch-all so a new sync-queue entity_type doesn't crash the worker;
     /// the normalizer skips unknown types.
     #[serde(other)]
@@ -192,6 +195,7 @@ impl EntityType {
             EntityType::Outcome => "outcome",
             EntityType::Action => "action",
             EntityType::LifeEvent => "life_event",
+            EntityType::PersonaProfile => "persona_profile",
             EntityType::FinancialAccount => "financial_account",
             EntityType::FinancialGoal => "financial_goal",
             EntityType::TransactionSummary => "transaction_summary",

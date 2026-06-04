@@ -6,11 +6,17 @@ import {
   getAccounts,
   getTransactions,
 } from '@/lib/integrations/plaid/client';
-import { getPersona, isValidPersonaId } from '@/lib/integrations/plaid/personas';
+import {
+  getPersona,
+  isValidPersonaId,
+  getPlaidActivation,
+  personaMetadata,
+} from '@/lib/integrations/plaid/personas';
 import {
   persistPlaidItem,
   persistAccounts,
   persistTransactions,
+  persistPersonaProfile,
 } from '@/lib/integrations/plaid/persist';
 import { recordUserEvent } from '@/lib/analytics/events';
 import { safeApiError } from '@/lib/security/safe-error';
@@ -59,12 +65,16 @@ export async function POST(request: NextRequest) {
   if (!svc) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
 
   try {
-    // 1) Sandbox token flow (no Link UI; credentials stay server-side).
+    // 1) Sandbox token flow (no Link UI; credentials stay server-side). Uses a
+    //    distinct user_custom dataset when the persona defines one, else a
+    //    documented sandbox user (graceful fallback).
+    const activation = getPlaidActivation(persona);
     const { publicToken } = await createSandboxPublicToken({
       institutionId: persona.institution_id,
       products: persona.plaid_products,
-      username: persona.plaid_sandbox_user,
-      password: persona.plaid_sandbox_password,
+      username: activation.username,
+      password: activation.password,
+      customConfig: activation.customConfig,
     });
     const { accessToken, itemId } = await exchangePublicToken(publicToken);
 
@@ -93,13 +103,17 @@ export async function POST(request: NextRequest) {
       console.warn('persona transactions sync deferred:', (txErr as Error)?.message);
     }
 
+    // 3b) Persist persona metadata (career/income/risk/goals) for the dashboard
+    //     + recommendation engine; the table trigger promotes it to the graph.
+    await persistPersonaProfile(svc, user.id, personaMetadata(persona));
+
     // 4) Audit event (service role: server-side audit, bypasses RLS).
     await recordUserEvent(svc, {
       user_id: user.id,
       event_type: 'sample_financial_profile_activated',
       event_metadata: {
         persona_id: persona.persona_id,
-        profile_label: persona.plaid_profile_label,
+        config_source: persona.plaid_config_source,
         accounts_linked: accounts.length,
         transactions_synced: txnCount,
       },
