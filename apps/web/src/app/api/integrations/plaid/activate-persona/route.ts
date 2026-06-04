@@ -93,8 +93,8 @@ export async function POST(request: NextRequest) {
       console.warn('persona transactions sync deferred:', (txErr as Error)?.message);
     }
 
-    // 4) Audit event.
-    await recordUserEvent(supabase, {
+    // 4) Audit event (service role: server-side audit, bypasses RLS).
+    await recordUserEvent(svc, {
       user_id: user.id,
       event_type: 'sample_financial_profile_activated',
       event_metadata: {
