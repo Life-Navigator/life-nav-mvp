@@ -11,6 +11,11 @@
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import {
+  type FinanceAccount,
+  formatAuthoritativeFinance,
+  buildMissingData,
+} from './grounding.ts';
 import { geminiFetch } from './retry.ts';
 
 // ---------------------------------------------------------------------------
@@ -94,20 +99,45 @@ If the question cannot be answered from this schema, return:
 {"cypher": null, "params": {}}`;
 
 const ANSWER_SYSTEM = `\
-You are Life Navigator, a personalized AI advisor helping users manage goals,
-finances, career, and personal development.
+You are Life Navigator, a personalized AI financial and life advisor.
 
-You have access to the user's ACTUAL data retrieved from their knowledge graph.
-Use it to give specific, personalized, actionable advice.
+Your context below is split into FOUR clearly labeled sections. They have
+different jobs and different authority:
 
-Guidelines:
-- Reference the user's specific goals, accounts, and data
-- Consider the user's risk tolerance when advising on finances
-- Be encouraging but realistic
-- Provide concrete next steps
-- If data is missing, acknowledge it honestly
-- Never fabricate data about the user
-- Keep tone conversational and helpful`;
+- CENTRAL_CONTEXT — shared policy, methodology, compliance and advice
+  constraints. It governs HOW you answer (framing, allowed language, advice
+  principles). It is the SAME for every user and NEVER contains this user's
+  personal facts.
+- AUTHORITATIVE_FINANCIAL_FACTS — the user's ACTUAL accounts, balances, APRs,
+  institutions and liabilities, read directly from their secure system of
+  record. This is the ONLY source of truth for the user's personal financial
+  numbers.
+- PERSONAL_CONTEXT — other user-specific facts retrieved from their personal
+  knowledge graph (goals, profile, risk tolerance). Enrichment; it is NOT the
+  primary source for balances/APRs.
+- MISSING_DATA — categories of the user's data that are NOT available right now.
+
+HARD RULES — you MUST follow these exactly:
+1. Central guidance tells you HOW to answer. AUTHORITATIVE_FINANCIAL_FACTS and
+   PERSONAL_CONTEXT tell you WHAT is true about this user. Never mix these up.
+2. Any factual statement about this user's money — balances, account names,
+   institutions/banks, APR/interest rates, debts/liabilities, income, net worth,
+   or transactions — MUST come verbatim from AUTHORITATIVE_FINANCIAL_FACTS (or,
+   if explicitly present there, PERSONAL_CONTEXT). Do not change the numbers,
+   add accounts, or invent institutions.
+3. If the user asks for a personal financial fact that is NOT in those sections
+   (or is listed under MISSING_DATA), you MUST say you don't have that
+   information for them yet and offer to help them connect/add it. Do NOT
+   estimate it, infer it, or fill it in from an example.
+4. NEVER fabricate personal financial data. Never use sample numbers, generic
+   figures, well-known bank names, or amounts from CENTRAL_CONTEXT or your own
+   training as if they were this user's real accounts. If you are not certain a
+   number came from AUTHORITATIVE_FINANCIAL_FACTS, do not state it.
+5. Never derive a personal financial fact from CENTRAL_CONTEXT. Central content
+   is policy/education only — it never reports what this user has.
+6. Use CENTRAL_CONTEXT for methodology and compliant, non-guaranteeing language
+   (no "guaranteed", "will earn", "risk-free"). Be encouraging, realistic, and
+   give concrete next steps grounded ONLY in the user's real data.`;
 
 // ---------------------------------------------------------------------------
 // Utilities
@@ -485,17 +515,96 @@ function reciprocalRankFusion(
 // Build answer context
 // ---------------------------------------------------------------------------
 
-function buildContext(results: SearchResult[]): string {
-  if (results.length === 0) return 'No relevant data found in the knowledge graph.';
-
-  const sections: string[] = ['## User Data from Knowledge Graph\n'];
-
-  for (const r of results.slice(0, 15)) {
-    sections.push(`- [${r.entity_type}] ${r.text}`);
+// Central (shared policy/methodology) vector search. NO tenant filter — central
+// knowledge is global and contains no personal data. Best-effort; returns [] on
+// any failure so it can never break a request.
+async function qdrantSearchCentral(
+  url: string,
+  apiKey: string,
+  collection: string,
+  vector: number[],
+): Promise<SearchResult[]> {
+  try {
+    const resp = await fetch(`${url}/collections/${collection}/points/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'api-key': apiKey },
+      body: JSON.stringify({
+        vector,
+        limit: 6,
+        with_payload: true,
+        score_threshold: 0.3,
+      }),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return (data.result || []).map(
+      (hit: { id: string; score: number; payload?: Record<string, unknown> }) => ({
+        entity_id: String(hit.id),
+        entity_type: String(hit.payload?.entity_type || 'policy'),
+        text: String(
+          hit.payload?.summary || hit.payload?.text || hit.payload?.title || '',
+        ),
+        score: hit.score,
+        source: 'vector' as const,
+        metadata: hit.payload,
+      }),
+    );
+  } catch {
+    return [];
   }
-
-  return sections.join('\n');
 }
+
+// PERSONAL_CONTEXT — enrichment facts from the user's personal graph/vector.
+function buildPersonalContext(results: SearchResult[]): string {
+  const header = '## PERSONAL_CONTEXT (user-specific enrichment from personal knowledge graph)';
+  if (results.length === 0) {
+    return `${header}\n(No additional personal context retrieved.)`;
+  }
+  const lines = results.slice(0, 15).map((r) => `- [${r.entity_type}] ${r.text}`);
+  return `${header}\n${lines.join('\n')}`;
+}
+
+// CENTRAL_CONTEXT — shared policy/methodology (HOW to answer). No personal data.
+function buildCentralContext(results: SearchResult[]): string {
+  const header =
+    '## CENTRAL_CONTEXT (shared advice policy & methodology — governs HOW to answer, never WHAT the user has)';
+  if (results.length === 0) {
+    return `${header}\n(No specific central policy retrieved; apply standard prudent, compliant financial-advice principles.)`;
+  }
+  const lines = results.slice(0, 8).map((r) => `- ${r.text}`);
+  return `${header}\n${lines.join('\n')}`;
+}
+
+// Deterministic, authoritative read from the finance system of record. Independent
+// of async graph promotion, so personal balances are ALWAYS grounded when present.
+// Returns null on fetch error (distinct from [] = user genuinely has no accounts).
+async function fetchAuthoritativeFinance(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  userId: string,
+): Promise<FinanceAccount[] | null> {
+  try {
+    const { data, error } = await supabase
+      .schema('finance')
+      .from('financial_accounts')
+      .select(
+        'account_name, account_type, institution_name, current_balance, available_balance, interest_rate, credit_limit, currency',
+      )
+      .eq('user_id', userId)
+      .eq('is_active', true);
+    if (error) {
+      console.warn('Authoritative finance fetch error:', error.message);
+      return null;
+    }
+    return (data ?? []) as FinanceAccount[];
+  } catch (e) {
+    console.warn('Authoritative finance fetch threw:', safeError(e));
+    return null;
+  }
+}
+
+// Pure finance-formatting helpers (formatAuthoritativeFinance, buildMissingData,
+// isDebtType, fmtMoney) live in ./grounding.ts so they can be unit-tested.
 
 // ---------------------------------------------------------------------------
 // Main handler
@@ -524,7 +633,11 @@ serve(async (req: Request) => {
     const qdrantUrl = Deno.env.get('QDRANT_URL');
     const qdrantKey = Deno.env.get('QDRANT_API_KEY');
     const qdrantCollection =
-      Deno.env.get('QDRANT_COLLECTION') || 'life_navigator';
+      Deno.env.get('QDRANT_PERSONAL_COLLECTION') ||
+      Deno.env.get('QDRANT_COLLECTION') ||
+      'life_navigator';
+    const qdrantCentralCollection =
+      Deno.env.get('QDRANT_CENTRAL_COLLECTION') || 'ln_central';
 
     if (
       !geminiKey ||
@@ -664,11 +777,25 @@ serve(async (req: Request) => {
       graphSearch(query, userId, geminiKey, neo4jUrl, neo4jUser, neo4jPass),
     ]);
 
-    // Fuse with RRF
+    // PERSONAL_CONTEXT — fuse personal graph + vector (enrichment).
     const fused = reciprocalRankFusion(vectorResults, graphResults);
-    const context = buildContext(fused);
+    const personalContext = buildPersonalContext(fused);
 
-    // --- Fetch user risk profile for personalization ---
+    // CENTRAL_CONTEXT — shared policy/methodology (HOW to answer). Reuse the
+    // already-computed query vector; no tenant filter. Best-effort.
+    const centralResults = queryVector
+      ? await qdrantSearchCentral(qdrantUrl, qdrantKey, qdrantCentralCollection, queryVector)
+      : [];
+    const centralContext = buildCentralContext(centralResults);
+
+    // AUTHORITATIVE_FINANCIAL_FACTS — deterministic, direct from the finance
+    // system of record. Independent of async graph promotion, so personal
+    // balances/APRs are grounded whenever they exist. THIS is what prevents
+    // the model from inventing accounts when the graph hasn't been populated.
+    const financeAccounts = await fetchAuthoritativeFinance(supabase, userId);
+    const authoritativeFinance = formatAuthoritativeFinance(financeAccounts);
+
+    // --- Fetch user risk profile for personalization (part of PERSONAL_CONTEXT) ---
     const { data: riskProfile } = await supabase
       .from('risk_assessments')
       .select('overall_score, risk_level, assessment_type')
@@ -679,10 +806,19 @@ serve(async (req: Request) => {
 
     let riskContext = '';
     if (riskProfile) {
-      riskContext = `\n\n## User Risk Profile\n- Risk Level: ${riskProfile.risk_level}\n- Overall Score: ${riskProfile.overall_score}/100\n- Assessment Type: ${riskProfile.assessment_type}`;
+      riskContext = `\n- Risk Level: ${riskProfile.risk_level}; Overall Score: ${riskProfile.overall_score}/100; Assessment: ${riskProfile.assessment_type}`;
     }
 
-    const fullContext = context + riskContext;
+    const missingData = buildMissingData(financeAccounts);
+
+    // Assemble the four labeled sections. Order: policy (how) → authoritative
+    // facts (what) → personal enrichment → what's missing.
+    const fullContext = [
+      centralContext,
+      authoritativeFinance,
+      personalContext + riskContext,
+      missingData,
+    ].join('\n\n');
 
     // Build conversation messages
     const messages: Array<{
