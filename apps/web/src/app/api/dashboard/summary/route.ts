@@ -35,7 +35,6 @@ export async function GET() {
     // engine's classification so the Financial Overview card and the brief
     // never contradict ("$242,200 …" above "No financial data" below).
     const ASSET = new Set(['checking', 'savings', 'investment', 'retirement']);
-    const DEBT = new Set(['credit_card', 'loan', 'mortgage']);
     let financial = { ...emptyDashboard.financial };
     try {
       const { data: accts } = await sb
@@ -54,9 +53,16 @@ export async function GET() {
         const savings = sum((t) => t === 'savings');
         const investments = sum((t) => t === 'investment' || t === 'retirement');
         const totalAssets = sum((t) => ASSET.has(t));
-        const totalLiabilities = sum((t) => DEBT.has(t));
+        // Plaid returns mortgage/loan liabilities but not the backing assets
+        // (home, car), so counting them yields a misleadingly negative net
+        // worth. Mirror the First Insight engine: net worth = assets minus
+        // credit-card debt; expose full liabilities (incl. mortgage) separately.
+        const consumerDebt = sum((t) => t === 'credit_card');
+        const totalLiabilities = sum(
+          (t) => t === 'credit_card' || t === 'loan' || t === 'mortgage'
+        );
         financial = {
-          netWorth: totalAssets - totalLiabilities,
+          netWorth: totalAssets - consumerDebt,
           totalAssets,
           totalLiabilities,
           checking,

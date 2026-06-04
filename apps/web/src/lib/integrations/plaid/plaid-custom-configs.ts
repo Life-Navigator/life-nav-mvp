@@ -288,8 +288,10 @@ export const PLAID_CUSTOM_CONFIGS: Record<string, PlaidCustomConfig> = {
         transactions: [tx(D('05-14'), 60, 'PHONE BILL')],
       },
       {
+        // Plaid sandbox override rejects loan subtype 'personal' (INVALID_
+        // CREDENTIALS) — 'consumer' is the valid subtype for a personal loan.
         type: 'loan',
-        subtype: 'personal',
+        subtype: 'consumer',
         starting_balance: 5200,
         meta: { name: 'Personal Loan (collections)' },
         transactions: [],
