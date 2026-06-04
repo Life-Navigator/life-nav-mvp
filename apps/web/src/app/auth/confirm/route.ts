@@ -80,6 +80,11 @@ export async function GET(request: NextRequest) {
     if (!onboarded) {
       return NextResponse.redirect(new URL('/onboarding/financial-profile', request.url));
     }
+    // Already-onboarded returning user: never drop them back on the onboarding
+    // picker even if the link carried next=/onboarding. Send them to the app.
+    if (next.startsWith('/onboarding')) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
   }
 
   return NextResponse.redirect(new URL(next, request.url));
