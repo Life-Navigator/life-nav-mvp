@@ -5,6 +5,7 @@ import ParallaxBackdrop from '@/components/site/ParallaxBackdrop';
 import HeroScene from '@/components/site/HeroScene';
 import MotionSection from '@/components/site/MotionSection';
 import DataConnectionMap from '@/components/site/DataConnectionMap';
+import ScrollZoom from '@/components/site/ScrollZoom';
 import TrustArchitectureVisual from '@/components/site/TrustArchitectureVisual';
 import ScenarioCard from '@/components/site/ScenarioCard';
 import EnterpriseCTA from '@/components/site/EnterpriseCTA';
@@ -283,7 +284,9 @@ export default function LandingPage() {
                 Six domains feeding one decision-intelligence core — every link a path your data
                 actually travels.
               </p>
-              <DataConnectionMap tone="dark" className="mt-4" />
+              <ScrollZoom className="mt-4" from={0.6} to={1.04}>
+                <DataConnectionMap tone="dark" />
+              </ScrollZoom>
             </div>
 
             {/* grounded chat tile */}
