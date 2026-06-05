@@ -126,20 +126,27 @@
     }
   }
 }
-/* MotionSection: hidden→shown via IntersectionObserver toggling data-shown */
+/* MotionSection scroll-reveal — VISIBLE BY DEFAULT (never gets stuck hidden).
+   JS only "arms" below-the-fold elements, which then reveal on scroll. If JS
+   never runs, everything is simply visible. */
 .reveal {
-  opacity: 0;
-  transform: translateY(18px);
+  opacity: 1;
+  transform: none;
   transition:
     opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
     transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.reveal[data-shown='true'] {
+.reveal[data-armed='true'] {
+  opacity: 0;
+  transform: translateY(22px);
+}
+.reveal[data-armed='true'][data-shown='true'] {
   opacity: 1;
   transform: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  .reveal {
+  .reveal,
+  .reveal[data-armed='true'] {
     opacity: 1;
     transform: none;
     transition: none;
