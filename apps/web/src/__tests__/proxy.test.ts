@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { middleware } from '../middleware';
+import { proxy } from '../proxy';
 
 // Mock next/server without requireActual (avoids needing Web Request/Response globals)
 jest.mock('next/server', () => ({
@@ -44,7 +44,7 @@ function createMockRequest(pathname: string): NextRequest {
   } as unknown as NextRequest;
 }
 
-describe('Middleware', () => {
+describe('Proxy (auth gating)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -53,7 +53,7 @@ describe('Middleware', () => {
     mockGetUser.mockResolvedValue({ data: { user: null } });
 
     const req = createMockRequest('/auth/login');
-    await middleware(req);
+    await proxy(req);
 
     expect(NextResponse.redirect).not.toHaveBeenCalled();
   });
@@ -62,7 +62,7 @@ describe('Middleware', () => {
     mockGetUser.mockResolvedValue({ data: { user: null } });
 
     const req = createMockRequest('/dashboard');
-    await middleware(req);
+    await proxy(req);
 
     expect(NextResponse.redirect).toHaveBeenCalled();
     const redirectUrl = (NextResponse.redirect as jest.Mock).mock.calls[0][0];
@@ -82,12 +82,12 @@ describe('Middleware', () => {
     });
 
     const req = createMockRequest('/dashboard');
-    await middleware(req);
+    await proxy(req);
 
     // Should not redirect away from dashboard
     const redirectCalls = (NextResponse.redirect as jest.Mock).mock.calls;
     const dashboardRedirect = redirectCalls.find(
-      (call: unknown[]) => (call[0] as URL)?.pathname === '/onboarding/questionnaire'
+      (call: unknown[]) => (call[0] as URL)?.pathname === '/onboarding/financial-profile'
     );
     expect(dashboardRedirect).toBeUndefined();
   });
@@ -105,11 +105,11 @@ describe('Middleware', () => {
     });
 
     const req = createMockRequest('/dashboard');
-    await middleware(req);
+    await proxy(req);
 
     expect(NextResponse.redirect).toHaveBeenCalled();
     const redirectUrl = (NextResponse.redirect as jest.Mock).mock.calls.find(
-      (call: unknown[]) => (call[0] as URL)?.pathname === '/onboarding/questionnaire'
+      (call: unknown[]) => (call[0] as URL)?.pathname === '/onboarding/financial-profile'
     );
     expect(redirectUrl).toBeDefined();
   });
@@ -120,7 +120,7 @@ describe('Middleware', () => {
     });
 
     const req = createMockRequest('/auth/login');
-    await middleware(req);
+    await proxy(req);
 
     expect(NextResponse.redirect).toHaveBeenCalled();
     const redirectUrl = (NextResponse.redirect as jest.Mock).mock.calls[0][0];

@@ -36,7 +36,7 @@ function isProtectedRoute(path: string): boolean {
   );
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Create response to pass through
