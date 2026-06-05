@@ -1,113 +1,52 @@
 # Auth + Domain E2E Report — lifenavigator.tech
 
 **Date:** 2026-06-05
-**Supabase project:** `lifenavigator-production` (ref `diwkyyahglnqmyledsey`)
-**App project:** Vercel `life-nav-mvp-web`
+**Supabase:** `lifenavigator-production` (`diwkyyahglnqmyledsey`)
+**App:** `https://app.lifenavigator.tech` (Vercel `life-nav-mvp-web`, prod branch `main`)
 
-This report covers Supabase Auth URL changes, app env, and the end-to-end test plan. It depends on `DOMAIN_CUTOVER_REPORT.md` (DNS/domains) and `RESEND_SMTP_SETUP_REPORT.md` (email) being completed first.
+## Executive result
 
----
+Auth **routing, URL config, branded templates, and the link→session→redirect flow are configured and verified live**. The one thing not working is **branded email delivery via Resend**, because the Resend account that owns the provided API key reports **`lifenavigator.tech` is NOT verified**. SMTP was therefore left **disabled** (built-in mailer restored) to avoid a broken-email state.
 
-## 1 — Supabase Auth URL configuration
+## What was applied (Supabase Management API, verified by GET)
 
-**Dashboard:** Supabase → Authentication → **URL Configuration**:
+| Item                    | State                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| **Site URL**            | `https://app.lifenavigator.tech` ✅                                                                                                   |
+| **Redirect allow-list** | `app./lifenavigator.tech/** , lifenavigator.tech/** , www…/** , life-nav-mvp-web.vercel.app/** , …git-main-…vercel.app/**` ✅         |
+| **Branded templates**   | confirmation, magic_link, recovery, invite — applied & confirmed branded (`contains LifeNavigator + /auth/confirm`) ✅                |
+| **SMTP**                | configured (`smtp.resend.com:587`, user `resend`, sender `welcome@lifenavigator.tech`) then **REVERTED to disabled** ⚠️ (see blocker) |
+| **Email rate limit**    | set to 100/hr, then reset to default when SMTP disabled (will set 100 when SMTP re-enabled)                                           |
 
-- **Site URL:** `https://app.lifenavigator.tech` _(was `https://life-nav-mvp-web.vercel.app`)_
-- **Redirect URLs (allow-list):**
-  ```
-  https://app.lifenavigator.tech/**
-  https://lifenavigator.tech/**
-  https://www.lifenavigator.tech/**
-  https://life-nav-mvp-web.vercel.app/**   # keep during cutover; remove once domains verified
-  ```
+## Verifications run
 
-**Management API alternative** (needs a `SUPABASE_ACCESS_TOKEN` with project access; per topology notes, **use curl — the Python UA is Cloudflare-blocked**):
+- **SMTP / sender path:** ❌ Resend `POST /emails` from `welcome@lifenavigator.tech` → `validation_error: "The lifenavigator.tech domain is not verified."` (tested twice).
+- **Auth URL config:** ✅ GET confirms `site_url` + `uri_allow_list` persisted.
+- **Redirects (live):** ✅ `app.lifenavigator.tech/` → 307 → `/auth/login`; `/auth/confirm?...` → 307 → `/onboarding/financial-profile`.
+- **Signup link → session (live E2E):** ✅ admin `generate_link type=signup` → followed `/auth/confirm?token_hash=…&type=signup` on `app.lifenavigator.tech` → **307 → /onboarding/financial-profile** with a valid `sb-…-auth-token` session cookie (decoded: `email_confirmed_at` set, role `authenticated`). Test user deleted afterward.
+- **Magic link / recovery:** templates applied with correct `type=magiclink`→`/dashboard` and `type=recovery`→`/auth/password-reset` links; same `/auth/confirm` mechanism proven by the signup E2E. Not separately delivered (email blocked).
+- **Email delivery (signup/magic/recovery to a real inbox):** ❌ blocked by the Resend domain blocker.
 
-```bash
-curl -X PATCH "https://api.supabase.com/v1/projects/diwkyyahglnqmyledsey/config/auth" \
-  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "site_url": "https://app.lifenavigator.tech",
-    "uri_allow_list": "https://app.lifenavigator.tech/**,https://lifenavigator.tech/**,https://www.lifenavigator.tech/**,https://life-nav-mvp-web.vercel.app/**"
-  }'
-```
+## P0 blocker — Resend domain verification
 
-**Why this matters / how the code uses it**
+`lifenavigator.tech` is **not verified** in the Resend account tied to the provided key. Until it is, Resend rejects all sends, so SMTP cannot be enabled. Likely causes (check in this order):
 
-- Email templates use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=…` (already deployed). With Site URL now = `app.lifenavigator.tech`, confirm/magic/invite links resolve to the **app** subdomain, which hosts `/auth/confirm` — correct.
-- Client auth redirects use `window.location.origin` (LoginForm OAuth `/auth/callback`, MagicLinkPanel `/auth/confirm`, ForgotPassword `/auth/password-reset`), so they automatically use whatever domain the user is on — covered by the `/**` allow-list entries above.
-- Google OAuth: the Supabase provider callback is `https://diwkyyahglnqmyledsey.supabase.co/auth/v1/callback` (unchanged). Ensure the app's post-login `redirectTo` origins (`app.lifenavigator.tech`) are allow-listed (they are, via `/**`).
+1. **DNS not complete:** Resend → Domains → `lifenavigator.tech` shows _pending_ — add its SPF/DKIM (`send.` + `resend._domainkey`) records in Hostinger (do **not** touch the Google MX; keep a single root SPF), then click **Verify**.
+2. **Wrong account:** the domain is verified in a _different_ Resend account/team than the API key. Create the key in the **same** account that owns the verified domain.
+3. **Wrong domain:** verify `lifenavigator.tech` (not `.com` or a subdomain).
 
----
+When the Resend test send returns `200`, re-enable SMTP (one PATCH — see `supabase/email-templates/README.md` / the consolidated command) with `rate_limit_email_sent: 100`, then re-run the signup/magic/recovery email tests to a real inbox.
 
-## 2 — App env (Vercel `life-nav-mvp-web` → Production) — then redeploy `mvp`
+## Other remaining items
 
-```
-NEXT_PUBLIC_APP_URL   = https://app.lifenavigator.tech
-NEXT_PUBLIC_SITE_URL  = https://lifenavigator.tech
-NEXTAUTH_URL          = https://app.lifenavigator.tech
-APP_HOST              = app.lifenavigator.tech
-EMAIL_FROM            = welcome@lifenavigator.tech
-RESEND_API_KEY        = re_…   (rotated)
-```
+- **Secrets to rotate (P0 security):** the Supabase `sbp_` token and the Resend `re_` key were both pasted in chat → rotate both after this cutover.
+- **Phase 4 (Vercel env audit + redeploy):** not done — no Vercel token provided. Code is already domain-clean (no `.com`/old-vercel/`mvp` refs). Set in Vercel Production then redeploy: `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_APP_URL`, `NEXTAUTH_URL`, `APP_HOST`, `EMAIL_FROM=welcome@lifenavigator.tech`, `RESEND_API_KEY` (new key).
+- **`welcome.html`** is committed for the app-level mailer; not a Supabase auth template.
 
-- `NEXT_PUBLIC_APP_URL` feeds server-side OAuth/wearable callbacks (LinkedIn/Microsoft/Google/Fitbit) — must be the app domain.
-- `APP_HOST` drives the `proxy.ts` root redirect on the app subdomain.
-- Redeploy production after setting (Vercel prod branch is `main`; serve `mvp`).
+## Final verdict
 
----
+### `NOT_READY` (single blocker: Resend domain verification)
 
-## 3 — Code changes shipped (this commit)
+Everything except branded email delivery is configured and verified live. Because the stated goal is **branded email signup/magic links**, and email delivery currently fails, this cannot be `AUTH_READY_FOR_20_USER_BETA`.
 
-- `proxy.ts`: `app.lifenavigator.tech/` → `/auth/login` (or `/dashboard` if authed). **8/8 proxy tests pass**, incl. 3 new host-redirect cases.
-- `beta-invite.mjs`: invite links default to `https://app.lifenavigator.tech`.
-- Email `.com` → `.tech`: sender default `welcome@lifenavigator.tech`, template footer links, error-page support address.
-- `.env.example` (root + web): documents all the above.
-- typecheck ✅ · build ✅.
-
----
-
-## 4 — End-to-end live test plan (run after steps 1–2 + DNS + Resend)
-
-> I can't execute these now — they need the live domains, Supabase config, and a verified Resend domain, none of which exist yet. Run this checklist once the runbooks are done.
-
-| #   | Test             | How                                                                                       | Expected                                                                                  |
-| --- | ---------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 1   | Marketing domain | visit `https://lifenavigator.tech`                                                        | premium homepage, valid SSL                                                               |
-| 2   | www redirect     | `curl -sI https://www.lifenavigator.tech`                                                 | 308 → apex                                                                                |
-| 3   | App domain root  | visit `https://app.lifenavigator.tech`                                                    | 307 → `/auth/login`                                                                       |
-| 4   | Signup email     | register at `app.lifenavigator.tech/auth/register`                                        | confirm email from `welcome@lifenavigator.tech` arrives; link → `/auth/confirm` → session |
-| 5   | Magic link       | `app.lifenavigator.tech/auth/magic`                                                       | magic-link email arrives; link signs in                                                   |
-| 6   | Invite link      | `APP_URL=https://app.lifenavigator.tech node apps/web/beta-invite.mjs generate you@x.com` | link → `/auth/confirm` → `/onboarding/financial-profile`                                  |
-| 7   | Onboarding       | new user after invite                                                                     | lands on `/onboarding/financial-profile`, activates                                       |
-| 8   | Dashboard        | after activation                                                                          | `/dashboard` renders, no CSP errors in console                                            |
-| 9   | Chat             | open advisor on dashboard                                                                 | grounded reply, no fallback / 429                                                         |
-
-CSP sanity on the new domain:
-
-```bash
-curl -sI https://app.lifenavigator.tech/auth/login | grep -i content-security-policy
-# script-src 'self' 'unsafe-inline' https://vercel.live
-# connect-src … https://*.supabase.co wss://*.supabase.co …   (auth fetch allowed)
-```
-
----
-
-## 5 — Final verdict
-
-### `NOT_READY` → flips to `DOMAIN_AND_AUTH_READY_FOR_BETA` after the runbook below
-
-There are **no P0 code defects** — typecheck, build, and the proxy suite are green, and the app code is domain-aware. The blockers are **configuration/DNS actions that require your dashboard access** (I have no Vercel/Supabase tokens and cannot touch Hostinger or Resend domains from here), so nothing is live or verifiable yet.
-
-**Blocking checklist (all external, ~20 min work + DNS propagation):**
-
-1. [ ] Add the 3 domains in Vercel `life-nav-mvp-web` (apex primary, www→apex, app no-redirect). `DOMAIN_CUTOVER_REPORT.md §1`
-2. [ ] Add Hostinger DNS: A `@`→76.76.21.21, CNAME `www`/`app`→cname.vercel-dns.com (remove conflicts). `§2`
-3. [ ] Add Resend domain `lifenavigator.tech` + its MX/SPF/DKIM DNS; verify. `RESEND_SMTP_SETUP_REPORT.md §1`
-4. [ ] Supabase: Site URL + redirect allow-list (§1 above); enable Resend SMTP; raise email rate limit.
-5. [ ] Vercel env (§2 above) + redeploy `mvp` to production.
-6. [ ] Rotate the Resend API key.
-7. [ ] Run §4 verification (DNS/SSL/redirects + the 9 E2E checks).
-
-When 1–7 pass, the verdict is **`DOMAIN_AND_AUTH_READY_FOR_BETA`**. Tell me once DNS is live and I can run the resolution/SSL/redirect/CSP verification commands against the real domains and confirm.
+**Note:** an **invite-link beta works today** (admin `generate_link` → `/auth/confirm` → session, proven above) — that path needs no email. To flip to `AUTH_READY_FOR_20_USER_BETA`: verify the Resend domain → re-enable SMTP → confirm a live signup + magic-link + recovery email each arrive from `welcome@lifenavigator.tech`.
