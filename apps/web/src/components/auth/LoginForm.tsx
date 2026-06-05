@@ -78,27 +78,22 @@ export default function LoginForm() {
     }
   };
 
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-8 border border-gray-200 dark:border-gray-700">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Welcome back</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Sign in to access your Life Navigator dashboard
-        </p>
-      </div>
+  const inputClass =
+    'w-full rounded-xl border border-white/12 bg-white/[0.03] px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-[#2dd4bf]/50 focus:ring-2 focus:ring-[#2dd4bf]/25 disabled:opacity-60';
+  const oauthClass =
+    'inline-flex w-full items-center justify-center gap-2 rounded-xl border border-white/12 bg-white/[0.03] px-4 py-3 text-sm font-medium text-white/80 transition hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-50';
 
+  return (
+    <div>
       {error && (
-        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 text-sm rounded-md">
+        <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-          >
+          <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-white/70">
             Email address
           </label>
           <input
@@ -110,26 +105,21 @@ export default function LoginForm() {
             value={formData.email}
             onChange={handleChange}
             disabled={isLoading}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-            bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+            className={inputClass}
             placeholder="you@example.com"
           />
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
+          <div className="mb-1.5 flex items-center justify-between">
+            <label htmlFor="password" className="block text-sm font-medium text-white/70">
               Password
             </label>
             <Link
               href="/auth/forgot-password"
-              className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+              className="text-sm font-medium text-[#5eead4] hover:underline"
             >
-              Forgot your password?
+              Forgot password?
             </Link>
           </div>
           <input
@@ -141,35 +131,27 @@ export default function LoginForm() {
             value={formData.password}
             onChange={handleChange}
             disabled={isLoading}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-            bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-            placeholder="password"
+            className={inputClass}
+            placeholder="••••••••"
           />
         </div>
 
-        <div>
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium
-            text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-            disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
-          >
-            {isLoading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="btn-primary w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {isLoading ? 'Signing in...' : 'Sign in'}
+        </button>
       </form>
 
       <div className="mt-6">
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-300 dark:border-gray-700" />
+            <div className="w-full border-t border-white/10" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-              Or continue with
-            </span>
+            <span className="bg-[#06060a] px-3 text-white/40">Or continue with</span>
           </div>
         </div>
 
@@ -178,9 +160,7 @@ export default function LoginForm() {
             type="button"
             onClick={() => handleOAuthLogin('google')}
             disabled={isLoading}
-            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm
-            bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700
-            disabled:opacity-50 disabled:cursor-not-allowed"
+            className={oauthClass}
           >
             <svg className="h-5 w-5" aria-hidden="true" viewBox="0 0 24 24">
               <path
@@ -207,28 +187,14 @@ export default function LoginForm() {
             type="button"
             onClick={() => handleOAuthLogin('linkedin_oidc')}
             disabled={isLoading}
-            className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm
-            bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700
-            disabled:opacity-50 disabled:cursor-not-allowed"
+            className={oauthClass}
           >
             <svg className="h-5 w-5" aria-hidden="true" fill="#0A66C2" viewBox="0 0 24 24">
               <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
             </svg>
-            <span className="ml-2">LinkedIn</span>
+            <span>LinkedIn</span>
           </button>
         </div>
-      </div>
-
-      <div className="mt-6 text-center">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Don't have an account?{' '}
-          <Link
-            href="/auth/register"
-            className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            Register now
-          </Link>
-        </p>
       </div>
     </div>
   );

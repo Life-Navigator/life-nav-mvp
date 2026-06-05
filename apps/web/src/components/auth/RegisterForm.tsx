@@ -105,27 +105,20 @@ export default function RegisterForm() {
     setIsLoading(false);
   };
 
-  return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-8 border border-gray-200 dark:border-gray-700">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Create your account</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Join Life Navigator to start managing your life journey
-        </p>
-      </div>
+  const inputClass =
+    'w-full rounded-xl border border-white/12 bg-white/[0.03] px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-[#2dd4bf]/50 focus:ring-2 focus:ring-[#2dd4bf]/25 disabled:opacity-60';
 
+  return (
+    <div>
       {error && (
-        <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 text-sm rounded-md">
+        <div className="mb-5 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label
-            htmlFor="name"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-          >
+          <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-white/70">
             Full name
           </label>
           <input
@@ -137,18 +130,13 @@ export default function RegisterForm() {
             value={formData.name}
             onChange={handleChange}
             disabled={isLoading}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-            bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-            placeholder="Enter your full name"
+            className={inputClass}
+            placeholder="Jane Doe"
           />
         </div>
 
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-          >
+          <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-white/70">
             Email address
           </label>
           <input
@@ -160,18 +148,13 @@ export default function RegisterForm() {
             value={formData.email}
             onChange={handleChange}
             disabled={isLoading}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-            bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-            placeholder="Enter your email"
+            className={inputClass}
+            placeholder="you@example.com"
           />
         </div>
 
         <div>
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-          >
+          <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-white/70">
             Password
           </label>
           <input
@@ -183,21 +166,18 @@ export default function RegisterForm() {
             value={formData.password}
             onChange={handleChange}
             disabled={isLoading}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-            bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-            placeholder="Create a password"
+            className={inputClass}
+            placeholder="Create a strong password"
           />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Must be at least 12 characters and include uppercase letters, lowercase letters,
-            numbers, and special characters
+          <p className="mt-1.5 text-xs text-white/40">
+            At least 12 characters with uppercase, lowercase, a number, and a special character.
           </p>
         </div>
 
         <div>
           <label
             htmlFor="confirmPassword"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            className="mb-1.5 block text-sm font-medium text-white/70"
           >
             Confirm password
           </label>
@@ -210,69 +190,41 @@ export default function RegisterForm() {
             value={formData.confirmPassword}
             onChange={handleChange}
             disabled={isLoading}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm placeholder-gray-400
-            focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
-            bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
-            placeholder="Confirm your password"
+            className={inputClass}
+            placeholder="Re-enter your password"
           />
         </div>
 
-        <div className="flex items-start">
-          <div className="flex items-center h-5">
-            <input
-              id="agreeTerms"
-              name="agreeTerms"
-              type="checkbox"
-              checked={formData.agreeTerms}
-              onChange={handleChange}
-              disabled={isLoading}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-          </div>
-          <div className="ml-3 text-sm">
-            <label htmlFor="agreeTerms" className="font-medium text-gray-700 dark:text-gray-300">
-              I agree to the{' '}
-              <Link
-                href="/legal/terms"
-                className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-              >
-                Terms of Service
-              </Link>{' '}
-              and{' '}
-              <Link
-                href="/legal/privacy"
-                className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-              >
-                Privacy Policy
-              </Link>
-            </label>
-          </div>
-        </div>
-
-        <div>
-          <button
-            type="submit"
+        <div className="flex items-start gap-3">
+          <input
+            id="agreeTerms"
+            name="agreeTerms"
+            type="checkbox"
+            checked={formData.agreeTerms}
+            onChange={handleChange}
             disabled={isLoading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium
-            text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-            disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors"
-          >
-            {isLoading ? 'Creating account...' : 'Create account'}
-          </button>
+            className="mt-0.5 h-4 w-4 rounded border-white/20 bg-white/5 text-[#2dd4bf] accent-[#2dd4bf] focus:ring-[#2dd4bf]"
+          />
+          <label htmlFor="agreeTerms" className="text-sm text-white/65">
+            I agree to the{' '}
+            <Link href="/legal/terms" className="text-[#5eead4] hover:underline">
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link href="/legal/privacy" className="text-[#5eead4] hover:underline">
+              Privacy Policy
+            </Link>
+          </label>
         </div>
-      </form>
 
-      <div className="mt-6 text-center">
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Already have an account?{' '}
-          <Link
-            href="/auth/login"
-            className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            Sign in
-          </Link>
-        </p>
-      </div>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="btn-primary w-full rounded-xl px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {isLoading ? 'Creating account...' : 'Create account'}
+        </button>
+      </form>
     </div>
   );
 }
