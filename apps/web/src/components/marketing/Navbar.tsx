@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import Logo from '@/components/brand/Logo';
 
 const navLinks = [
-  { href: '/#product', label: 'Product' },
+  { href: '/product', label: 'Product' },
   { href: '/how-it-works', label: 'How It Works' },
   { href: '/trust', label: 'Trust' },
   { href: '/security', label: 'Security' },

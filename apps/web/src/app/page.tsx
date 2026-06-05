@@ -8,7 +8,10 @@ import DeviceMockup from '@/components/site/DeviceMockup';
 import DataConnectionMap from '@/components/site/DataConnectionMap';
 import TrustArchitectureVisual from '@/components/site/TrustArchitectureVisual';
 import ScenarioCard from '@/components/site/ScenarioCard';
+import FloatingInsightCard from '@/components/site/FloatingInsightCard';
 import EnterpriseCTA from '@/components/site/EnterpriseCTA';
+import Photo from '@/components/site/Photo';
+import { IMG } from '@/components/site/media';
 
 export const metadata = {
   title: 'LifeNavigator — Decision Intelligence for Life',
@@ -31,6 +34,18 @@ function Ico({ d }: { d: string }) {
     </svg>
   );
 }
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="text-xs font-medium uppercase tracking-wider text-[#5eead4]">{children}</div>
+  );
+}
+
+const STATS = [
+  ['6', 'life domains, one connected system'],
+  ['0', 'invented facts — grounded or it refuses'],
+  ['100%', 'per-user data isolation'],
+  ['<3 min', 'from invite to first insight'],
+];
 
 const DOMAINS = [
   {
@@ -122,9 +137,52 @@ const FAQ = [
   },
 ];
 
-function Eyebrow({ children }: { children: React.ReactNode }) {
+function FeatureRow({
+  eyebrow,
+  title,
+  body,
+  points,
+  img,
+  alt,
+  reverse,
+}: {
+  eyebrow: string;
+  title: string;
+  body: string;
+  points: string[];
+  img: string;
+  alt: string;
+  reverse?: boolean;
+}) {
   return (
-    <div className="text-xs font-medium uppercase tracking-wider text-[#5eead4]">{children}</div>
+    <div className="grid items-center gap-12 lg:grid-cols-2">
+      <div className={reverse ? 'lg:order-2' : ''}>
+        <Eyebrow>{eyebrow}</Eyebrow>
+        <h3 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">{title}</h3>
+        <p className="mt-4 text-white/55">{body}</p>
+        <ul className="mt-6 space-y-3">
+          {points.map((p) => (
+            <li key={p} className="flex items-start gap-3 text-sm text-white/70">
+              <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#2dd4bf]/15 text-[#5eead4]">
+                <svg
+                  viewBox="0 0 20 20"
+                  className="h-3 w-3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                >
+                  <path d="M4 10.5l4 4 8-9" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              {p}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div className={reverse ? 'lg:order-1' : ''}>
+        <Photo src={img} alt={alt} className="aspect-[4/3]" rounded="rounded-3xl" />
+      </div>
+    </div>
   );
 }
 
@@ -137,8 +195,20 @@ export default function LandingPage() {
       {/* 1 · Hero */}
       <HeroScene />
 
+      {/* Stats credibility band */}
+      <MotionSection as="section" className="px-6">
+        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] sm:grid-cols-4">
+          {STATS.map(([n, l]) => (
+            <div key={l} className="bg-[#06060a]/40 px-6 py-7 backdrop-blur-sm">
+              <div className="font-display text-3xl font-semibold text-white">{n}</div>
+              <div className="mt-1 text-xs leading-snug text-white/50">{l}</div>
+            </div>
+          ))}
+        </div>
+      </MotionSection>
+
       {/* 2 · Product dashboard */}
-      <MotionSection as="section" className="px-6 py-28">
+      <MotionSection as="section" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
           <div className="mx-auto max-w-2xl text-center">
             <Eyebrow>The product</Eyebrow>
@@ -150,23 +220,123 @@ export default function LandingPage() {
               presented with the restraint of a tool you&apos;ll trust with your life.
             </p>
           </div>
-          <div className="relative mx-auto mt-16 max-w-4xl [perspective:1600px]">
-            <div
-              className="pointer-events-none absolute -inset-x-16 -top-12 bottom-0 -z-10 rounded-[3rem] blur-3xl"
-              style={{
-                background:
-                  'radial-gradient(60% 60% at 50% 30%, rgba(45,212,191,0.18), transparent 70%)',
-              }}
-            />
-            <div className="[transform:rotateX(6deg)]">
-              <DeviceMockup variant="laptop" />
+          <div className="relative mx-auto mt-16 grid max-w-6xl items-center gap-8 lg:grid-cols-[1fr_auto]">
+            <div className="relative [perspective:1600px]">
+              <div
+                className="pointer-events-none absolute -inset-12 -z-10 rounded-[3rem] blur-3xl"
+                style={{
+                  background:
+                    'radial-gradient(60% 60% at 50% 30%, rgba(45,212,191,0.18), transparent 70%)',
+                }}
+              />
+              <div className="[transform:rotateX(5deg)]">
+                <DeviceMockup variant="laptop" />
+              </div>
             </div>
+            <div className="hidden w-64 flex-col gap-4 lg:flex">
+              <FloatingInsightCard
+                eyebrow="First insight"
+                spark
+                title="Pay the 21.99% card first"
+                detail="Your highest-return dollar, before investing."
+              />
+              <FloatingInsightCard
+                eyebrow="Grounded"
+                spark
+                title="Everyday Checking · $3,200.00"
+                detail="Read from your accounts — cited, not guessed."
+              />
+              <FloatingInsightCard
+                eyebrow="Governed"
+                spark
+                title="Fail-closed"
+                detail="No data? It says so."
+              />
+            </div>
+          </div>
+          <div className="mt-10 text-center">
+            <Link href="/product" className="text-sm font-medium text-[#5eead4] hover:underline">
+              Explore the full platform →
+            </Link>
           </div>
         </div>
       </MotionSection>
 
+      {/* Built for real life — photo collage */}
+      <MotionSection as="section" className="border-y border-white/10 px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-2xl text-center">
+            <Eyebrow>Built for real life</Eyebrow>
+            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
+              For the decisions that actually shape a life.
+            </h2>
+            <p className="mt-4 text-white/55">
+              Not dashboards for their own sake — the moments where money, time, work, and family
+              collide.
+            </p>
+          </div>
+          <div className="mt-14 grid gap-5 sm:grid-cols-3">
+            <Photo src={IMG.team} alt="Professionals collaborating" className="aspect-[3/4]" />
+            <Photo src={IMG.family} alt="A family at home" className="aspect-[3/4] sm:mt-10" />
+            <Photo src={IMG.wellness} alt="Wellness and performance" className="aspect-[3/4]" />
+          </div>
+        </div>
+      </MotionSection>
+
+      {/* 4 · What it helps with */}
+      <MotionSection as="section" id="product" className="px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="max-w-2xl">
+            <Eyebrow>What it helps with</Eyebrow>
+            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
+              Six kinds of intelligence. One system.
+            </h2>
+          </div>
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {DOMAINS.map((d) => (
+              <ScenarioCard key={d.domain} {...d} />
+            ))}
+          </div>
+        </div>
+      </MotionSection>
+
+      {/* Feature rows with imagery */}
+      <MotionSection as="section" className="px-6 py-20">
+        <div className="mx-auto max-w-6xl">
+          <FeatureRow
+            eyebrow="Financial intelligence"
+            title="Your money, finally in context."
+            body="LifeNavigator reads your real accounts via Plaid and reasons about the trade-offs — debt vs. investing, runway vs. opportunity — instead of just charting the past."
+            points={[
+              'Debt-before-invest, weighed against your goals',
+              'Net worth, cash, and APRs cited from your accounts',
+              'Read-only — it can never move your money',
+            ]}
+            img={IMG.finance}
+            alt="Financial dashboard and planning"
+          />
+        </div>
+      </MotionSection>
+      <MotionSection as="section" className="px-6 py-20">
+        <div className="mx-auto max-w-6xl">
+          <FeatureRow
+            reverse
+            eyebrow="Career & education"
+            title="Decisions that compound over decades."
+            body="A role change, a degree, a relocation — each one ripples through your finances and your life. LifeNavigator models them together so you can see the whole board."
+            points={[
+              'Compensation and timing vs. your runway',
+              'Program ROI connected to the career it unlocks',
+              'Scenario modeling across domains',
+            ]}
+            img={IMG.career}
+            alt="Professional at work"
+          />
+        </div>
+      </MotionSection>
+
       {/* 3 · Your data layer */}
-      <MotionSection as="section" className="border-y border-white/10 px-6 py-28">
+      <MotionSection as="section" className="border-y border-white/10 px-6 py-24">
         <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-2">
           <div>
             <Eyebrow>Your data layer</Eyebrow>
@@ -174,9 +344,8 @@ export default function LandingPage() {
               Your whole life, in one private graph.
             </h2>
             <p className="mt-4 text-white/55">
-              A career move changes your finances. A degree changes your career. A family decision
-              touches all of it. LifeNavigator builds a personal knowledge graph — isolated to you —
-              so the system reasons across your domains together, not in five disconnected apps.
+              LifeNavigator builds a personal knowledge graph — isolated to you — so the system
+              reasons across your domains together, not in five disconnected apps.
             </p>
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
@@ -185,25 +354,8 @@ export default function LandingPage() {
         </div>
       </MotionSection>
 
-      {/* 4 · What it helps with */}
-      <MotionSection as="section" id="product" className="px-6 py-28">
-        <div className="mx-auto max-w-6xl">
-          <div className="max-w-2xl">
-            <Eyebrow>What it helps with</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
-              Six kinds of intelligence. One system.
-            </h2>
-          </div>
-          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {DOMAINS.map((d) => (
-              <ScenarioCard key={d.domain} {...d} />
-            ))}
-          </div>
-        </div>
-      </MotionSection>
-
       {/* 5 · How it works */}
-      <MotionSection as="section" className="border-t border-white/10 px-6 py-28">
+      <MotionSection as="section" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
           <div className="max-w-2xl">
             <Eyebrow>How it works</Eyebrow>
@@ -211,7 +363,7 @@ export default function LandingPage() {
               From your data to a decision you can trust.
             </h2>
           </div>
-          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((s) => (
               <div
                 key={s.n}
@@ -227,7 +379,7 @@ export default function LandingPage() {
       </MotionSection>
 
       {/* 6 · Trust architecture */}
-      <MotionSection as="section" id="trust" className="border-t border-white/10 px-6 py-28">
+      <MotionSection as="section" id="trust" className="border-t border-white/10 px-6 py-24">
         <div className="mx-auto max-w-6xl">
           <div className="max-w-2xl">
             <Eyebrow>Trust architecture</Eyebrow>
@@ -239,55 +391,81 @@ export default function LandingPage() {
               what is true about you.
             </p>
           </div>
-          <TrustArchitectureVisual className="mt-14" />
+          <TrustArchitectureVisual className="mt-12" />
+        </div>
+      </MotionSection>
+
+      {/* Testimonial / vision quote */}
+      <MotionSection as="section" className="px-6 py-24">
+        <div className="mx-auto max-w-4xl text-center">
+          <p className="font-display text-2xl font-medium leading-snug text-white sm:text-3xl">
+            “Most software manages information. LifeNavigator is built to help people make the
+            decisions that actually change their lives —{' '}
+            <span className="text-gradient">grounded in their own data, governed for trust.</span>”
+          </p>
+          <p className="mt-6 text-sm text-white/45">The LifeNavigator vision</p>
         </div>
       </MotionSection>
 
       {/* 7 · Beta experience */}
-      <MotionSection as="section" className="px-6 py-28">
-        <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl border border-white/10">
-          <div className="grid sm:grid-cols-2">
-            <div className="bg-white/[0.03] p-10 backdrop-blur-sm">
-              <Eyebrow>Today · Beta</Eyebrow>
-              <h3 className="mt-3 text-xl font-semibold text-white">Safe sample life profiles</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/55">
-                Preview the entire system on a realistic profile — grounded insights,
-                recommendations, and chat. No real data required. This is a preview, not the final
-                experience.
-              </p>
-            </div>
-            <div
-              className="p-10"
-              style={{
-                background: 'linear-gradient(135deg, rgba(45,212,191,0.12), rgba(99,102,241,0.08))',
-              }}
-            >
-              <div className="text-xs font-medium uppercase tracking-wider text-[#5eead4]">
-                The full product
+      <MotionSection as="section" className="px-6 py-20">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
+          <Photo
+            src={IMG.workspace}
+            alt="A modern workspace"
+            className="aspect-[4/3]"
+            rounded="rounded-3xl"
+          />
+          <div>
+            <Eyebrow>The beta experience</Eyebrow>
+            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
+              Preview the system. Then bring your real life.
+            </h2>
+            <div className="mt-6 space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                <div className="text-xs font-medium uppercase tracking-wider text-[#5eead4]">
+                  Today · Beta
+                </div>
+                <p className="mt-1 text-sm text-white/60">
+                  Safe sample life profiles — full insights, recommendations, and chat. No real data
+                  required.
+                </p>
               </div>
-              <h3 className="mt-3 text-xl font-semibold text-white">Your real connected data</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/65">
-                Connect your accounts via Plaid, your goals, history, and context — and the same
-                intelligence runs on your actual life.
-              </p>
+              <div
+                className="rounded-2xl border border-white/10 p-5"
+                style={{
+                  background:
+                    'linear-gradient(135deg, rgba(45,212,191,0.1), rgba(99,102,241,0.06))',
+                }}
+              >
+                <div className="text-xs font-medium uppercase tracking-wider text-white/60">
+                  The full product
+                </div>
+                <p className="mt-1 text-sm text-white/70">
+                  Your real connected data via Plaid, your goals, history, and context.
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </MotionSection>
 
-      {/* 8 · Security & privacy */}
+      {/* 8 · Security */}
       <MotionSection as="section" className="border-t border-white/10 px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="max-w-2xl">
+            <Eyebrow>Security &amp; privacy</Eyebrow>
+            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
+              Private by architecture.
+            </h2>
+          </div>
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[
               [
                 'Per-user isolation',
                 'Row-level security across every store; your graph is never mixed with anyone else’s.',
               ],
-              [
-                'Encryption',
-                'Encryption in transit and at rest; least-privilege access throughout.',
-              ],
+              ['Encryption', 'In transit and at rest; least-privilege access throughout.'],
               ['Read-only Plaid', 'Bank-grade connectivity that can read, never move, your money.'],
               [
                 'Governed output',
@@ -349,7 +527,6 @@ export default function LandingPage() {
 
       {/* 11 · Final CTA */}
       <EnterpriseCTA />
-
       <Footer />
     </div>
   );
