@@ -4,11 +4,9 @@ import Footer from '@/components/marketing/Footer';
 import ParallaxBackdrop from '@/components/site/ParallaxBackdrop';
 import HeroScene from '@/components/site/HeroScene';
 import MotionSection from '@/components/site/MotionSection';
-import DeviceMockup from '@/components/site/DeviceMockup';
 import DataConnectionMap from '@/components/site/DataConnectionMap';
 import TrustArchitectureVisual from '@/components/site/TrustArchitectureVisual';
 import ScenarioCard from '@/components/site/ScenarioCard';
-import FloatingInsightCard from '@/components/site/FloatingInsightCard';
 import EnterpriseCTA from '@/components/site/EnterpriseCTA';
 import Photo from '@/components/site/Photo';
 import { IMG } from '@/components/site/media';
@@ -36,7 +34,10 @@ function Ico({ d }: { d: string }) {
 }
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-xs font-medium uppercase tracking-wider text-[#5eead4]">{children}</div>
+    <div className="inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-[#5eead4]">
+      <span className="h-1 w-1 rounded-full bg-[#2dd4bf]" />
+      {children}
+    </div>
   );
 }
 
@@ -118,6 +119,36 @@ const STEPS = [
   },
 ];
 
+const PERSONAS = [
+  {
+    name: 'Young Professional',
+    tag: 'Alex · 28',
+    line: 'Pay down a 21.99% card before investing, then capture the full 401(k) match.',
+    stats: [
+      ['Net worth', '$148,920'],
+      ['Runway', '6.2 mo'],
+    ],
+  },
+  {
+    name: 'Dual-Income Family',
+    tag: 'The Morales · 2 kids',
+    line: 'Balance childcare costs, a home upgrade, and two 529 plans on one timeline.',
+    stats: [
+      ['Net worth', '$612,400'],
+      ['Goals', '5 / 7'],
+    ],
+  },
+  {
+    name: 'Career Switcher',
+    tag: 'Priya · 34',
+    line: 'Model a bootcamp + pay cut against a higher-ceiling role two years out.',
+    stats: [
+      ['Program ROI', '3.1×'],
+      ['Break-even', '22 mo'],
+    ],
+  },
+];
+
 const FAQ = [
   {
     q: 'Is this budgeting software?',
@@ -136,6 +167,26 @@ const FAQ = [
     a: 'Your personal graph is isolated per user with row-level security and encryption. Central policy knowledge is shared and contains no personal data. Plaid connectivity is read-only.',
   },
 ];
+
+function SectionHead({
+  eyebrow,
+  title,
+  body,
+  center,
+}: {
+  eyebrow: string;
+  title: React.ReactNode;
+  body?: string;
+  center?: boolean;
+}) {
+  return (
+    <div className={center ? 'mx-auto max-w-2xl text-center' : 'max-w-2xl'}>
+      <Eyebrow>{eyebrow}</Eyebrow>
+      <h2 className="mt-4 font-display text-3xl font-medium tracking-tight sm:text-5xl">{title}</h2>
+      {body && <p className="mt-4 text-white/55">{body}</p>}
+    </div>
+  );
+}
 
 function FeatureRow({
   eyebrow,
@@ -158,7 +209,9 @@ function FeatureRow({
     <div className="grid items-center gap-12 lg:grid-cols-2">
       <div className={reverse ? 'lg:order-2' : ''}>
         <Eyebrow>{eyebrow}</Eyebrow>
-        <h3 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">{title}</h3>
+        <h3 className="mt-4 font-display text-3xl font-medium tracking-tight sm:text-4xl">
+          {title}
+        </h3>
         <p className="mt-4 text-white/55">{body}</p>
         <ul className="mt-6 space-y-3">
           {points.map((p) => (
@@ -200,82 +253,94 @@ export default function LandingPage() {
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] sm:grid-cols-4">
           {STATS.map(([n, l]) => (
             <div key={l} className="bg-[#06060a]/40 px-6 py-7 backdrop-blur-sm">
-              <div className="font-display text-3xl font-semibold text-white">{n}</div>
+              <div className="font-display text-3xl font-medium tracking-tight text-white">{n}</div>
               <div className="mt-1 text-xs leading-snug text-white/50">{l}</div>
             </div>
           ))}
         </div>
       </MotionSection>
 
-      {/* 2 · Product dashboard */}
+      {/* 2 · Connected data layer — bento */}
       <MotionSection as="section" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="mx-auto max-w-2xl text-center">
-            <Eyebrow>The product</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
-              One dashboard for every decision that matters.
-            </h2>
-            <p className="mt-4 text-white/55">
-              Insights, recommendations, and a grounded assistant — reading from your real data,
-              presented with the restraint of a tool you&apos;ll trust with your life.
-            </p>
-          </div>
-          <div className="relative mx-auto mt-16 grid max-w-6xl items-center gap-8 lg:grid-cols-[1fr_auto]">
-            <div className="relative [perspective:1600px]">
-              <div
-                className="pointer-events-none absolute -inset-12 -z-10 rounded-[3rem] blur-3xl"
-                style={{
-                  background:
-                    'radial-gradient(60% 60% at 50% 30%, rgba(45,212,191,0.18), transparent 70%)',
-                }}
-              />
-              <div className="[transform:rotateX(5deg)]">
-                <DeviceMockup variant="laptop" />
+          <SectionHead
+            center
+            eyebrow="Your connected data layer"
+            title={
+              <>
+                Your whole life, in one{' '}
+                <em className="italic-display text-gradient">private graph.</em>
+              </>
+            }
+            body="LifeNavigator builds a personal knowledge graph — isolated to you — so the system reasons across every domain together, not in five disconnected apps."
+          />
+
+          <div className="stagger mt-14 grid auto-rows-[minmax(0,1fr)] gap-4 md:grid-cols-3">
+            {/* big tile: data map */}
+            <div className="edge-glow relative row-span-2 overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-7 backdrop-blur-sm md:col-span-2">
+              <div className="text-sm font-medium text-white">Connected data graph</div>
+              <p className="mt-1 max-w-md text-sm text-white/50">
+                Six domains feeding one decision-intelligence core — every link a path your data
+                actually travels.
+              </p>
+              <DataConnectionMap tone="dark" className="mt-4" />
+            </div>
+
+            {/* grounded chat tile */}
+            <div className="edge-glow relative overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm">
+              <div className="flex items-center gap-1.5 text-[0.7rem] font-medium uppercase tracking-wider text-[#5eead4]">
+                <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-[#2dd4bf]" /> Grounded
+              </div>
+              <div className="mt-3 rounded-xl bg-white/[0.04] p-3 text-xs text-white/70">
+                What&apos;s my checking balance?
+              </div>
+              <div className="mt-2 rounded-xl border border-[#2dd4bf]/25 bg-[#2dd4bf]/[0.06] p-3 text-xs text-white/85">
+                Your Everyday Checking balance is{' '}
+                <span className="font-semibold text-white">$3,200.00</span>. <br />
+                <span className="text-white/45">Cited from your accounts — not guessed.</span>
               </div>
             </div>
-            <div className="hidden w-64 flex-col gap-4 lg:flex">
-              <FloatingInsightCard
-                eyebrow="First insight"
-                spark
-                title="Pay the 21.99% card first"
-                detail="Your highest-return dollar, before investing."
-              />
-              <FloatingInsightCard
-                eyebrow="Grounded"
-                spark
-                title="Everyday Checking · $3,200.00"
-                detail="Read from your accounts — cited, not guessed."
-              />
-              <FloatingInsightCard
-                eyebrow="Governed"
-                spark
-                title="Fail-closed"
-                detail="No data? It says so."
-              />
+
+            {/* plaid / read-only tile */}
+            <div className="edge-glow relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#818cf8]/[0.08] to-transparent p-6 backdrop-blur-sm">
+              <div className="text-[0.7rem] font-medium uppercase tracking-wider text-white/55">
+                Plaid-connected · read-only
+              </div>
+              <div className="mt-4 space-y-2">
+                {[
+                  ['Everyday Checking', '$3,200.00'],
+                  ['High-Yield Savings', '$24,500.00'],
+                  ['Brought-forward 401(k)', '$96,210.00'],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between text-xs">
+                    <span className="text-white/55">{k}</span>
+                    <span className="font-semibold text-white">{v}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 text-[0.7rem] text-white/40">
+                Bank-grade. It can read, never move.
+              </div>
             </div>
-          </div>
-          <div className="mt-10 text-center">
-            <Link href="/product" className="text-sm font-medium text-[#5eead4] hover:underline">
-              Explore the full platform →
-            </Link>
           </div>
         </div>
       </MotionSection>
 
-      {/* Built for real life — photo collage */}
-      <MotionSection as="section" className="border-y border-white/10 px-6 py-24">
+      {/* 3 · Built for real life — photo collage */}
+      <MotionSection as="section" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="mx-auto max-w-2xl text-center">
-            <Eyebrow>Built for real life</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
-              For the decisions that actually shape a life.
-            </h2>
-            <p className="mt-4 text-white/55">
-              Not dashboards for their own sake — the moments where money, time, work, and family
-              collide.
-            </p>
-          </div>
-          <div className="mt-14 grid gap-5 sm:grid-cols-3">
+          <SectionHead
+            center
+            eyebrow="Built for real life"
+            title={
+              <>
+                For the decisions that{' '}
+                <em className="italic-display text-gradient">actually shape a life.</em>
+              </>
+            }
+            body="Not dashboards for their own sake — the moments where money, time, work, and family collide."
+          />
+          <div className="stagger mt-14 grid gap-5 sm:grid-cols-3">
             <Photo src={IMG.team} alt="Professionals collaborating" className="aspect-[3/4]" />
             <Photo src={IMG.family} alt="A family at home" className="aspect-[3/4] sm:mt-10" />
             <Photo src={IMG.wellness} alt="Wellness and performance" className="aspect-[3/4]" />
@@ -283,16 +348,19 @@ export default function LandingPage() {
         </div>
       </MotionSection>
 
-      {/* 4 · What it helps with */}
+      {/* 4 · Decision domains */}
       <MotionSection as="section" id="product" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="max-w-2xl">
-            <Eyebrow>What it helps with</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
-              Six kinds of intelligence. One system.
-            </h2>
-          </div>
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <SectionHead
+            eyebrow="Decision domains"
+            title={
+              <>
+                Six kinds of intelligence.{' '}
+                <em className="italic-display text-gradient">One system.</em>
+              </>
+            }
+          />
+          <div className="stagger mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {DOMAINS.map((d) => (
               <ScenarioCard key={d.domain} {...d} />
             ))}
@@ -329,137 +397,150 @@ export default function LandingPage() {
               'Program ROI connected to the career it unlocks',
               'Scenario modeling across domains',
             ]}
-            img={IMG.career}
-            alt="Professional at work"
+            img={IMG.journey}
+            alt="A long road ahead — decisions that compound over decades"
           />
-        </div>
-      </MotionSection>
-
-      {/* 3 · Your data layer */}
-      <MotionSection as="section" className="border-y border-white/10 px-6 py-24">
-        <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-2">
-          <div>
-            <Eyebrow>Your data layer</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
-              Your whole life, in one private graph.
-            </h2>
-            <p className="mt-4 text-white/55">
-              LifeNavigator builds a personal knowledge graph — isolated to you — so the system
-              reasons across your domains together, not in five disconnected apps.
-            </p>
-          </div>
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
-            <DataConnectionMap tone="dark" />
-          </div>
         </div>
       </MotionSection>
 
       {/* 5 · How it works */}
       <MotionSection as="section" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="max-w-2xl">
-            <Eyebrow>How it works</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
-              From your data to a decision you can trust.
-            </h2>
-          </div>
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {STEPS.map((s) => (
-              <div
-                key={s.n}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 backdrop-blur-sm"
-              >
-                <div className="text-sm font-semibold text-[#5eead4]">{s.n}</div>
-                <h3 className="mt-2 font-semibold text-white">{s.t}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-white/55">{s.d}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </MotionSection>
-
-      {/* 6 · Trust architecture */}
-      <MotionSection as="section" id="trust" className="border-t border-white/10 px-6 py-24">
-        <div className="mx-auto max-w-6xl">
-          <div className="max-w-2xl">
-            <Eyebrow>Trust architecture</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
-              Built to be trusted.
-            </h2>
-            <p className="mt-4 text-white/55">
-              Advice about your life has to be right. Our architecture separates how we reason from
-              what is true about you.
-            </p>
-          </div>
-          <TrustArchitectureVisual className="mt-12" />
-        </div>
-      </MotionSection>
-
-      {/* Testimonial / vision quote */}
-      <MotionSection as="section" className="px-6 py-24">
-        <div className="mx-auto max-w-4xl text-center">
-          <p className="font-display text-2xl font-medium leading-snug text-white sm:text-3xl">
-            “Most software manages information. LifeNavigator is built to help people make the
-            decisions that actually change their lives —{' '}
-            <span className="text-gradient">grounded in their own data, governed for trust.</span>”
-          </p>
-          <p className="mt-6 text-sm text-white/45">The LifeNavigator vision</p>
-        </div>
-      </MotionSection>
-
-      {/* 7 · Beta experience */}
-      <MotionSection as="section" className="px-6 py-20">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
-          <Photo
-            src={IMG.workspace}
-            alt="A modern workspace"
-            className="aspect-[4/3]"
-            rounded="rounded-3xl"
+          <SectionHead
+            eyebrow="How it works"
+            title={
+              <>
+                From your data to a decision{' '}
+                <em className="italic-display text-gradient">you can trust.</em>
+              </>
+            }
           />
-          <div>
-            <Eyebrow>The beta experience</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
-              Preview the system. Then bring your real life.
-            </h2>
-            <div className="mt-6 space-y-4">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-                <div className="text-xs font-medium uppercase tracking-wider text-[#5eead4]">
-                  Today · Beta
+          <div className="relative mt-14">
+            <div className="hairline absolute inset-x-0 top-6 hidden lg:block" />
+            <div className="stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {STEPS.map((s) => (
+                <div
+                  key={s.n}
+                  className="edge-glow relative rounded-2xl border border-white/10 bg-[#08080c]/70 p-7 backdrop-blur-sm"
+                >
+                  <div className="grid h-9 w-9 place-items-center rounded-full border border-[#2dd4bf]/30 bg-[#2dd4bf]/10 text-sm font-semibold text-[#5eead4]">
+                    {s.n}
+                  </div>
+                  <h3 className="mt-4 font-semibold tracking-tight text-white">{s.t}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-white/55">{s.d}</p>
                 </div>
-                <p className="mt-1 text-sm text-white/60">
-                  Safe sample life profiles — full insights, recommendations, and chat. No real data
-                  required.
-                </p>
-              </div>
-              <div
-                className="rounded-2xl border border-white/10 p-5"
-                style={{
-                  background:
-                    'linear-gradient(135deg, rgba(45,212,191,0.1), rgba(99,102,241,0.06))',
-                }}
-              >
-                <div className="text-xs font-medium uppercase tracking-wider text-white/60">
-                  The full product
-                </div>
-                <p className="mt-1 text-sm text-white/70">
-                  Your real connected data via Plaid, your goals, history, and context.
-                </p>
-              </div>
+              ))}
             </div>
           </div>
         </div>
       </MotionSection>
 
-      {/* 8 · Security */}
-      <MotionSection as="section" className="border-t border-white/10 px-6 py-24">
+      {/* 6 · Trust architecture */}
+      <MotionSection as="section" id="trust" className="px-6 py-24">
         <div className="mx-auto max-w-6xl">
-          <div className="max-w-2xl">
-            <Eyebrow>Security &amp; privacy</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
-              Private by architecture.
-            </h2>
+          <SectionHead
+            eyebrow="Trust architecture"
+            title={
+              <>
+                Built to be <em className="italic-display text-gradient">trusted.</em>
+              </>
+            }
+            body="Advice about your life has to be right. Our architecture separates how we reason from what is true about you."
+          />
+          <TrustArchitectureVisual className="mt-12" />
+        </div>
+      </MotionSection>
+
+      {/* Vision quote */}
+      <MotionSection as="section" className="px-6 py-24">
+        <div className="mx-auto max-w-4xl text-center">
+          <p className="font-display text-2xl font-medium leading-snug text-white sm:text-[2.1rem]">
+            “Most software manages information. LifeNavigator is built to help people make the
+            decisions that actually change their lives —{' '}
+            <span className="italic-display text-gradient">
+              grounded in their own data, governed for trust.
+            </span>
+            ”
+          </p>
+          <p className="mt-6 text-sm text-white/45">The LifeNavigator vision</p>
+        </div>
+      </MotionSection>
+
+      {/* 7 · Beta sample profiles */}
+      <MotionSection as="section" className="px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <SectionHead
+            eyebrow="The beta experience"
+            title={
+              <>
+                Preview the system with{' '}
+                <em className="italic-display text-gradient">safe sample profiles.</em>
+              </>
+            }
+            body="Explore full insights, recommendations, and grounded chat on realistic lives — no real data required. When you're ready, bring your own."
+          />
+          <div className="stagger mt-12 grid gap-5 lg:grid-cols-3">
+            {PERSONAS.map((p) => (
+              <div
+                key={p.name}
+                className="edge-glow relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm transition-transform duration-300 hover:-translate-y-1.5"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-[0.7rem] font-medium uppercase tracking-wider text-[#5eead4]">
+                    Sample profile
+                  </div>
+                  <div className="rounded-full bg-white/8 px-2.5 py-0.5 text-[0.7rem] text-white/55">
+                    {p.tag}
+                  </div>
+                </div>
+                <h3 className="mt-3 text-lg font-semibold tracking-tight text-white">{p.name}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-white/55">{p.line}</p>
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  {p.stats.map(([k, v]) => (
+                    <div key={k} className="rounded-lg border border-white/8 bg-white/[0.02] p-2.5">
+                      <div className="text-[0.65rem] uppercase tracking-wider text-white/35">
+                        {k}
+                      </div>
+                      <div className="mt-0.5 text-sm font-semibold text-white">{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div
+            className="mt-6 flex flex-col items-center justify-between gap-4 rounded-2xl border border-white/10 p-6 text-center sm:flex-row sm:text-left"
+            style={{
+              background: 'linear-gradient(135deg, rgba(45,212,191,0.1), rgba(99,102,241,0.06))',
+            }}
+          >
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wider text-white/60">
+                The full product
+              </div>
+              <p className="mt-1 text-sm text-white/70">
+                Your real connected data via Plaid, your goals, history, and context.
+              </p>
+            </div>
+            <Link href="/beta" className="btn-primary shrink-0 rounded-xl px-6 py-3 font-medium">
+              Request Beta Invite
+            </Link>
+          </div>
+        </div>
+      </MotionSection>
+
+      {/* 8 · Security */}
+      <MotionSection as="section" className="px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <SectionHead
+            eyebrow="Security & privacy"
+            title={
+              <>
+                Private by <em className="italic-display text-gradient">architecture.</em>
+              </>
+            }
+          />
+          <div className="stagger mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {[
               [
                 'Per-user isolation',
@@ -474,7 +555,7 @@ export default function LandingPage() {
             ].map(([t, d]) => (
               <div
                 key={t}
-                className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm"
+                className="edge-glow relative rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm"
               >
                 <h3 className="text-sm font-semibold text-white">{t}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-white/55">{d}</p>
@@ -489,43 +570,38 @@ export default function LandingPage() {
         </div>
       </MotionSection>
 
-      {/* 9 · Pricing / beta access */}
-      <MotionSection as="section" className="px-6 py-10">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center backdrop-blur-sm sm:flex-row sm:justify-between sm:text-left">
-          <div>
-            <h3 className="font-display text-xl font-semibold text-white">
-              Invite-only beta · free during preview
-            </h3>
-            <p className="mt-1 text-sm text-white/55">
-              Pricing for the full product will be announced at general availability.
-            </p>
-          </div>
-          <Link
-            href="/beta"
-            className="rounded-xl bg-white px-6 py-3 font-medium text-[#06060a] transition-transform hover:-translate-y-0.5"
-          >
-            Request Beta Invite
-          </Link>
-        </div>
-      </MotionSection>
-
-      {/* 10 · FAQ */}
+      {/* 9 · FAQ */}
       <MotionSection as="section" className="px-6 py-24">
         <div className="mx-auto max-w-3xl">
           <Eyebrow>FAQ</Eyebrow>
-          <h2 className="mt-3 font-display text-3xl font-semibold">Questions</h2>
-          <dl className="mt-10 divide-y divide-white/10">
+          <h2 className="mt-4 font-display text-3xl font-medium tracking-tight sm:text-4xl">
+            Questions
+          </h2>
+          <div className="mt-10 divide-y divide-white/10 border-y border-white/10">
             {FAQ.map((x) => (
-              <div key={x.q} className="py-6">
-                <dt className="font-medium text-white">{x.q}</dt>
-                <dd className="mt-2 text-sm leading-relaxed text-white/55">{x.a}</dd>
-              </div>
+              <details key={x.q} className="group py-5">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-medium text-white marker:hidden">
+                  {x.q}
+                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full border border-white/15 text-white/60 transition-transform duration-300 group-open:rotate-45">
+                    <svg
+                      viewBox="0 0 20 20"
+                      className="h-3.5 w-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                    >
+                      <path d="M10 4v12M4 10h12" strokeLinecap="round" />
+                    </svg>
+                  </span>
+                </summary>
+                <p className="mt-3 text-sm leading-relaxed text-white/55">{x.a}</p>
+              </details>
             ))}
-          </dl>
+          </div>
         </div>
       </MotionSection>
 
-      {/* 11 · Final CTA */}
+      {/* 10 · Final CTA */}
       <EnterpriseCTA />
       <Footer />
     </div>

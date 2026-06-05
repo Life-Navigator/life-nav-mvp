@@ -34,7 +34,7 @@ const CAPS = [
   },
   {
     title: 'Career & Education',
-    img: IMG.career,
+    img: IMG.education,
     body: 'Roles, compensation, programs, and ROI — modeled against your goals and the finances they move.',
     points: ['Compensation vs. runway', 'Program ROI → career impact', 'Cross-domain scenarios'],
   },

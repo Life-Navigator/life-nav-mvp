@@ -1,45 +1,66 @@
-import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import "./dark-mode.css"; // Import the dark mode styles
-import { Providers } from "@/providers";
-import { Analytics } from "@/components/analytics/Analytics";
-import { Toaster } from "@/components/ui/toaster";
-import { getThemeScript } from "./theme-script";
-import { ProductionErrorBoundary } from "@/components/error-boundary/ProductionErrorBoundary";
-import ChatSidebar from "@/components/chat/ChatSidebar";
+import type { Metadata, Viewport } from 'next';
+import { Geist, Geist_Mono, Newsreader } from 'next/font/google';
+import './globals.css';
+import './dark-mode.css'; // Import the dark mode styles
+import { Providers } from '@/providers';
+import { Analytics } from '@/components/analytics/Analytics';
+import { Toaster } from '@/components/ui/toaster';
+import { getThemeScript } from './theme-script';
+import { ProductionErrorBoundary } from '@/components/error-boundary/ProductionErrorBoundary';
+import ChatSidebar from '@/components/chat/ChatSidebar';
 
 // Font configuration
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+});
+
+// Editorial display serif — the single highest-leverage signal that this is a
+// premium, considered product and not a generic SaaS template. Used only on the
+// largest headlines and pull-quotes via the `.font-display` class.
+const newsreader = Newsreader({
+  variable: '--font-display',
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  style: ['normal', 'italic'],
+  display: 'swap',
 });
 
 // Metadata
 export const metadata: Metadata = {
-  title: "Life Navigator | Secure Life Management",
-  description: "Secure, AI-powered life management platform for finance, career, education, and healthcare guidance",
-  keywords: ["life management", "AI advisor", "financial planning", "career development", "education planning", "healthcare management"],
-  authors: [{ name: "NexLevel Team" }],
-  robots: "index, follow",
+  title: 'LifeNavigator — Decision Intelligence for Life',
+  description:
+    'LifeNavigator connects your finances, career, education, health, and goals into one trusted AI system — helping you make better decisions grounded in your own data.',
+  keywords: [
+    'decision intelligence',
+    'AI life planning',
+    'financial planning',
+    'career development',
+    'education planning',
+    'personal AI',
+    'grounded AI',
+  ],
+  authors: [{ name: 'LifeNavigator' }],
+  robots: 'index, follow',
   openGraph: {
-    type: "website",
-    locale: "en_US",
-    url: "https://nexlevel-intelligence.com",
-    siteName: "Life Navigator",
-    title: "Life Navigator | Secure Life Management",
-    description: "Secure, AI-powered life management platform for finance, career, education, and healthcare guidance",
+    type: 'website',
+    locale: 'en_US',
+    url: 'https://nexlevel-intelligence.com',
+    siteName: 'LifeNavigator',
+    title: 'LifeNavigator — Decision Intelligence for Life',
+    description:
+      'Connect your finances, career, education, health, and goals into one trusted AI system — decisions grounded in your own data.',
     images: [
       {
-        url: "/og-image.png",
+        url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: "Life Navigator",
+        alt: 'Life Navigator',
       },
     ],
   },
@@ -47,7 +68,7 @@ export const metadata: Metadata = {
 
 // Viewport
 export const viewport = {
-  width: "device-width",
+  width: 'device-width',
   initialScale: 1,
 };
 
@@ -65,7 +86,7 @@ export default function RootLayout({
         <script src="/force-dark-mode.js" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} antialiased`}
         suppressHydrationWarning
       >
         <Providers>

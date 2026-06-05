@@ -1,20 +1,21 @@
-/** Two-layer grounding architecture, dark/cinematic. */
+/** Two-layer grounding architecture, dark/cinematic — HOW vs WHAT feeding a
+    single grounded, governed answer. */
 export default function TrustArchitectureVisual({ className = '' }: { className?: string }) {
   return (
     <div className={`grid gap-4 ${className}`}>
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm">
+        <div className="edge-glow relative rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/10 px-2.5 py-1 text-[0.7rem] font-medium uppercase tracking-wider text-white/50">
             Central GraphRAG
           </div>
-          <h3 className="mt-3 text-lg font-semibold text-white">Governs HOW</h3>
+          <h3 className="mt-3 text-lg font-semibold tracking-tight text-white">Governs HOW</h3>
           <p className="mt-1.5 text-sm leading-relaxed text-white/55">
             Shared methodology, compliance, and safety policy. Identical for everyone. Contains no
             personal data, and never decides what is true about you.
           </p>
         </div>
         <div
-          className="rounded-2xl border border-[#2dd4bf]/30 p-6 backdrop-blur-sm"
+          className="edge-glow relative rounded-2xl border border-[#2dd4bf]/30 p-6 backdrop-blur-sm"
           style={{
             background: 'linear-gradient(135deg, rgba(45,212,191,0.1), rgba(45,212,191,0.02))',
           }}
@@ -22,11 +23,22 @@ export default function TrustArchitectureVisual({ className = '' }: { className?
           <div className="inline-flex items-center gap-2 rounded-full border border-[#2dd4bf]/30 px-2.5 py-1 text-[0.7rem] font-medium uppercase tracking-wider text-[#5eead4]">
             Personal GraphRAG
           </div>
-          <h3 className="mt-3 text-lg font-semibold text-white">Determines WHAT is true</h3>
+          <h3 className="mt-3 text-lg font-semibold tracking-tight text-white">
+            Determines WHAT is true
+          </h3>
           <p className="mt-1.5 text-sm leading-relaxed text-white/65">
             Your accounts, goals, and history — isolated to you. The only source for any personal
             fact.
           </p>
+        </div>
+      </div>
+
+      {/* convergence row */}
+      <div className="relative flex items-center justify-center py-1">
+        <div className="hairline absolute inset-x-8 top-1/2" />
+        <div className="relative inline-flex items-center gap-2 rounded-full border border-white/12 bg-[#070709] px-4 py-1.5 text-[0.72rem] font-medium text-white/70">
+          <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-[#2dd4bf]" />
+          One grounded, governed answer
         </div>
       </div>
 

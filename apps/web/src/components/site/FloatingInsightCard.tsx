@@ -22,10 +22,11 @@ export default function FloatingInsightCard({
   className?: string;
   spark?: boolean;
 }) {
-  const glass = tone === 'dark' ? 'glass-dark text-white' : 'glass text-[var(--brand-ink)]';
+  const glass =
+    tone === 'dark' ? 'glass-dark text-white edge-glow shimmer' : 'glass text-[var(--brand-ink)]';
   const muted = tone === 'dark' ? 'text-white/55' : 'text-[var(--brand-muted)]';
   return (
-    <div className={`rounded-2xl p-4 ${glass} ${className}`}>
+    <div className={`relative rounded-2xl p-4 ${glass} ${className}`}>
       <div className="flex items-start gap-3">
         {icon && (
           <div

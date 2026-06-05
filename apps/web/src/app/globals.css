@@ -24,10 +24,25 @@
   --brand-line: #232228;
   --brand-elev: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 30px -12px rgb(0 0 0 / 0.6);
 }
-/* Premium type rhythm: tight tracking on display, comfortable measure on body */
+/* Premium type rhythm: an editorial display serif for the largest headlines and
+   pull-quotes (the signal that reads "considered product", not "Tailwind blocks"),
+   a comfortable measure on body. Geist remains the UI/body face. */
 .font-display {
-  letter-spacing: -0.03em;
-  line-height: 1.04;
+  font-family: var(--font-display), ui-serif, Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  letter-spacing: -0.018em;
+  line-height: 1.02;
+}
+.font-display em,
+.font-display i,
+.italic-display {
+  font-style: italic;
+  font-weight: 500;
+}
+/* When we want the tight neo-grotesk look instead of the serif (eyebrows, labels) */
+.font-grotesk {
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 .measure {
   max-width: 38rem;
@@ -155,6 +170,215 @@
   .float-2,
   .aurora {
     animation: none !important;
+  }
+}
+
+/* ============================================================================
+ * Premium primitives v5 — depth, texture, and cinematic motion
+ * ==========================================================================*/
+/* Fine film grain over the whole dark stage — kills the "flat CSS gradient" look
+   that reads as a template. Cheap, GPU-friendly, fixed so it never scrolls. */
+.grain::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* Gradient hairline divider — replaces flat 1px borders between sections */
+.hairline {
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.12) 18%,
+    rgba(45, 212, 191, 0.35) 50%,
+    rgba(255, 255, 255, 0.12) 82%,
+    transparent
+  );
+}
+/* Soft top border that glows on a panel */
+.edge-glow {
+  position: relative;
+}
+.edge-glow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.02) 40%);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+/* Conic halo behind the data-map / hero core — slow rotation */
+.conic-halo {
+  background: conic-gradient(
+    from 0deg,
+    rgba(45, 212, 191, 0.0),
+    rgba(45, 212, 191, 0.5),
+    rgba(99, 102, 241, 0.45),
+    rgba(168, 85, 247, 0.35),
+    rgba(45, 212, 191, 0.0)
+  );
+}
+@media (prefers-reduced-motion: no-preference) {
+  .spin-slow {
+    animation: spin-slow 22s linear infinite;
+  }
+  @keyframes spin-slow {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+/* Shimmer sweep across glass cards (used on hover / for "live" feel) */
+@media (prefers-reduced-motion: no-preference) {
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-120%);
+    background: linear-gradient(
+      105deg,
+      transparent 30%,
+      rgba(255, 255, 255, 0.08) 48%,
+      transparent 66%
+    );
+    animation: shimmer 5.5s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0%,
+    55% {
+      transform: translateX(-120%);
+    }
+    100% {
+      transform: translateX(120%);
+    }
+  }
+}
+/* Live pulsing dot for "grounded / streaming" status chips */
+@media (prefers-reduced-motion: no-preference) {
+  .pulse-dot {
+    animation: pulse-dot 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(45, 212, 191, 0.5);
+      opacity: 1;
+    }
+    50% {
+      box-shadow: 0 0 0 5px rgba(45, 212, 191, 0);
+      opacity: 0.7;
+    }
+  }
+}
+/* Animated draw-on for the connected-graph link paths */
+@media (prefers-reduced-motion: no-preference) {
+  .draw {
+    stroke-dasharray: 240;
+    stroke-dashoffset: 240;
+    animation: draw 2.4s ease forwards;
+  }
+  @keyframes draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+}
+/* Staggered child reveal inside a MotionSection once it is shown */
+.stagger > * {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .reveal[data-armed='true'] .stagger > * {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  .reveal[data-armed='true'][data-shown='true'] .stagger > * {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .reveal[data-armed='true'][data-shown='true'] .stagger > *:nth-child(2) {
+    transition-delay: 0.07s;
+  }
+  .reveal[data-armed='true'][data-shown='true'] .stagger > *:nth-child(3) {
+    transition-delay: 0.14s;
+  }
+  .reveal[data-armed='true'][data-shown='true'] .stagger > *:nth-child(4) {
+    transition-delay: 0.21s;
+  }
+  .reveal[data-armed='true'][data-shown='true'] .stagger > *:nth-child(5) {
+    transition-delay: 0.28s;
+  }
+  .reveal[data-armed='true'][data-shown='true'] .stagger > *:nth-child(6) {
+    transition-delay: 0.35s;
+  }
+}
+/* Warm secondary gradient text */
+.text-gradient-soft {
+  background: linear-gradient(100deg, #ffffff 0%, #cbd5e1 60%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* Premium primary button: subtle gradient + inner light + lift */
+.btn-primary {
+  background: linear-gradient(180deg, #ffffff, #e8e8ea);
+  color: #07070a;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 10px 30px -10px rgba(45, 212, 191, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.4);
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s ease;
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 18px 44px -12px rgba(45, 212, 191, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.45);
+}
+.btn-ghost {
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.02);
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.25s ease,
+    border-color 0.25s ease;
+}
+.btn-ghost:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin-slow,
+  .shimmer::after,
+  .pulse-dot,
+  .draw {
+    animation: none !important;
+  }
+  .draw {
+    stroke-dashoffset: 0;
   }
 }
 

@@ -162,6 +162,8 @@ interface Tier {
   };
   available: boolean;
   popular?: boolean;
+  /** Enterprise-style tier: price varies, so we show "Custom" and route to a consultation. */
+  custom?: boolean;
   features: TierFeature[];
   cta: string;
   ctaLink: string;
@@ -240,14 +242,15 @@ export default function PricingPage() {
       id: 'enterprise',
       name: 'Enterprise',
       description: 'Custom solutions for teams and advisors',
-      price: { monthly: 99, annual: 990 },
+      price: { monthly: 0, annual: 0 },
       icon: <BuildingIcon />,
       colorClasses: {
         iconBg: 'bg-green-100 dark:bg-green-900/30',
         iconText: 'text-green-600',
         ctaAvailable: 'bg-green-600 hover:bg-green-700 text-white shadow-lg hover:shadow-xl',
       },
-      available: false,
+      available: true,
+      custom: true,
       features: [
         { name: 'Unlimited everything', included: true },
         { name: 'White-label branding', included: true },
@@ -261,7 +264,7 @@ export default function PricingPage() {
         { name: 'Onboarding & training', included: true },
         { name: 'Custom SLA', included: true },
       ],
-      cta: 'Join Waitlist',
+      cta: 'Book a Consultation',
       ctaLink: '/waitlist?tier=enterprise',
     },
   ];
@@ -368,21 +371,32 @@ export default function PricingPage() {
 
                 {/* Price */}
                 <div className="mb-6">
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-5xl font-bold text-gray-900 dark:text-white">
-                      $
-                      {billingPeriod === 'monthly'
-                        ? tier.price.monthly
-                        : Math.floor(tier.price.annual / 12)}
-                    </span>
-                    {tier.price.monthly > 0 && (
-                      <span className="text-gray-600 dark:text-gray-400">/month</span>
-                    )}
-                  </div>
-                  {billingPeriod === 'annual' && tier.price.annual > 0 && (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                      ${tier.price.annual} billed annually
-                    </p>
+                  {tier.custom ? (
+                    <>
+                      <div className="text-5xl font-bold text-gray-900 dark:text-white">Custom</div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Pricing scales with your team — let&apos;s find the right fit.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-5xl font-bold text-gray-900 dark:text-white">
+                          $
+                          {billingPeriod === 'monthly'
+                            ? tier.price.monthly
+                            : Math.floor(tier.price.annual / 12)}
+                        </span>
+                        {tier.price.monthly > 0 && (
+                          <span className="text-gray-600 dark:text-gray-400">/month</span>
+                        )}
+                      </div>
+                      {billingPeriod === 'annual' && tier.price.annual > 0 && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          ${tier.price.annual} billed annually
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -516,12 +530,15 @@ export default function PricingPage() {
           </p>
         </div>
 
-        {/* FAQ */}
+        {/* Enterprise / contact */}
         <div className="text-center">
           <p className="text-gray-600 dark:text-gray-400">
-            Have questions?{' '}
-            <Link href="/contact" className="text-cyan-600 hover:text-cyan-700 font-medium">
-              Contact us
+            Need a plan for a team, or have questions about Enterprise?{' '}
+            <Link
+              href="/waitlist?tier=enterprise"
+              className="text-cyan-600 hover:text-cyan-700 font-medium"
+            >
+              Talk to our team
             </Link>
           </p>
         </div>

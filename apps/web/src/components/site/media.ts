@@ -12,5 +12,8 @@ export const IMG = {
   education: u('1503676260728-1c00da094a0b'),
   finance: u('1554224155-6726b3ff858f'),
   career: u('1507003211169-0a1dd7228f2d'),
+  // Long, winding road — the "decisions that compound over decades" / long-term
+  // trajectory metaphor (replaces a literal portrait, which didn't fit).
+  journey: u('1469854523086-cc02fe5d8800'),
   heroAbstract: u('1639762681485-074b7f938ba0'),
 };
