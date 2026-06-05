@@ -24,24 +24,30 @@ export default async function AuthErrorPage({
         {/* Logo/Branding */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center space-x-2">
-            <img 
-              src="/LifeNavigator.png" 
-              alt="LifeNavigator Logo" 
-              className="w-10 h-10" 
-            />
+            <img src="/LifeNavigator.png" alt="LifeNavigator Logo" className="w-10 h-10" />
             <span className="text-2xl font-bold text-gray-900 dark:text-white">LifeNavigator</span>
           </Link>
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900 dark:text-white">
             Authentication Error
           </h2>
         </div>
-        
+
         {/* Error Message */}
         <div className="bg-red-50 dark:bg-red-900/30 p-4 rounded-md mb-6">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              <svg
+                className="h-5 w-5 text-red-400"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                  clipRule="evenodd"
+                />
               </svg>
             </div>
             <div className="ml-3">
@@ -54,7 +60,7 @@ export default async function AuthErrorPage({
             </div>
           </div>
         </div>
-        
+
         {/* Actions */}
         <div className="flex flex-col gap-4">
           <Link
@@ -63,7 +69,7 @@ export default async function AuthErrorPage({
           >
             Return to Login
           </Link>
-          
+
           <Link
             href="/"
             className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -71,11 +77,17 @@ export default async function AuthErrorPage({
             Go to Homepage
           </Link>
         </div>
-        
+
         {/* Help text */}
         <div className="mt-6 text-center text-sm text-gray-600 dark:text-gray-400">
           <p>
-            Need help? <a href="mailto:support@lifenavigator.com" className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300">Contact Support</a>
+            Need help?{' '}
+            <a
+              href="mailto:support@lifenavigator.tech"
+              className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Contact Support
+            </a>
           </p>
         </div>
       </div>

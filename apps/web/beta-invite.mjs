@@ -9,7 +9,7 @@
 //
 // Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY, APP_URL
 const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY: SERVICE, SUPABASE_ANON_KEY: ANON, APP_URL } = process.env;
-const APP = (APP_URL || 'https://life-nav-mvp-web.vercel.app').replace(/\/$/, '');
+const APP = (APP_URL || 'https://app.lifenavigator.tech').replace(/\/$/, '');
 
 // Mint a link via the built-in admin endpoint. type 'invite' creates the user;
 // 'magiclink' is for existing users. Returns { hashed_token, action_link, confirm_url }.

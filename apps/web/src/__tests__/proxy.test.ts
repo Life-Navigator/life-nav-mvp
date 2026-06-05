@@ -28,14 +28,17 @@ jest.mock('@supabase/ssr', () => ({
 process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://test.supabase.co';
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
 
-function createMockRequest(pathname: string): NextRequest {
+function createMockRequest(pathname: string, host = 'localhost'): NextRequest {
   return {
     nextUrl: {
       pathname,
-      href: `http://localhost:3000${pathname}`,
+      href: `http://${host}${pathname}`,
       clone: jest.fn().mockReturnThis(),
     },
-    url: `http://localhost:3000${pathname}`,
+    url: `http://${host}${pathname}`,
+    headers: {
+      get: (key: string) => (key.toLowerCase() === 'host' ? host : null),
+    },
     cookies: {
       get: jest.fn(),
       getAll: jest.fn().mockReturnValue([]),
@@ -125,5 +128,39 @@ describe('Proxy (auth gating)', () => {
     expect(NextResponse.redirect).toHaveBeenCalled();
     const redirectUrl = (NextResponse.redirect as jest.Mock).mock.calls[0][0];
     expect(redirectUrl.pathname).toBe('/dashboard');
+  });
+
+  it('redirects the app-subdomain root to sign-in for anonymous users', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+
+    const req = createMockRequest('/', 'app.lifenavigator.tech');
+    await proxy(req);
+
+    expect(NextResponse.redirect).toHaveBeenCalled();
+    const redirectUrl = (NextResponse.redirect as jest.Mock).mock.calls[0][0];
+    expect(redirectUrl.pathname).toBe('/auth/login');
+  });
+
+  it('redirects the app-subdomain root to dashboard for authenticated users', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-id' } } });
+
+    const req = createMockRequest('/', 'app.lifenavigator.tech');
+    await proxy(req);
+
+    expect(NextResponse.redirect).toHaveBeenCalled();
+    const redirectUrl = (NextResponse.redirect as jest.Mock).mock.calls[0][0];
+    expect(redirectUrl.pathname).toBe('/dashboard');
+  });
+
+  it('serves the marketing apex root without redirecting', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+
+    const req = createMockRequest('/', 'lifenavigator.tech');
+    await proxy(req);
+
+    const rootRedirect = (NextResponse.redirect as jest.Mock).mock.calls.find(
+      (call: unknown[]) => (call[0] as URL)?.pathname === '/auth/login'
+    );
+    expect(rootRedirect).toBeUndefined();
   });
 });

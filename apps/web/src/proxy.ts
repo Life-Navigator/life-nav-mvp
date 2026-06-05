@@ -27,6 +27,10 @@ function isPublicRoute(path: string): boolean {
   return false;
 }
 
+// Host that serves the application entry (vs. the marketing apex). Visiting its
+// root should land on the app, not the marketing homepage.
+const APP_HOST = process.env.APP_HOST || 'app.lifenavigator.tech';
+
 function isProtectedRoute(path: string): boolean {
   return (
     path.startsWith('/dashboard') ||
@@ -72,6 +76,14 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isAuthenticated = !!user;
+
+  // ---- App subdomain: root goes to the app entry, not the marketing home ----
+  const host = (request.headers.get('host') || '').split(':')[0].toLowerCase();
+  if (host === APP_HOST && path === '/') {
+    return NextResponse.redirect(
+      new URL(isAuthenticated ? '/dashboard' : '/auth/login', request.url)
+    );
+  }
 
   // ---- Public routes: allow through ----
   if (isPublicRoute(path)) {

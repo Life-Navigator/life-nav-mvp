@@ -31,7 +31,7 @@ export class EmailService {
   private fromName: string;
 
   private constructor() {
-    this.fromEmail = process.env.EMAIL_FROM || 'noreply@lifenavigator.com';
+    this.fromEmail = process.env.EMAIL_FROM || 'welcome@lifenavigator.tech';
     this.fromName = process.env.EMAIL_FROM_NAME || 'LifeNavigator';
 
     // Configure email provider

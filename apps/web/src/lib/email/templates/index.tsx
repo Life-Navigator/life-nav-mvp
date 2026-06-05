@@ -126,13 +126,13 @@ function EmailLayout({ children }: { children: React.ReactNode }) {
           </div>
           {children}
           <div className="footer">
-            <p>© 2024 LifeNavigator. All rights reserved.</p>
+            <p>© 2026 LifeNavigator. All rights reserved.</p>
             <p>
-              <a href="https://lifenavigator.com/unsubscribe" style={{ color: '#6b7280' }}>
+              <a href="https://lifenavigator.tech/unsubscribe" style={{ color: '#6b7280' }}>
                 Unsubscribe
               </a>
               {' | '}
-              <a href="https://lifenavigator.com/privacy" style={{ color: '#6b7280' }}>
+              <a href="https://lifenavigator.tech/legal/privacy" style={{ color: '#6b7280' }}>
                 Privacy Policy
               </a>
             </p>
