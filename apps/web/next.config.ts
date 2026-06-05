@@ -1,13 +1,54 @@
 import type { NextConfig } from "next";
 
-// Get CSP directive values from environment variables or use defaults
-const cspConnectSrc = process.env.CSP_CONNECT_SRC || `'self'`;
+// Build CSP allow-lists. Defaults are permissive enough for a Next.js app —
+// Next's inline bootstrap/hydration scripts, next/font + React inline styles,
+// Supabase auth/realtime, and Vercel tooling — while still locking down
+// object-src, base-uri, and frame-ancestors. Each is overridable via CSP_* env.
+//
+// NOTE: 'unsafe-inline' on script-src is required because Next injects inline
+// bootstrap scripts (and we ship a small theme script). A nonce-based CSP would
+// be stricter but forces every page to render dynamically (no static caching),
+// so for the beta we accept 'unsafe-inline' here.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseWs = supabaseUrl ? supabaseUrl.replace(/^https:/i, 'wss:') : '';
+const apiOrigins = [
+  process.env.NEXT_PUBLIC_AGENT_API_URL,
+  process.env.NEXT_PUBLIC_API_URL,
+  process.env.NEXT_PUBLIC_API_BASE_URL,
+]
+  .filter(Boolean)
+  .map((u) => {
+    try {
+      return new URL(u as string).origin;
+    } catch {
+      return '';
+    }
+  })
+  .filter(Boolean);
+
+const cspConnectSrc =
+  process.env.CSP_CONNECT_SRC ||
+  [
+    `'self'`,
+    supabaseUrl,
+    supabaseWs,
+    'https://*.supabase.co',
+    'wss://*.supabase.co',
+    'https://*.fly.dev',
+    'https://vercel.live',
+    'wss://vercel.live',
+    'https://vitals.vercel-insights.com',
+    ...apiOrigins,
+  ]
+    .filter(Boolean)
+    .join(' ');
 const cspDefaultSrc = process.env.CSP_DEFAULT_SRC || `'self'`;
 const cspFontSrc = process.env.CSP_FONT_SRC || `'self' https://fonts.gstatic.com`;
 const cspImgSrc = process.env.CSP_IMG_SRC || `'self' data: https: blob:`;
-const cspScriptSrc = process.env.CSP_SCRIPT_SRC || `'self'`;
-const cspStyleSrc = process.env.CSP_STYLE_SRC || `'self' https://fonts.googleapis.com`;
-const cspFrameSrc = process.env.CSP_FRAME_SRC || `'self'`;
+const cspScriptSrc = process.env.CSP_SCRIPT_SRC || `'self' 'unsafe-inline' https://vercel.live`;
+const cspStyleSrc =
+  process.env.CSP_STYLE_SRC || `'self' 'unsafe-inline' https://fonts.googleapis.com`;
+const cspFrameSrc = process.env.CSP_FRAME_SRC || `'self' https://vercel.live`;
 
 // Define security headers
 const securityHeaders = [
