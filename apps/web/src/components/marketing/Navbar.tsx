@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Logo from '@/components/brand/Logo';
 
 const navLinks = [
@@ -16,9 +16,23 @@ const navLinks = [
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   return (
-    <nav className="fixed top-0 z-50 w-full border-b border-[var(--brand-line)] bg-[var(--brand-paper)]/80 backdrop-blur-xl">
+    <nav
+      className={`fixed top-0 z-50 w-full transition-colors duration-300 ${
+        scrolled
+          ? 'border-b border-white/10 bg-[#06060a]/80 backdrop-blur-xl'
+          : 'border-b border-transparent bg-transparent'
+      }`}
+    >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
         <Logo markClassName="h-8 w-8" size={32} />
 
@@ -28,9 +42,7 @@ export default function Navbar() {
               key={link.href}
               href={link.href}
               className={`transition-colors ${
-                pathname === link.href
-                  ? 'text-[var(--brand-ink)]'
-                  : 'text-[var(--brand-muted)] hover:text-[var(--brand-ink)]'
+                pathname === link.href ? 'text-white' : 'text-white/60 hover:text-white'
               }`}
             >
               {link.label}
@@ -41,15 +53,15 @@ export default function Navbar() {
         <div className="hidden items-center gap-4 md:flex">
           <Link
             href="/auth/magic"
-            className="text-sm text-[var(--brand-muted)] transition-colors hover:text-[var(--brand-ink)]"
+            className="text-sm text-white/60 transition-colors hover:text-white"
           >
             Sign in
           </Link>
           <Link
             href="/beta"
-            className="rounded-lg bg-[var(--brand-ink)] px-4 py-2 text-sm font-medium text-[var(--brand-paper)] transition-transform hover:-translate-y-0.5"
+            className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-[#06060a] transition-transform hover:-translate-y-0.5"
           >
-            Request Beta Access
+            Request Beta Invite
           </Link>
         </div>
 
@@ -59,20 +71,20 @@ export default function Navbar() {
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen((v) => !v)}
         >
-          <span className="block h-0.5 w-6 bg-[var(--brand-ink)]" />
-          <span className="mt-1.5 block h-0.5 w-6 bg-[var(--brand-ink)]" />
+          <span className="block h-0.5 w-6 bg-white" />
+          <span className="mt-1.5 block h-0.5 w-6 bg-white" />
         </button>
       </div>
 
       {mobileOpen && (
-        <div className="border-t border-[var(--brand-line)] bg-[var(--brand-paper)] px-6 py-4 md:hidden">
+        <div className="border-t border-white/10 bg-[#06060a]/95 px-6 py-4 backdrop-blur-xl md:hidden">
           <div className="flex flex-col gap-4 text-sm">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className="text-[var(--brand-muted)]"
+                className="text-white/70"
               >
                 {link.label}
               </Link>
@@ -80,9 +92,9 @@ export default function Navbar() {
             <Link
               href="/beta"
               onClick={() => setMobileOpen(false)}
-              className="rounded-lg bg-[var(--brand-ink)] px-4 py-2 text-center font-medium text-[var(--brand-paper)]"
+              className="rounded-lg bg-white px-4 py-2 text-center font-medium text-[#06060a]"
             >
-              Request Beta Access
+              Request Beta Invite
             </Link>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Navbar from '@/components/marketing/Navbar';
 import Footer from '@/components/marketing/Footer';
+import ParallaxBackdrop from '@/components/site/ParallaxBackdrop';
 
 export const metadata = {
   title: 'How It Works — LifeNavigator',
@@ -37,7 +38,8 @@ const STEPS = [
 
 export default function HowItWorksPage() {
   return (
-    <div className="min-h-screen bg-[var(--brand-paper)] text-[var(--brand-ink)] antialiased">
+    <div className="dark relative min-h-screen text-[var(--brand-ink)] antialiased">
+      <ParallaxBackdrop />
       <Navbar />
       <section className="px-6 pt-36 pb-16">
         <div className="mx-auto max-w-3xl rise">

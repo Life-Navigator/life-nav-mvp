@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Navbar from '@/components/marketing/Navbar';
 import Footer from '@/components/marketing/Footer';
+import ParallaxBackdrop from '@/components/site/ParallaxBackdrop';
 import HeroScene from '@/components/site/HeroScene';
 import MotionSection from '@/components/site/MotionSection';
 import DeviceMockup from '@/components/site/DeviceMockup';
@@ -123,72 +124,77 @@ const FAQ = [
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-xs font-medium uppercase tracking-wider text-[var(--brand-accent)]">
-      {children}
-    </div>
+    <div className="text-xs font-medium uppercase tracking-wider text-[#5eead4]">{children}</div>
   );
 }
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[var(--brand-paper)] text-[var(--brand-ink)] antialiased">
+    <div className="relative min-h-screen text-white antialiased">
+      <ParallaxBackdrop />
       <Navbar />
 
       {/* 1 · Hero */}
       <HeroScene />
 
-      {/* 2 · Product mockup / dashboard */}
-      <MotionSection as="section" className="px-6 py-24">
+      {/* 2 · Product dashboard */}
+      <MotionSection as="section" className="px-6 py-28">
         <div className="mx-auto max-w-6xl">
           <div className="mx-auto max-w-2xl text-center">
             <Eyebrow>The product</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
+            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
               One dashboard for every decision that matters.
             </h2>
-            <p className="mt-4 text-[var(--brand-muted)]">
+            <p className="mt-4 text-white/55">
               Insights, recommendations, and a grounded assistant — reading from your real data,
               presented with the restraint of a tool you&apos;ll trust with your life.
             </p>
           </div>
-          <div className="mx-auto mt-14 max-w-4xl">
-            <DeviceMockup variant="laptop" />
+          <div className="relative mx-auto mt-16 max-w-4xl [perspective:1600px]">
+            <div
+              className="pointer-events-none absolute -inset-x-16 -top-12 bottom-0 -z-10 rounded-[3rem] blur-3xl"
+              style={{
+                background:
+                  'radial-gradient(60% 60% at 50% 30%, rgba(45,212,191,0.18), transparent 70%)',
+              }}
+            />
+            <div className="[transform:rotateX(6deg)]">
+              <DeviceMockup variant="laptop" />
+            </div>
           </div>
         </div>
       </MotionSection>
 
       {/* 3 · Your data layer */}
-      <MotionSection
-        as="section"
-        className="border-y border-[var(--brand-line)] bg-white/40 px-6 py-24 dark:bg-white/[0.02]"
-      >
-        <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
+      <MotionSection as="section" className="border-y border-white/10 px-6 py-28">
+        <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-2">
           <div>
             <Eyebrow>Your data layer</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
+            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
               Your whole life, in one private graph.
             </h2>
-            <p className="mt-4 text-[var(--brand-muted)]">
+            <p className="mt-4 text-white/55">
               A career move changes your finances. A degree changes your career. A family decision
               touches all of it. LifeNavigator builds a personal knowledge graph — isolated to you —
               so the system reasons across your domains together, not in five disconnected apps.
             </p>
           </div>
-          <div className="rounded-3xl border border-[var(--brand-line)] bg-[var(--brand-paper)] p-6 [box-shadow:var(--brand-elev)]">
-            <DataConnectionMap tone="light" />
+          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 backdrop-blur-sm">
+            <DataConnectionMap tone="dark" />
           </div>
         </div>
       </MotionSection>
 
-      {/* 4 · What LifeNavigator helps with */}
-      <MotionSection as="section" id="product" className="px-6 py-24">
+      {/* 4 · What it helps with */}
+      <MotionSection as="section" id="product" className="px-6 py-28">
         <div className="mx-auto max-w-6xl">
           <div className="max-w-2xl">
             <Eyebrow>What it helps with</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
+            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
               Six kinds of intelligence. One system.
             </h2>
           </div>
-          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {DOMAINS.map((d) => (
               <ScenarioCard key={d.domain} {...d} />
             ))}
@@ -197,20 +203,23 @@ export default function LandingPage() {
       </MotionSection>
 
       {/* 5 · How it works */}
-      <MotionSection as="section" className="border-t border-[var(--brand-line)] px-6 py-24">
+      <MotionSection as="section" className="border-t border-white/10 px-6 py-28">
         <div className="mx-auto max-w-6xl">
           <div className="max-w-2xl">
             <Eyebrow>How it works</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
+            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
               From your data to a decision you can trust.
             </h2>
           </div>
-          <div className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-[var(--brand-line)] bg-[var(--brand-line)] sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {STEPS.map((s) => (
-              <div key={s.n} className="bg-[var(--brand-paper)] p-7">
-                <div className="text-sm font-semibold text-[var(--brand-accent)]">{s.n}</div>
-                <h3 className="mt-2 font-semibold">{s.t}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-[var(--brand-muted)]">{s.d}</p>
+              <div
+                key={s.n}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] p-7 backdrop-blur-sm"
+              >
+                <div className="text-sm font-semibold text-[#5eead4]">{s.n}</div>
+                <h3 className="mt-2 font-semibold text-white">{s.t}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-white/55">{s.d}</p>
               </div>
             ))}
           </div>
@@ -218,45 +227,46 @@ export default function LandingPage() {
       </MotionSection>
 
       {/* 6 · Trust architecture */}
-      <MotionSection
-        as="section"
-        id="trust"
-        className="border-t border-[var(--brand-line)] bg-white/40 px-6 py-24 dark:bg-white/[0.02]"
-      >
+      <MotionSection as="section" id="trust" className="border-t border-white/10 px-6 py-28">
         <div className="mx-auto max-w-6xl">
           <div className="max-w-2xl">
             <Eyebrow>Trust architecture</Eyebrow>
-            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">
+            <h2 className="mt-3 font-display text-3xl font-semibold sm:text-5xl">
               Built to be trusted.
             </h2>
-            <p className="mt-4 text-[var(--brand-muted)]">
+            <p className="mt-4 text-white/55">
               Advice about your life has to be right. Our architecture separates how we reason from
               what is true about you.
             </p>
           </div>
-          <TrustArchitectureVisual className="mt-12" />
+          <TrustArchitectureVisual className="mt-14" />
         </div>
       </MotionSection>
 
       {/* 7 · Beta experience */}
-      <MotionSection as="section" className="px-6 py-24">
-        <div className="mx-auto max-w-4xl overflow-hidden rounded-3xl border border-[var(--brand-line)] [box-shadow:var(--brand-elev)]">
+      <MotionSection as="section" className="px-6 py-28">
+        <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl border border-white/10">
           <div className="grid sm:grid-cols-2">
-            <div className="bg-[var(--brand-paper)] p-9">
+            <div className="bg-white/[0.03] p-10 backdrop-blur-sm">
               <Eyebrow>Today · Beta</Eyebrow>
-              <h3 className="mt-3 text-xl font-semibold">Safe sample life profiles</h3>
-              <p className="mt-2 text-sm leading-relaxed text-[var(--brand-muted)]">
+              <h3 className="mt-3 text-xl font-semibold text-white">Safe sample life profiles</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/55">
                 Preview the entire system on a realistic profile — grounded insights,
                 recommendations, and chat. No real data required. This is a preview, not the final
                 experience.
               </p>
             </div>
-            <div className="bg-[#07070a] p-9 text-white">
+            <div
+              className="p-10"
+              style={{
+                background: 'linear-gradient(135deg, rgba(45,212,191,0.12), rgba(99,102,241,0.08))',
+              }}
+            >
               <div className="text-xs font-medium uppercase tracking-wider text-[#5eead4]">
                 The full product
               </div>
-              <h3 className="mt-3 text-xl font-semibold">Your real connected data</h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/60">
+              <h3 className="mt-3 text-xl font-semibold text-white">Your real connected data</h3>
+              <p className="mt-2 text-sm leading-relaxed text-white/65">
                 Connect your accounts via Plaid, your goals, history, and context — and the same
                 intelligence runs on your actual life.
               </p>
@@ -266,50 +276,55 @@ export default function LandingPage() {
       </MotionSection>
 
       {/* 8 · Security & privacy */}
-      <MotionSection as="section" className="border-t border-[var(--brand-line)] px-6 py-20">
-        <div className="mx-auto grid max-w-6xl gap-px overflow-hidden rounded-2xl border border-[var(--brand-line)] bg-[var(--brand-line)] sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            [
-              'Per-user isolation',
-              'Row-level security across every store; your graph is never mixed with anyone else’s.',
-            ],
-            ['Encryption', 'Encryption in transit and at rest; least-privilege access throughout.'],
-            ['Read-only Plaid', 'Bank-grade connectivity that can read, never move, your money.'],
-            [
-              'Governed output',
-              'A constitutional + compliance layer reviews advice before it reaches you.',
-            ],
-          ].map(([t, d]) => (
-            <div key={t} className="bg-[var(--brand-paper)] p-6">
-              <h3 className="text-sm font-semibold">{t}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-[var(--brand-muted)]">{d}</p>
-            </div>
-          ))}
-        </div>
-        <div className="mx-auto mt-6 max-w-6xl">
-          <Link
-            href="/trust"
-            className="text-sm font-medium text-[var(--brand-accent)] hover:underline"
-          >
-            Visit the Trust Center →
-          </Link>
+      <MotionSection as="section" className="border-t border-white/10 px-6 py-24">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              [
+                'Per-user isolation',
+                'Row-level security across every store; your graph is never mixed with anyone else’s.',
+              ],
+              [
+                'Encryption',
+                'Encryption in transit and at rest; least-privilege access throughout.',
+              ],
+              ['Read-only Plaid', 'Bank-grade connectivity that can read, never move, your money.'],
+              [
+                'Governed output',
+                'A constitutional + compliance layer reviews advice before it reaches you.',
+              ],
+            ].map(([t, d]) => (
+              <div
+                key={t}
+                className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm"
+              >
+                <h3 className="text-sm font-semibold text-white">{t}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-white/55">{d}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6">
+            <Link href="/trust" className="text-sm font-medium text-[#5eead4] hover:underline">
+              Visit the Trust Center →
+            </Link>
+          </div>
         </div>
       </MotionSection>
 
       {/* 9 · Pricing / beta access */}
-      <MotionSection as="section" className="px-6 pb-8 pt-4">
-        <div className="mx-auto flex max-w-4xl flex-col items-center gap-4 rounded-2xl border border-[var(--brand-line)] p-8 text-center sm:flex-row sm:justify-between sm:text-left [box-shadow:var(--brand-elev)]">
+      <MotionSection as="section" className="px-6 py-10">
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 rounded-3xl border border-white/10 bg-white/[0.03] p-8 text-center backdrop-blur-sm sm:flex-row sm:justify-between sm:text-left">
           <div>
-            <h3 className="font-display text-xl font-semibold">
+            <h3 className="font-display text-xl font-semibold text-white">
               Invite-only beta · free during preview
             </h3>
-            <p className="mt-1 text-sm text-[var(--brand-muted)]">
+            <p className="mt-1 text-sm text-white/55">
               Pricing for the full product will be announced at general availability.
             </p>
           </div>
           <Link
             href="/beta"
-            className="rounded-xl bg-[var(--brand-ink)] px-6 py-3 font-medium text-[var(--brand-paper)] transition-transform hover:-translate-y-0.5"
+            className="rounded-xl bg-white px-6 py-3 font-medium text-[#06060a] transition-transform hover:-translate-y-0.5"
           >
             Request Beta Invite
           </Link>
@@ -321,11 +336,11 @@ export default function LandingPage() {
         <div className="mx-auto max-w-3xl">
           <Eyebrow>FAQ</Eyebrow>
           <h2 className="mt-3 font-display text-3xl font-semibold">Questions</h2>
-          <dl className="mt-10 divide-y divide-[var(--brand-line)]">
+          <dl className="mt-10 divide-y divide-white/10">
             {FAQ.map((x) => (
               <div key={x.q} className="py-6">
-                <dt className="font-medium">{x.q}</dt>
-                <dd className="mt-2 text-sm leading-relaxed text-[var(--brand-muted)]">{x.a}</dd>
+                <dt className="font-medium text-white">{x.q}</dt>
+                <dd className="mt-2 text-sm leading-relaxed text-white/55">{x.a}</dd>
               </div>
             ))}
           </dl>

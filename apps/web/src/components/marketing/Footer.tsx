@@ -26,24 +26,24 @@ const footerLinks = {
 
 export default function Footer() {
   return (
-    <footer className="border-t border-[var(--brand-line)] bg-[var(--brand-paper)]">
-      <div className="mx-auto max-w-7xl px-6 py-14">
+    <footer className="relative border-t border-white/10 bg-[#06060a]">
+      <div className="mx-auto max-w-7xl px-6 py-16">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-5">
           <div className="col-span-2 md:col-span-1">
             <Logo markClassName="h-7 w-7" size={28} />
-            <p className="mt-3 max-w-xs text-sm leading-relaxed text-[var(--brand-muted)]">
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-white/45">
               Decision Intelligence for Life. Grounded in your data, governed for trust.
             </p>
           </div>
           {Object.entries(footerLinks).map(([heading, links]) => (
             <div key={heading}>
-              <h4 className="text-sm font-semibold text-[var(--brand-ink)]">{heading}</h4>
+              <h4 className="text-sm font-semibold text-white">{heading}</h4>
               <ul className="mt-3 space-y-2">
                 {links.map((link) => (
                   <li key={link.label}>
                     <Link
                       href={link.href}
-                      className="text-sm text-[var(--brand-muted)] transition-colors hover:text-[var(--brand-ink)]"
+                      className="text-sm text-white/45 transition-colors hover:text-white"
                     >
                       {link.label}
                     </Link>
@@ -53,8 +53,8 @@ export default function Footer() {
             </div>
           ))}
         </div>
-        <div className="mt-12 border-t border-[var(--brand-line)] pt-6">
-          <p className="text-sm text-[var(--brand-muted)]">
+        <div className="mt-12 border-t border-white/10 pt-6">
+          <p className="text-sm text-white/40">
             &copy; {new Date().getFullYear()} LifeNavigator · Decision Intelligence for Life
           </p>
         </div>

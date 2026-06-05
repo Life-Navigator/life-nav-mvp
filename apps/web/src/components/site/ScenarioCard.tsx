@@ -14,23 +14,22 @@ export default function ScenarioCard({
   icon: ReactNode;
 }) {
   return (
-    <div className="group relative overflow-hidden rounded-2xl border border-[var(--brand-line)] bg-[var(--brand-paper)] p-6 transition-all hover:-translate-y-1 [box-shadow:var(--brand-elev)]">
+    <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.06]">
       <div
         aria-hidden
-        className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[var(--brand-accent)] opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-[0.12]"
+        className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
+        style={{ background: 'radial-gradient(circle, rgba(45,212,191,0.35), transparent 60%)' }}
       />
-      <div className="flex items-center gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--brand-ink)] text-[var(--brand-paper)]">
+      <div className="relative flex items-center gap-3">
+        <div className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/5 text-[#5eead4]">
           {icon}
         </div>
-        <div className="text-xs font-medium uppercase tracking-wider text-[var(--brand-accent)]">
-          {domain}
-        </div>
+        <div className="text-xs font-medium uppercase tracking-wider text-[#5eead4]">{domain}</div>
       </div>
-      <h3 className="mt-4 text-lg font-semibold">{title}</h3>
-      <p className="mt-2 text-sm leading-relaxed text-[var(--brand-muted)]">{detail}</p>
+      <h3 className="relative mt-4 text-lg font-semibold text-white">{title}</h3>
+      <p className="relative mt-2 text-sm leading-relaxed text-white/55">{detail}</p>
       {metric && (
-        <div className="mt-4 inline-flex items-center gap-2 rounded-lg bg-[var(--brand-accent-soft)] px-2.5 py-1 text-xs font-medium text-[var(--brand-accent)]">
+        <div className="relative mt-4 inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-medium text-white/70">
           {metric}
         </div>
       )}

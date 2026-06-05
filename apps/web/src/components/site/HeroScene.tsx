@@ -32,15 +32,10 @@ export default function HeroScene() {
   }, []);
 
   return (
-    <section className="relative overflow-hidden bg-[#07070a] text-white">
-      <div aria-hidden className="aurora pointer-events-none absolute inset-0" />
-      <div aria-hidden className="tech-grid pointer-events-none absolute inset-0" />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-[var(--brand-paper)]"
-      />
+    <section className="relative overflow-hidden text-white">
+      <div aria-hidden className="aurora pointer-events-none absolute inset-0 opacity-70" />
 
-      <div className="relative mx-auto max-w-6xl px-6 pt-36 pb-24 text-center">
+      <div className="relative mx-auto max-w-6xl px-6 pt-40 pb-28 text-center">
         <div className="mx-auto mb-7 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1 text-sm text-white/70 rise">
           <span className="h-1.5 w-1.5 rounded-full bg-[#2dd4bf]" />
           Invite-only beta · Decision Intelligence Platform
