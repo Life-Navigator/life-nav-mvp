@@ -44,6 +44,113 @@
   }
 }
 
+/* ============================================================================
+ * Cinematic primitives (v4 enterprise rebuild)
+ * ==========================================================================*/
+/* Animated aurora/mesh gradient for the dark hero */
+.aurora {
+  background:
+    radial-gradient(40rem 30rem at 15% 10%, rgba(45, 212, 191, 0.22), transparent 60%),
+    radial-gradient(38rem 28rem at 85% 20%, rgba(99, 102, 241, 0.2), transparent 60%),
+    radial-gradient(50rem 40rem at 50% 100%, rgba(20, 184, 166, 0.16), transparent 60%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .aurora {
+    animation: aurora-shift 18s ease-in-out infinite alternate;
+  }
+  @keyframes aurora-shift {
+    from {
+      transform: translate3d(-2%, -1%, 0) scale(1.05);
+    }
+    to {
+      transform: translate3d(2%, 2%, 0) scale(1.12);
+    }
+  }
+}
+/* Faint engineering grid behind the hero */
+.tech-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(60% 60% at 50% 40%, #000 30%, transparent 100%);
+}
+/* Glass surfaces */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 20px 50px -24px rgba(7, 7, 12, 0.4);
+}
+.glass-dark {
+  background: rgba(18, 19, 27, 0.55);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 24px 60px -28px rgba(0, 0, 0, 0.8);
+}
+.text-gradient {
+  background: linear-gradient(100deg, #5eead4 0%, #818cf8 60%, #f0abfc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* Gentle float for hero cards */
+@media (prefers-reduced-motion: no-preference) {
+  .float {
+    animation: floaty 7s ease-in-out infinite;
+  }
+  .float-2 {
+    animation: floaty 9s ease-in-out infinite;
+    animation-delay: -2s;
+  }
+  @keyframes floaty {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-12px);
+    }
+  }
+  .dash {
+    stroke-dasharray: 5 7;
+    animation: dashmove 1.2s linear infinite;
+  }
+  @keyframes dashmove {
+    to {
+      stroke-dashoffset: -24;
+    }
+  }
+}
+/* MotionSection: hidden→shown via IntersectionObserver toggling data-shown */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.reveal[data-shown='true'] {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .float,
+  .float-2,
+  .aurora {
+    animation: none !important;
+  }
+}
+
 @layer base {
   :root {
     --background: 249 250 251; /* gray-50 */
