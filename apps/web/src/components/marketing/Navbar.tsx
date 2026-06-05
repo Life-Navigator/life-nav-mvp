@@ -1,14 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
+import Logo from '@/components/brand/Logo';
 
 const navLinks = [
-  { href: '/features', label: 'Features' },
-  { href: '/pricing', label: 'Pricing' },
+  { href: '/#product', label: 'Product' },
+  { href: '/how-it-works', label: 'How It Works' },
+  { href: '/trust', label: 'Trust' },
   { href: '/security', label: 'Security' },
+  { href: '/pricing', label: 'Pricing' },
 ];
 
 export default function Navbar() {
@@ -16,30 +18,19 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5">
-          <Image
-            src="/LifeNavigator.png"
-            alt="Life Navigator"
-            width={36}
-            height={36}
-            className="rounded-lg"
-          />
-          <span className="text-lg font-bold text-gray-900 dark:text-white">Life Navigator</span>
-        </Link>
+    <nav className="fixed top-0 z-50 w-full border-b border-[var(--brand-line)] bg-[var(--brand-paper)]/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+        <Logo markClassName="h-8 w-8" size={32} />
 
-        {/* Desktop nav links */}
-        <div className="hidden md:flex items-center gap-8 text-sm">
+        <div className="hidden items-center gap-8 text-sm md:flex">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               className={`transition-colors ${
                 pathname === link.href
-                  ? 'text-cyan-600 dark:text-cyan-400 font-medium'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+                  ? 'text-[var(--brand-ink)]'
+                  : 'text-[var(--brand-muted)] hover:text-[var(--brand-ink)]'
               }`}
             >
               {link.label}
@@ -47,93 +38,51 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* Desktop CTA */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden items-center gap-4 md:flex">
           <Link
-            href="/auth/login"
-            className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white transition-colors"
+            href="/auth/magic"
+            className="text-sm text-[var(--brand-muted)] transition-colors hover:text-[var(--brand-ink)]"
           >
             Sign in
           </Link>
           <Link
-            href="/auth/register"
-            className="text-sm px-4 py-2 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700 transition-colors font-medium"
+            href="/beta"
+            className="rounded-lg bg-[var(--brand-ink)] px-4 py-2 text-sm font-medium text-[var(--brand-paper)] transition-transform hover:-translate-y-0.5"
           >
-            Get Started
+            Request Beta Access
           </Link>
         </div>
 
-        {/* Mobile hamburger */}
         <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          className="md:hidden p-2 text-gray-600 dark:text-gray-400"
+          className="md:hidden"
           aria-label="Toggle menu"
+          aria-expanded={mobileOpen}
+          onClick={() => setMobileOpen((v) => !v)}
         >
-          {mobileOpen ? (
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          ) : (
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          )}
+          <span className="block h-0.5 w-6 bg-[var(--brand-ink)]" />
+          <span className="mt-1.5 block h-0.5 w-6 bg-[var(--brand-ink)]" />
         </button>
       </div>
 
-      {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800">
-          <div className="px-4 py-4 space-y-3">
+        <div className="border-t border-[var(--brand-line)] bg-[var(--brand-paper)] px-6 py-4 md:hidden">
+          <div className="flex flex-col gap-4 text-sm">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className={`block py-2 text-sm ${
-                  pathname === link.href
-                    ? 'text-cyan-600 dark:text-cyan-400 font-medium'
-                    : 'text-gray-600 dark:text-gray-400'
-                }`}
+                className="text-[var(--brand-muted)]"
               >
                 {link.label}
               </Link>
             ))}
-            <hr className="border-gray-200 dark:border-gray-800" />
             <Link
-              href="/auth/login"
+              href="/beta"
               onClick={() => setMobileOpen(false)}
-              className="block py-2 text-sm text-gray-700 dark:text-gray-300"
+              className="rounded-lg bg-[var(--brand-ink)] px-4 py-2 text-center font-medium text-[var(--brand-paper)]"
             >
-              Sign in
-            </Link>
-            <Link
-              href="/auth/register"
-              onClick={() => setMobileOpen(false)}
-              className="block w-full text-center py-2.5 rounded-lg bg-cyan-600 text-white text-sm font-medium"
-            >
-              Get Started
+              Request Beta Access
             </Link>
           </div>
         </div>

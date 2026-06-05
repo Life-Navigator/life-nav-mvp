@@ -1,5 +1,49 @@
 @import "tailwindcss";
 
+/* ============================================================================
+ * LifeNavigator brand system — "Decision Intelligence for Life"
+ * Restrained, premium palette: ink + warm paper + a single iris accent.
+ * Intentionally NOT consumer-finance (no bright cyan/teal). Reads like Linear /
+ * Stripe / Mercury: near-black type, generous whitespace, one intelligent hue.
+ * ==========================================================================*/
+:root {
+  --brand-ink: #0b0b0f; /* near-black, primary type */
+  --brand-paper: #faf9f7; /* warm off-white, surfaces */
+  --brand-accent: #0f766e; /* deep teal — harmonizes with the compass logo, used sparingly */
+  --brand-accent-soft: #e6f2f0; /* accent tint for chips/halos */
+  --brand-muted: #6b6b76; /* secondary type */
+  --brand-line: #e7e6e2; /* hairline borders */
+  --brand-elev: 0 1px 2px rgb(11 11 15 / 0.04), 0 8px 24px -12px rgb(11 11 15 / 0.12);
+}
+.dark {
+  --brand-ink: #f5f4f1;
+  --brand-paper: #0b0b0f;
+  --brand-accent: #2dd4bf; /* brighter teal for contrast on dark */
+  --brand-accent-soft: #0c2a27;
+  --brand-muted: #9a9aa6;
+  --brand-line: #232228;
+  --brand-elev: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 30px -12px rgb(0 0 0 / 0.6);
+}
+/* Premium type rhythm: tight tracking on display, comfortable measure on body */
+.font-display {
+  letter-spacing: -0.03em;
+  line-height: 1.04;
+}
+.measure {
+  max-width: 38rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rise {
+    animation: rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
+}
+
 @layer base {
   :root {
     --background: 249 250 251; /* gray-50 */
