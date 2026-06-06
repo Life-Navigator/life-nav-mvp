@@ -10,6 +10,8 @@
  */
 
 import { createGovernedHandler } from '@/lib/governance/governed-route';
+import { persistChatTurn } from '@/lib/chat/persistence';
+import { randomUUID } from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,6 +22,21 @@ interface ChatBody {
   message: string;
   conversation_id?: string;
   previous_messages?: Array<{ role: string; content: string }>;
+}
+
+/**
+ * Accept the incoming conversation_id (a UUID) or mint a new one. The legacy
+ * `conv_${timestamp}` format from the graphrag-query Edge Function is
+ * rewritten to a fresh UUID so the chat.* tables can store it.
+ */
+function normalizeConversationId(incoming?: string): string {
+  if (
+    incoming &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(incoming)
+  ) {
+    return incoming;
+  }
+  return randomUUID();
 }
 
 export const POST = createGovernedHandler<ChatBody>({
@@ -39,6 +56,9 @@ export const POST = createGovernedHandler<ChatBody>({
 
     const url = new URL(request.url);
     const shouldStream = url.searchParams.get('stream') === 'true';
+    // Stable UUID for this conversation across turns. Persisted to the
+    // chat.* tables below so the chat page can list + resume.
+    const conversation_id = normalizeConversationId(body.conversation_id);
 
     const edgeFunctionUrl = `${SUPABASE_URL}/functions/v1/graphrag-query`;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -53,7 +73,7 @@ export const POST = createGovernedHandler<ChatBody>({
         // Server-internal streaming for the SSE → factory accumulator
         // path; the factory decides what to release.
         stream: shouldStream,
-        conversation_id: body.conversation_id,
+        conversation_id,
         previous_messages: body.previous_messages,
       }),
     });
@@ -65,10 +85,20 @@ export const POST = createGovernedHandler<ChatBody>({
     // Non-streaming: read full JSON, feed text to governance.
     if (!shouldStream || !edgeResponse.body) {
       const json = await edgeResponse.json();
+      const assistantText = typeof json.message === 'string' ? json.message : JSON.stringify(json);
+      // Persist BOTH turns to chat.* so the user can resume / browse later.
+      // Best-effort: never blocks the response.
+      void persistChatTurn({
+        user_id: user.id,
+        conversation_id,
+        user_message: body.message,
+        assistant_message: assistantText,
+        metadata: { sources: json.sources, edge_metadata: json.metadata },
+      });
       return {
-        text: typeof json.message === 'string' ? json.message : JSON.stringify(json),
+        text: assistantText,
         data: {
-          conversation_id: json.conversation_id || body.conversation_id || `conv_${Date.now()}`,
+          conversation_id,
           timestamp: new Date().toISOString(),
           sources: json.sources,
           metadata: json.metadata,
@@ -105,8 +135,18 @@ export const POST = createGovernedHandler<ChatBody>({
       }
     }
 
+    const finalText = accumulator.text();
+    // Persist both turns from the streaming path too. Same best-effort.
+    void persistChatTurn({
+      user_id: user.id,
+      conversation_id,
+      user_message: body.message,
+      assistant_message: finalText,
+      metadata: { streamed: true },
+    });
     return {
-      text: accumulator.text(),
+      text: finalText,
+      data: { conversation_id },
       streaming: true,
     };
   },

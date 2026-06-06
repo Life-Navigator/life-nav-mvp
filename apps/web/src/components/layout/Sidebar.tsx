@@ -390,6 +390,12 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Chat',
+    href: '/dashboard/chat',
+    icon: ChatIcon,
+    current: false,
+  },
+  {
     name: 'Goals & Assessment',
     href: '/dashboard/goals',
     icon: TargetIcon,
@@ -406,7 +412,6 @@ const navigation = [
     href: '/dashboard/finance',
     icon: CurrencyDollarIcon,
     current: false,
-    comingSoon: true,
     children: [{ name: 'Overview', href: '/dashboard/finance/overview' }],
   },
   {
@@ -414,35 +419,30 @@ const navigation = [
     href: '/dashboard/career',
     icon: BriefcaseIcon,
     current: false,
-    comingSoon: true,
   },
   {
     name: 'Education',
     href: '/dashboard/education',
     icon: AcademicCapIcon,
     current: false,
-    comingSoon: true,
   },
   {
     name: 'Healthcare',
     href: '/dashboard/healthcare',
     icon: HeartIcon,
     current: false,
-    comingSoon: true,
   },
   {
     name: 'Calendar',
     href: '/dashboard/calendar',
     icon: CalendarNavIcon,
     current: false,
-    comingSoon: true,
   },
   {
     name: 'Roadmap',
     href: '/dashboard/roadmap',
     icon: MapIcon,
     current: false,
-    comingSoon: true,
   },
   {
     name: 'Settings',

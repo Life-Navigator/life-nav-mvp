@@ -60,6 +60,12 @@ const Header: FC = () => {
   const [calendarConnections, setCalendarConnections] = useState<CalendarConnection[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [user, setUser] = useState<UserProfile>({
+    name: 'User',
+    email: '',
+    initials: 'U',
+    image: null,
+  });
 
   const userMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -154,40 +160,81 @@ const Header: FC = () => {
     return path.charAt(0).toUpperCase() + path.slice(1);
   };
 
-  // Get user data from localStorage
-  const getUserData = (): UserProfile => {
-    if (typeof window === 'undefined') {
-      return { name: 'User', email: '', initials: 'U', image: null };
-    }
-
-    const userData = localStorage.getItem('user_data');
-    if (userData) {
+  /**
+   * Compute the user's profile from the live Supabase auth session + the
+   * `public.profiles` row, in that priority order:
+   *   1. profile.display_name / full_name / name
+   *   2. auth user_metadata.full_name / name / display_name
+   *   3. email local-part (before @) as a last resort before "User"
+   *
+   * Initials are derived from the first two whitespace-separated tokens.
+   */
+  useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+    (async () => {
       try {
-        const parsed = JSON.parse(userData);
-        const name = parsed.name || 'User';
-        const email = parsed.email || '';
-        const initials = name
-          .split(' ')
-          .map((n: string) => n[0])
-          .join('')
-          .toUpperCase()
-          .slice(0, 2);
+        const { getSupabaseClient } = await import('@/lib/supabase/client');
+        const supabase = getSupabaseClient();
+        if (!supabase) return;
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        if (!authUser || cancelled) return;
 
-        return {
-          name,
-          email,
-          initials: initials || 'U',
-          image: parsed.image || null,
-        };
-      } catch (e) {
-        console.error('Error parsing user data:', e);
+        const meta = (authUser.user_metadata ?? {}) as Record<string, unknown>;
+        let name =
+          (typeof meta.full_name === 'string' && meta.full_name) ||
+          (typeof meta.name === 'string' && meta.name) ||
+          (typeof meta.display_name === 'string' && meta.display_name) ||
+          '';
+
+        let image =
+          (typeof meta.avatar_url === 'string' && meta.avatar_url) ||
+          (typeof meta.picture === 'string' && meta.picture) ||
+          null;
+
+        // Try to enrich from public.profiles (typed loosely; the column set
+        // varies between projects).
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const sb = supabase as any;
+          const profileRes = await sb
+            .from('profiles')
+            .select('display_name, full_name, name, avatar_url')
+            .eq('id', authUser.id)
+            .maybeSingle();
+          const p = profileRes?.data ?? null;
+          if (p) {
+            name = p.display_name || p.full_name || p.name || name;
+            image = p.avatar_url || image;
+          }
+        } catch {
+          /* profiles table optional; fall back to auth metadata */
+        }
+
+        const email = authUser.email ?? '';
+        if (!name && email) name = email.split('@')[0];
+        if (!name) name = 'User';
+
+        const initials =
+          name
+            .split(/\s+/)
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((t) => t[0])
+            .join('')
+            .toUpperCase() || (email[0] || 'U').toUpperCase();
+
+        if (!cancelled) setUser({ name, email, initials, image });
+      } catch {
+        /* keep the default "User / U" so the header still renders */
       }
-    }
-
-    return { name: 'User', email: '', initials: 'U', image: null };
-  };
-
-  const user = getUserData();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mounted]);
 
   // Helper to format time ago
   const getTimeAgo = (date: Date): string => {
