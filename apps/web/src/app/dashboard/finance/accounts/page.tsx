@@ -14,22 +14,22 @@ export default function AccountsPage() {
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  
-  // Fetch accounts from Plaid API
+
+  // Fetch accounts from the Finance aggregator. The legacy URL
+  // /api/plaid/accounts didn't exist; the real endpoint is at
+  // /api/financial (server-rendered from finance.financial_accounts under RLS,
+  // returned in the shape this page expects: { id, name, type, balance,
+  // institution }).
   React.useEffect(() => {
     const fetchAccounts = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/plaid/accounts');
-
-        // Handle non-OK responses gracefully - show empty state
+        const response = await fetch('/api/financial?timeframe=month');
         if (!response.ok) {
-          console.warn('[Accounts] API returned non-OK status:', response.status);
+          console.warn('[Accounts] /api/financial returned', response.status);
           setAccounts([]);
-          setLoading(false);
           return;
         }
-
         const data = await response.json();
         setAccounts(Array.isArray(data?.accounts) ? data.accounts : []);
       } catch (error) {
@@ -41,12 +41,11 @@ export default function AccountsPage() {
     };
     fetchAccounts();
   }, []);
-  
+
   // Filter accounts based on selected type
-  const filteredAccounts = selectedType === 'all' 
-    ? accounts 
-    : accounts.filter(acc => acc.type === selectedType);
-  
+  const filteredAccounts =
+    selectedType === 'all' ? accounts : accounts.filter((acc) => acc.type === selectedType);
+
   // Group accounts by institution
   const accountGroups = filteredAccounts.reduce((groups: any, account: any) => {
     const institution = account.institution || 'Other';
@@ -56,13 +55,13 @@ export default function AccountsPage() {
     groups[institution].push(account);
     return groups;
   }, {});
-  
+
   // Handle account click
   const handleAccountClick = (accountId: string) => {
     // In a real implementation, this would navigate to the account details page
     console.log('Account clicked:', accountId);
   };
-  
+
   // Handle institution connect
   const handleConnectAccount = (institutionId: string) => {
     console.log('Connecting to institution:', institutionId);
@@ -73,7 +72,9 @@ export default function AccountsPage() {
   return (
     <div className="container mx-auto py-6 px-4 md:px-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-4 md:mb-0">Financial Accounts</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-4 md:mb-0">
+          Financial Accounts
+        </h1>
         <button
           onClick={() => setIsConnectModalOpen(true)}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -93,13 +94,13 @@ export default function AccountsPage() {
           Connect Account
         </button>
       </div>
-      
+
       {/* Net Worth Summary */}
       <NetWorthSummary accounts={filteredAccounts} />
-      
+
       {/* Account Type Filter */}
       <AccountTypeFilter selectedType={selectedType} onChange={setSelectedType} />
-      
+
       {/* Institution Groups */}
       {loading ? (
         <div className="text-center py-8">
@@ -116,13 +117,15 @@ export default function AccountsPage() {
         ))
       ) : (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 text-center">
-          <p className="text-gray-500 dark:text-gray-400 mb-4">No accounts found for this filter.</p>
+          <p className="text-gray-500 dark:text-gray-400 mb-4">
+            No accounts found for this filter.
+          </p>
           <div className="w-1/2 mx-auto">
             <AddAccountButton onClick={() => setIsConnectModalOpen(true)} />
           </div>
         </div>
       )}
-      
+
       {/* Connect Account Modal */}
       <ConnectAccountModal
         isOpen={isConnectModalOpen}
