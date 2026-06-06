@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Mark } from '@/components/brand/Logo';
 
 interface PublicPersona {
   persona_id: string;
@@ -62,36 +63,53 @@ export default function SampleFinancialProfile() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Activation failed. Please try again.');
       router.push('/dashboard');
+      router.refresh();
     } catch (e) {
       setError((e as Error).message);
       setActivating(false);
     }
   }
 
+  const inputClass =
+    'w-full rounded-xl border border-white/12 bg-white/[0.03] px-4 py-3 text-white outline-none transition focus:border-[#2dd4bf]/50 focus:ring-2 focus:ring-[#2dd4bf]/25 disabled:opacity-60';
+
   return (
-    <div className="mx-auto max-w-xl p-6">
-      <h1 className="text-2xl font-semibold text-gray-900">Choose a sample financial profile</h1>
-      <p className="mt-2 text-gray-600">
-        Use a sample financial profile to explore LifeNavigator without connecting real accounts.
+    <div className="mx-auto max-w-xl">
+      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.18em] text-[#5eead4]">
+        <span className="h-1 w-1 rounded-full bg-[#2dd4bf]" /> Step 1 of 1 · Almost there
+      </div>
+      <h1 className="mt-3 font-display text-3xl font-medium tracking-tight sm:text-4xl">
+        Your account is ready
+      </h1>
+      <p className="mt-3 text-white/55">
+        Pick a sample financial profile to explore the full system safely — no real bank
+        credentials, just real reasoning grounded in the data.
       </p>
 
+      {activating && (
+        <div className="mt-6 flex items-center gap-3 rounded-xl border border-[#2dd4bf]/20 bg-[#2dd4bf]/[0.06] p-3 text-sm text-[#a7f3e4]">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/15 border-t-[#2dd4bf]" />
+          Preparing your profile…
+        </div>
+      )}
+
       {loading ? (
-        <p className="mt-6 text-gray-500">Loading sample profiles…</p>
+        <p className="mt-8 text-white/45">Loading sample profiles…</p>
       ) : (
-        <div className="mt-6 space-y-5">
+        <div className="mt-8 space-y-5">
           <div>
-            <label htmlFor="persona" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="persona" className="mb-1.5 block text-sm font-medium text-white/70">
               Sample profile
             </label>
             <select
               id="persona"
-              className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none"
+              className={inputClass}
               value={selectedId}
               onChange={(e) => setSelectedId(e.target.value)}
               disabled={activating}
             >
               {personas.map((p) => (
-                <option key={p.persona_id} value={p.persona_id}>
+                <option key={p.persona_id} value={p.persona_id} className="bg-[#0b0b0f]">
                   {p.display_name}
                 </option>
               ))}
@@ -99,24 +117,24 @@ export default function SampleFinancialProfile() {
           </div>
 
           {selected && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-medium text-gray-900">{selected.display_name}</h2>
-                <span className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-800">
+                <h2 className="text-lg font-medium text-white">{selected.display_name}</h2>
+                <span className="rounded-full border border-[#2dd4bf]/25 bg-[#2dd4bf]/10 px-2.5 py-0.5 text-xs font-medium text-[#5eead4]">
                   {COMPLEXITY_LABEL[selected.complexity] ?? selected.complexity}
                 </span>
               </div>
-              <p className="mt-2 text-sm text-gray-600">{selected.description}</p>
+              <p className="mt-2 text-sm text-white/55">{selected.description}</p>
               {selected.goals?.length > 0 && (
-                <div className="mt-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <div className="mt-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-white/40">
                     What you can explore
                   </p>
-                  <ul className="mt-1 flex flex-wrap gap-2">
+                  <ul className="mt-2 flex flex-wrap gap-2">
                     {selected.goals.map((g) => (
                       <li
                         key={g}
-                        className="rounded-full bg-white px-2.5 py-1 text-xs text-gray-700 ring-1 ring-gray-200"
+                        className="rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs text-white/70"
                       >
                         {g}
                       </li>
@@ -127,19 +145,24 @@ export default function SampleFinancialProfile() {
             </div>
           )}
 
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-white/40">
             No real bank credentials are used during this beta experience.
           </p>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
+              {error}
+            </div>
+          )}
 
           <button
             type="button"
             onClick={activate}
             disabled={activating || !selectedId}
-            className="w-full rounded-md bg-indigo-600 px-4 py-2 font-medium text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className="btn-primary inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {activating ? 'Activating financial profile…' : 'Activate Financial Profile'}
+            <Mark className="h-4 w-4" size={16} />
+            {activating ? 'Preparing your profile…' : 'Activate & enter LifeNavigator'}
           </button>
         </div>
       )}

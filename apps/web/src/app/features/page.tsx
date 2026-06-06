@@ -206,7 +206,7 @@ export default function FeaturesPage() {
         <h2 className="text-3xl font-bold text-white">Start navigating your life today</h2>
         <p className="mt-4 text-cyan-100 text-lg">Free to start. No credit card required.</p>
         <Link
-          href="/auth/register"
+          href="/auth?mode=create"
           className="mt-8 inline-flex px-8 py-3.5 rounded-xl bg-white text-cyan-600 font-medium hover:bg-gray-100 transition-all"
         >
           Get Started Free

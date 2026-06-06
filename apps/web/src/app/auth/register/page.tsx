@@ -1,29 +1,21 @@
-import React from 'react';
-import Link from 'next/link';
-import RegisterForm from '@/components/auth/RegisterForm';
-import AuthShell from '@/components/auth/AuthShell';
-import { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 
-export const metadata: Metadata = {
-  title: 'Create your account | LifeNavigator',
-  description: 'Create a new LifeNavigator account',
-};
+export const dynamic = 'force-dynamic';
 
-export default function RegisterPage() {
-  return (
-    <AuthShell
-      title="Create your account"
-      subtitle="Start making decisions grounded in your own data."
-      footer={
-        <p>
-          Already have an account?{' '}
-          <Link href="/auth/login" className="font-medium text-[#5eead4] hover:underline">
-            Sign in
-          </Link>
-        </p>
-      }
-    >
-      <RegisterForm />
-    </AuthShell>
-  );
+/**
+ * Legacy route. Unified auth lives at /auth — redirect into "create" mode,
+ * preserving any query.
+ */
+export default async function LegacyRegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const p = await searchParams;
+  const q = new URLSearchParams({ mode: 'create' });
+  for (const k of ['email', 'next', 'redirect']) {
+    const v = p[k];
+    if (typeof v === 'string') q.set(k, v);
+  }
+  redirect(`/auth?${q.toString()}`);
 }

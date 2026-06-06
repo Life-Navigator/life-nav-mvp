@@ -53,7 +53,7 @@ export default function BetaPage() {
               Request an invite
             </Link>
             <Link
-              href="/auth/magic"
+              href="/auth?mode=magic"
               className="w-full rounded-xl border border-[var(--brand-line)] px-7 py-3.5 font-medium transition-colors hover:bg-white/60 sm:w-auto dark:hover:bg-white/5"
             >
               I have an invite — sign in

@@ -26,7 +26,7 @@ export default function EnterpriseCTA() {
           </p>
           <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
-              href="/beta"
+              href="/auth?mode=magic"
               className="btn-primary w-full rounded-xl px-8 py-3.5 font-medium sm:w-auto"
             >
               Request Beta Invite

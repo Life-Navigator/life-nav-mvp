@@ -157,7 +157,7 @@ export default function SecurityPage() {
           We&apos;re happy to answer any security questions. Reach out to our team.
         </p>
         <Link
-          href="/auth/register"
+          href="/auth?mode=create"
           className="mt-8 inline-flex px-8 py-3.5 rounded-xl bg-cyan-600 text-white font-medium hover:bg-cyan-700 transition-all shadow-lg shadow-cyan-600/25"
         >
           Get Started Free

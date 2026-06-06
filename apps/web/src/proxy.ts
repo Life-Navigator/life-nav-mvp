@@ -9,6 +9,7 @@ const PUBLIC_ROUTES = new Set([
   '/features',
   '/security',
   '/waitlist',
+  '/auth',
   '/auth/login',
   '/auth/register',
   '/auth/forgot-password',
@@ -81,14 +82,14 @@ export async function proxy(request: NextRequest) {
   const host = (request.headers.get('host') || '').split(':')[0].toLowerCase();
   if (host === APP_HOST && path === '/') {
     return NextResponse.redirect(
-      new URL(isAuthenticated ? '/dashboard' : '/auth/login', request.url)
+      new URL(isAuthenticated ? '/dashboard' : '/auth?mode=signin', request.url)
     );
   }
 
   // ---- Public routes: allow through ----
   if (isPublicRoute(path)) {
-    // If authenticated user visits auth pages, redirect to dashboard
-    if (isAuthenticated && path.startsWith('/auth/')) {
+    // If authenticated user visits any auth page, redirect to dashboard
+    if (isAuthenticated && (path === '/auth' || path.startsWith('/auth/'))) {
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
     return response;
@@ -96,8 +97,9 @@ export async function proxy(request: NextRequest) {
 
   // ---- Protected routes: require auth ----
   if (isProtectedRoute(path) && !isAuthenticated) {
-    const loginUrl = new URL('/auth/login', request.url);
-    loginUrl.searchParams.set('redirect', path);
+    const loginUrl = new URL('/auth', request.url);
+    loginUrl.searchParams.set('mode', 'signin');
+    loginUrl.searchParams.set('next', path);
     return NextResponse.redirect(loginUrl);
   }
 

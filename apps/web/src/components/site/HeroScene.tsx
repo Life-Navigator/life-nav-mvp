@@ -86,7 +86,7 @@ export default function HeroScene() {
 
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row rise">
           <Link
-            href="/beta"
+            href="/auth?mode=magic"
             className="btn-primary w-full rounded-xl px-7 py-3.5 font-medium sm:w-auto"
           >
             Request Beta Invite

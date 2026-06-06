@@ -65,7 +65,7 @@ export default function ProductPage() {
           </p>
           <div className="mt-9 flex justify-center gap-3">
             <Link
-              href="/beta"
+              href="/auth?mode=magic"
               className="rounded-xl bg-white px-7 py-3.5 font-medium text-[#06060a] transition-transform hover:-translate-y-0.5"
             >
               Request Beta Invite
@@ -173,7 +173,7 @@ export default function ProductPage() {
             Request a beta invite and preview the entire platform in minutes.
           </p>
           <Link
-            href="/beta"
+            href="/auth?mode=magic"
             className="mt-8 inline-block rounded-xl bg-white px-8 py-3.5 font-medium text-[#06060a] transition-transform hover:-translate-y-0.5"
           >
             Request Beta Invite

@@ -52,13 +52,13 @@ export default function Navbar() {
 
         <div className="hidden items-center gap-4 md:flex">
           <Link
-            href="/auth/magic"
+            href="/auth?mode=signin"
             className="text-sm text-white/60 transition-colors hover:text-white"
           >
             Sign in
           </Link>
           <Link
-            href="/beta"
+            href="/auth?mode=magic"
             className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-[#06060a] transition-transform hover:-translate-y-0.5"
           >
             Request Beta Invite
@@ -90,7 +90,7 @@ export default function Navbar() {
               </Link>
             ))}
             <Link
-              href="/beta"
+              href="/auth?mode=magic"
               onClick={() => setMobileOpen(false)}
               className="rounded-lg bg-white px-4 py-2 text-center font-medium text-[#06060a]"
             >

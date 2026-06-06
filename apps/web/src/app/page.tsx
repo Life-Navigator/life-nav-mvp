@@ -525,7 +525,10 @@ export default function LandingPage() {
                 Your real connected data via Plaid, your goals, history, and context.
               </p>
             </div>
-            <Link href="/beta" className="btn-primary shrink-0 rounded-xl px-6 py-3 font-medium">
+            <Link
+              href="/auth?mode=magic"
+              className="btn-primary shrink-0 rounded-xl px-6 py-3 font-medium"
+            >
               Request Beta Invite
             </Link>
           </div>

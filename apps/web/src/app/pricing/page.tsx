@@ -150,7 +150,7 @@ export default function PricingPage() {
         { name: 'Priority support', included: false },
       ],
       cta: 'Get Started Free',
-      ctaLink: '/auth/register',
+      ctaLink: '/auth?mode=create',
     },
     {
       id: 'pro',
@@ -395,7 +395,7 @@ export default function PricingPage() {
                     {packs.map((pack) => (
                       <Link
                         key={pack.priceId}
-                        href="/auth/register"
+                        href="/auth?mode=create"
                         className={`group relative rounded-2xl border p-4 text-center transition-all hover:-translate-y-1 ${
                           pack.popular
                             ? 'border-[#2dd4bf]/40 bg-[#2dd4bf]/[0.06]'

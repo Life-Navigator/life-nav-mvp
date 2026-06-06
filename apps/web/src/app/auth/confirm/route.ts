@@ -19,13 +19,15 @@ export async function GET(request: NextRequest) {
 
   if (!token_hash || !type) {
     return NextResponse.redirect(
-      new URL('/auth/login?error=invalid_confirmation_link', request.url)
+      new URL('/auth?mode=signin&error=invalid_confirmation_link', request.url)
     );
   }
 
   const supabase = await createServerSupabaseClient();
   if (!supabase) {
-    return NextResponse.redirect(new URL('/auth/login?error=auth_not_configured', request.url));
+    return NextResponse.redirect(
+      new URL('/auth?mode=signin&error=auth_not_configured', request.url)
+    );
   }
 
   const { error } = await supabase.auth.verifyOtp({ token_hash, type });
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
         ? 'link_expired'
         : 'confirmation_failed';
     console.error('Auth link verification error:', error.message);
-    return NextResponse.redirect(new URL(`/auth/login?error=${code}`, request.url));
+    return NextResponse.redirect(new URL(`/auth?mode=signin&error=${code}`, request.url));
   }
 
   // Session is now established (cookies set on this response). Magic-link,
