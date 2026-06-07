@@ -54,6 +54,11 @@ pub enum EntityType {
     LifeEvent,
     FinancialAccount,
     FinancialGoal,
+    /// Serializes as "transaction_summary" but also accepts "transaction"
+    /// from older triggers (finance.transactions emits entity_type='transaction').
+    /// Without the alias, every transaction job deserializes as Unknown,
+    /// producing :Unknown Neo4j labels (233 such nodes observed 2026-06-06).
+    #[serde(alias = "transaction")]
     TransactionSummary,
     Debt,
     Asset,

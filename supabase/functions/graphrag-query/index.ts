@@ -569,12 +569,22 @@ function buildPersonalContext(results: SearchResult[]): string {
 }
 
 // CENTRAL_CONTEXT — shared policy/methodology (HOW to answer). No personal data.
+//
+// v1 NOTE (2026-06-06): the ln_central Qdrant collection is empty — no curated
+// central corpus has been ingested. Telling the model to "consult
+// CENTRAL_CONTEXT" while CENTRAL_CONTEXT is empty wastes tokens and risks
+// confusing the model. Until the central seed corpus lands (audit recommends
+// fiduciary stance / debt-before-invest / emergency reserve / compliance
+// language / decision-framework primers), the function returns the empty string
+// so no CENTRAL_CONTEXT block is appended at all. The system prompt's
+// references to CENTRAL_CONTEXT remain in place but the model simply does not
+// see the section. Re-enable by removing the early return when results > 0.
 function buildCentralContext(results: SearchResult[]): string {
+  if (results.length === 0) {
+    return '';
+  }
   const header =
     '## CENTRAL_CONTEXT (shared advice policy & methodology — governs HOW to answer, never WHAT the user has)';
-  if (results.length === 0) {
-    return `${header}\n(No specific central policy retrieved; apply standard prudent, compliant financial-advice principles.)`;
-  }
   const lines = results.slice(0, 8).map((r) => `- ${r.text}`);
   return `${header}\n${lines.join('\n')}`;
 }
