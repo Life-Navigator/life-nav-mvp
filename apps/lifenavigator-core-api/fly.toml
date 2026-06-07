@@ -1,0 +1,48 @@
+# LifeNavigator Core API — Fly.io app definition.
+#
+# The orchestration tier. Holds Supabase/Gemini/Qdrant/Neo4j credentials
+# server-side ONLY. The Vercel frontend never holds a Gemini key
+# (ARCHITECTURE_BOUNDARIES.md).
+#
+#   fly apps create lifenavigator-core-api
+#   fly secrets set \
+#     SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_JWT_SECRET=... \
+#     SUPABASE_SERVICE_ROLE_KEY=... \
+#     GEMINI_API_KEY=... \
+#     QDRANT_URL=... QDRANT_API_KEY=... \
+#     QDRANT_PERSONAL_COLLECTION=life_navigator QDRANT_CENTRAL_COLLECTION=ln_central \
+#     NEO4J_URI=... NEO4J_USERNAME=... NEO4J_PASSWORD=... \
+#     NEO4J_PERSONAL_DATABASE=... ALLOWED_ORIGINS=https://lifenavigator.tech
+#   fly deploy
+#
+# (Reuse the same secret values already present on lifenavigator-api-gateway.)
+
+app = "lifenavigator-core-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  LOG_LEVEL = "info"
+  GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"   # 3072-dim; MUST match the worker
+  GEMINI_GENERATION_MODEL = "gemini-2.5-flash"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "get"
+    path = "/healthz"
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "5s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
