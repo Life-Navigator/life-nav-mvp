@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import jwt
 import pytest
@@ -42,15 +42,29 @@ def _test_settings() -> Settings:
 
 
 class FakeSupabase:
-    """Deterministic stand-in for SupabaseClient — no network."""
+    """Deterministic stand-in for SupabaseClient — no network.
 
-    def __init__(self, rows: Optional[list[dict[str, Any]]] = None) -> None:
-        self._rows = rows or []
+    ``rows`` may be a list (applied to ``financial_accounts``) or a dict
+    ``{table: rows}`` for per-table control. Captures inserts for assertions.
+    """
 
     configured = True
 
+    def __init__(self, rows: Any = None) -> None:
+        if isinstance(rows, dict):
+            self._by_table: dict[str, list[dict[str, Any]]] = rows
+        elif rows:
+            self._by_table = {"financial_accounts": rows}
+        else:
+            self._by_table = {}
+        self.inserts: list[tuple[str, dict[str, Any]]] = []
+
     async def select(self, table: str, **_: Any) -> list[dict[str, Any]]:
-        return list(self._rows)
+        return list(self._by_table.get(table, []))
+
+    async def insert(self, table: str, row: dict[str, Any], **_: Any) -> list[dict[str, Any]]:
+        self.inserts.append((table, row))
+        return [{**row, "id": "new-id"}]
 
     async def ready(self) -> bool:
         return True
@@ -73,11 +87,14 @@ def make_jwt(sub: str = "11111111-1111-1111-1111-111111111111", *, secret: str =
 def make_client():
     """Factory: build a TestClient with an optional fake Supabase row set."""
 
-    def _make(rows: Optional[list[dict[str, Any]]] = None) -> TestClient:
+    def _make(rows: Any = None) -> TestClient:
         application = create_app()
+        fake = FakeSupabase(rows)
         application.dependency_overrides[get_settings] = _test_settings
-        application.dependency_overrides[get_supabase] = lambda: FakeSupabase(rows)
-        return TestClient(application)
+        application.dependency_overrides[get_supabase] = lambda: fake
+        tc = TestClient(application)
+        tc.fake_supabase = fake  # type: ignore[attr-defined]  # for write assertions
+        return tc
 
     return _make
 

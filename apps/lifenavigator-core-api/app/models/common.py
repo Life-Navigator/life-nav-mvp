@@ -89,9 +89,11 @@ class GovernanceVerdict(BaseModel):
 
 
 class Recommendation(BaseModel):
+    """H contract — every recommendation, from any domain/agent, has this shape."""
+
     id: str
     title: str
-    explanation: str
+    why_it_matters: str
     evidence: list[Evidence] = Field(default_factory=list)
     source_tables: list[str] = Field(default_factory=list)
     source_graph_nodes: list[dict[str, str]] = Field(default_factory=list)
@@ -100,9 +102,11 @@ class Recommendation(BaseModel):
     priority: Literal["high", "medium", "low"] = "medium"
     affected_domains: list[str] = Field(default_factory=list)
     action_steps: list[ActionStep] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    revisit_date: Optional[str] = None
     escalation: Optional[Escalation] = None
     generated_by: str = "core-api"
-    governance: Optional[GovernanceVerdict] = None
+    governance_verdict: Optional[GovernanceVerdict] = None
 
 
 # --------------------------------------------------------------------------- #

@@ -64,27 +64,64 @@ class SupabaseClient:
         columns: str = "*",
         filters: Optional[dict[str, str]] = None,
         limit: Optional[int] = None,
+        order: Optional[str] = None,
+        schema: str = "public",
         user_jwt: Optional[str] = None,
     ) -> list[dict[str, Any]]:
-        """PostgREST select. Returns [] on missing config or any error."""
+        """PostgREST select. Returns [] on missing config or any error.
+
+        ``schema`` selects a non-public schema (e.g. ``finance``) via the
+        PostgREST ``Accept-Profile`` header.
+        """
         if not self.configured:
             return []
         params: dict[str, str] = {"select": columns}
         if filters:
             params.update(filters)
+        if order is not None:
+            params["order"] = order
         if limit is not None:
             params["limit"] = str(limit)
+        headers = self._headers(user_jwt=user_jwt)
+        if schema != "public":
+            headers["Accept-Profile"] = schema
         endpoint = f"{self._url}/rest/v1/{table}"
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
-                resp = await client.get(
-                    endpoint, headers=self._headers(user_jwt=user_jwt), params=params
-                )
+                resp = await client.get(endpoint, headers=headers, params=params)
                 resp.raise_for_status()
                 data = resp.json()
                 return data if isinstance(data, list) else []
         except Exception as exc:  # noqa: BLE001 — degrade, never raise to the route
             log.warning("supabase select %s failed: %s", table, exc)
+            return []
+
+    async def insert(
+        self,
+        table: str,
+        row: dict[str, Any],
+        *,
+        schema: str = "public",
+    ) -> list[dict[str, Any]]:
+        """Service-role insert (write path). Returns the inserted row(s) or [] on
+        error. ``schema`` selects a non-public schema via ``Content-Profile``.
+        Callers MUST set ``user_id`` from the verified JWT, never the request body.
+        """
+        if not self.configured:
+            return []
+        headers = self._headers()
+        headers["Prefer"] = "return=representation"
+        if schema != "public":
+            headers["Content-Profile"] = schema
+        endpoint = f"{self._url}/rest/v1/{table}"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(endpoint, headers=headers, json=row)
+                resp.raise_for_status()
+                data = resp.json()
+                return data if isinstance(data, list) else [data]
+        except Exception as exc:  # noqa: BLE001
+            log.warning("supabase insert %s failed: %s", table, exc)
             return []
 
     async def ready(self) -> bool:

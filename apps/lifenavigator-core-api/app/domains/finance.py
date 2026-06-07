@@ -1,37 +1,56 @@
-"""FinanceService — the reference DomainService (F1 scaffold).
+"""FinanceService — the reference DomainService.
 
-F1 goal: a real Supabase-backed *minimal* view-model when the tables are
-reachable, and a typed placeholder otherwise. It NEVER returns a fake number:
-when data is absent the tiles are explicitly ``None`` and ``confidence.basis``
-reflects it, so the frontend renders a premium "connect your accounts" prompt
-rather than a misleading ``$0``.
+Returns COMPLETE, frontend-ready view-models. Core rules:
+  * user-scoped: every read/write is filtered/stamped with ctx.user_id (from the
+    verified JWT, never the request body).
+  * no fake zeroes: when data is absent the tiles are ``None`` / ``[]`` and the
+    payload carries a ``missing`` list + ``confidence.basis`` so the frontend
+    renders a premium "connect/add" prompt — never a misleading $0.
+  * service-role writes only (goals / manual asset / manual liability).
+  * recommendations follow the H contract (models.common.Recommendation).
 
-Elite finance (snapshots, budgeting, debt optimizer, full rec library) is
-specified in FINANCE_DOMAIN_COMPLETION_REPORT.md and built in Phase 1 proper.
+Finance tables live in the ``finance`` Postgres schema (PostgREST Accept-Profile).
+Snapshot/budget tables are a Phase-1 migration; endpoints that need them return
+an honest missing-data state until then.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
 
 from ..clients.supabase import SupabaseClient
 from ..models.common import (
+    ActionStep,
     Confidence,
     DomainChatContext,
     DomainViewModel,
+    Evidence,
     Freshness,
+    GovernanceVerdict,
     Recommendation,
     SourceRef,
     UserContext,
+    WriteResult,
 )
 from .base import DomainService
 
+FINANCE = "finance"
 
-def _now_iso() -> str:
+
+def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _money(amount: float, currency: str = "USD") -> dict[str, Any]:
+    return {"amount": round(float(amount), 2), "currency": currency}
+
+
+def _src(table: str) -> SourceRef:
+    return SourceRef(system="supabase", table=f"finance.{table}", as_of=_now())
+
+
 class FinanceService(DomainService):
-    domain = "finance"
+    domain = FINANCE
     entity_types = [
         "financial_account",
         "transaction_summary",
@@ -45,88 +64,360 @@ class FinanceService(DomainService):
     def __init__(self, supabase: SupabaseClient) -> None:
         self._supabase = supabase
 
-    async def summary(self, ctx: UserContext) -> DomainViewModel:
-        accounts = await self._supabase.select(
-            "financial_accounts",
-            columns="id,name,institution_name,account_type,current_balance,currency",
+    # ----------------------------------------------------------------- reads
+    async def _rows(self, table: str, ctx: UserContext, *, limit: int = 200, order: Optional[str] = None) -> list[dict]:
+        return await self._supabase.select(
+            table,
+            columns="*",
             filters={"user_id": f"eq.{ctx.user_id}"},
-            limit=50,
+            limit=limit,
+            order=order,
+            schema=FINANCE,
         )
 
+    def _vm(
+        self,
+        ctx: UserContext,
+        data: dict[str, Any],
+        *,
+        sources: list[SourceRef],
+        missing: list[str],
+        basis: str,
+        recommendations: Optional[list[Recommendation]] = None,
+    ) -> DomainViewModel:
+        return DomainViewModel(
+            domain=FINANCE,
+            user_id=ctx.user_id,
+            generated_at=_now(),
+            freshness=Freshness(as_of=_now(), stale=(basis == "missing"), sources=sources),
+            confidence=Confidence(
+                score={"complete": 0.9, "partial": 0.6, "sparse": 0.3, "missing": 0.0}[basis],
+                basis=basis,  # type: ignore[arg-type]
+                missing_fields=missing,
+            ),
+            data=data,
+            recommendations=recommendations or [],
+            missing=missing,
+        )
+
+    @staticmethod
+    def _bal(row: dict) -> float:
+        for k in ("current_balance", "balance", "value", "market_value", "amount"):
+            if row.get(k) is not None:
+                try:
+                    return float(row[k])
+                except (TypeError, ValueError):
+                    return 0.0
+        return 0.0
+
+    async def summary(self, ctx: UserContext) -> DomainViewModel:
+        accounts = await self._rows("financial_accounts", ctx)
         if not accounts:
-            # No data (or Supabase unreachable) → honest empty view-model.
-            return DomainViewModel(
-                domain=self.domain,
-                user_id=ctx.user_id,
-                generated_at=_now_iso(),
-                freshness=Freshness(as_of=_now_iso(), stale=True),
-                confidence=Confidence(score=0.0, basis="missing", missing_fields=["accounts"]),
-                data={
-                    "net_worth": None,
-                    "cash": None,
-                    "debt": None,
-                    "accounts": [],
-                },
-                recommendations=[],
-                missing=["plaid_link"],
+            return self._vm(
+                ctx,
+                {"net_worth": None, "cash": None, "debt": None, "monthly_income": None,
+                 "monthly_expenses": None, "savings_rate": None, "emergency_reserve_months": None,
+                 "accounts": [], "top_opportunities": [], "top_risks": [], "next_best_action": None},
+                sources=[], missing=["plaid_link"], basis="missing",
             )
 
-        cash = sum(
-            float(a.get("current_balance") or 0)
-            for a in accounts
-            if (a.get("account_type") or "").lower() in {"depository", "checking", "savings", "cash"}
-        )
-        net_worth = sum(float(a.get("current_balance") or 0) for a in accounts)
+        debts = await self._rows("asset_loans", ctx)
+        txns = await self._rows("transactions", ctx, limit=500, order="transaction_date.desc")
 
-        return DomainViewModel(
-            domain=self.domain,
-            user_id=ctx.user_id,
-            generated_at=_now_iso(),
-            freshness=Freshness(
-                as_of=_now_iso(),
-                stale=False,
-                sources=[SourceRef(system="supabase", table="finance.financial_accounts", as_of=_now_iso())],
-            ),
-            confidence=Confidence(score=0.6, basis="partial", missing_fields=["snapshots", "budgets"]),
-            data={
-                "net_worth": {"amount": net_worth, "currency": "USD"},
-                "cash": {"amount": cash, "currency": "USD"},
-                "debt": None,  # populated when liabilities/debts land (Phase 1)
-                "accounts": [
+        cash = sum(self._bal(a) for a in accounts if (a.get("account_type") or "").lower() in {"depository", "checking", "savings", "cash"})
+        net_worth = sum(self._bal(a) for a in accounts) - sum(self._bal(d) for d in debts)
+        debt_total = sum(self._bal(d) for d in debts)
+        income, expense = self._income_expense(txns)
+        savings_rate = None
+        if income and income > 0:
+            savings_rate = round(max(0.0, (income - expense)) / income, 3)
+        reserve_months = round(cash / expense, 1) if expense and expense > 0 else None
+
+        recs = await self.recommendations(ctx)
+        opportunities = [r.title for r in recs if r.priority in {"high", "medium"}][:3]
+        risks = [r.title for r in recs if ("risk" in r.title.lower() or "gap" in r.title.lower())][:3]
+
+        return self._vm(
+            ctx,
+            {
+                "net_worth": _money(net_worth),
+                "cash": _money(cash),
+                "debt": _money(debt_total) if debts else None,
+                "monthly_income": _money(income) if income else None,
+                "monthly_expenses": _money(expense) if expense else None,
+                "savings_rate": savings_rate,
+                "emergency_reserve_months": reserve_months,
+                "accounts": [self._account_vm(a) for a in accounts],
+                "top_opportunities": opportunities,
+                "top_risks": risks or [r.title for r in recs][:3],
+                "next_best_action": recs[0].title if recs else None,
+            },
+            sources=[_src("financial_accounts"), _src("transactions"), _src("asset_loans")],
+            missing=([] if txns else ["transactions"]) + ([] if debts else []),
+            basis="partial",
+            recommendations=recs,
+        )
+
+    @staticmethod
+    def _account_vm(a: dict) -> dict[str, Any]:
+        return {
+            "id": a.get("id"),
+            "name": a.get("name"),
+            "institution": a.get("institution_name") or a.get("institution"),
+            "type": a.get("account_type"),
+            "balance": _money(FinanceService._bal(a), a.get("currency") or "USD"),
+        }
+
+    async def accounts(self, ctx: UserContext) -> DomainViewModel:
+        rows = await self._rows("financial_accounts", ctx)
+        if not rows:
+            return self._vm(ctx, {"accounts": []}, sources=[], missing=["plaid_link"], basis="missing")
+        return self._vm(ctx, {"accounts": [self._account_vm(a) for a in rows]},
+                        sources=[_src("financial_accounts")], missing=[], basis="complete")
+
+    async def transactions(self, ctx: UserContext, *, limit: int = 100) -> DomainViewModel:
+        rows = await self._rows("transactions", ctx, limit=limit, order="transaction_date.desc")
+        if not rows:
+            return self._vm(ctx, {"transactions": []}, sources=[], missing=["transactions"], basis="missing")
+        txns = [
+            {
+                "id": t.get("id"),
+                "date": t.get("transaction_date") or t.get("date"),
+                "merchant": t.get("merchant") or "",
+                "description": t.get("description") or "",
+                "amount": _money(self._bal(t), t.get("currency") or "USD"),
+                "category": t.get("category") or "Uncategorized",
+                "type": t.get("type") or ("income" if self._bal(t) < 0 else "expense"),
+            }
+            for t in rows
+        ]
+        return self._vm(ctx, {"transactions": txns, "count": len(txns)},
+                        sources=[_src("transactions")], missing=[], basis="complete")
+
+    @staticmethod
+    def _income_expense(txns: list[dict]) -> tuple[float, float]:
+        income = sum(FinanceService._bal(t) for t in txns if (t.get("type") or "").lower() == "income")
+        expense = sum(FinanceService._bal(t) for t in txns if (t.get("type") or "").lower() == "expense")
+        return income, expense
+
+    async def cash_flow(self, ctx: UserContext) -> DomainViewModel:
+        txns = await self._rows("transactions", ctx, limit=1000, order="transaction_date.desc")
+        if not txns:
+            return self._vm(ctx, {"month_income": None, "month_expense": None, "net": None, "daily": []},
+                            sources=[], missing=["transactions"], basis="missing")
+        income, expense = self._income_expense(txns)
+        return self._vm(
+            ctx,
+            {
+                "month_income": _money(income),
+                "month_expense": _money(expense),
+                "net": _money(income - expense),
+                "trend_available": False,  # needs cash_flow_snapshots (Phase 1)
+            },
+            sources=[_src("transactions")],
+            missing=["cash_flow_snapshots"],
+            basis="partial",
+        )
+
+    async def net_worth(self, ctx: UserContext) -> DomainViewModel:
+        accounts = await self._rows("financial_accounts", ctx)
+        assets = await self._rows("assets", ctx)
+        debts = await self._rows("asset_loans", ctx)
+        if not accounts and not assets:
+            return self._vm(ctx, {"net_worth": None, "assets_total": None, "liabilities_total": None, "trend": []},
+                            sources=[], missing=["plaid_link"], basis="missing")
+        assets_total = sum(self._bal(a) for a in accounts) + sum(self._bal(a) for a in assets)
+        liabilities_total = sum(self._bal(d) for d in debts)
+        return self._vm(
+            ctx,
+            {
+                "net_worth": _money(assets_total - liabilities_total),
+                "assets_total": _money(assets_total),
+                "liabilities_total": _money(liabilities_total),
+                "trend": [],  # needs net_worth_snapshots (Phase 1)
+            },
+            sources=[_src("financial_accounts"), _src("assets"), _src("asset_loans")],
+            missing=["net_worth_snapshots"],
+            basis="partial",
+        )
+
+    async def debt(self, ctx: UserContext) -> DomainViewModel:
+        debts = await self._rows("asset_loans", ctx)
+        if not debts:
+            return self._vm(ctx, {"debts": [], "total": None}, sources=[], missing=["debts"], basis="missing")
+        ranked = sorted(debts, key=lambda d: float(d.get("interest_rate") or d.get("apr") or 0), reverse=True)
+        return self._vm(
+            ctx,
+            {
+                "total": _money(sum(self._bal(d) for d in debts)),
+                "debts": [
                     {
-                        "id": a.get("id"),
-                        "name": a.get("name"),
-                        "institution": a.get("institution_name"),
-                        "type": a.get("account_type"),
-                        "balance": {"amount": float(a.get("current_balance") or 0), "currency": a.get("currency") or "USD"},
+                        "id": d.get("id"),
+                        "name": d.get("name") or d.get("loan_name") or "Loan",
+                        "balance": _money(self._bal(d)),
+                        "apr": float(d.get("interest_rate") or d.get("apr") or 0),
+                        "strategy_rank": i + 1,  # avalanche order
                     }
-                    for a in accounts
+                    for i, d in enumerate(ranked)
                 ],
             },
-            recommendations=[],
-            missing=["cash_flow_snapshots", "net_worth_snapshots"],
+            sources=[_src("asset_loans")], missing=[], basis="complete",
         )
 
+    async def investments(self, ctx: UserContext) -> DomainViewModel:
+        holdings = await self._rows("investment_holdings", ctx)
+        if not holdings:
+            return self._vm(ctx, {"holdings": [], "total": None}, sources=[], missing=["investments"], basis="missing")
+        total = sum(self._bal(h) for h in holdings)
+        return self._vm(
+            ctx,
+            {
+                "total": _money(total),
+                "holdings": [
+                    {"id": h.get("id"), "name": h.get("name") or h.get("symbol"),
+                     "value": _money(self._bal(h)),
+                     "share_pct": round(self._bal(h) / total * 100, 1) if total else None}
+                    for h in holdings
+                ],
+            },
+            sources=[_src("investment_holdings")], missing=[], basis="complete",
+        )
+
+    async def retirement(self, ctx: UserContext) -> DomainViewModel:
+        plans = await self._rows("retirement_plans", ctx)
+        if not plans:
+            return self._vm(ctx, {"accounts": [], "total": None}, sources=[], missing=["retirement_plans"], basis="missing")
+        return self._vm(
+            ctx,
+            {
+                "total": _money(sum(self._bal(p) for p in plans)),
+                "accounts": [{"id": p.get("id"), "name": p.get("name") or p.get("plan_type"),
+                              "balance": _money(self._bal(p))} for p in plans],
+                "projection_available": False,  # needs contribution modeling (Phase 1)
+            },
+            sources=[_src("retirement_plans")], missing=["contribution_rate"], basis="partial",
+        )
+
+    async def recommendations_view(self, ctx: UserContext) -> DomainViewModel:
+        recs = await self.recommendations(ctx)
+        return self._vm(
+            ctx, {"count": len(recs)},
+            sources=[_src("financial_accounts"), _src("asset_loans"), _src("transactions")],
+            missing=[] if recs else ["insufficient_data"],
+            basis="partial" if recs else "missing",
+            recommendations=recs,
+        )
+
+    # ------------------------------------------------------- recommendations
+    async def recommendations(self, ctx: UserContext) -> list[Recommendation]:
+        accounts = await self._rows("financial_accounts", ctx)
+        if not accounts:
+            return []  # no data → no fabricated advice
+        debts = await self._rows("asset_loans", ctx)
+        txns = await self._rows("transactions", ctx, limit=1000)
+        cash = sum(self._bal(a) for a in accounts if (a.get("account_type") or "").lower() in {"depository", "checking", "savings", "cash"})
+        _, expense = self._income_expense(txns)
+        revisit = (datetime.now(timezone.utc) + timedelta(days=30)).date().isoformat()
+
+        recs: list[Recommendation] = []
+
+        # 1. Highest-APR debt payoff (avalanche)
+        apr_debts = [d for d in debts if float(d.get("interest_rate") or d.get("apr") or 0) > 0]
+        if apr_debts:
+            top = max(apr_debts, key=lambda d: float(d.get("interest_rate") or d.get("apr") or 0))
+            apr = float(top.get("interest_rate") or top.get("apr") or 0)
+            recs.append(Recommendation(
+                id=f"debt-payoff-{top.get('id')}",
+                title="Pay down your highest-interest debt first",
+                why_it_matters=f"Your highest-APR balance ({apr:.1f}%) costs the most in interest; clearing it first (avalanche) minimizes total interest paid.",
+                evidence=[Evidence(statement=f"{top.get('name') or 'Loan'}: balance ${self._bal(top):,.0f} @ {apr:.1f}% APR", source=_src("asset_loans"))],
+                source_tables=["finance.asset_loans"],
+                source_graph_nodes=[{"label": "Debt", "entity_id": str(top.get("id"))}],
+                assumptions=["APR is fixed", "no prepayment penalty"],
+                confidence=Confidence(score=0.8, basis="partial", missing_fields=["minimum_payment"]),
+                priority="high",
+                affected_domains=["finance"],
+                action_steps=[ActionStep(step="Direct extra payments to this balance until cleared", effort="low", impact="high")],
+                risks=["Reducing liquidity if you overpay vs. your emergency reserve"],
+                revisit_date=revisit,
+                generated_by="finance.agent",
+                governance_verdict=GovernanceVerdict(passed=True),
+            ))
+
+        # 2. Emergency fund gap (needs an expense estimate)
+        if expense and expense > 0:
+            months = cash / expense
+            if months < 3:
+                recs.append(Recommendation(
+                    id="emergency-fund-gap",
+                    title="Close your emergency fund gap",
+                    why_it_matters=f"Your liquid reserve covers ~{months:.1f} months of expenses; the planning baseline is 3 months.",
+                    evidence=[
+                        Evidence(statement=f"Liquid cash ≈ ${cash:,.0f}", source=_src("financial_accounts")),
+                        Evidence(statement=f"Monthly expenses ≈ ${expense:,.0f}", source=_src("transactions")),
+                    ],
+                    source_tables=["finance.financial_accounts", "finance.transactions"],
+                    source_graph_nodes=[{"label": "CashFlowSnapshot", "entity_id": "derived"}],
+                    assumptions=["recent transactions represent a typical month"],
+                    confidence=Confidence(score=0.7, basis="partial", missing_fields=["income_stability"]),
+                    priority="high",
+                    affected_domains=["finance", "risk"],
+                    action_steps=[ActionStep(step=f"Automate savings until reserve ≥ ${expense * 3:,.0f}", effort="low", impact="high")],
+                    risks=["Building cash slowly if income is variable"],
+                    revisit_date=revisit,
+                    generated_by="finance.agent",
+                    governance_verdict=GovernanceVerdict(passed=True),
+                ))
+        return recs
+
+    # ---------------------------------------------------------------- writes
+    async def create_goal(self, ctx: UserContext, payload: dict[str, Any]) -> WriteResult:
+        row = {k: v for k, v in payload.items() if k != "user_id"}
+        row["user_id"] = ctx.user_id  # identity from JWT, never the body
+        inserted = await self._supabase.insert("financial_goals", row, schema=FINANCE)
+        if not inserted:
+            return WriteResult(ok=False, detail="write failed or not configured")
+        return WriteResult(ok=True, entity_id=str(inserted[0].get("id")) if inserted else None)
+
+    async def manual_asset(self, ctx: UserContext, payload: dict[str, Any]) -> WriteResult:
+        row = {k: v for k, v in payload.items() if k != "user_id"}
+        row["user_id"] = ctx.user_id
+        inserted = await self._supabase.insert("assets", row, schema=FINANCE)
+        if not inserted:
+            return WriteResult(ok=False, detail="write failed or not configured")
+        return WriteResult(ok=True, entity_id=str(inserted[0].get("id")) if inserted else None)
+
+    async def manual_liability(self, ctx: UserContext, payload: dict[str, Any]) -> WriteResult:
+        row = {k: v for k, v in payload.items() if k != "user_id"}
+        row["user_id"] = ctx.user_id
+        inserted = await self._supabase.insert("asset_loans", row, schema=FINANCE)
+        if not inserted:
+            return WriteResult(ok=False, detail="write failed or not configured")
+        return WriteResult(ok=True, entity_id=str(inserted[0].get("id")) if inserted else None)
+
+    async def refresh(self, ctx: UserContext) -> WriteResult:
+        # F-scaffold: Plaid re-pull is owned by the connector layer; this signals
+        # intent and returns a status. Real wiring re-pulls + regenerates snapshots.
+        return WriteResult(ok=True, detail="refresh requested")
+
+    # ------------------------------------------------------------ chat (G)
     async def chat_context(self, ctx: UserContext) -> DomainChatContext:
         vm = await self.summary(ctx)
-        nw = vm.data.get("net_worth")
         facts: list[dict] = []
+        nw = vm.data.get("net_worth")
         if nw:
-            facts.append(
-                {"fact": "net_worth", "value": nw, "source": {"system": "supabase", "table": "finance.financial_accounts"}}
-            )
+            facts.append({"fact": "net_worth", "value": nw, "source": {"system": "supabase", "table": "finance.financial_accounts"}})
+        cash = vm.data.get("cash")
+        if cash:
+            facts.append({"fact": "cash", "value": cash, "source": {"system": "supabase", "table": "finance.financial_accounts"}})
         return DomainChatContext(
-            domain=self.domain,
+            domain=FINANCE,
             authoritative_facts=facts,
             missing_facts=[] if facts else ["accounts", "net_worth"],
             relevant_goals=[],
             risks=[],
-            recommendations=[],
-            graph_evidence=[],  # Qdrant/Neo4j fusion lands in F2
+            recommendations=vm.recommendations,
+            graph_evidence=[],
             freshness=vm.freshness,
             confidence=vm.confidence,
         )
-
-    async def recommendations(self, ctx: UserContext) -> list[Recommendation]:
-        # F1: no recommendation engine yet (Phase 1 builds the gated library).
-        return []
