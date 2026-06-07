@@ -170,6 +170,11 @@ pub enum EntityType {
     /// LifeNavigator beta "sample financial profile" metadata (career, income,
     /// risk, goals) — promoted to the graph alongside Plaid-derived data.
     PersonaProfile,
+    /// Risk tolerance / risk profile from public.risk_assessments. Enqueued by
+    /// migration 112's trigger; mirrors `Goal`. Serializes as "risk_assessment"
+    /// → Neo4j label :RiskAssessment. Without this variant the worker would
+    /// deserialize it to Unknown and write a :Unknown node.
+    RiskAssessment,
     /// Catch-all so a new sync-queue entity_type doesn't crash the worker;
     /// the normalizer skips unknown types.
     #[serde(other)]
@@ -201,6 +206,7 @@ impl EntityType {
             EntityType::Action => "action",
             EntityType::LifeEvent => "life_event",
             EntityType::PersonaProfile => "persona_profile",
+            EntityType::RiskAssessment => "risk_assessment",
             EntityType::FinancialAccount => "financial_account",
             EntityType::FinancialGoal => "financial_goal",
             EntityType::TransactionSummary => "transaction_summary",
@@ -554,5 +560,31 @@ mod point_id_tests {
         let c = qdrant_point_uuid("t", "financial_account", "2");
         assert_eq!(a, b); // stable across runs → idempotent upsert/delete
         assert_ne!(a, c); // different entity → different point
+    }
+}
+
+#[cfg(test)]
+mod entity_type_tests {
+    use super::EntityType;
+
+    /// Baseline: `goal` round-trips correctly (the pattern we mirror).
+    #[test]
+    fn goal_round_trips() {
+        let et = EntityType::from_queue_str("goal");
+        assert!(matches!(et, EntityType::Goal), "got {et:?}");
+        assert_eq!(EntityType::Goal.as_str(), "goal");
+    }
+
+    /// Mirrors `goal_round_trips`: `entity_type='risk_assessment'` must
+    /// deserialize to `RiskAssessment` (NOT `Unknown`) and serialize back to
+    /// the canonical "risk_assessment" string, which `pascalize` turns into the
+    /// Neo4j label `:RiskAssessment`. Regression guard for the worker enum gap
+    /// that produced `:Unknown` risk nodes before migration 112 had a home.
+    #[test]
+    fn risk_assessment_round_trips() {
+        let et = EntityType::from_queue_str("risk_assessment");
+        assert!(matches!(et, EntityType::RiskAssessment), "got {et:?}");
+        assert!(!matches!(et, EntityType::Unknown));
+        assert_eq!(EntityType::RiskAssessment.as_str(), "risk_assessment");
     }
 }

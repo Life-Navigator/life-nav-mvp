@@ -357,6 +357,8 @@ mod tests {
         assert_eq!(pascalize("user_profile"), "UserProfile");
         assert_eq!(pascalize("financial_account"), "FinancialAccount");
         assert_eq!(pascalize("goal"), "Goal");
+        // risk_assessment must label as :RiskAssessment (mirrors Goal).
+        assert_eq!(pascalize("risk_assessment"), "RiskAssessment");
     }
 
     #[test]

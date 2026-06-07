@@ -116,6 +116,9 @@ fn build_title(et: &EntityType, attrs: &Map<String, Value>) -> String {
         EntityType::WorkoutLog => {
             by_key(&["session_name", "modality"]).unwrap_or_else(|| "Workout".into())
         }
+        EntityType::RiskAssessment => by_key(&["assessment_type", "risk_tolerance"])
+            .map(|t| format!("{t} risk assessment"))
+            .unwrap_or_else(|| "Risk assessment".into()),
         _ => by_key(&["title", "name", "label", "action"]).unwrap_or_else(|| et.as_str().into()),
     }
 }
@@ -176,6 +179,12 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "liability_profile",
             "investment_profile",
             "risk_profile",
+        ]),
+        EntityType::RiskAssessment => parts_for(&[
+            "assessment_type",
+            "status",
+            "overall_risk_score",
+            "risk_tolerance",
         ]),
         EntityType::FinancialAccount => parts_for(&[
             "account_name",
