@@ -17,6 +17,12 @@ export const dynamic = 'force-dynamic';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const GRAPHRAG_WORKER_SECRET = process.env.GRAPHRAG_WORKER_SECRET;
+// The graphrag-query Edge function runs behind the Supabase gateway with
+// verify_jwt enabled, so every call needs a valid apikey/Authorization header
+// or the gateway returns 401 (UNAUTHORIZED_NO_AUTH_HEADER) before the function
+// runs — which previously made EVERY chat silently fall back. The anon key is
+// the correct gateway credential; the function's real auth is x-worker-secret.
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 interface ChatBody {
   message: string;
@@ -61,7 +67,11 @@ export const POST = createGovernedHandler<ChatBody>({
     const conversation_id = normalizeConversationId(body.conversation_id);
 
     const edgeFunctionUrl = `${SUPABASE_URL}/functions/v1/graphrag-query`;
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      apikey: SUPABASE_ANON_KEY,
+    };
     if (GRAPHRAG_WORKER_SECRET) headers['x-worker-secret'] = GRAPHRAG_WORKER_SECRET;
 
     const edgeResponse = await fetch(edgeFunctionUrl, {
