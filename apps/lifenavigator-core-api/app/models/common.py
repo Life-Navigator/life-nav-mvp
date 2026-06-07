@@ -139,3 +139,40 @@ class WriteResult(BaseModel):
     ok: bool = True
     entity_id: Optional[str] = None
     detail: Optional[str] = None
+
+
+# --------------------------------------------------------------------------- #
+# Orchestration (agent ↔ orchestrator) + chat response
+# --------------------------------------------------------------------------- #
+class EvidencePacket(BaseModel):
+    """What the orchestrator assembles before any model call. Gemini is prompted
+    ONLY with this — never raw cross-user data, never ungated content.
+    """
+
+    intent: str = "general"
+    domains: list[str] = Field(default_factory=list)
+    authoritative_facts: list[dict[str, Any]] = Field(default_factory=list)
+    missing_facts: list[str] = Field(default_factory=list)
+    graph_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    recommendations: list[Recommendation] = Field(default_factory=list)
+    central_context: Optional[str] = None  # disabled until ln_central is seeded
+    freshness: Freshness = Field(default_factory=Freshness)
+    confidence: Confidence = Field(default_factory=Confidence)
+
+    @property
+    def has_sufficient_grounding(self) -> bool:
+        """Anti-hallucination gate: we only reason when the system of record has
+        at least one authoritative fact. Otherwise we ask, never invent.
+        """
+        return len(self.authoritative_facts) > 0
+
+
+class ChatTurnResponse(BaseModel):
+    message: str
+    grounded: bool = True
+    used_gemini: bool = False
+    missing_facts: list[str] = Field(default_factory=list)
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
+    conversation_id: Optional[str] = None
+    governance: Optional[GovernanceVerdict] = None
+    fallback: bool = False

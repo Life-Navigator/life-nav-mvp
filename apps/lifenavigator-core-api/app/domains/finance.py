@@ -23,13 +23,14 @@ from ..models.common import (
     SourceRef,
     UserContext,
 )
+from .base import DomainService
 
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class FinanceService:
+class FinanceService(DomainService):
     domain = "finance"
     entity_types = [
         "financial_account",

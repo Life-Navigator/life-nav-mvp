@@ -1,18 +1,49 @@
-"""Gemini client (F1 placeholder) — server-side reasoning ONLY.
+"""Gemini client — server-side reasoning ONLY.
 
-The API key lives only in the Fly environment. This client is never importable
-into any frontend/Vercel path (ARCHITECTURE_BOUNDARIES.md). Real embed/generate
-(behind the Trust/Safety gate) lands in F2.
+The API key lives only in the Fly environment; this client is never importable
+into any frontend/Vercel path (ARCHITECTURE_BOUNDARIES.md). Embeddings use
+gemini-embedding-001 (3072-dim, MUST match the worker); generation uses
+gemini-2.5-flash. Transient provider errors (429/500/503) are retried; auth and
+safety blocks are not. Logs never include prompts, payloads, user data, or keys.
 """
 from __future__ import annotations
 
+import asyncio
+import logging
+import random
+from typing import Awaitable, Callable
+
+import httpx
+
 from ..config import Settings
 
+log = logging.getLogger("core.gemini")
+
 GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+RETRY_STATUSES = frozenset({429, 500, 503})
+
+
+async def _request_with_retry(
+    do_request: Callable[[], Awaitable[httpx.Response]],
+    *,
+    label: str,
+    max_retries: int = 2,
+    backoff: tuple[float, ...] = (0.5, 1.5),
+) -> httpx.Response:
+    resp = await do_request()
+    for attempt in range(max_retries):
+        if resp.status_code < 400 or resp.status_code not in RETRY_STATUSES:
+            return resp
+        base = backoff[attempt] if attempt < len(backoff) else backoff[-1]
+        delay = base + random.random() * (base / 2)
+        log.warning("gemini %s transient %s; retry %d/%d", label, resp.status_code, attempt + 1, max_retries)
+        await asyncio.sleep(delay)
+        resp = await do_request()
+    return resp
 
 
 class GeminiClient:
-    def __init__(self, api_key: str, embedding_model: str, generation_model: str, timeout: float = 8.0) -> None:
+    def __init__(self, api_key: str, embedding_model: str, generation_model: str, timeout: float = 30.0) -> None:
         self._api_key = api_key
         self._embedding_model = embedding_model
         self._generation_model = generation_model
@@ -24,21 +55,39 @@ class GeminiClient:
             api_key=settings.gemini_api_key,
             embedding_model=settings.gemini_embedding_model,
             generation_model=settings.gemini_generation_model,
-            timeout=settings.http_timeout_seconds,
+            # generation is slower than the 8s downstream default
+            timeout=max(settings.http_timeout_seconds, 30.0),
         )
 
     @property
     def configured(self) -> bool:
         return bool(self._api_key)
 
-    async def embed(self, text: str) -> list[float]:  # pragma: no cover - F2
-        raise NotImplementedError("Gemini embed lands in F2 (grounding).")
-
-    async def generate(self, prompt: str) -> str:  # pragma: no cover - F2
-        raise NotImplementedError(
-            "Gemini generate lands in F2 (behind the Trust/Safety gate)."
-        )
-
     def ready(self) -> bool:
-        # Config presence only — we do NOT spend a token on health checks.
+        # Config presence only — we never spend a token on health checks.
         return self.configured
+
+    async def embed(self, text: str) -> list[float]:
+        if not text or not text.strip():
+            raise ValueError("refused to embed empty text")
+        url = f"{GEMINI_BASE}/{self._embedding_model}:embedContent?key={self._api_key}"
+        payload = {"content": {"parts": [{"text": text}]}}
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            r = await _request_with_retry(lambda: client.post(url, json=payload), label="embed")
+            r.raise_for_status()
+            return r.json()["embedding"]["values"]
+
+    async def generate(self, system_prompt: str, user_prompt: str) -> str:
+        url = f"{GEMINI_BASE}/{self._generation_model}:generateContent?key={self._api_key}"
+        payload = {
+            "systemInstruction": {"parts": [{"text": system_prompt}]},
+            "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+        }
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            r = await _request_with_retry(lambda: client.post(url, json=payload), label="generate")
+            r.raise_for_status()
+            data = r.json()
+            try:
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+            except (KeyError, IndexError, TypeError):
+                return ""

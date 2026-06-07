@@ -43,6 +43,37 @@ class Neo4jClient:
     def configured(self) -> bool:
         return bool(self._uri and self._password)
 
+    async def query_personal(
+        self,
+        statement: str,
+        *,
+        user_id: str,
+        parameters: dict | None = None,
+    ) -> list[list]:
+        """Run a user-scoped Cypher via the Aura Query API v2. The caller's
+        statement MUST filter ``tenant_id = $user_id``; we always bind it.
+        Returns the raw value rows; [] on missing config or any error.
+        """
+        if not user_id:
+            raise ValueError("query_personal requires a non-empty user_id")
+        if not self.configured:
+            return []
+        params = {"user_id": user_id, **(parameters or {})}
+        url = f"{_host_from_uri(self._uri)}/db/{self._database}/query/v2"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(
+                    url,
+                    auth=(self._username, self._password),
+                    json={"statement": statement, "parameters": params},
+                    headers={"Accept": "application/json", "Content-Type": "application/json"},
+                )
+                resp.raise_for_status()
+                return resp.json().get("data", {}).get("values", []) or []
+        except Exception as exc:  # noqa: BLE001
+            log.warning("neo4j query_personal failed: %s", exc)
+            return []
+
     async def ready(self) -> bool:
         """Readiness ping via the Query API v2 (RETURN 1). Never raises."""
         if not self.configured:
