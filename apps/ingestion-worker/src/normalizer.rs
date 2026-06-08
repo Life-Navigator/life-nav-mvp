@@ -33,7 +33,7 @@ pub fn normalize(job: &SyncQueueJob, now: DateTime<Utc>) -> Result<CanonicalGrap
 
     let title = build_title(&entity_type, &sanitized);
     let summary = build_summary(&entity_type, &sanitized);
-    let relationships = relationships_for(&entity_type, &job.user_id.to_string());
+    let relationships = relationships_for(&entity_type, &job.user_id.to_string(), &sanitized);
 
     Ok(CanonicalGraphObject {
         tenant_id: job.user_id,
@@ -664,11 +664,7 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "secondary_driver",
             "readiness_score",
         ]),
-        EntityType::ArcanaAssessment => parts_for(&[
-            "assessment_kind",
-            "summary",
-            "confidence",
-        ]),
+        EntityType::ArcanaAssessment => parts_for(&["assessment_kind", "summary", "confidence"]),
         EntityType::ArcanaGoal => parts_for(&[
             "goal_kind",
             "domain",
@@ -686,11 +682,9 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "value_numeric",
             "value_unit",
         ]),
-        EntityType::ArcanaCapability => parts_for(&[
-            "capability_kind",
-            "proficiency",
-            "description",
-        ]),
+        EntityType::ArcanaCapability => {
+            parts_for(&["capability_kind", "proficiency", "description"])
+        }
         EntityType::ArcanaMotivation => parts_for(&[
             "driver",
             "motivation_text",
@@ -723,12 +717,9 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "periodization_kind",
             "active",
         ]),
-        EntityType::HealthMilestone => parts_for(&[
-            "title",
-            "description",
-            "target_date",
-            "achieved_at",
-        ]),
+        EntityType::HealthMilestone => {
+            parts_for(&["title", "description", "target_date", "achieved_at"])
+        }
         EntityType::BiometricObservation => parts_for(&[
             "metric_kind",
             "value",
@@ -749,11 +740,9 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
         EntityType::WearableConnection => {
             parts_for(&["provider", "status", "scopes", "connected_at"])
         }
-        EntityType::ArcanaInsuranceDocument => parts_for(&[
-            "document_kind",
-            "ocr_status",
-            "uploaded_at",
-        ]),
+        EntityType::ArcanaInsuranceDocument => {
+            parts_for(&["document_kind", "ocr_status", "uploaded_at"])
+        }
         EntityType::LeadPackageConsent => parts_for(&[
             "consent_kind",
             "include_goals",
@@ -775,13 +764,9 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "recovery_preferences",
             "provider_preferences",
         ]),
-        EntityType::ArcanaMembership => parts_for(&[
-            "tier",
-            "status",
-            "started_at",
-            "renewed_at",
-            "ends_at",
-        ]),
+        EntityType::ArcanaMembership => {
+            parts_for(&["tier", "status", "started_at", "renewed_at", "ends_at"])
+        }
         _ => {
             // Fallback — include every short stringable field we
             // didn't explicitly drop. Cap the total length so we never
@@ -806,11 +791,18 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
 /// payload attrs — the trigger payloads in 050/055/068/074 deliberately
 /// don't include `user_id` because the queue row already has it as a
 /// column).
-fn relationships_for(et: &EntityType, user_id: &str) -> Vec<Relationship> {
+fn relationships_for(
+    et: &EntityType,
+    user_id: &str,
+    attrs: &Map<String, Value>,
+) -> Vec<Relationship> {
     if user_id.is_empty() {
         return Vec::new();
     }
-    let label: String = match et {
+    // Typed user -> entity edge label. Finance entities get real labels here
+    // (OWNS_ACCOUNT, HAS_TRANSACTION, …) instead of the generic RELATED_TO
+    // fallback. Inter-entity edges (e.g. account -> transaction) are added below.
+    let user_label: &str = match et {
         EntityType::Goal => "HAS_GOAL",
         EntityType::Constraint => "HAS_CONSTRAINT",
         EntityType::Capability => "HAS_CAPABILITY",
@@ -908,14 +900,64 @@ fn relationships_for(et: &EntityType, user_id: &str) -> Vec<Relationship> {
         EntityType::LeadPackageConsent => "GRANTED_LEAD_CONSENT",
         EntityType::ConciergePreference => "HAS_CONCIERGE_PREFERENCE",
         EntityType::ArcanaMembership => "HAS_ARCANA_MEMBERSHIP",
+        // --- Finance (typed user edges; previously fell through to RELATED_TO) ---
+        EntityType::FinancialAccount => "OWNS_ACCOUNT",
+        EntityType::TransactionSummary => "HAS_TRANSACTION",
+        EntityType::Asset => "HAS_ASSET",
+        EntityType::Debt => "HAS_DEBT",
+        EntityType::InvestmentHolding => "HAS_HOLDING",
+        EntityType::RetirementPlan => "CONTRIBUTES_TO",
+        EntityType::FinancialGoal => "HAS_GOAL",
         _ => "RELATED_TO",
-    }
-    .into();
-    vec![Relationship {
-        label,
+    };
+
+    // The always-present user -> entity edge: (:UserProfile)-[:LABEL]->(:Entity).
+    let mut rels = vec![Relationship {
+        label: user_label.into(),
         target_entity_type: "user_profile".into(),
         target_entity_id: user_id.to_string(),
-    }]
+    }];
+
+    // Inter-entity edges, emitted ONLY when the source payload carries the
+    // foreign key. Direction matches merge_cypher_for: (target)-[r]->(node), and
+    // the target node is MERGEd under the same tenant_id (no cross-user edges).
+    let id_of = |key: &str| -> Option<String> {
+        attrs
+            .get(key)
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+            .filter(|s| !s.is_empty())
+    };
+    match et {
+        // (:FinancialAccount)-[:HAS_TRANSACTION]->(:TransactionSummary)
+        EntityType::TransactionSummary => {
+            if let Some(account_id) = id_of("account_id") {
+                rels.push(Relationship {
+                    label: "HAS_TRANSACTION".into(),
+                    target_entity_type: "financial_account".into(),
+                    target_entity_id: account_id,
+                });
+            }
+        }
+        // (:FinancialAccount)-[:HAS_HOLDING]->(:InvestmentHolding)
+        EntityType::InvestmentHolding => {
+            if let Some(account_id) = id_of("account_id") {
+                rels.push(Relationship {
+                    label: "HAS_HOLDING".into(),
+                    target_entity_type: "financial_account".into(),
+                    target_entity_id: account_id,
+                });
+            }
+        }
+        // Extension points (deferred — no data yet; SECURED_BY / SUPPORTS_GOAL /
+        // BLOCKS_GOAL / FUNDED_BY need reverse-direction edge support and linkage
+        // fields in the source payload):
+        //   (:Debt)-[:SECURED_BY]->(:Asset)
+        //   (:Asset|:IncomeSource)-[:SUPPORTS_GOAL]->(:FinancialGoal)
+        //   (:Debt)-[:BLOCKS_GOAL]->(:FinancialGoal)
+        _ => {}
+    }
+    rels
 }
 
 fn parse_ts(map: &Map<String, Value>, key: &str) -> Option<DateTime<Utc>> {
@@ -1026,5 +1068,136 @@ mod tests {
         assert!(!canon.summary.trim().is_empty());
         assert!(canon.summary.contains("Software Analyst"));
         assert!(canon.summary.contains("moderate"));
+    }
+
+    // ---- Typed finance relationships (replaces the RELATED_TO star) ----
+
+    fn rels(et: &str, payload: Value) -> Vec<Relationship> {
+        normalize(&job_with(et, payload), Utc::now())
+            .unwrap()
+            .relationships
+    }
+    fn has_edge(rels: &[Relationship], label: &str, target_type: &str) -> bool {
+        rels.iter()
+            .any(|r| r.label == label && r.target_entity_type == target_type)
+    }
+
+    #[test]
+    fn financial_account_emits_owns_account() {
+        let r = rels(
+            "financial_account",
+            json!({"name": "Checking", "account_type": "depository"}),
+        );
+        assert!(has_edge(&r, "OWNS_ACCOUNT", "user_profile"));
+        assert!(!has_edge(&r, "RELATED_TO", "user_profile"));
+    }
+
+    #[test]
+    fn transaction_emits_has_transaction_to_user_and_account() {
+        let acct = Uuid::new_v4().to_string();
+        let r = rels(
+            "transaction",
+            json!({"amount": 19.57, "merchant": "Netflix", "account_id": acct}),
+        );
+        // user -> transaction
+        assert!(has_edge(&r, "HAS_TRANSACTION", "user_profile"));
+        // account -> transaction (inter-entity, from the account_id FK)
+        assert!(r.iter().any(|x| x.label == "HAS_TRANSACTION"
+            && x.target_entity_type == "financial_account"
+            && x.target_entity_id == acct));
+        assert!(!has_edge(&r, "RELATED_TO", "user_profile"));
+    }
+
+    #[test]
+    fn transaction_without_account_id_keeps_only_user_edge_not_fallback() {
+        let r = rels("transaction", json!({"amount": 5.0, "merchant": "X"}));
+        assert!(has_edge(&r, "HAS_TRANSACTION", "user_profile"));
+        assert!(!has_edge(&r, "HAS_TRANSACTION", "financial_account")); // no FK -> no inter-entity edge
+        assert!(!has_edge(&r, "RELATED_TO", "user_profile")); // still typed, never fallback
+    }
+
+    #[test]
+    fn asset_emits_has_asset() {
+        assert!(has_edge(
+            &rels("asset", json!({"name": "Car"})),
+            "HAS_ASSET",
+            "user_profile"
+        ));
+    }
+
+    #[test]
+    fn investment_holding_emits_has_holding_and_account_link() {
+        let acct = Uuid::new_v4().to_string();
+        let r = rels(
+            "investment_holding",
+            json!({"name": "VTI", "account_id": acct}),
+        );
+        assert!(has_edge(&r, "HAS_HOLDING", "user_profile"));
+        assert!(r.iter().any(|x| x.label == "HAS_HOLDING"
+            && x.target_entity_type == "financial_account"
+            && x.target_entity_id == acct));
+    }
+
+    #[test]
+    fn retirement_plan_emits_contributes_to() {
+        assert!(has_edge(
+            &rels("retirement_plan", json!({"name": "401k"})),
+            "CONTRIBUTES_TO",
+            "user_profile"
+        ));
+    }
+
+    #[test]
+    fn financial_goal_emits_has_goal() {
+        assert!(has_edge(
+            &rels("financial_goal", json!({"title": "Save"})),
+            "HAS_GOAL",
+            "user_profile"
+        ));
+    }
+
+    #[test]
+    fn no_finance_entity_falls_back_to_related_to() {
+        for et in [
+            "financial_account",
+            "transaction",
+            "asset",
+            "debt",
+            "investment_holding",
+            "retirement_plan",
+            "financial_goal",
+        ] {
+            let r = rels(
+                et,
+                json!({"account_id": Uuid::new_v4().to_string(), "name": "x"}),
+            );
+            assert!(
+                !r.iter().any(|x| x.label == "RELATED_TO"),
+                "{et} fell back to RELATED_TO"
+            );
+        }
+    }
+
+    #[test]
+    fn relationship_creation_is_idempotent_via_merge() {
+        // Reprocessing the same job must not duplicate edges: every node + edge is
+        // a MERGE, never a CREATE.
+        let acct = Uuid::new_v4().to_string();
+        let canon = normalize(
+            &job_with("transaction", json!({"amount": 1.0, "account_id": acct})),
+            Utc::now(),
+        )
+        .unwrap();
+        let cypher = crate::neo4j_client::Neo4jClient::merge_cypher_for(&canon);
+        assert!(cypher.contains("MERGE (t:FinancialAccount"));
+        assert!(cypher.contains("MERGE (t)-[:HAS_TRANSACTION]->(n)"));
+        assert!(!cypher.contains("CREATE "));
+    }
+
+    #[test]
+    fn unknown_relationship_still_uses_related_to_fallback() {
+        let r = rels("nonexistent_type", json!({"title": "x"}));
+        assert_eq!(r.len(), 1);
+        assert!(has_edge(&r, "RELATED_TO", "user_profile"));
     }
 }
