@@ -73,6 +73,26 @@ _PROMPT_COPY: dict[tuple[str, str], tuple[str, str, str]] = {
         "Log meals to unlock nutrition-consistency coaching grounded in your data. Not medical advice.",
         "add_data",
     ),
+    ("career", "career_profiles"): (
+        "Build your career profile",
+        "Add your current role, employer, and experience to see your cited market value and growth paths.",
+        "add_data",
+    ),
+    ("career", "job_targets"): (
+        "Set a target role",
+        "Add a target role to compare compensation and surface the skills that close the gap.",
+        "add_data",
+    ),
+    ("career", "compensation_records"): (
+        "Add your compensation",
+        "Add your current pay to compare against cited market bands and spot underpayment.",
+        "add_data",
+    ),
+    ("career", "compensation_bands"): (
+        "Market data coming online",
+        "We'll cite OEWS compensation bands for your role to estimate your market value.",
+        "none",
+    ),
 }
 
 
@@ -148,6 +168,14 @@ class LifeProfileService:
             if avg is not None:
                 return f"Avg sleep {avg}h"
             return "Add your wellness data to begin"
+        if domain == "career":
+            comp = (vm.data.get("compensation") or {}).get("current_estimated_market_value")
+            if comp and isinstance(comp, dict) and comp.get("median") is not None:
+                return f"Market value ~${comp['median']:,.0f}"
+            cur = vm.data.get("current_state")
+            if cur and isinstance(cur, dict) and cur.get("title"):
+                return str(cur["title"])
+            return "Build your career profile to begin"
         return domain.capitalize()
 
     @staticmethod

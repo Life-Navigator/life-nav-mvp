@@ -51,16 +51,28 @@ def test_empty_finance_yields_missing_prompts_not_fake_zero(client):
     assert body["confidence"]["basis"] == "missing"
 
 
-def test_finance_and_health_live_after_unlock(make_client):
+def test_finance_health_career_live_after_unlock(make_client):
     client = make_client({"financial_accounts": [ACCOUNT]})
     body = client.get("/v1/life-profile", headers=_auth()).json()
     live = set(body["domains"].keys())
-    assert live == {"finance", "health"}  # both live after H-unlock
-    assert "health" not in body["missing_domains"]  # unlocked
-    for d in ("career", "family", "education"):
+    assert live == {"finance", "health", "career"}  # all three live after Career-unlock
+    for d in ("health", "career"):
+        assert d not in body["missing_domains"]  # unlocked
+    for d in ("family", "education"):
         assert d in body["missing_domains"]   # still known-but-metadata-only
         assert d not in body["domains"]        # never exposed as live
         assert d not in body["summaries"]
+
+
+def test_career_live_but_no_data_shows_prompts_not_fake(make_client):
+    client = make_client({"financial_accounts": [ACCOUNT]})  # no career tables seeded
+    body = client.get("/v1/life-profile", headers=_auth()).json()
+    ccard = body["domains"]["career"]
+    assert ccard["available"] is False  # live, but no data
+    comp = body["summaries"]["career"]["data"]["compensation"]["current_estimated_market_value"]
+    assert comp is None  # never a fabricated salary
+    assert any(p["domain"] == "career" for p in body["missing_data_prompts"])
+    assert body["summaries"]["career"]["data"]["safety_boundaries"][0]["boundary_type"] == "career_guidance"
 
 
 def test_health_live_but_no_data_shows_prompts_not_fake(make_client):
