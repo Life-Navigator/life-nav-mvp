@@ -28,6 +28,7 @@ from .domains.registry import DomainRegistry
 from .grounding.context_builder import ContextBuilder
 from .grounding.retriever import Retriever
 from .services.compensation import CompensationIntelligenceEngine
+from .services.decision_engine import DecisionEngine
 from .services.cost_meter import CostMeter
 from .services.life_profile import LifeProfileService
 from .services.market_intelligence import MarketPositionAnalyzer
@@ -105,6 +106,17 @@ def get_education_service(
     # missing domain, not live) until its gates pass + approval. Its ROI engine cites
     # Career compensation (OEWS) + Scorecard program earnings — no uncited ROI.
     return EducationService(supabase=supabase, comp=CompensationIntelligenceEngine(supabase))
+
+
+def get_decision_engine(
+    supabase: SupabaseClient = Depends(get_supabase),
+    education: EducationService = Depends(get_education_service),
+    career: CareerService = Depends(get_career_service),
+    family: FamilyService = Depends(get_family_service),
+) -> DecisionEngine:
+    # D1: the cross-domain Decision Engine. Reuses the live domain engines; NOT a registry
+    # domain (decisions are produced on demand, persisted as decision graphs).
+    return DecisionEngine(supabase=supabase, education=education, career=career, family=family)
 
 
 def get_domain_services(
