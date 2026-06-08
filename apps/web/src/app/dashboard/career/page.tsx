@@ -1,370 +1,258 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import {
-  BarChart, Bar, LineChart, Line, ResponsiveContainer,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, RadarChart,
-  PolarGrid, PolarAngleAxis, Radar
-} from 'recharts';
-import { getAuthHeaders } from '@/hooks/useAuth';
+// Career Intelligence — render-only view of the Core API Career DomainViewModel
+// (via /api/career/summary). Every compensation figure is a CITED market band (no
+// fantasy salaries); absent data renders as missing-data prompts, never fake numbers.
+// No internals (Qdrant/Neo4j/GraphRAG/worker) are shown.
 
-const CareerDashboard = () => {
-  const router = useRouter();
+import React, { useEffect, useState } from 'react';
 
-  // State for career data
-  const [careerData, setCareerData] = useState({
-    skills: [] as { name: string; level: number; target: number }[],
-    jobMatch: [] as { id: string; company: string; title: string; match: number; salary: string; location: string }[],
-    networkMetrics: [] as { month: string; connections: number; messages: number }[],
-    upcomingEvents: [] as { id: string; title: string; date: string; type: string }[],
-    industryTrends: [] as { skill: string; growth: number }[]
-  });
-  const [careerSummary, setCareerSummary] = useState({
-    roleReadiness: 0,
-    networkStrength: 0,
-    industryAlignment: 0,
-    skillGrowth: 0
-  });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch career data
-  useEffect(() => {
-    const fetchCareerData = async () => {
-      try {
-        setLoading(true);
-
-        // Call real API endpoint with auth headers
-        const headers = getAuthHeaders();
-        const response = await fetch('/api/career', { headers });
-        if (!response.ok) {
-          throw new Error('Failed to fetch career data');
-        }
-
-        const data = await response.json();
-
-        // Calculate Role Readiness: average of (current level / target) * 100
-        const roleReadiness = data.skills?.length > 0
-          ? Math.round(data.skills.reduce((sum: number, skill: any) =>
-              sum + (skill.level / skill.target * 100), 0) / data.skills.length)
-          : 0;
-
-        // Calculate Network Strength: growth trend from network metrics
-        const networkStrength = data.networkMetrics?.length > 0
-          ? (() => {
-              const recentMonths = data.networkMetrics.slice(-3);
-              const earlierMonths = data.networkMetrics.slice(0, 3);
-
-              const recentAvg = recentMonths.reduce((sum: number, m: any) =>
-                sum + m.connections + m.messages, 0) / recentMonths.length;
-              const earlierAvg = earlierMonths.length > 0
-                ? earlierMonths.reduce((sum: number, m: any) =>
-                    sum + m.connections + m.messages, 0) / earlierMonths.length
-                : recentAvg * 0.7;
-
-              return Math.min(100, Math.round((recentAvg / earlierAvg) * 70));
-            })()
-          : 0;
-
-        // Calculate Industry Alignment: average of top job match scores
-        const industryAlignment = data.jobMatch?.length > 0
-          ? Math.round(data.jobMatch.reduce((sum: number, job: any) =>
-              sum + job.match, 0) / data.jobMatch.length)
-          : 0;
-
-        // Calculate Skill Growth: average gap to target as percentage
-        const skillGrowth = data.skills?.length > 0
-          ? Math.round(data.skills.reduce((sum: number, skill: any) =>
-              sum + ((skill.target - skill.level) / skill.target * 100), 0) / data.skills.length)
-          : 0;
-
-        setCareerData({
-          skills: data.skills,
-          jobMatch: data.jobMatch,
-          networkMetrics: data.networkMetrics,
-          upcomingEvents: data.upcomingEvents,
-          industryTrends: data.industryTrends
-        });
-
-        setCareerSummary({
-          roleReadiness,
-          networkStrength,
-          industryAlignment,
-          skillGrowth
-        });
-
-        setLoading(false);
-      } catch (err) {
-        setError("Failed to load career data");
-        setLoading(false);
-      }
+interface Band {
+  low: number | null;
+  median: number | null;
+  high: number | null;
+  currency: string;
+  source: string;
+  confidence: number;
+  as_of?: string | null;
+}
+interface CareerRec {
+  id: string;
+  title: string;
+  why_it_matters: string;
+  evidence: { statement: string }[];
+  priority: 'high' | 'medium' | 'low';
+}
+interface CareerVM {
+  domain: string;
+  data: {
+    current_state: {
+      title?: string;
+      employer?: string;
+      industry?: string;
+      seniority?: string;
+      years_experience?: number;
+    } | null;
+    target_state: { role?: string; target_comp_median?: number; goal?: string } | null;
+    market_position: {
+      demand_level?: string;
+      growth_outlook?: number | null;
+      competition_level?: string;
+      source?: string | null;
+    } | null;
+    compensation: {
+      current_estimated_market_value: Band | null;
+      target_estimated_market_value: Band | null;
+      recorded_comp_median: number | null;
     };
+    skill_gaps: { skill?: string; target_role?: string; severity?: string }[];
+    safety_boundaries: { boundary_type: string; disclaimer_text: string }[];
+    missing_data_prompts?: string[];
+  };
+  recommendations: CareerRec[];
+  missing: string[];
+  freshness: { as_of?: string };
+  confidence: { score: number; basis: string };
+}
 
-    fetchCareerData();
-  }, []);
-
-  const hasCareerData = careerData.skills.length > 0 ||
-                        careerData.jobMatch.length > 0 ||
-                        careerData.upcomingEvents.length > 0;
-
-  return (
-    <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
-      <header className="mb-8 flex justify-between items-start">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Career Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">Track your professional development and opportunities</p>
-        </div>
-        <Link
-          href="/dashboard/career/skills"
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
-        >
-          Add Career Data
-        </Link>
-      </header>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-        {/* Career Summary */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md lg:col-span-1">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Career Summary</h2>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
-              <span className="font-medium text-gray-700 dark:text-gray-300">Role Readiness</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{careerSummary.roleReadiness}%</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
-              <span className="font-medium text-gray-700 dark:text-gray-300">Network Strength</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{careerSummary.networkStrength}%</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
-              <span className="font-medium text-gray-700 dark:text-gray-300">Industry Alignment</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{careerSummary.industryAlignment}%</span>
-            </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-md">
-              <span className="font-medium text-gray-700 dark:text-gray-300">Skill Growth Potential</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{careerSummary.skillGrowth}%</span>
-            </div>
-          </div>
-        </div>
-        
-        {/* Skills Radar */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md lg:col-span-2">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Skills Assessment</h2>
-          {careerData.skills.length > 0 ? (
-            <div className="h-64 md:h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={careerData.skills}>
-                  <PolarGrid />
-                  <PolarAngleAxis dataKey="name" />
-                  <Radar name="Current Level" dataKey="level" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                  <Radar name="Target Level" dataKey="target" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.6} />
-                  <Legend />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 md:h-80 text-center">
-              <div className="text-6xl mb-4">🎯</div>
-              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Skills Data</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Add your skills to track your professional development
-              </p>
-              <Link
-                href="/dashboard/career/skills"
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors inline-block"
-              >
-                Add Skills
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Top Job Matches */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Top Job Matches</h2>
-          {careerData.jobMatch.length > 0 ? (
-            <>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Position</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Match</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Salary</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Location</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {careerData.jobMatch.map((job) => (
-                      <tr key={job.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{job.title}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{job.company}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-green-600 dark:text-green-400">{job.match}%</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{job.salary}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{job.location}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-4 text-center">
-                <button className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">
-                  View All Opportunities
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="text-6xl mb-4">💼</div>
-              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Job Matches</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Add your skills and preferences to see job recommendations
-              </p>
-              <Link
-                href="/dashboard/career/opportunities"
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors inline-block"
-              >
-                Set Job Preferences
-              </Link>
-            </div>
-          )}
-        </div>
-        
-        {/* Networking Activity */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Networking Activity</h2>
-          {careerData.networkMetrics.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={careerData.networkMetrics}
-                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="connections" name="New Connections" fill="#8884d8" />
-                  <Bar dataKey="messages" name="Messages Sent" fill="#82ca9d" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <div className="text-6xl mb-4">🤝</div>
-              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Networking Data</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Track your professional networking activity and connections
-              </p>
-              <Link
-                href="/dashboard/career/networking"
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors inline-block"
-              >
-                Add Connections
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Upcoming Events */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Upcoming Events</h2>
-          {careerData.upcomingEvents.length > 0 ? (
-            <>
-              <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {careerData.upcomingEvents.map((event) => (
-                  <div key={event.id} className="py-3 flex justify-between items-center">
-                    <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">{event.title}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{new Date(event.date).toLocaleDateString()}</div>
-                    </div>
-                    <div className="px-2 py-1 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
-                      {event.type}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 text-center">
-                <button className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium">
-                  View All Events
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="text-6xl mb-4">📅</div>
-              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Upcoming Events</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Add networking events, conferences, and career fairs
-              </p>
-              <Link
-                href="/dashboard/calendar"
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors inline-block"
-              >
-                Add Event
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Industry Trends - Empty state */}
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Industry Trends</h2>
-          {careerData.industryTrends.length > 0 ? (
-            <>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                Top growing skills in your industry for the next 12 months:
-              </p>
-              <div className="space-y-4">
-                {careerData.industryTrends.map((trend) => (
-                  <div key={trend.skill} className="relative pt-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {trend.skill}
-                      </div>
-                      <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                        {trend.growth}% growth
-                      </div>
-                    </div>
-                    <div className="overflow-hidden h-2 text-xs flex rounded bg-gray-200 dark:bg-gray-700">
-                      <div
-                        style={{ width: `${trend.growth}%` }}
-                        className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-600 dark:bg-blue-500"
-                      ></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="text-6xl mb-4">📈</div>
-              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Industry Trends</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                Industry trends will be displayed once you add your industry and skills
-              </p>
-              <Link
-                href="/dashboard/career/skills"
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors inline-block"
-              >
-                Add Skills & Industry
-              </Link>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+const PROMPT_COPY: Record<string, { title: string; body: string }> = {
+  career_profiles: {
+    title: 'Build your career profile',
+    body: 'Add your current role, employer, and experience to see your cited market value and growth paths.',
+  },
+  job_targets: {
+    title: 'Set a target role',
+    body: 'Add a target role to compare compensation and surface the skills that close the gap.',
+  },
+  compensation_records: {
+    title: 'Add your compensation',
+    body: 'Add your current pay to compare against cited market bands and spot underpayment.',
+  },
+  compensation_bands: {
+    title: 'Market data coming online',
+    body: 'We cite OEWS compensation bands for your role to estimate your market value.',
+  },
 };
 
-export default CareerDashboard;
+const fmt = (n: number | null | undefined, ccy = 'USD') =>
+  n == null
+    ? '—'
+    : new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: ccy,
+        maximumFractionDigits: 0,
+      }).format(n);
+
+export default function CareerPage() {
+  const [vm, setVm] = useState<CareerVM | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/career/summary')
+      .then(async (r) => (r.ok ? ((await r.json()) as CareerVM) : null))
+      .then((d) => {
+        if (active) {
+          setVm(d);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setVm(null);
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const boundary = vm?.data.safety_boundaries?.[0];
+  const cur = vm?.data.compensation?.current_estimated_market_value ?? null;
+  const tgt = vm?.data.compensation?.target_estimated_market_value ?? null;
+  const missing = vm?.missing ?? [];
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-gray-900">Career Intelligence</h1>
+      <p className="text-sm text-gray-500 mt-1">
+        Compensation, skills, and growth — grounded in cited market data.
+      </p>
+
+      <div className="mt-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+        {boundary?.disclaimer_text ??
+          'Career coaching grounded in cited market data — not a guarantee of hire or compensation.'}
+      </div>
+
+      {loading ? (
+        <div className="mt-8 text-gray-500">Loading your career intelligence…</div>
+      ) : (
+        <>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold text-gray-700">Your market value</h2>
+              {cur && cur.median != null ? (
+                <>
+                  <div className="text-2xl font-bold text-gray-900 mt-2">
+                    {fmt(cur.median, cur.currency)}
+                  </div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    Range {fmt(cur.low, cur.currency)}–{fmt(cur.high, cur.currency)} · {cur.source}
+                  </div>
+                </>
+              ) : (
+                <Prompt field="career_profiles" />
+              )}
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold text-gray-700">Target role</h2>
+              {vm?.data.target_state?.role ? (
+                <>
+                  <div className="text-xl font-semibold text-gray-900 mt-2">
+                    {vm.data.target_state.role}
+                  </div>
+                  {tgt && tgt.median != null && (
+                    <div className="text-sm text-gray-500 mt-1">
+                      Market median {fmt(tgt.median, tgt.currency)}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Prompt field="job_targets" />
+              )}
+            </div>
+          </div>
+
+          {vm?.data.market_position &&
+            vm.data.market_position.demand_level &&
+            vm.data.market_position.demand_level !== 'unknown' && (
+              <div className="mt-6 bg-white p-6 rounded-lg shadow-md">
+                <h2 className="text-lg font-semibold text-gray-700">Market position</h2>
+                <div className="text-sm text-gray-600 mt-2">
+                  Demand: <b>{vm.data.market_position.demand_level}</b> · Competition:{' '}
+                  <b>{vm.data.market_position.competition_level}</b>
+                  {vm.data.market_position.source ? ` · ${vm.data.market_position.source}` : ''}
+                </div>
+              </div>
+            )}
+
+          {vm && vm.data.skill_gaps.length > 0 && (
+            <div className="mt-6 bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold text-gray-700">Skill gaps to your target</h2>
+              <ul className="mt-2 flex flex-wrap gap-2">
+                {vm.data.skill_gaps.map((g, i) => (
+                  <li
+                    key={i}
+                    className="text-sm px-3 py-1 rounded-full bg-amber-100 text-amber-800"
+                  >
+                    {g.skill}
+                    {g.severity ? ` · ${g.severity}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {vm && vm.recommendations.length > 0 && (
+            <div className="mt-6 bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Recommended moves</h2>
+              <div className="space-y-4">
+                {vm.recommendations.map((rec) => (
+                  <div key={rec.id} className="border-l-4 border-sky-600 pl-4 py-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-900">{rec.title}</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">
+                        {rec.priority}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">{rec.why_it_matters}</p>
+                    {rec.evidence.length > 0 && (
+                      <ul className="list-disc list-inside text-sm text-gray-700 mt-2">
+                        {rec.evidence.map((e, i) => (
+                          <li key={i}>{e.statement}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {missing.length > 0 && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {missing.map((field) => (
+                <div key={field} className="bg-white p-5 rounded-lg shadow-md text-center">
+                  <Prompt field={field} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {vm && (
+            <div className="mt-8 text-xs text-gray-400">
+              Confidence: {vm.confidence.basis}
+              {vm.freshness.as_of
+                ? ` · as of ${new Date(vm.freshness.as_of).toLocaleDateString()}`
+                : ''}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function Prompt({ field }: { field: string }) {
+  const copy = PROMPT_COPY[field] ?? {
+    title: `Add your ${field.replace(/_/g, ' ')}`,
+    body: 'Add your career data to unlock cited intelligence.',
+  };
+  return (
+    <div className="text-center py-2">
+      <p className="font-medium text-gray-700">{copy.title}</p>
+      <p className="text-sm text-gray-500 mt-1">{copy.body}</p>
+    </div>
+  );
+}

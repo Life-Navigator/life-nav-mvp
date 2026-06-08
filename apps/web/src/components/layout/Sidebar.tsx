@@ -419,7 +419,6 @@ const navigation = [
     href: '/dashboard/career',
     icon: BriefcaseIcon,
     current: false,
-    comingSoon: true,
   },
   {
     name: 'Education',
