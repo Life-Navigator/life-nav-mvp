@@ -31,6 +31,7 @@ from .services.analytics import AnalyticsService
 from .services.comp_benefits import CompensationBenefitsEngine
 from .services.compensation import CompensationIntelligenceEngine
 from .services.decision_engine import DecisionEngine
+from .services.decision_graph import DecisionGraphService
 from .services.decision_workspace import DecisionWorkspaceService
 from .services.documents import DocumentIntelligenceService
 from .services.readiness import LifeReadinessEngine
@@ -187,6 +188,14 @@ def get_decision_workspace(
     readiness: LifeReadinessEngine = Depends(get_readiness_engine),
 ) -> DecisionWorkspaceService:
     return DecisionWorkspaceService(decision_engine=decision, readiness_engine=readiness)
+
+
+def get_decision_graph(
+    workspace: DecisionWorkspaceService = Depends(get_decision_workspace),
+    comp: CompensationBenefitsEngine = Depends(get_comp_benefits_engine),
+    supabase: SupabaseClient = Depends(get_supabase),
+) -> DecisionGraphService:
+    return DecisionGraphService(workspace=workspace, comp_benefits=comp, supabase=supabase)
 
 
 def get_retriever(
