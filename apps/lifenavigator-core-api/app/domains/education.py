@@ -28,6 +28,7 @@ from ..models.common import (
     WriteResult,
 )
 from ..services.compensation import CompensationIntelligenceEngine
+from ..services.education_report import EducationReportBuilder, content_hash
 from ..services.education_roi import EducationROIEngine, ProgramScore
 from .base import DomainService
 
@@ -299,6 +300,28 @@ class EducationService(DomainService):
         res = await self._sb.insert(table, row, schema=EDUCATION)
         return WriteResult(ok=bool(res), entity_id=(res[0].get("id") if res else None))
 
+    # ---------------------------------------------------- E3: report (9 sections)
+    async def build_report(self, ctx: UserContext) -> dict[str, Any]:
+        """Build the structured EducationReportViewModel (deterministic given the data)."""
+        vm = await self.summary(ctx)
+        rows = await self._compute_rows(ctx)
+        return EducationReportBuilder().build(vm, rows)
+
+    async def generate_report(self, ctx: UserContext) -> dict[str, Any]:
+        """Build + persist the report. Reproducible: same inputs -> same content_hash. The
+        row id is deterministic per user, so re-generation upserts in place (idempotent)."""
+        report = await self.build_report(ctx)
+        digest = content_hash(report)
+        row = {
+            "id": _rec_id(ctx.user_id, "education-report"),
+            "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+            "title": str(report.get("title")), "report_type": "education_comparison",
+            "version": 1, "status": "generated",
+            "content_json": report, "content_hash": digest, "pdf_url": None,
+        }
+        res = await self._sb.upsert("education_comparison_reports", row, schema=EDUCATION)
+        return {"content_hash": digest, "report": report, "stored": bool(res), "report_id": row["id"]}
+
 
 def _score_dict(s: ProgramScore) -> dict[str, Any]:
     return {
@@ -306,4 +329,7 @@ def _score_dict(s: ProgramScore) -> dict[str, Any]:
         "net_cost": s.net_cost, "opportunity_cost": s.opportunity_cost, "income_lift": s.income_lift,
         "breakeven_months": s.breakeven_months, "scenarios": s.scenarios, "scores": s.scores,
         "composite": _composite(s.scores), "missing": s.missing,
+        # carried for the report builder (evidence appendix + citations); not part of the
+        # public score surface but harmless in the view-model.
+        "_evidence": s.evidence, "_assumptions": s.assumptions,
     }

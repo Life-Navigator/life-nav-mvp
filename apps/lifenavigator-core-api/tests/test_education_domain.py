@@ -100,6 +100,52 @@ async def test_no_recommendation_without_programs():
     assert await _svc({}).persist_recommendations(CTX) == []
 
 
+# ---- E3: report ----
+@pytest.mark.asyncio
+async def test_report_has_nine_sections_charts_citations():
+    from app.services.education_report import content_hash
+    svc = _svc({"programs": [PROGRAM_MS, PROGRAM_BOOT], "schools": [SCHOOL], "career_profiles": [CAREER_PROFILE], "education_goals": [GOAL], "compensation_bands": BANDS})
+    rpt = await svc.build_report(CTX)
+    secs = rpt["sections"]
+    for k in ["1_executive_summary", "2_recommended_path", "3_alternative_paths", "4_roi_analysis",
+              "5_compensation_forecast", "6_financial_impact", "7_family_impact", "8_risk_analysis", "9_evidence_appendix"]:
+        assert k in secs, f"missing section {k}"
+    for chart in ["total_cost_comparison", "expected_salary_uplift", "breakeven_timeline", "confidence_bands", "roi_scenario_range", "score_radar"]:
+        assert chart in rpt["charts"], f"missing chart {chart}"
+    assert rpt["citations"]  # source tables cited
+    assert rpt["sections"]["9_evidence_appendix"]["evidence"]  # appendix has evidence
+    assert rpt["sections"]["9_evidence_appendix"]["assumptions"]
+    # confidence band = the worst/expected/best ROI scenario range
+    rng = rpt["charts"]["roi_scenario_range"]
+    assert rng["worst"] is not None and rng["best"] is not None
+    assert content_hash(rpt)  # hashable
+
+
+@pytest.mark.asyncio
+async def test_report_is_reproducible_same_inputs_same_hash():
+    from app.services.education_report import content_hash
+    rows = {"programs": [PROGRAM_MS, PROGRAM_BOOT], "schools": [SCHOOL], "career_profiles": [CAREER_PROFILE], "education_goals": [GOAL], "compensation_bands": BANDS}
+    h1 = content_hash(await _svc(rows).build_report(CTX))
+    h2 = content_hash(await _svc(rows).build_report(CTX))
+    assert h1 == h2  # same inputs -> same report (timestamps normalized out)
+
+
+@pytest.mark.asyncio
+async def test_report_hash_changes_when_inputs_change():
+    from app.services.education_report import content_hash
+    base = {"programs": [PROGRAM_MS], "schools": [SCHOOL], "career_profiles": [CAREER_PROFILE], "education_goals": [GOAL], "compensation_bands": BANDS}
+    changed = {**base, "programs": [PROGRAM_BOOT]}
+    assert content_hash(await _svc(base).build_report(CTX)) != content_hash(await _svc(changed).build_report(CTX))
+
+
+@pytest.mark.asyncio
+async def test_generate_report_persists_with_hash():
+    svc = _svc({"programs": [PROGRAM_MS], "schools": [SCHOOL], "career_profiles": [CAREER_PROFILE], "education_goals": [GOAL], "compensation_bands": BANDS})
+    res = await svc.generate_report(CTX)
+    assert res["stored"] and res["content_hash"]
+    assert res["report"]["version"] == 1
+
+
 # ---- Chat grounding ----
 @pytest.mark.asyncio
 async def test_chat_context_cites_best_program():

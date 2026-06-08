@@ -48,3 +48,15 @@ async def comparison(user: AuthenticatedUser = Depends(authenticated), svc: Educ
     """Ranked program comparison with cited scores + worst/expected/best scenarios."""
     vm = await svc.summary(_ctx(user))
     return {"programs": vm.data.get("programs"), "best_program": vm.data.get("best_program"), "comparison": vm.data.get("comparison")}
+
+
+@router.get("/report")
+async def report(user: AuthenticatedUser = Depends(authenticated), svc: EducationService = Depends(get_education_service)):
+    """The structured EducationReportViewModel (9 sections + chart specs). Renderer later."""
+    return await svc.build_report(_ctx(user))
+
+
+@router.post("/report/generate")
+async def report_generate(user: AuthenticatedUser = Depends(authenticated), svc: EducationService = Depends(get_education_service)):
+    """Build + persist the report; returns content_hash (reproducible: same inputs -> same hash)."""
+    return await svc.generate_report(_ctx(user))
