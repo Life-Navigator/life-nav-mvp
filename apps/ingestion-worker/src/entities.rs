@@ -236,6 +236,10 @@ pub enum EntityType {
     InsuranceProfile,
     CollegePlanning,
     FamilyRecommendation,
+    // ---- Decision Engine D1 (migration 134) ----
+    // New cross-domain decision root + scenario (distinct from legacy Decision/LifeScenario).
+    LifeDecision,
+    DecisionScenario,
     /// Catch-all so a new sync-queue entity_type doesn't crash the worker;
     /// the normalizer skips unknown types.
     #[serde(other)]
@@ -425,6 +429,9 @@ impl EntityType {
             EntityType::InsuranceProfile => "insurance_profile",
             EntityType::CollegePlanning => "college_planning",
             EntityType::FamilyRecommendation => "family_recommendation",
+            // Decision Engine D1
+            EntityType::LifeDecision => "life_decision",
+            EntityType::DecisionScenario => "decision_scenario",
             EntityType::Unknown => "unknown",
         }
     }
@@ -532,6 +539,8 @@ impl EntityType {
             | EntityType::InsuranceProfile
             | EntityType::CollegePlanning
             | EntityType::FamilyRecommendation => "family",
+
+            EntityType::LifeDecision | EntityType::DecisionScenario => "decision",
 
             EntityType::EstateProfile | EntityType::EstateBeneficiary => "estate",
 
@@ -716,7 +725,10 @@ impl EntityType {
             // Family: household profile / college planning / recommendations → Medium.
             | EntityType::FamilyProfile
             | EntityType::CollegePlanning
-            | EntityType::FamilyRecommendation => SensitivityLevel::Medium,
+            | EntityType::FamilyRecommendation
+            // Decision engine: cross-domain decisions / scenarios → Medium.
+            | EntityType::LifeDecision
+            | EntityType::DecisionScenario => SensitivityLevel::Medium,
 
             // Labels / meta (no raw figures) → Low: BudgetCategory, ExpenseCategory,
             // Assumption, Tradeoff, AdviceBoundary fall through to the default.
@@ -952,6 +964,17 @@ mod entity_type_tests {
                 SensitivityLevel::Medium
             };
             assert_eq!(got.sensitivity().as_str(), want.as_str(), "{s} sensitivity");
+        }
+    }
+
+    // ---- Decision Engine D1 ----
+    #[test]
+    fn decision_entities_round_trip_domain() {
+        for s in ["life_decision", "decision_scenario"] {
+            let got = EntityType::from_queue_str(s);
+            assert!(!matches!(got, EntityType::Unknown), "{s} -> Unknown");
+            assert_eq!(got.as_str(), s, "round-trip {s}");
+            assert_eq!(got.domain(), "decision", "{s} domain");
         }
     }
 }

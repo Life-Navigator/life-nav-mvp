@@ -75,11 +75,13 @@ pub fn expand_children(job: &SyncQueueJob, now: DateTime<Utc>) -> Vec<CanonicalG
             | EntityType::CareerRecommendation
             | EntityType::EducationRecommendation
             | EntityType::FamilyRecommendation
+            | EntityType::LifeDecision
     ) {
         return Vec::new();
     }
-    // Children link to THIS recommendation's type (financial_/health_/career_/
-    // education_/family_recommendation), so the fan-out is domain-generic.
+    // Children link to THIS parent's type (a *_recommendation OR a life_decision), so the
+    // fan-out is domain-generic. LifeDecision additionally fans scenarios_json into
+    // DecisionScenario nodes (worst/expected/best) — the decision graph.
     let parent_label = parent.as_str();
     let payload = job.payload.as_object().cloned().unwrap_or_default();
     let rec_id = job.entity_id.clone();
@@ -98,6 +100,8 @@ pub fn expand_children(job: &SyncQueueJob, now: DateTime<Utc>) -> Vec<CanonicalG
         (EntityType::Evidence, "evidence_json"),
         (EntityType::Assumption, "assumptions_json"),
         (EntityType::Tradeoff, "tradeoffs_json"),
+        // Only LifeDecision rows carry scenarios_json; recommendations simply have none.
+        (EntityType::DecisionScenario, "scenarios_json"),
     ] {
         for (i, v) in arr(key).iter().enumerate() {
             if let Value::Object(m) = v {
@@ -169,6 +173,7 @@ fn build_child(
         EntityType::Assumption => "HAS_ASSUMPTION",
         EntityType::Tradeoff => "HAS_TRADEOFF",
         EntityType::AdviceBoundary => "REQUIRES_REVIEW",
+        EntityType::DecisionScenario => "HAS_SCENARIO",
         _ => "RELATED_TO",
     };
     let relationships = vec![Relationship {
@@ -382,6 +387,13 @@ fn build_title(et: &EntityType, attrs: &Map<String, Value>) -> String {
             .map(|v| format!("College plan ({v})"))
             .unwrap_or_else(|| "College planning".into()),
         EntityType::FamilyProfile => "Family profile".into(),
+        // Decision Engine D1
+        EntityType::LifeDecision => {
+            by_key(&["title", "question"]).unwrap_or_else(|| "Decision".into())
+        }
+        EntityType::DecisionScenario => by_key(&["label"])
+            .map(|l| format!("{l} scenario"))
+            .unwrap_or_else(|| "Scenario".into()),
         _ => by_key(&["title", "name", "label", "action"]).unwrap_or_else(|| et.as_str().into()),
     }
 }
@@ -1264,6 +1276,19 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "confidence",
             "status",
         ]),
+        // Decision Engine D1
+        EntityType::LifeDecision => parts_for(&[
+            "question",
+            "title",
+            "description",
+            "decision_type",
+            "priority",
+            "confidence",
+            "status",
+        ]),
+        EntityType::DecisionScenario => {
+            parts_for(&["label", "outcome", "value", "probability", "description"])
+        }
         _ => {
             // Fallback — include every short stringable field we
             // didn't explicitly drop. Cap the total length so we never
@@ -2347,6 +2372,49 @@ mod tests {
                     && r.target_entity_id == "FREC1"));
             assert!(c.relationships.iter().all(|r| r.label != "RELATED_TO"));
         }
+        assert!(children.iter().any(|c| c.entity_type == "evidence"
+            && c.relationships.iter().any(|r| r.label == "HAS_EVIDENCE")));
+        assert!(children.iter().any(|c| c.entity_type == "advice_boundary"));
+    }
+
+    // ---- Decision Engine D1 ----
+    #[test]
+    fn life_decision_fans_out_into_decision_graph() {
+        let mut job = job_with(
+            "life_decision",
+            json!({
+                "question": "MBA or invest the money?",
+                "title": "MBA vs invest",
+                "decision_type": "mba_or_invest",
+                "scenarios_json": [
+                    {"label": "worst", "outcome": "low salary lift", "value": -20000, "probability": 0.2},
+                    {"label": "expected", "outcome": "moderate lift", "value": 15000, "probability": 0.55},
+                    {"label": "best", "outcome": "strong lift", "value": 45000, "probability": 0.25}
+                ],
+                "evidence_json": [{"metric_name": "program_median_salary", "metric_value": "118000", "source_table": "education.programs", "confidence": 0.8, "explanation": "Scorecard"}],
+                "tradeoffs_json": [{"option_a": "MBA", "option_b": "invest", "benefit": "career lift", "cost": "tuition + 2y"}],
+                "governance_verdict": {"passed": true, "boundary_type": "decision_guidance", "disclaimer_text": "Decision support, not financial advice"}
+            }),
+        );
+        job.entity_id = "DEC1".into();
+        let children = expand_children(&job, Utc::now());
+        // 3 scenarios + 1 evidence + 1 tradeoff + 1 boundary = 6
+        assert_eq!(children.len(), 6, "got {}", children.len());
+        let scen: Vec<_> = children
+            .iter()
+            .filter(|c| c.entity_type == "decision_scenario")
+            .collect();
+        assert_eq!(scen.len(), 3);
+        for c in &children {
+            assert!(c
+                .relationships
+                .iter()
+                .any(|r| r.target_entity_type == "life_decision" && r.target_entity_id == "DEC1"));
+            assert!(c.relationships.iter().all(|r| r.label != "RELATED_TO"));
+        }
+        assert!(scen
+            .iter()
+            .all(|c| c.relationships.iter().any(|r| r.label == "HAS_SCENARIO")));
         assert!(children.iter().any(|c| c.entity_type == "evidence"
             && c.relationships.iter().any(|r| r.label == "HAS_EVIDENCE")));
         assert!(children.iter().any(|c| c.entity_type == "advice_boundary"));

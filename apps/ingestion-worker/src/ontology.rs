@@ -238,6 +238,15 @@ const INSURANCE_PROFILE: &[IncomingEdge] = &[user("HAS_INSURANCE_PROFILE")];
 const COLLEGE_PLANNING: &[IncomingEdge] = &[user("HAS_COLLEGE_PLAN")];
 const FAMILY_RECOMMENDATION: &[IncomingEdge] = &[user("HAS_RECOMMENDATION")];
 
+// ── Decision Engine ontology (migration 134) ─────────────────────────────────
+// A LifeDecision is the user-anchored root of a decision graph; DecisionScenario nodes
+// (worst/expected/best) + Evidence/Tradeoff/AdviceBoundary are fanned out by the worker
+// (expand_children) anchored to the decision, so their edges are emitted there — these
+// consts cover standalone processing. DecisionScenario anchors to its decision via the
+// `decision_id` FK.
+const LIFE_DECISION: &[IncomingEdge] = &[user("HAS_DECISION")];
+const DECISION_SCENARIO: &[IncomingEdge] = &[fk("HAS_SCENARIO", "life_decision", "decision_id")];
+
 /// Registry lookup: the declared incoming edges for an entity type.
 ///
 /// Returns a non-empty slice for entities the ontology registry owns (finance
@@ -319,6 +328,9 @@ pub fn incoming_edges(et: &EntityType) -> &'static [IncomingEdge] {
         EntityType::InsuranceProfile => INSURANCE_PROFILE,
         EntityType::CollegePlanning => COLLEGE_PLANNING,
         EntityType::FamilyRecommendation => FAMILY_RECOMMENDATION,
+        // Decision Engine (migration 134).
+        EntityType::LifeDecision => LIFE_DECISION,
+        EntityType::DecisionScenario => DECISION_SCENARIO,
         _ => &[],
     }
 }
@@ -401,6 +413,7 @@ pub fn domain_of(et: &EntityType) -> Domain {
         | EntityType::InsuranceProfile
         | EntityType::CollegePlanning
         | EntityType::FamilyRecommendation => Domain::Family,
+        EntityType::LifeDecision | EntityType::DecisionScenario => Domain::Decision,
         _ => Domain::General,
     }
 }
