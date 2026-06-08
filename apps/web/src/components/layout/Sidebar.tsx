@@ -466,6 +466,12 @@ const navigation = [
     comingSoon: true,
   },
   {
+    name: 'Executive Dashboard',
+    href: '/dashboard/metrics',
+    icon: ChartBarIcon,
+    current: false,
+  },
+  {
     name: 'Settings',
     href: '/dashboard/settings',
     icon: CogIcon,
