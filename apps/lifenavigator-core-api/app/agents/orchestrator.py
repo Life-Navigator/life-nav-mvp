@@ -51,8 +51,17 @@ _EDUCATION_KEYWORDS = (
 )
 
 
+_FAMILY_KEYWORDS = (
+    "family", "spouse", "partner", "dependent", "child", "children", "kids", "guardian",
+    "guardianship", "estate", "will", "power of attorney", "beneficiary", "life insurance",
+    "insurance need", "if i die", "survivor", "529", "college fund",
+)
+
+
 def _classify(query: str) -> tuple[str, list[str]]:
     q = (query or "").lower()
+    if any(k in q for k in _FAMILY_KEYWORDS):
+        return "family_query", ["family"]
     if any(k in q for k in _EDUCATION_KEYWORDS):
         return "education_query", ["education"]
     if any(k in q for k in _CAREER_KEYWORDS):
@@ -62,7 +71,7 @@ def _classify(query: str) -> tuple[str, list[str]]:
     if any(k in q for k in _FINANCE_KEYWORDS):
         return "finance_query", ["finance"]
     # Ambiguous (e.g. "why are you recommending this?") -> ground on any recommendation.
-    return "general", ["finance", "health", "career", "education"]
+    return "general", ["finance", "health", "career", "education", "family"]
 
 
 class LifeOrchestratorAgent:

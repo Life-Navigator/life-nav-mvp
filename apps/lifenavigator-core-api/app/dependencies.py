@@ -21,6 +21,7 @@ from .config import Settings, get_settings
 from .domains.base import DomainService
 from .domains.career import CareerService
 from .domains.education import EducationService
+from .domains.family import FamilyService
 from .domains.finance import FinanceService
 from .domains.health import HealthService
 from .domains.registry import DomainRegistry
@@ -85,6 +86,15 @@ def get_career_service(
     comp = CompensationIntelligenceEngine(supabase)
     market = MarketPositionAnalyzer(supabase)
     return CareerService(supabase=supabase, comp=comp, market=market)
+
+
+def get_family_service(
+    supabase: SupabaseClient = Depends(get_supabase),
+) -> FamilyService:
+    # F2: FamilyService backs the /v1/family router but is NOT registered in
+    # get_domain_services, so Family stays `unavailable()` until its gates pass + approval.
+    # Income for the insurance/survivor need comes from the Career compensation engine (cited).
+    return FamilyService(supabase=supabase, comp=CompensationIntelligenceEngine(supabase))
 
 
 def get_education_service(
