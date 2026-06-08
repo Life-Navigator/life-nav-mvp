@@ -30,6 +30,7 @@ from .grounding.retriever import Retriever
 from .services.compensation import CompensationIntelligenceEngine
 from .services.decision_engine import DecisionEngine
 from .services.readiness import LifeReadinessEngine
+from .services.sharing import ShareService
 from .services.report_engine import UniversalReportEngine
 from .services.cost_meter import CostMeter
 from .services.life_profile import LifeProfileService
@@ -147,6 +148,13 @@ def get_readiness_engine(
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> LifeReadinessEngine:
     return LifeReadinessEngine(domains=domains, education=education, supabase=supabase)
+
+
+def get_share_service(
+    supabase: SupabaseClient = Depends(get_supabase),
+    reports: UniversalReportEngine = Depends(get_report_engine),
+) -> ShareService:
+    return ShareService(supabase=supabase, reports=reports)
 
 
 def get_retriever(

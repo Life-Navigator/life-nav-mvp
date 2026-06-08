@@ -124,6 +124,33 @@ class SupabaseClient:
             log.warning("supabase insert %s failed: %s", table, exc)
             return []
 
+    async def update(
+        self,
+        table: str,
+        patch: dict[str, Any],
+        *,
+        filters: dict[str, str],
+        schema: str = "public",
+    ) -> list[dict[str, Any]]:
+        """Service-role partial update (PATCH) of rows matching ``filters`` (PostgREST
+        ``col=eq.value``). Returns the updated row(s) or [] on error/no match."""
+        if not self.configured or not filters:
+            return []
+        headers = self._headers()
+        headers["Prefer"] = "return=representation"
+        if schema != "public":
+            headers["Content-Profile"] = schema
+        endpoint = f"{self._url}/rest/v1/{table}"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.patch(endpoint, headers=headers, params=filters, json=patch)
+                resp.raise_for_status()
+                data = resp.json()
+                return data if isinstance(data, list) else [data]
+        except Exception as exc:  # noqa: BLE001
+            log.warning("supabase update %s failed: %s", table, exc)
+            return []
+
     async def upsert(
         self,
         table: str,

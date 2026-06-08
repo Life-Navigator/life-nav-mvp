@@ -71,13 +71,35 @@ class FakeSupabase:
         return rows
 
     async def insert(self, table: str, row: dict[str, Any], **_: Any) -> list[dict[str, Any]]:
+        stored = {**row, "id": row.get("id", "new-id")}
         self.inserts.append((table, row))
-        return [{**row, "id": "new-id"}]
+        self._by_table.setdefault(table, []).append(stored)  # persist so it's queryable
+        return [stored]
 
     async def upsert(self, table: str, row: dict[str, Any], **_: Any) -> list[dict[str, Any]]:
-        # Idempotent: return the row with its caller-supplied deterministic id.
+        # Idempotent: replace any existing row with the same id, else append (stateful store).
         self.inserts.append((table, row))
+        bucket = self._by_table.setdefault(table, [])
+        rid = row.get("id")
+        for i, existing in enumerate(bucket):
+            if rid is not None and existing.get("id") == rid:
+                bucket[i] = dict(row)
+                return [dict(row)]
+        bucket.append(dict(row))
         return [dict(row)]
+
+    async def update(self, table: str, patch: dict[str, Any], *, filters: Any = None, **_: Any) -> list[dict[str, Any]]:
+        updated = []
+        for r in self._by_table.get(table, []):
+            ok = True
+            for field, expr in (filters or {}).items():
+                if isinstance(expr, str) and expr.startswith("eq.") and str(r.get(field)) != expr[3:]:
+                    ok = False
+                    break
+            if ok:
+                r.update(patch)
+                updated.append(dict(r))
+        return updated
 
     async def ready(self) -> bool:
         return True
