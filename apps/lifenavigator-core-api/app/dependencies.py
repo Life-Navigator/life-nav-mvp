@@ -19,13 +19,16 @@ from .clients.qdrant import QdrantClient
 from .clients.supabase import SupabaseClient
 from .config import Settings, get_settings
 from .domains.base import DomainService
+from .domains.career import CareerService
 from .domains.finance import FinanceService
 from .domains.health import HealthService
 from .domains.registry import DomainRegistry
 from .grounding.context_builder import ContextBuilder
 from .grounding.retriever import Retriever
+from .services.compensation import CompensationIntelligenceEngine
 from .services.cost_meter import CostMeter
 from .services.life_profile import LifeProfileService
+from .services.market_intelligence import MarketPositionAnalyzer
 from .services.trust_safety import TrustSafetyGate
 
 # Stateless singletons (no per-request state).
@@ -70,6 +73,17 @@ def get_health_service(
     # get_domain_services, so Health stays `unavailable()` in the registry (not
     # unlocked / not in production navigation) until its gates pass.
     return HealthService(supabase=supabase)
+
+
+def get_career_service(
+    supabase: SupabaseClient = Depends(get_supabase),
+) -> CareerService:
+    # X4: CareerService backs the /v1/career router but is NOT registered in
+    # get_domain_services, so Career stays `unavailable()` in the registry (appears
+    # in life-profile as a missing domain, not live) until its 15 gates pass + approval.
+    comp = CompensationIntelligenceEngine(supabase)
+    market = MarketPositionAnalyzer(supabase)
+    return CareerService(supabase=supabase, comp=comp, market=market)
 
 
 def get_domain_services(

@@ -59,8 +59,16 @@ class FakeSupabase:
             self._by_table = {}
         self.inserts: list[tuple[str, dict[str, Any]]] = []
 
-    async def select(self, table: str, **_: Any) -> list[dict[str, Any]]:
-        return list(self._by_table.get(table, []))
+    async def select(self, table: str, *, filters: Any = None, **_: Any) -> list[dict[str, Any]]:
+        rows = list(self._by_table.get(table, []))
+        # Apply `eq.` filters LENIENTLY: a row missing the filtered field passes (so
+        # fixtures that omit user_id still return), but a present field must match —
+        # this lets reference lookups (e.g. compensation_bands by occupation_code) work.
+        for field, expr in (filters or {}).items():
+            if isinstance(expr, str) and expr.startswith("eq."):
+                want = expr[3:]
+                rows = [r for r in rows if field not in r or str(r.get(field)) == want]
+        return rows
 
     async def insert(self, table: str, row: dict[str, Any], **_: Any) -> list[dict[str, Any]]:
         self.inserts.append((table, row))

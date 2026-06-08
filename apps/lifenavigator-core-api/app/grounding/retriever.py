@@ -23,8 +23,8 @@ log = logging.getLogger("core.retriever")
 RECOMMENDATION_LABELS: dict[str, str] = {
     "finance": "FinancialRecommendation",
     "health": "HealthRecommendation",
-    # future: "career": "CareerRecommendation", "family": "FamilyRecommendation",
-    #         "education": "EducationRecommendation",
+    "career": "CareerRecommendation",
+    # future: "family": "FamilyRecommendation", "education": "EducationRecommendation",
 }
 
 
