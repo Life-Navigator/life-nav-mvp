@@ -421,6 +421,12 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Family',
+    href: '/dashboard/family',
+    icon: HeartIcon,
+    current: false,
+  },
+  {
     name: 'Education',
     href: '/dashboard/education',
     icon: AcademicCapIcon,

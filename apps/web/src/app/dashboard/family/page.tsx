@@ -1,328 +1,254 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useSession } from '@/hooks/useSession';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 
-interface FamilyMember {
+// Family — render-only view of the Core API Family DomainViewModel (via /api/family/summary).
+// Protection / readiness / college are grounded in your data; absent values render as
+// missing-data prompts, never fake. Estate & guardianship carry a legal boundary (attorney
+// escalation) — this is not legal advice. No internals exposed.
+
+import React, { useEffect, useState } from 'react';
+
+interface Rec {
   id: string;
-  firstName: string;
-  lastName?: string;
-  nickname?: string;
-  relationship: string;
-  dateOfBirth?: string;
-  photoUrl?: string;
-  email?: string;
-  phoneNumber?: string;
-  isActive: boolean;
+  title: string;
+  why_it_matters: string;
+  evidence: { statement: string }[];
+  priority: 'high' | 'medium' | 'low';
+}
+interface FamilyVM {
+  domain: string;
+  data: {
+    protection: {
+      life_coverage: number | null;
+      life_insurance_need: number | null;
+      coverage_gap: number | null;
+      income_basis: number | null;
+      income_source: string | null;
+    };
+    readiness: {
+      dependents: number;
+      guardianship_status: string | null;
+      estate: {
+        has_will?: boolean;
+        has_poa?: boolean;
+        has_beneficiaries?: boolean;
+        status?: string;
+      } | null;
+    };
+    college: {
+      target_year?: number;
+      projected_cost?: number | null;
+      saved_amount?: number | null;
+      funding_gap?: number | null;
+    }[];
+    safety_boundaries: { boundary_type: string; disclaimer_text: string }[];
+    missing_data_prompts?: string[];
+  };
+  recommendations: Rec[];
+  missing: string[];
+  freshness: { as_of?: string };
+  confidence: { score: number; basis: string };
 }
 
-interface Pet {
-  id: string;
-  name: string;
-  species: string;
-  breed?: string;
-  dateOfBirth?: string;
-  photoUrl?: string;
-  isActive: boolean;
-}
+const PROMPT_COPY: Record<string, { title: string; body: string }> = {
+  dependents: {
+    title: 'Add your household',
+    body: 'Add dependents, a spouse/partner, and coverage to see protection gaps and readiness.',
+  },
+  insurance_profiles: {
+    title: 'Add your coverage',
+    body: 'Add your life/disability coverage to compare against an income-replacement need.',
+  },
+  estate_plans: {
+    title: 'Track estate readiness',
+    body: 'Note your will / POA / beneficiaries. Not legal advice — an attorney completes these.',
+  },
+  career_profiles: {
+    title: 'Add your income basis',
+    body: 'Add your role so we can estimate an income-replacement need (cited market value).',
+  },
+};
+
+const fmt = (n: number | null | undefined, ccy = 'USD') =>
+  n == null
+    ? '—'
+    : new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: ccy,
+        maximumFractionDigits: 0,
+      }).format(n);
+const yn = (b: boolean | undefined) => (b ? '✓' : '✗');
 
 export default function FamilyPage() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-  const [pets, setPets] = useState<Pet[]>([]);
+  const [vm, setVm] = useState<FamilyVM | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/login');
-    }
-  }, [status, router]);
+    let active = true;
+    fetch('/api/family/summary')
+      .then(async (r) => (r.ok ? ((await r.json()) as FamilyVM) : null))
+      .then((d) => {
+        if (active) {
+          setVm(d);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setVm(null);
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  useEffect(() => {
-    if (session) {
-      fetchFamilyData();
-    }
-  }, [session]);
-
-  const fetchFamilyData = async () => {
-    try {
-      setLoading(true);
-      const [membersRes, petsRes] = await Promise.all([
-        fetch('/api/family/members'),
-        fetch('/api/family/pets'),
-      ]);
-
-      if (!membersRes.ok || !petsRes.ok) {
-        throw new Error('Failed to fetch family data');
-      }
-
-      const membersData = await membersRes.json();
-      const petsData = await petsRes.json();
-
-      setFamilyMembers(membersData.familyMembers || []);
-      setPets(petsData.pets || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
-      console.error('Error fetching family data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getAge = (dateOfBirth?: string) => {
-    if (!dateOfBirth) return null;
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-    return age;
-  };
-
-  if (status === 'loading' || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-600 dark:text-gray-400">Loading family information...</div>
-      </div>
-    );
-  }
-
-  if (!session) {
-    return null;
-  }
+  const prot = vm?.data.protection;
+  const ready = vm?.data.readiness;
+  const college = vm?.data.college ?? [];
+  const legal = vm?.data.safety_boundaries?.find((b) => b.boundary_type === 'legal');
+  const missing = vm?.missing ?? [];
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Family Management</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          Manage your family members, pets, and appointments all in one place
-        </p>
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-gray-900">Family &amp; Protection</h1>
+      <p className="text-sm text-gray-500 mt-1">
+        Protection, readiness, and college — grounded in your own data.
+      </p>
+
+      <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        {legal?.disclaimer_text ??
+          'Planning guidance, not legal or financial advice. Consult an attorney for wills, guardianship, and estate documents.'}
       </div>
 
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-          <p className="text-red-800 dark:text-red-200">{error}</p>
-        </div>
+      {loading ? (
+        <div className="mt-8 text-gray-500">Loading your family summary…</div>
+      ) : (
+        <>
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold text-gray-700">Life-insurance protection</h2>
+              {prot && prot.life_insurance_need != null ? (
+                <>
+                  <div className="text-sm text-gray-600 mt-2">
+                    Coverage {fmt(prot.life_coverage)} · Need {fmt(prot.life_insurance_need)}
+                  </div>
+                  {prot.coverage_gap != null && prot.coverage_gap > 0 ? (
+                    <div className="mt-2 text-lg font-bold text-rose-700">
+                      Gap {fmt(prot.coverage_gap)}
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-lg font-bold text-emerald-700">Covered ✓</div>
+                  )}
+                  <div className="text-xs text-gray-400 mt-1">
+                    Need = 10× income ({fmt(prot.income_basis)}, {prot.income_source}) + debts
+                  </div>
+                </>
+              ) : (
+                <Prompt field="insurance_profiles" />
+              )}
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold text-gray-700">Readiness</h2>
+              {ready && (ready.dependents > 0 || ready.estate) ? (
+                <div className="text-sm text-gray-600 mt-2 space-y-1">
+                  <div>
+                    Dependents: <b>{ready.dependents}</b>
+                  </div>
+                  <div>
+                    Guardianship: <b>{ready.guardianship_status ?? 'undesignated'}</b>
+                  </div>
+                  {ready.estate && (
+                    <div>
+                      Estate — will {yn(ready.estate.has_will)} · POA {yn(ready.estate.has_poa)} ·
+                      beneficiaries {yn(ready.estate.has_beneficiaries)}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Prompt field="dependents" />
+              )}
+            </div>
+          </div>
+
+          {college.length > 0 && (
+            <div className="mt-6 bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-lg font-semibold text-gray-700">College funding</h2>
+              <div className="mt-2 space-y-1 text-sm text-gray-600">
+                {college.map((c, i) => (
+                  <div key={i}>
+                    {c.target_year}: projected {fmt(c.projected_cost)} · saved {fmt(c.saved_amount)}
+                    {c.funding_gap != null && c.funding_gap > 0 && (
+                      <span className="text-rose-700 font-semibold">
+                        {' '}
+                        · gap {fmt(c.funding_gap)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {vm && vm.recommendations.length > 0 && (
+            <div className="mt-6 bg-white p-6 rounded-lg shadow-md">
+              <h2 className="text-xl font-semibold text-gray-800 mb-4">Protect &amp; plan</h2>
+              <div className="space-y-4">
+                {vm.recommendations.map((rec) => (
+                  <div key={rec.id} className="border-l-4 border-rose-600 pl-4 py-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-semibold text-gray-900">{rec.title}</h3>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
+                        {rec.priority}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">{rec.why_it_matters}</p>
+                    {rec.evidence.length > 0 && (
+                      <ul className="list-disc list-inside text-sm text-gray-700 mt-2">
+                        {rec.evidence.map((e, i) => (
+                          <li key={i}>{e.statement}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {missing.length > 0 && (
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+              {missing.map((field) => (
+                <div key={field} className="bg-white p-5 rounded-lg shadow-md text-center">
+                  <Prompt field={field} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {vm && (
+            <div className="mt-8 text-xs text-gray-400">
+              Confidence: {vm.confidence.basis}
+              {vm.freshness.as_of
+                ? ` · as of ${new Date(vm.freshness.as_of).toLocaleDateString()}`
+                : ''}
+            </div>
+          )}
+        </>
       )}
+    </div>
+  );
+}
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border-t-4 border-blue-500">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Family Members</h3>
-            <span className="text-3xl">👨‍👩‍👧‍👦</span>
-          </div>
-          <p className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">
-            {familyMembers.filter((m) => m.isActive).length}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Active members</p>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border-t-4 border-green-500">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Pets</h3>
-            <span className="text-3xl">🐾</span>
-          </div>
-          <p className="text-4xl font-bold text-green-600 dark:text-green-400 mb-2">
-            {pets.filter((p) => p.isActive).length}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Active pets</p>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 border-t-4 border-purple-500">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Appointments</h3>
-            <span className="text-3xl">📅</span>
-          </div>
-          <p className="text-4xl font-bold text-purple-600 dark:text-purple-400 mb-2">0</p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Upcoming appointments</p>
-        </div>
-      </div>
-
-      {/* Family Members Section */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Family Members</h2>
-          <button
-            onClick={() => router.push('/dashboard/family/members/new')}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-          >
-            + Add Member
-          </button>
-        </div>
-
-        {familyMembers.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
-            <span className="text-6xl mb-4 block">👨‍👩‍👧‍👦</span>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              No family members yet
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Start by adding your family members to keep track of their information and
-              appointments
-            </p>
-            <button
-              onClick={() => router.push('/dashboard/family/members/new')}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-            >
-              Add Your First Family Member
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {familyMembers.map((member) => (
-              <Link
-                key={member.id}
-                href={`/dashboard/family/members/${member.id}`}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-2xl overflow-hidden flex-shrink-0">
-                    {member.photoUrl ? (
-                      <img
-                        src={member.photoUrl}
-                        alt={member.firstName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      '👤'
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                      {member.firstName} {member.lastName}
-                      {member.nickname && (
-                        <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
-                          "{member.nickname}"
-                        </span>
-                      )}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                      {member.relationship}
-                    </p>
-                    {member.dateOfBirth && (
-                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-                        Age: {getAge(member.dateOfBirth)}
-                      </p>
-                    )}
-                    {member.email && (
-                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1 truncate">
-                        {member.email}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Pets Section */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Pets</h2>
-          <button
-            onClick={() => router.push('/dashboard/family/pets/new')}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-          >
-            + Add Pet
-          </button>
-        </div>
-
-        {pets.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
-            <span className="text-6xl mb-4 block">🐾</span>
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              No pets yet
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              Add your pets to keep track of their medical records, vet appointments, and care
-              information
-            </p>
-            <button
-              onClick={() => router.push('/dashboard/family/pets/new')}
-              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
-            >
-              Add Your First Pet
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {pets.map((pet) => (
-              <Link
-                key={pet.id}
-                href={`/dashboard/family/pets/${pet.id}`}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-2xl overflow-hidden flex-shrink-0">
-                    {pet.photoUrl ? (
-                      <img
-                        src={pet.photoUrl}
-                        alt={pet.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      '🐾'
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                      {pet.name}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                      {pet.breed || pet.species}
-                    </p>
-                    {pet.dateOfBirth && (
-                      <p className="text-sm text-gray-500 dark:text-gray-500 mt-1">
-                        Age: {getAge(pet.dateOfBirth)}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Upcoming Appointments Section */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Upcoming Appointments
-          </h2>
-          <button
-            onClick={() => router.push('/dashboard/family/appointments/new')}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-          >
-            + Add Appointment
-          </button>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
-          <span className="text-6xl mb-4 block">📅</span>
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            No upcoming appointments
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Schedule appointments for your family members and pets to keep track of important dates
-          </p>
-          <button
-            onClick={() => router.push('/dashboard/family/appointments/new')}
-            className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors"
-          >
-            Schedule First Appointment
-          </button>
-        </div>
-      </div>
+function Prompt({ field }: { field: string }) {
+  const copy = PROMPT_COPY[field] ?? {
+    title: `Add your ${field.replace(/_/g, ' ')}`,
+    body: 'Add your family data to unlock protection insights.',
+  };
+  return (
+    <div className="text-center py-2">
+      <p className="font-medium text-gray-700">{copy.title}</p>
+      <p className="text-sm text-gray-500 mt-1">{copy.body}</p>
     </div>
   );
 }
