@@ -415,7 +415,7 @@ const navigation = [
   },
   {
     name: 'Life Decisions',
-    href: '/dashboard/life-decisions',
+    href: '/dashboard/life-decisions/workspace',
     icon: TargetIcon,
     current: false,
   },
