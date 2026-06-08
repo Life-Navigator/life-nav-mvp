@@ -20,6 +20,7 @@ from .clients.supabase import SupabaseClient
 from .config import Settings, get_settings
 from .domains.base import DomainService
 from .domains.finance import FinanceService
+from .domains.health import HealthService
 from .domains.registry import DomainRegistry
 from .grounding.context_builder import ContextBuilder
 from .grounding.retriever import Retriever
@@ -60,6 +61,15 @@ def get_finance_service(
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> FinanceService:
     return FinanceService(supabase=supabase)
+
+
+def get_health_service(
+    supabase: SupabaseClient = Depends(get_supabase),
+) -> HealthService:
+    # H1: HealthService backs the /v1/health router but is NOT registered in
+    # get_domain_services, so Health stays `unavailable()` in the registry (not
+    # unlocked / not in production navigation) until its gates pass.
+    return HealthService(supabase=supabase)
 
 
 def get_domain_services(
