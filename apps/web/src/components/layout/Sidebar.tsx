@@ -420,6 +420,12 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Documents',
+    href: '/dashboard/documents',
+    icon: DocumentIcon,
+    current: false,
+  },
+  {
     name: 'Finance',
     href: '/dashboard/finance',
     icon: CurrencyDollarIcon,
