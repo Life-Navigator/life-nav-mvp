@@ -74,3 +74,51 @@ async def test_list_view_missing_when_empty():
     vm = await _svc({}).list_view(CTX, "vitals", "vitals")
     assert vm.data["vitals"] == []
     assert "vitals" in vm.missing
+
+
+# ---- Phase 3: activity + nutrition recommendation families ----
+ACTIVITY = [{"id": "a1", "logged_at": "2026-06-07", "activity_type": "walk", "steps": 3000}]
+NUTRITION = [{"id": "n1", "logged_at": "2026-06-07", "calories": 1800}]
+
+
+@pytest.mark.asyncio
+async def test_activity_consistency_persists_with_evidence_and_boundary():
+    persisted = await _svc({"activity_logs": ACTIVITY}).persist_recommendations(CTX)
+    act = next((r for r in persisted if r["recommendation_type"] == "activity_consistency"), None)
+    assert act is not None
+    metrics = {e["metric_name"] for e in act["evidence_json"]}
+    assert {"sessions_logged", "target_sessions"} <= metrics
+    assert act["governance_verdict"]["boundary_type"] == "medical"
+
+
+@pytest.mark.asyncio
+async def test_no_activity_no_activity_recommendation():
+    persisted = await _svc({"sleep_logs": SLEEP_LOW}).persist_recommendations(CTX)
+    assert not any(r["recommendation_type"] == "activity_consistency" for r in persisted)
+
+
+@pytest.mark.asyncio
+async def test_nutrition_logging_consistency_persists_with_evidence():
+    persisted = await _svc({"nutrition_logs": NUTRITION}).persist_recommendations(CTX)
+    nut = next((r for r in persisted if r["recommendation_type"] == "nutrition_logging_consistency"), None)
+    assert nut is not None
+    metrics = {e["metric_name"] for e in nut["evidence_json"]}
+    assert {"days_logged", "target_days"} <= metrics
+
+
+@pytest.mark.asyncio
+async def test_no_nutrition_no_nutrition_recommendation():
+    persisted = await _svc({"sleep_logs": SLEEP_LOW}).persist_recommendations(CTX)
+    assert not any(r["recommendation_type"] == "nutrition_logging_consistency" for r in persisted)
+
+
+@pytest.mark.asyncio
+async def test_all_three_families_fire_with_all_data():
+    persisted = await _svc(
+        {"sleep_logs": SLEEP_LOW, "activity_logs": ACTIVITY, "nutrition_logs": NUTRITION}
+    ).persist_recommendations(CTX)
+    types = {r["recommendation_type"] for r in persisted}
+    assert {"improve_sleep", "activity_consistency", "nutrition_logging_consistency"} <= types
+    for r in persisted:  # every row: evidence + medical boundary, never fabricated
+        assert r["evidence_json"]
+        assert r["governance_verdict"]["boundary_type"] == "medical"

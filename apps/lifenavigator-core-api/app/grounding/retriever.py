@@ -18,6 +18,15 @@ from ..models.common import UserContext
 
 log = logging.getLogger("core.retriever")
 
+# Recommendation node label per domain. New domains extend this map — the evidence
+# traversal itself is domain-generic (it matches the HAS_RECOMMENDATION edge).
+RECOMMENDATION_LABELS: dict[str, str] = {
+    "finance": "FinancialRecommendation",
+    "health": "HealthRecommendation",
+    # future: "career": "CareerRecommendation", "family": "FamilyRecommendation",
+    #         "education": "EducationRecommendation",
+}
+
 
 class Retriever:
     def __init__(self, gemini: GeminiClient, qdrant: QdrantClient, neo4j: Neo4jClient) -> None:
@@ -80,25 +89,36 @@ class Retriever:
 
         return evidence
 
-    async def recommendation_evidence(self, ctx: UserContext) -> list[dict[str, Any]]:
-        """Traverse the user's recommendation evidence subgraph and return it as
-        authoritative facts, so the chat can answer "why are you recommending this?"
-        strictly from graph evidence (never invented rationale).
+    async def recommendation_evidence(
+        self, ctx: UserContext, *, domain: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Domain-generic recommendation evidence retrieval.
 
-        The Cypher is tenant-scoped (``tenant_id = $user_id``), so it can only ever
-        return the caller's own recommendations.
+        Traverses the user's recommendation subgraph — any domain via the
+        HAS_RECOMMENDATION edge, or a specific domain's label when ``domain`` is set —
+        and returns Evidence / Assumption / Tradeoff / AdviceBoundary as authoritative
+        facts, so chat answers "why are you recommending this?" strictly from graph
+        evidence (never invented rationale).
+
+        Tenant-scoped (``tenant_id = $user_id``): no cross-tenant leakage. Returns
+        ``[]`` when there is no matching recommendation (the explicit missing-evidence
+        signal — the orchestrator's anti-hallucination gate then asks for data).
         """
         if not self._neo4j.configured:
             return []
+        label = RECOMMENDATION_LABELS.get(domain) if domain else None
+        rec_match = f"(r:{label})" if label else "(r)"
         cypher = (
-            "MATCH (u:UserProfile {tenant_id: $user_id})-[:HAS_RECOMMENDATION]->(r:FinancialRecommendation) "
+            f"MATCH (u:UserProfile {{tenant_id: $user_id}})-[:HAS_RECOMMENDATION]->{rec_match} "
             "OPTIONAL MATCH (r)-[:HAS_EVIDENCE]->(e:Evidence) "
             "OPTIONAL MATCH (r)-[:HAS_ASSUMPTION]->(a:Assumption) "
+            "OPTIONAL MATCH (r)-[:HAS_TRADEOFF]->(t:Tradeoff) "
             "OPTIONAL MATCH (r)-[:REQUIRES_REVIEW]->(b:AdviceBoundary) "
             "RETURN r.title AS title, "
-            "collect(DISTINCT [e.metric_name, e.metric_value, e.source_table, e.confidence]) AS evidence, "
-            "collect(DISTINCT a.assumption_text) AS assumptions, "
-            "collect(DISTINCT b.disclaimer_text) AS disclaimers"
+            "collect(DISTINCT [e.metric_name, e.metric_value, e.source_table, e.confidence, e.explanation]) AS evidence, "
+            "collect(DISTINCT [a.assumption_text, a.confidence]) AS assumptions, "
+            "collect(DISTINCT [t.option_a, t.option_b]) AS tradeoffs, "
+            "collect(DISTINCT [b.boundary_type, b.disclaimer_text]) AS boundaries"
         )
         facts: list[dict[str, Any]] = []
         try:
@@ -107,22 +127,33 @@ class Retriever:
             log.warning("recommendation evidence retrieval degraded: %s", exc)
             return []
         for row in rows:
-            title = row[0] if len(row) > 0 else "Recommendation"
+            title = (row[0] if len(row) > 0 else None) or "Recommendation"
             evidence = row[1] if len(row) > 1 and row[1] else []
             assumptions = row[2] if len(row) > 2 and row[2] else []
-            disclaimers = row[3] if len(row) > 3 and row[3] else []
+            tradeoffs = row[3] if len(row) > 3 and row[3] else []
+            boundaries = row[4] if len(row) > 4 and row[4] else []
             for ev in evidence:
                 if ev and ev[0] is not None:
+                    expl = f" — {ev[4]}" if len(ev) > 4 and ev[4] else ""
                     facts.append(
                         {
                             "fact": f"[{title}] evidence: {ev[0]}",
-                            "value": f"{ev[1]} (source {ev[2]}, confidence {ev[3]})",
+                            "value": f"{ev[1]} (source {ev[2]}, confidence {ev[3]}){expl}",
                         }
                     )
             for a in assumptions:
-                if a:
-                    facts.append({"fact": f"[{title}] assumption", "value": a})
-            for d in disclaimers:
-                if d:
-                    facts.append({"fact": f"[{title}] governance", "value": d})
+                if a and a[0]:
+                    conf = f" (confidence {a[1]})" if len(a) > 1 and a[1] is not None else ""
+                    facts.append({"fact": f"[{title}] assumption", "value": f"{a[0]}{conf}"})
+            for t in tradeoffs:
+                if t and t[0]:
+                    other = f" vs {t[1]}" if len(t) > 1 and t[1] else ""
+                    facts.append({"fact": f"[{title}] tradeoff", "value": f"{t[0]}{other}"})
+            for b in boundaries:
+                bt = b[0] if b else None
+                dt = b[1] if b and len(b) > 1 else None
+                if bt or dt:
+                    facts.append(
+                        {"fact": f"[{title}] governance ({bt or 'boundary'})", "value": dt or "review boundary"}
+                    )
         return facts

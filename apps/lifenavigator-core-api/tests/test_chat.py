@@ -16,7 +16,7 @@ class FakeRetriever:
     async def retrieve_personal(self, query, ctx, *, domain=None, limit=10):
         return []
 
-    async def recommendation_evidence(self, ctx):
+    async def recommendation_evidence(self, ctx, *, domain=None):
         return list(self._rec_evidence)
 
 ACCOUNTS = [

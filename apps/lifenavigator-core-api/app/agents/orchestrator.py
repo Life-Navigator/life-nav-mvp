@@ -17,6 +17,7 @@ import logging
 from ..clients.gemini import GeminiClient
 from ..grounding.context_builder import ContextBuilder
 from ..models.common import ChatTurnResponse, EvidencePacket, GovernanceVerdict, UserContext
+from ..services.medical_safety import MedicalSafetyGate
 from .memory import MemoryAgent
 from .trust_safety import TrustSafetyAgent
 
@@ -33,12 +34,20 @@ _FALLBACK = (
 )
 
 
+_HEALTH_KEYWORDS = (
+    "sleep", "nutrition", "exercise", "workout", "activity", "wellness", "habit",
+    "steps", "vital", "health", "fitness", "diet", "recovery", "hydration",
+)
+
+
 def _classify(query: str) -> tuple[str, list[str]]:
     q = (query or "").lower()
+    if any(k in q for k in _HEALTH_KEYWORDS):
+        return "health_query", ["health"]
     if any(k in q for k in _FINANCE_KEYWORDS):
         return "finance_query", ["finance"]
-    # F2 only wires finance; default to it so we always ground against real data.
-    return "general", ["finance"]
+    # Ambiguous (e.g. "why are you recommending this?") -> ground on any recommendation.
+    return "general", ["finance", "health"]
 
 
 class LifeOrchestratorAgent:
@@ -53,11 +62,26 @@ class LifeOrchestratorAgent:
         self._gemini = gemini
         self._trust_safety = trust_safety
         self._memory = memory
+        self._medical = MedicalSafetyGate()
 
     async def handle(
         self, ctx: UserContext, query: str, conversation_id: str | None = None
     ) -> ChatTurnResponse:
         intent, domains = _classify(query)
+
+        # Medical safety: for health queries, BLOCK diagnosis/dosing/treatment and
+        # ESCALATE emergencies before any model call (HEALTH_GOVERNANCE_STANDARD).
+        if "health" in domains:
+            decision = self._medical.evaluate(query)
+            if not decision.allowed:
+                return ChatTurnResponse(
+                    message=decision.message,
+                    grounded=True,
+                    used_gemini=False,
+                    conversation_id=conversation_id,
+                    governance=GovernanceVerdict(passed=(decision.action != "block")),
+                )
+
         packet = await self._ctx_builder.build_evidence_packet(ctx, query, domains, intent=intent)
 
         # (3) ANTI-HALLUCINATION GATE — no facts → no model call.
