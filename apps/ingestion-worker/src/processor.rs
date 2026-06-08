@@ -33,7 +33,7 @@ use crate::entities::{qdrant_point_uuid, EntityType};
 use crate::errors::Result;
 use crate::gemini_client::GeminiClient;
 use crate::neo4j_client::Neo4jClient;
-use crate::normalizer::normalize;
+use crate::normalizer::{expand_children, normalize};
 use crate::qdrant_client::QdrantClient;
 use crate::queue::{AccessScope, SyncOperation, SyncQueueJob};
 use crate::supabase_client::SupabaseClient;
@@ -137,6 +137,30 @@ impl<'a> Processor<'a> {
             }
         };
 
+        // 4. Fan-out: recommendation evidence/assumption/tradeoff/boundary child
+        //    nodes. Best-effort per child (logged), so a single child failure never
+        //    fails the recommendation job; reprocessing re-MERGEs idempotently.
+        for child in expand_children(job, Utc::now()) {
+            if !child.summary.trim().is_empty() {
+                if let Ok(vector) = self.gemini.embed(&child.summary).await {
+                    let _ = qdrant.upsert(&child, vector).await;
+                }
+            }
+            match neo4j.upsert_node(&child).await {
+                Ok(()) => info!(
+                    entity_type = %child.entity_type,
+                    entity_id = %child.entity_id,
+                    "neo4j child upsert ok"
+                ),
+                Err(e) => warn!(
+                    entity_type = %child.entity_type,
+                    entity_id = %child.entity_id,
+                    error = %e,
+                    "neo4j child upsert failed"
+                ),
+            }
+        }
+
         Ok(ProcessOutcome {
             qdrant_synced: qdrant_ok,
             neo4j_synced: neo4j_ok,
@@ -146,8 +170,11 @@ impl<'a> Processor<'a> {
     async fn process_delete(&self, job: &SyncQueueJob) -> Result<ProcessOutcome> {
         let entity_type = EntityType::from_queue_str(&job.entity_type);
         let (qdrant, neo4j) = self.route(job.access_scope);
-        let point_id =
-            qdrant_point_uuid(&job.user_id.to_string(), entity_type.as_str(), &job.entity_id);
+        let point_id = qdrant_point_uuid(
+            &job.user_id.to_string(),
+            entity_type.as_str(),
+            &job.entity_id,
+        );
         let q = qdrant.delete(&point_id).await.is_ok();
         let n = neo4j
             .delete_node(

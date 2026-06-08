@@ -52,6 +52,112 @@ pub fn normalize(job: &SyncQueueJob, now: DateTime<Utc>) -> Result<CanonicalGrap
     })
 }
 
+/// Fan-out for the recommendation evidence graph. A `financial_recommendation`
+/// row carries its evidence/assumptions/tradeoffs as JSON arrays and its advice
+/// boundary inside `governance_verdict`. Expand those into child graph objects so
+/// the recommendation becomes a traceable subgraph:
+///   (:FinancialRecommendation)-[:HAS_EVIDENCE]->(:Evidence)
+///   (:FinancialRecommendation)-[:HAS_ASSUMPTION]->(:Assumption)
+///   (:FinancialRecommendation)-[:HAS_TRADEOFF]->(:Tradeoff)
+///   (:FinancialRecommendation)-[:REQUIRES_REVIEW]->(:AdviceBoundary)
+///
+/// Child `entity_id`s are deterministic (`{rec_id}::{type}::{idx}`) so reprocessing
+/// MERGEs in place (idempotent). Each child carries the parent's tenant/user and a
+/// `recommendation_id` FK that the ontology registry turns into the typed edge — no
+/// RELATED_TO fallback, no cross-tenant edge (the FK is the same owner's row).
+/// Returns empty for any non-recommendation entity.
+pub fn expand_children(job: &SyncQueueJob, now: DateTime<Utc>) -> Vec<CanonicalGraphObject> {
+    if !matches!(
+        EntityType::from_queue_str(&job.entity_type),
+        EntityType::FinancialRecommendation
+    ) {
+        return Vec::new();
+    }
+    let payload = job.payload.as_object().cloned().unwrap_or_default();
+    let rec_id = job.entity_id.clone();
+    let user_id = job.user_id;
+    let src = job.source_table.clone();
+    let arr = |key: &str| -> Vec<Value> {
+        payload
+            .get(key)
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default()
+    };
+
+    let mut out = Vec::new();
+    for (child_et, key) in [
+        (EntityType::Evidence, "evidence_json"),
+        (EntityType::Assumption, "assumptions_json"),
+        (EntityType::Tradeoff, "tradeoffs_json"),
+    ] {
+        for (i, v) in arr(key).iter().enumerate() {
+            if let Value::Object(m) = v {
+                out.push(build_child(
+                    child_et,
+                    &rec_id,
+                    i,
+                    m.clone(),
+                    user_id,
+                    &src,
+                    now,
+                ));
+            }
+        }
+    }
+    // Advice boundary: derived from governance_verdict when it carries boundary data.
+    if let Some(Value::Object(gov)) = payload.get("governance_verdict") {
+        if gov.contains_key("boundary_type")
+            || gov.contains_key("disclaimer_text")
+            || gov.contains_key("disclaimer")
+        {
+            out.push(build_child(
+                EntityType::AdviceBoundary,
+                &rec_id,
+                0,
+                gov.clone(),
+                user_id,
+                &src,
+                now,
+            ));
+        }
+    }
+    out
+}
+
+fn build_child(
+    child_et: EntityType,
+    rec_id: &str,
+    idx: usize,
+    mut item: Map<String, Value>,
+    user_id: Uuid,
+    source_table: &str,
+    now: DateTime<Utc>,
+) -> CanonicalGraphObject {
+    // Stamp the FK so the ontology registry emits the typed edge into this child.
+    item.insert(
+        "recommendation_id".into(),
+        Value::String(rec_id.to_string()),
+    );
+    let sanitized = sanitize(&item);
+    let entity_id = format!("{rec_id}::{}::{idx}", child_et.as_str());
+    CanonicalGraphObject {
+        tenant_id: user_id,
+        user_id,
+        entity_id,
+        entity_type: child_et.as_str().to_string(),
+        domain: child_et.domain().to_string(),
+        source_table: source_table.to_string(),
+        title: build_title(&child_et, &sanitized),
+        summary: build_summary(&child_et, &sanitized),
+        relationships: relationships_for(&child_et, &user_id.to_string(), &sanitized),
+        sensitivity_level: child_et.sensitivity(),
+        attributes: sanitized,
+        created_at: now,
+        updated_at: now,
+    }
+}
+
 /// Recursive sensitive-field stripper. Returns a fresh Map.
 /// `null` values are dropped to keep the embedding text terse.
 pub fn sanitize(map: &Map<String, Value>) -> Map<String, Value> {
@@ -1338,5 +1444,86 @@ mod tests {
             );
             assert_eq!(canon.domain, "financial", "{et}: wrong domain");
         }
+    }
+
+    // ---- Recommendation fan-out into the evidence graph (Phase 2) ----
+    #[test]
+    fn recommendation_fans_out_into_evidence_graph() {
+        let mut job = job_with(
+            "financial_recommendation",
+            json!({
+                "title": "Build your emergency fund",
+                "recommendation_type": "emergency_fund",
+                "evidence_json": [
+                    {"metric_name": "cash", "metric_value": "500", "source_table": "finance.financial_accounts", "confidence": 1.0, "explanation": "current cash"},
+                    {"metric_name": "monthly_expenses", "metric_value": "2000", "source_table": "finance.transactions", "confidence": 0.7, "explanation": "3mo avg"}
+                ],
+                "assumptions_json": [
+                    {"assumption_text": "expenses stay flat", "confidence": 0.7, "user_confirmed": false, "source": "model"}
+                ],
+                "tradeoffs_json": [
+                    {"option_a": "save more", "option_b": "invest", "benefit": "liquidity", "cost": "lower returns", "affected_domains": ["finance"]}
+                ],
+                "governance_verdict": {"passed": true, "boundary_type": "financial_planning", "disclaimer_text": "Not individualized investment advice", "requires_human_review": false}
+            }),
+        );
+        job.entity_id = "REC1".into();
+        let children = expand_children(&job, Utc::now());
+        assert_eq!(children.len(), 5); // 2 evidence + 1 assumption + 1 tradeoff + 1 boundary
+        let count = |t: &str| children.iter().filter(|c| c.entity_type == t).count();
+        assert_eq!(count("evidence"), 2);
+        assert_eq!(count("assumption"), 1);
+        assert_eq!(count("tradeoff"), 1);
+        assert_eq!(count("advice_boundary"), 1);
+        for c in &children {
+            assert_eq!(c.tenant_id, job.user_id); // tenant-safe
+            assert!(c.entity_id.starts_with("REC1::")); // deterministic -> idempotent
+            assert!(!c.summary.trim().is_empty()); // embeddable
+            assert!(c.relationships.iter().all(|r| r.label != "RELATED_TO")); // no fallback
+            assert!(c
+                .relationships
+                .iter()
+                .any(|r| r.target_entity_type == "financial_recommendation"
+                    && r.target_entity_id == "REC1"));
+        }
+        let ev = children
+            .iter()
+            .find(|c| c.entity_type == "evidence")
+            .unwrap();
+        assert!(ev.relationships.iter().any(|r| r.label == "HAS_EVIDENCE"));
+        let asm = children
+            .iter()
+            .find(|c| c.entity_type == "assumption")
+            .unwrap();
+        assert!(asm
+            .relationships
+            .iter()
+            .any(|r| r.label == "HAS_ASSUMPTION"));
+        let bnd = children
+            .iter()
+            .find(|c| c.entity_type == "advice_boundary")
+            .unwrap();
+        assert!(bnd
+            .relationships
+            .iter()
+            .any(|r| r.label == "REQUIRES_REVIEW"));
+    }
+
+    #[test]
+    fn expand_children_empty_for_non_recommendation_and_deterministic() {
+        assert!(expand_children(
+            &job_with("financial_account", json!({"name": "x"})),
+            Utc::now()
+        )
+        .is_empty());
+        let mut rec = job_with(
+            "financial_recommendation",
+            json!({"title": "t", "evidence_json": [{"metric_name": "m", "metric_value": "1"}]}),
+        );
+        rec.entity_id = "REC1".into();
+        let a = expand_children(&rec, Utc::now());
+        let b = expand_children(&rec, Utc::now());
+        assert_eq!(a[0].entity_id, b[0].entity_id); // reprocessing -> same id -> MERGE
+        assert_eq!(a[0].entity_id, "REC1::evidence::0");
     }
 }
