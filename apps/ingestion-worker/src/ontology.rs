@@ -198,6 +198,23 @@ const COMPENSATION_RECORD: &[IncomingEdge] = &[user("HAS_COMPENSATION")];
 const COMPENSATION_PROJECTION: &[IncomingEdge] = &[user("HAS_COMPENSATION_PROJECTION")];
 const CAREER_RECOMMENDATION: &[IncomingEdge] = &[user("HAS_RECOMMENDATION")];
 
+// ── Education ontology (migration 127) ───────────────────────────────────────
+// User-anchored (required) so no mapped Education entity falls back to RELATED_TO.
+// Program OFFERS edge declared because the X1 FK (programs.school_id) exists + reads
+// naturally as (:School)-[:OFFERS]->(:Program). Cross-domain links (Program QUALIFIES_FOR
+// JobTarget, Program FUNDED_BY FinancialGoal, Program IMPACTS CashFlowSnapshot) are
+// documented extension points in CAREER_EDUCATION_FAMILY_ONTOLOGY — NOT faked here.
+const EDUCATION_PROFILE: &[IncomingEdge] = &[user("HAS_EDUCATION")];
+const EDUCATION_GOAL: &[IncomingEdge] = &[user("HAS_EDUCATION_GOAL")];
+const LEARNING_PATH: &[IncomingEdge] = &[user("HAS_LEARNING_PATH")];
+const SCHOOL: &[IncomingEdge] = &[user("CONSIDERS_SCHOOL")];
+const PROGRAM: &[IncomingEdge] = &[
+    user("EVALUATES_PROGRAM"),
+    fk("OFFERS", "school", "school_id"),
+];
+const PROGRAM_COMPARISON: &[IncomingEdge] = &[user("HAS_PROGRAM_COMPARISON")];
+const EDUCATION_RECOMMENDATION: &[IncomingEdge] = &[user("HAS_RECOMMENDATION")];
+
 /// Registry lookup: the declared incoming edges for an entity type.
 ///
 /// Returns a non-empty slice for entities the ontology registry owns (finance
@@ -262,6 +279,14 @@ pub fn incoming_edges(et: &EntityType) -> &'static [IncomingEdge] {
         EntityType::CompensationRecord => COMPENSATION_RECORD,
         EntityType::CompensationProjection => COMPENSATION_PROJECTION,
         EntityType::CareerRecommendation => CAREER_RECOMMENDATION,
+        // Education (migration 127).
+        EntityType::EducationProfile => EDUCATION_PROFILE,
+        EntityType::EducationGoal => EDUCATION_GOAL,
+        EntityType::LearningPath => LEARNING_PATH,
+        EntityType::School => SCHOOL,
+        EntityType::Program => PROGRAM,
+        EntityType::ProgramComparison => PROGRAM_COMPARISON,
+        EntityType::EducationRecommendation => EDUCATION_RECOMMENDATION,
         _ => &[],
     }
 }
@@ -329,6 +354,13 @@ pub fn domain_of(et: &EntityType) -> Domain {
         | EntityType::CompensationRecord
         | EntityType::CompensationProjection
         | EntityType::CareerRecommendation => Domain::Career,
+        EntityType::EducationProfile
+        | EntityType::EducationGoal
+        | EntityType::LearningPath
+        | EntityType::School
+        | EntityType::Program
+        | EntityType::ProgramComparison
+        | EntityType::EducationRecommendation => Domain::Education,
         _ => Domain::General,
     }
 }
@@ -415,5 +447,38 @@ mod career_tests {
         assert!(incoming_edges(&EntityType::CareerGoal)
             .iter()
             .all(|e| matches!(e.from, EdgeFrom::UserAnchor)));
+    }
+
+    #[test]
+    fn education_entities_registry_mapped_and_user_anchored() {
+        let cases = [
+            (EntityType::EducationProfile, "HAS_EDUCATION"),
+            (EntityType::EducationGoal, "HAS_EDUCATION_GOAL"),
+            (EntityType::LearningPath, "HAS_LEARNING_PATH"),
+            (EntityType::School, "CONSIDERS_SCHOOL"),
+            (EntityType::Program, "EVALUATES_PROGRAM"),
+            (EntityType::ProgramComparison, "HAS_PROGRAM_COMPARISON"),
+            (EntityType::EducationRecommendation, "HAS_RECOMMENDATION"),
+        ];
+        for (et, rel) in cases {
+            assert!(
+                is_registry_mapped(&et),
+                "{et:?} not mapped (would RELATED_TO)"
+            );
+            assert_eq!(domain_of(&et), Domain::Education, "{et:?} domain_of");
+            let edges = incoming_edges(&et);
+            let anchor = edges
+                .iter()
+                .find(|e| matches!(e.from, EdgeFrom::UserAnchor))
+                .expect("anchor");
+            assert_eq!(anchor.rel_type, rel, "{et:?}");
+            assert!(edges.iter().all(|e| e.rel_type != "RELATED_TO"));
+        }
+        // Program OFFERS school via the X1 school_id FK (optional inter-entity).
+        let p: Vec<_> = incoming_edges(&EntityType::Program)
+            .iter()
+            .filter(|e| matches!(e.from, EdgeFrom::PayloadFk { field, .. } if field == "school_id"))
+            .collect();
+        assert!(p.iter().any(|e| e.rel_type == "OFFERS" && !e.required));
     }
 }

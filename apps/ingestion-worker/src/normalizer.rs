@@ -73,11 +73,12 @@ pub fn expand_children(job: &SyncQueueJob, now: DateTime<Utc>) -> Vec<CanonicalG
         EntityType::FinancialRecommendation
             | EntityType::HealthRecommendation
             | EntityType::CareerRecommendation
+            | EntityType::EducationRecommendation
     ) {
         return Vec::new();
     }
-    // Children link to THIS recommendation's type (financial_/health_/career_
-    // recommendation), so the fan-out is domain-generic.
+    // Children link to THIS recommendation's type (financial_/health_/career_/
+    // education_recommendation), so the fan-out is domain-generic.
     let parent_label = parent.as_str();
     let payload = job.payload.as_object().cloned().unwrap_or_default();
     let rec_id = job.entity_id.clone();
@@ -349,6 +350,21 @@ fn build_title(et: &EntityType, attrs: &Map<String, Value>) -> String {
         EntityType::CompensationProjection => by_key(&["scenario"])
             .map(|s| format!("Projected compensation ({s})"))
             .unwrap_or_else(|| "Compensation projection".into()),
+        // Education E1
+        EntityType::EducationProfile => by_key(&["highest_level"])
+            .map(|l| format!("Education profile ({l})"))
+            .unwrap_or_else(|| "Education profile".into()),
+        EntityType::School => by_key(&["name"]).unwrap_or_else(|| "School".into()),
+        EntityType::Program => format!(
+            "{}{}",
+            by_key(&["name"]).unwrap_or_else(|| "Program".into()),
+            by_key(&["level"])
+                .map(|l| format!(" ({l})"))
+                .unwrap_or_default()
+        ),
+        EntityType::ProgramComparison => {
+            by_key(&["title"]).unwrap_or_else(|| "Program comparison".into())
+        }
         _ => by_key(&["title", "name", "label", "action"]).unwrap_or_else(|| et.as_str().into()),
     }
 }
@@ -1172,6 +1188,34 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "confidence",
         ]),
         EntityType::CareerRecommendation => parts_for(&[
+            "title",
+            "description",
+            "recommendation_type",
+            "priority",
+            "confidence",
+            "status",
+        ]),
+        // Education E1 — curated field lists.
+        EntityType::EducationProfile => parts_for(&["highest_level", "learning_preferences"]),
+        EntityType::EducationGoal => {
+            parts_for(&["title", "goal_type", "target_role", "target_date", "status"])
+        }
+        EntityType::LearningPath => parts_for(&["title", "description", "status"]),
+        EntityType::School => {
+            parts_for(&["name", "school_type", "location", "accreditation_status"])
+        }
+        EntityType::Program => parts_for(&[
+            "name",
+            "level",
+            "major",
+            "modality",
+            "duration_months",
+            "tuition",
+            "graduation_rate",
+            "median_salary",
+        ]),
+        EntityType::ProgramComparison => parts_for(&["title", "status"]),
+        EntityType::EducationRecommendation => parts_for(&[
             "title",
             "description",
             "recommendation_type",
@@ -2061,5 +2105,103 @@ mod tests {
             .unwrap();
         // the edge always anchors to the row's own user_id -> never cross-tenant
         assert_eq!(anchor.target_entity_id, owner);
+    }
+
+    // ---- Education E1 ----
+    #[test]
+    fn education_entities_normalize_and_user_anchor_edges() {
+        let cases = [
+            (
+                "education_profile",
+                json!({"highest_level": "bachelors", "learning_preferences": "online"}),
+                "HAS_EDUCATION",
+            ),
+            (
+                "education_goal",
+                json!({"title": "Earn an MS in CS", "goal_type": "degree", "target_role": "Platform Engineer"}),
+                "HAS_EDUCATION_GOAL",
+            ),
+            (
+                "learning_path",
+                json!({"title": "K8s mastery", "status": "planned"}),
+                "HAS_LEARNING_PATH",
+            ),
+            (
+                "school",
+                json!({"name": "State University", "school_type": "public", "location": "US"}),
+                "CONSIDERS_SCHOOL",
+            ),
+            (
+                "program",
+                json!({"name": "MS Computer Science", "level": "masters", "tuition": 40000}),
+                "EVALUATES_PROGRAM",
+            ),
+            (
+                "program_comparison",
+                json!({"title": "MS vs bootcamp", "status": "draft"}),
+                "HAS_PROGRAM_COMPARISON",
+            ),
+            (
+                "education_recommendation",
+                json!({"title": "Pick the lower-debt program", "recommendation_type": "lower_cost_alternative", "priority": "high"}),
+                "HAS_RECOMMENDATION",
+            ),
+        ];
+        for (et, payload, rel) in cases {
+            let c = normalize(&job_with(et, payload), Utc::now()).unwrap();
+            assert_eq!(c.entity_type, et, "{et}: entity_type");
+            assert_ne!(c.entity_type, "unknown", "{et}: unknown");
+            assert!(!c.title.trim().is_empty(), "{et}: empty title");
+            assert!(!c.summary.trim().is_empty(), "{et}: empty summary");
+            assert_eq!(c.domain, "education", "{et}: domain");
+            assert!(
+                has_edge(&c.relationships, rel, "user_profile"),
+                "{et}: missing {rel}"
+            );
+            assert!(
+                c.relationships.iter().all(|r| r.label != "RELATED_TO"),
+                "{et}: RELATED_TO"
+            );
+        }
+    }
+
+    #[test]
+    fn program_offers_edge_only_with_school_fk() {
+        let sid = Uuid::new_v4().to_string();
+        let with_fk = rels("program", json!({"name": "MS CS", "school_id": sid}));
+        assert!(with_fk
+            .iter()
+            .any(|r| r.label == "OFFERS" && r.target_entity_type == "school"));
+        let no_fk = rels("program", json!({"name": "MS CS"}));
+        assert!(!no_fk.iter().any(|r| r.label == "OFFERS")); // no fake edge
+        assert!(has_edge(&no_fk, "EVALUATES_PROGRAM", "user_profile"));
+    }
+
+    #[test]
+    fn education_recommendation_fans_out() {
+        let mut job = job_with(
+            "education_recommendation",
+            json!({
+                "title": "Lower-cost alternative",
+                "recommendation_type": "lower_cost_alternative",
+                "evidence_json": [{"metric_name": "net_cost_delta", "metric_value": "22000", "source_table": "education.programs", "confidence": 0.7, "explanation": "cheaper program, comparable ROI"}],
+                "assumptions_json": [{"assumption_text": "Scorecard earnings approximate outcomes", "confidence": 0.6}],
+                "governance_verdict": {"passed": true, "boundary_type": "education_guidance", "disclaimer_text": "Decision support, not admissions or financial advice"}
+            }),
+        );
+        job.entity_id = "EREC1".into();
+        let children = expand_children(&job, Utc::now());
+        assert_eq!(children.len(), 3);
+        for c in &children {
+            assert!(c
+                .relationships
+                .iter()
+                .any(|r| r.target_entity_type == "education_recommendation"
+                    && r.target_entity_id == "EREC1"));
+            assert!(c.relationships.iter().all(|r| r.label != "RELATED_TO"));
+        }
+        assert!(children.iter().any(|c| c.entity_type == "evidence"
+            && c.relationships.iter().any(|r| r.label == "HAS_EVIDENCE")));
+        assert!(children.iter().any(|c| c.entity_type == "advice_boundary"));
     }
 }

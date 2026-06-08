@@ -217,6 +217,15 @@ pub enum EntityType {
     CompensationRecord,
     CompensationProjection,
     CareerRecommendation,
+    // ---- Education E1 (migration 127) ----
+    // Reuses legacy Certification (shared with Career) above.
+    EducationProfile,
+    EducationGoal,
+    LearningPath,
+    School,
+    Program,
+    ProgramComparison,
+    EducationRecommendation,
     /// Catch-all so a new sync-queue entity_type doesn't crash the worker;
     /// the normalizer skips unknown types.
     #[serde(other)]
@@ -389,6 +398,14 @@ impl EntityType {
             EntityType::CompensationRecord => "compensation_record",
             EntityType::CompensationProjection => "compensation_projection",
             EntityType::CareerRecommendation => "career_recommendation",
+            // Education E1
+            EntityType::EducationProfile => "education_profile",
+            EntityType::EducationGoal => "education_goal",
+            EntityType::LearningPath => "learning_path",
+            EntityType::School => "school",
+            EntityType::Program => "program",
+            EntityType::ProgramComparison => "program_comparison",
+            EntityType::EducationRecommendation => "education_recommendation",
             EntityType::Unknown => "unknown",
         }
     }
@@ -477,7 +494,14 @@ impl EntityType {
             | EntityType::EducationRecord
             | EntityType::Course
             | EntityType::StudyLog
-            | EntityType::EducationIntake => "education",
+            | EntityType::EducationIntake
+            | EntityType::EducationProfile
+            | EntityType::EducationGoal
+            | EntityType::LearningPath
+            | EntityType::School
+            | EntityType::Program
+            | EntityType::ProgramComparison
+            | EntityType::EducationRecommendation => "education",
 
             EntityType::FamilyMember | EntityType::LifestyleGoal => "lifestyle",
 
@@ -646,7 +670,15 @@ impl EntityType {
             | EntityType::Degree
             | EntityType::PortfolioItem
             | EntityType::JobTarget
-            | EntityType::CareerRecommendation => SensitivityLevel::Medium,
+            | EntityType::CareerRecommendation
+            // Education: profiles / goals / programs / comparisons / recommendations → Medium.
+            | EntityType::EducationProfile
+            | EntityType::EducationGoal
+            | EntityType::LearningPath
+            | EntityType::School
+            | EntityType::Program
+            | EntityType::ProgramComparison
+            | EntityType::EducationRecommendation => SensitivityLevel::Medium,
 
             // Labels / meta (no raw figures) → Low: BudgetCategory, ExpenseCategory,
             // Assumption, Tradeoff, AdviceBoundary fall through to the default.
@@ -823,6 +855,30 @@ mod entity_type_tests {
             assert!(
                 matches!(et.sensitivity(), SensitivityLevel::Medium),
                 "{et:?} expected Medium"
+            );
+        }
+    }
+
+    // ---- Education E1 ----
+    #[test]
+    fn education_entities_round_trip_domain_sensitivity() {
+        use super::SensitivityLevel;
+        for s in [
+            "education_profile",
+            "education_goal",
+            "learning_path",
+            "school",
+            "program",
+            "program_comparison",
+            "education_recommendation",
+        ] {
+            let got = EntityType::from_queue_str(s);
+            assert!(!matches!(got, EntityType::Unknown), "{s} -> Unknown");
+            assert_eq!(got.as_str(), s, "round-trip {s}");
+            assert_eq!(got.domain(), "education", "{s} domain");
+            assert!(
+                matches!(got.sensitivity(), SensitivityLevel::Medium),
+                "{s} sensitivity"
             );
         }
     }
