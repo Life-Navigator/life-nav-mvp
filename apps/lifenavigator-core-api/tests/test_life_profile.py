@@ -51,17 +51,27 @@ def test_empty_finance_yields_missing_prompts_not_fake_zero(client):
     assert body["confidence"]["basis"] == "missing"
 
 
-def test_finance_health_career_live_after_unlock(make_client):
+def test_finance_health_career_family_live_after_unlock(make_client):
     client = make_client({"financial_accounts": [ACCOUNT]})
     body = client.get("/v1/life-profile", headers=_auth()).json()
     live = set(body["domains"].keys())
-    assert live == {"finance", "health", "career"}  # all three live after Career-unlock
-    for d in ("health", "career"):
+    assert live == {"finance", "health", "career", "family"}  # four live after Family-unlock
+    for d in ("health", "career", "family"):
         assert d not in body["missing_domains"]  # unlocked
-    for d in ("family", "education"):
+    for d in ("education",):
         assert d in body["missing_domains"]   # still known-but-metadata-only
         assert d not in body["domains"]        # never exposed as live
         assert d not in body["summaries"]
+
+
+def test_family_live_but_no_data_shows_prompts_not_fake(make_client):
+    client = make_client({"financial_accounts": [ACCOUNT]})  # no family tables seeded
+    body = client.get("/v1/life-profile", headers=_auth()).json()
+    fcard = body["domains"]["family"]
+    assert fcard["available"] is False  # live, but no data
+    assert any(p["domain"] == "family" for p in body["missing_data_prompts"])
+    btypes = {b["boundary_type"] for b in body["summaries"]["family"]["data"]["safety_boundaries"]}
+    assert {"family_planning", "legal"} <= btypes
 
 
 def test_career_live_but_no_data_shows_prompts_not_fake(make_client):

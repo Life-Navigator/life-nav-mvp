@@ -93,6 +93,21 @@ _PROMPT_COPY: dict[tuple[str, str], tuple[str, str, str]] = {
         "We'll cite OEWS compensation bands for your role to estimate your market value.",
         "none",
     ),
+    ("family", "dependents"): (
+        "Add your household",
+        "Add dependents, a spouse/partner, and coverage to see protection gaps and readiness.",
+        "add_data",
+    ),
+    ("family", "insurance_profiles"): (
+        "Add your coverage",
+        "Add your life/disability coverage to compare against an income-replacement need.",
+        "add_data",
+    ),
+    ("family", "estate_plans"): (
+        "Track estate readiness",
+        "Note your will / POA / beneficiaries to see what's missing. Not legal advice — an attorney completes these.",
+        "add_data",
+    ),
 }
 
 
@@ -176,6 +191,15 @@ class LifeProfileService:
             if cur and isinstance(cur, dict) and cur.get("title"):
                 return str(cur["title"])
             return "Build your career profile to begin"
+        if domain == "family":
+            prot: Any = vm.data.get("protection") or {}
+            gap = prot.get("coverage_gap")
+            if gap is not None and gap > 0:
+                return f"Protection gap ~${gap:,.0f}"
+            readiness = vm.data.get("readiness") or {}
+            if readiness.get("dependents"):
+                return f"{readiness['dependents']} dependent(s) tracked"
+            return "Build your family profile to begin"
         return domain.capitalize()
 
     @staticmethod
