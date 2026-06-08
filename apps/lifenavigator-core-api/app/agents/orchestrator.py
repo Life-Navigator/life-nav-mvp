@@ -40,14 +40,21 @@ _HEALTH_KEYWORDS = (
 )
 
 _CAREER_KEYWORDS = (
-    "career", "job", "role", "promotion", "promoted", "skill", "certification",
-    "credential", "market value", "what am i worth", "raise", "salary", "compensation",
-    "employer", "industry", "resume", "interview", "hire", "hiring",
+    "career", "job", "role", "promotion", "promoted", "market value", "what am i worth",
+    "raise", "salary", "compensation", "employer", "resume", "interview", "hire", "hiring",
+)
+
+_EDUCATION_KEYWORDS = (
+    "school", "college", "degree", "program", "major", "bootcamp", "mba", "law school",
+    "grad school", "graduate program", "tuition", "student debt", "education", "study",
+    "university", "phd", "masters", "bachelor", "course", "scholarship",
 )
 
 
 def _classify(query: str) -> tuple[str, list[str]]:
     q = (query or "").lower()
+    if any(k in q for k in _EDUCATION_KEYWORDS):
+        return "education_query", ["education"]
     if any(k in q for k in _CAREER_KEYWORDS):
         return "career_query", ["career"]
     if any(k in q for k in _HEALTH_KEYWORDS):
@@ -55,7 +62,7 @@ def _classify(query: str) -> tuple[str, list[str]]:
     if any(k in q for k in _FINANCE_KEYWORDS):
         return "finance_query", ["finance"]
     # Ambiguous (e.g. "why are you recommending this?") -> ground on any recommendation.
-    return "general", ["finance", "health", "career"]
+    return "general", ["finance", "health", "career", "education"]
 
 
 class LifeOrchestratorAgent:

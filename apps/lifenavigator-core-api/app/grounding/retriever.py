@@ -24,7 +24,8 @@ RECOMMENDATION_LABELS: dict[str, str] = {
     "finance": "FinancialRecommendation",
     "health": "HealthRecommendation",
     "career": "CareerRecommendation",
-    # future: "family": "FamilyRecommendation", "education": "EducationRecommendation",
+    "education": "EducationRecommendation",
+    # future: "family": "FamilyRecommendation",
 }
 
 

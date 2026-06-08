@@ -20,6 +20,7 @@ from .clients.supabase import SupabaseClient
 from .config import Settings, get_settings
 from .domains.base import DomainService
 from .domains.career import CareerService
+from .domains.education import EducationService
 from .domains.finance import FinanceService
 from .domains.health import HealthService
 from .domains.registry import DomainRegistry
@@ -84,6 +85,16 @@ def get_career_service(
     comp = CompensationIntelligenceEngine(supabase)
     market = MarketPositionAnalyzer(supabase)
     return CareerService(supabase=supabase, comp=comp, market=market)
+
+
+def get_education_service(
+    supabase: SupabaseClient = Depends(get_supabase),
+) -> EducationService:
+    # E2: EducationService backs the /v1/education router but is NOT registered in
+    # get_domain_services, so Education stays `unavailable()` (appears in life-profile as a
+    # missing domain, not live) until its gates pass + approval. Its ROI engine cites
+    # Career compensation (OEWS) + Scorecard program earnings — no uncited ROI.
+    return EducationService(supabase=supabase, comp=CompensationIntelligenceEngine(supabase))
 
 
 def get_domain_services(
