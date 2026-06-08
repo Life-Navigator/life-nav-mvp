@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -30,6 +31,9 @@ REPORTING = "reporting"
 DECISION = "decision"
 _NS = uuid.UUID("6f3b1e22-0000-4000-8000-000000000007")
 _VOLATILE = {"generated_at", "observed_at", "as_of", "created_at", "updated_at", "revisit_date"}
+# Any ISO-8601 datetime *value* is neutralized for the hash too, so a timestamp leaking under
+# an unexpected key name can't break reproducibility (same inputs -> same hash).
+_TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
 
 REPORT_TYPES = ("full", "financial", "education", "decision")
 
@@ -47,6 +51,8 @@ def _normalize(obj: Any) -> Any:
         return {k: _normalize(v) for k, v in sorted(obj.items()) if k not in _VOLATILE}
     if isinstance(obj, list):
         return [_normalize(v) for v in obj]
+    if isinstance(obj, str) and _TS_RE.match(obj):
+        return "<ts>"  # neutralize any leaked ISO timestamp value
     return obj
 
 
