@@ -426,6 +426,12 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Comp & Benefits',
+    href: '/dashboard/benefits',
+    icon: CurrencyDollarIcon,
+    current: false,
+  },
+  {
     name: 'Finance',
     href: '/dashboard/finance',
     icon: CurrencyDollarIcon,
