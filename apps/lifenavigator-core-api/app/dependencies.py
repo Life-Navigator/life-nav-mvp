@@ -29,6 +29,7 @@ from .grounding.context_builder import ContextBuilder
 from .grounding.retriever import Retriever
 from .services.compensation import CompensationIntelligenceEngine
 from .services.decision_engine import DecisionEngine
+from .services.report_engine import UniversalReportEngine
 from .services.cost_meter import CostMeter
 from .services.life_profile import LifeProfileService
 from .services.market_intelligence import MarketPositionAnalyzer
@@ -129,6 +130,14 @@ def get_domain_services(
     life-profile, and recommendations. Finance/Health/Career/Family are live; the
     life-profile aggregation degrades gracefully if any single domain summary fails."""
     return {finance.domain: finance, health.domain: health, career.domain: career, family.domain: family}
+
+
+def get_report_engine(
+    domains: dict[str, DomainService] = Depends(get_domain_services),
+    education: EducationService = Depends(get_education_service),
+    supabase: SupabaseClient = Depends(get_supabase),
+) -> UniversalReportEngine:
+    return UniversalReportEngine(domains=domains, education=education, supabase=supabase)
 
 
 def get_retriever(
