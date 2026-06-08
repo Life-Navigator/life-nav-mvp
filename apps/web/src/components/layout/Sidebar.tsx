@@ -390,6 +390,12 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Life Readiness',
+    href: '/dashboard/readiness',
+    icon: TargetIcon,
+    current: false,
+  },
+  {
     name: 'Chat',
     href: '/dashboard/chat',
     icon: ChatIcon,
