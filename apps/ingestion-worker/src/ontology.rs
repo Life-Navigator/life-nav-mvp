@@ -141,6 +141,28 @@ const ADVICE_BOUNDARY: &[IncomingEdge] = &[fk(
     "recommendation_id",
 )];
 
+// ── Health & Wellness (H1; migration 119) — user-anchor edges ────────────────
+// Benefit inter-entity edges (HealthInsurancePlan COVERED_BY EmployerBenefit;
+// MedicalExpense ELIGIBLE_FOR_HSA_FSA HealthSpendingAccount; BenefitDeadline
+// ADDRESSES HealthSpendingAccount) have the processed node as the edge SOURCE, so
+// they need outgoing-edge support in merge_cypher_for — EXTENSION POINTS, not faked.
+const HEALTH_PROFILE: &[IncomingEdge] = &[user("HAS_WELLNESS")];
+const HEALTH_GOAL: &[IncomingEdge] = &[user("HAS_HEALTH_GOAL")];
+const WELLNESS_HABIT: &[IncomingEdge] = &[user("PURSUING")];
+const ACTIVITY_LOG: &[IncomingEdge] = &[user("LOGGED")];
+const SLEEP_LOG: &[IncomingEdge] = &[user("LOGGED")];
+const NUTRITION_LOG: &[IncomingEdge] = &[user("LOGGED")];
+const SUPPLEMENT_LOG: &[IncomingEdge] = &[user("LOGGED")];
+const WORKOUT_LOG: &[IncomingEdge] = &[user("LOGGED")];
+const VITAL: &[IncomingEdge] = &[user("TRACKS_METRIC")];
+const LAB_MARKER: &[IncomingEdge] = &[user("TRACKS_METRIC")];
+const BODY_METRIC: &[IncomingEdge] = &[user("TRACKS_METRIC")];
+const HEALTH_INSURANCE_PLAN: &[IncomingEdge] = &[user("HAS_INSURANCE_PLAN")];
+const HEALTH_SPENDING_ACCOUNT: &[IncomingEdge] = &[user("HAS_SPENDING_ACCOUNT")];
+const MEDICAL_EXPENSE: &[IncomingEdge] = &[user("LOGGED")];
+const BENEFIT_DEADLINE: &[IncomingEdge] = &[user("HAS_BENEFIT_DEADLINE")];
+const HEALTH_RECOMMENDATION: &[IncomingEdge] = &[user("HAS_RECOMMENDATION")];
+
 /// Registry lookup: the declared incoming edges for an entity type.
 ///
 /// Returns a non-empty slice for entities the ontology registry owns (finance
@@ -170,6 +192,23 @@ pub fn incoming_edges(et: &EntityType) -> &'static [IncomingEdge] {
         EntityType::Assumption => ASSUMPTION,
         EntityType::Tradeoff => TRADEOFF,
         EntityType::AdviceBoundary => ADVICE_BOUNDARY,
+        // Health & Wellness (migration 119).
+        EntityType::HealthProfile => HEALTH_PROFILE,
+        EntityType::HealthGoal => HEALTH_GOAL,
+        EntityType::WellnessHabit => WELLNESS_HABIT,
+        EntityType::ActivityLog => ACTIVITY_LOG,
+        EntityType::SleepLog => SLEEP_LOG,
+        EntityType::NutritionLog => NUTRITION_LOG,
+        EntityType::SupplementLog => SUPPLEMENT_LOG,
+        EntityType::WorkoutLog => WORKOUT_LOG,
+        EntityType::Vital => VITAL,
+        EntityType::LabMarker => LAB_MARKER,
+        EntityType::BodyMetric => BODY_METRIC,
+        EntityType::HealthInsurancePlan => HEALTH_INSURANCE_PLAN,
+        EntityType::HealthSpendingAccount => HEALTH_SPENDING_ACCOUNT,
+        EntityType::MedicalExpense => MEDICAL_EXPENSE,
+        EntityType::BenefitDeadline => BENEFIT_DEADLINE,
+        EntityType::HealthRecommendation => HEALTH_RECOMMENDATION,
         _ => &[],
     }
 }
@@ -204,6 +243,22 @@ pub fn domain_of(et: &EntityType) -> Domain {
         | EntityType::Assumption
         | EntityType::Tradeoff
         | EntityType::AdviceBoundary => Domain::Finance,
+        EntityType::HealthProfile
+        | EntityType::HealthGoal
+        | EntityType::WellnessHabit
+        | EntityType::ActivityLog
+        | EntityType::SleepLog
+        | EntityType::NutritionLog
+        | EntityType::SupplementLog
+        | EntityType::WorkoutLog
+        | EntityType::Vital
+        | EntityType::LabMarker
+        | EntityType::BodyMetric
+        | EntityType::HealthInsurancePlan
+        | EntityType::HealthSpendingAccount
+        | EntityType::MedicalExpense
+        | EntityType::BenefitDeadline
+        | EntityType::HealthRecommendation => Domain::Health,
         _ => Domain::General,
     }
 }

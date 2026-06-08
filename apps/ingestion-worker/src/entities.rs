@@ -190,6 +190,18 @@ pub enum EntityType {
     Assumption,
     Tradeoff,
     AdviceBoundary,
+    // ---- Health & Wellness (H1; migration 119) — enum-before-trigger ----
+    HealthGoal,
+    WellnessHabit,
+    ActivityLog,
+    SleepLog,
+    Vital,
+    LabMarker,
+    BodyMetric,
+    HealthSpendingAccount,
+    MedicalExpense,
+    BenefitDeadline,
+    HealthRecommendation,
     /// Catch-all so a new sync-queue entity_type doesn't crash the worker;
     /// the normalizer skips unknown types.
     #[serde(other)]
@@ -234,6 +246,17 @@ impl EntityType {
             EntityType::Assumption => "assumption",
             EntityType::Tradeoff => "tradeoff",
             EntityType::AdviceBoundary => "advice_boundary",
+            EntityType::HealthGoal => "health_goal",
+            EntityType::WellnessHabit => "wellness_habit",
+            EntityType::ActivityLog => "activity_log",
+            EntityType::SleepLog => "sleep_log",
+            EntityType::Vital => "vital",
+            EntityType::LabMarker => "lab_marker",
+            EntityType::BodyMetric => "body_metric",
+            EntityType::HealthSpendingAccount => "health_spending_account",
+            EntityType::MedicalExpense => "medical_expense",
+            EntityType::BenefitDeadline => "benefit_deadline",
+            EntityType::HealthRecommendation => "health_recommendation",
             EntityType::FinancialAccount => "financial_account",
             EntityType::FinancialGoal => "financial_goal",
             EntityType::TransactionSummary => "transaction_summary",
@@ -386,7 +409,18 @@ impl EntityType {
             | EntityType::LabRecord
             | EntityType::WearableMetric
             | EntityType::Injury
-            | EntityType::HealthAlertEvent => "health",
+            | EntityType::HealthAlertEvent
+            | EntityType::HealthGoal
+            | EntityType::WellnessHabit
+            | EntityType::ActivityLog
+            | EntityType::SleepLog
+            | EntityType::Vital
+            | EntityType::LabMarker
+            | EntityType::BodyMetric
+            | EntityType::HealthSpendingAccount
+            | EntityType::MedicalExpense
+            | EntityType::BenefitDeadline
+            | EntityType::HealthRecommendation => "health",
 
             EntityType::HealthInsurancePlan
             | EntityType::InsuranceDocumentFact
@@ -512,7 +546,14 @@ impl EntityType {
             | EntityType::ArcanaInsuranceDocument
             | EntityType::LeadPackageConsent
             | EntityType::ConciergePreference
-            | EntityType::ArcanaMembership => SensitivityLevel::High,
+            | EntityType::ArcanaMembership
+            // Health: medical / raw biometrics → High.
+            | EntityType::Vital
+            | EntityType::LabMarker
+            | EntityType::SleepLog
+            | EntityType::ActivityLog
+            | EntityType::BodyMetric
+            | EntityType::MedicalExpense => SensitivityLevel::High,
 
             EntityType::FinancialAccount
             | EntityType::Debt
@@ -537,7 +578,13 @@ impl EntityType {
             | EntityType::NetWorthSnapshot
             | EntityType::IncomeSource
             | EntityType::FinancialEvent
-            | EntityType::Evidence => SensitivityLevel::Medium,
+            | EntityType::Evidence
+            // Health: goals / habits / benefits / recommendations → Medium.
+            | EntityType::HealthGoal
+            | EntityType::WellnessHabit
+            | EntityType::HealthSpendingAccount
+            | EntityType::BenefitDeadline
+            | EntityType::HealthRecommendation => SensitivityLevel::Medium,
 
             // Labels / meta (no raw figures) → Low: BudgetCategory, ExpenseCategory,
             // Assumption, Tradeoff, AdviceBoundary fall through to the default.

@@ -67,12 +67,16 @@ pub fn normalize(job: &SyncQueueJob, now: DateTime<Utc>) -> Result<CanonicalGrap
 /// RELATED_TO fallback, no cross-tenant edge (the FK is the same owner's row).
 /// Returns empty for any non-recommendation entity.
 pub fn expand_children(job: &SyncQueueJob, now: DateTime<Utc>) -> Vec<CanonicalGraphObject> {
+    let parent = EntityType::from_queue_str(&job.entity_type);
     if !matches!(
-        EntityType::from_queue_str(&job.entity_type),
-        EntityType::FinancialRecommendation
+        parent,
+        EntityType::FinancialRecommendation | EntityType::HealthRecommendation
     ) {
         return Vec::new();
     }
+    // Children link to THIS recommendation's type (financial_recommendation OR
+    // health_recommendation), so the fan-out is domain-generic.
+    let parent_label = parent.as_str();
     let payload = job.payload.as_object().cloned().unwrap_or_default();
     let rec_id = job.entity_id.clone();
     let user_id = job.user_id;
@@ -95,6 +99,7 @@ pub fn expand_children(job: &SyncQueueJob, now: DateTime<Utc>) -> Vec<CanonicalG
             if let Value::Object(m) = v {
                 out.push(build_child(
                     child_et,
+                    parent_label,
                     &rec_id,
                     i,
                     m.clone(),
@@ -113,6 +118,7 @@ pub fn expand_children(job: &SyncQueueJob, now: DateTime<Utc>) -> Vec<CanonicalG
         {
             out.push(build_child(
                 EntityType::AdviceBoundary,
+                parent_label,
                 &rec_id,
                 0,
                 gov.clone(),
@@ -125,8 +131,10 @@ pub fn expand_children(job: &SyncQueueJob, now: DateTime<Utc>) -> Vec<CanonicalG
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_child(
     child_et: EntityType,
+    parent_label: &str,
     rec_id: &str,
     idx: usize,
     mut item: Map<String, Value>,
@@ -134,7 +142,7 @@ fn build_child(
     source_table: &str,
     now: DateTime<Utc>,
 ) -> CanonicalGraphObject {
-    // Stamp the FK so the ontology registry emits the typed edge into this child.
+    // Keep the FK on the node for provenance/queryability.
     item.insert(
         "recommendation_id".into(),
         Value::String(rec_id.to_string()),
@@ -150,6 +158,20 @@ fn build_child(
         .unwrap_or_else(|| source_table.to_string());
     let sanitized = sanitize(&item);
     let entity_id = format!("{rec_id}::{}::{idx}", child_et.as_str());
+    // Typed edge into the child, anchored to THIS recommendation's type
+    // (financial_recommendation OR health_recommendation) — domain-generic, no fallback.
+    let rel_label = match child_et {
+        EntityType::Evidence => "HAS_EVIDENCE",
+        EntityType::Assumption => "HAS_ASSUMPTION",
+        EntityType::Tradeoff => "HAS_TRADEOFF",
+        EntityType::AdviceBoundary => "REQUIRES_REVIEW",
+        _ => "RELATED_TO",
+    };
+    let relationships = vec![Relationship {
+        label: rel_label.into(),
+        target_entity_type: parent_label.to_string(),
+        target_entity_id: rec_id.to_string(),
+    }];
     CanonicalGraphObject {
         tenant_id: user_id,
         user_id,
@@ -159,7 +181,7 @@ fn build_child(
         source_table: node_source,
         title: build_title(&child_et, &sanitized),
         summary: build_summary(&child_et, &sanitized),
-        relationships: relationships_for(&child_et, &user_id.to_string(), &sanitized),
+        relationships,
         sensitivity_level: child_et.sensitivity(),
         attributes: sanitized,
         created_at: now,
@@ -265,6 +287,36 @@ fn build_title(et: &EntityType, attrs: &Map<String, Value>) -> String {
         EntityType::AdviceBoundary => by_key(&["boundary_type"])
             .map(|b| format!("{b} review boundary"))
             .unwrap_or_else(|| "Advice boundary".into()),
+        // Health & Wellness (migration 119).
+        EntityType::HealthGoal => {
+            by_key(&["title", "target_metric"]).unwrap_or_else(|| "Health goal".into())
+        }
+        EntityType::WellnessHabit => by_key(&["name"]).unwrap_or_else(|| "Wellness habit".into()),
+        EntityType::ActivityLog => by_key(&["activity_type"])
+            .map(|a| format!("{a} activity"))
+            .unwrap_or_else(|| "Activity".into()),
+        EntityType::SleepLog => by_key(&["night_of"])
+            .map(|d| format!("Sleep {d}"))
+            .unwrap_or_else(|| "Sleep log".into()),
+        EntityType::Vital => by_key(&["kind"])
+            .map(|k| format!("{k} reading"))
+            .unwrap_or_else(|| "Vital".into()),
+        EntityType::LabMarker => by_key(&["marker"]).unwrap_or_else(|| "Lab marker".into()),
+        EntityType::BodyMetric => by_key(&["observed_at"])
+            .map(|d| format!("Body metrics {d}"))
+            .unwrap_or_else(|| "Body metrics".into()),
+        EntityType::HealthSpendingAccount => by_key(&["account_type"])
+            .map(|t| format!("{} account", t.to_uppercase()))
+            .unwrap_or_else(|| "Spending account".into()),
+        EntityType::MedicalExpense => {
+            by_key(&["description", "category"]).unwrap_or_else(|| "Medical expense".into())
+        }
+        EntityType::BenefitDeadline => {
+            by_key(&["benefit_type", "description"]).unwrap_or_else(|| "Benefit deadline".into())
+        }
+        EntityType::HealthRecommendation => {
+            by_key(&["title"]).unwrap_or_else(|| "Health recommendation".into())
+        }
         _ => by_key(&["title", "name", "label", "action"]).unwrap_or_else(|| et.as_str().into()),
     }
 }
@@ -992,6 +1044,54 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "requires_human_review",
             "escalation_path",
         ]),
+        // Health & Wellness (migration 119).
+        EntityType::HealthGoal => parts_for(&[
+            "title",
+            "goal_type",
+            "target_metric",
+            "target_value",
+            "target_unit",
+            "target_date",
+            "status",
+        ]),
+        EntityType::WellnessHabit => parts_for(&["name", "cadence", "streak"]),
+        EntityType::ActivityLog => parts_for(&[
+            "activity_type",
+            "logged_at",
+            "duration_min",
+            "steps",
+            "calories",
+        ]),
+        EntityType::SleepLog => parts_for(&["night_of", "total_hours", "efficiency", "awakenings"]),
+        EntityType::Vital => {
+            parts_for(&["kind", "value", "value_secondary", "unit", "observed_at"])
+        }
+        EntityType::LabMarker => parts_for(&[
+            "marker",
+            "value",
+            "unit",
+            "reference_low",
+            "reference_high",
+            "observed_at",
+        ]),
+        EntityType::BodyMetric => {
+            parts_for(&["weight_kg", "body_fat_pct", "waist_cm", "observed_at"])
+        }
+        EntityType::HealthSpendingAccount => {
+            parts_for(&["account_type", "balance", "contribution_ytd", "currency"])
+        }
+        EntityType::MedicalExpense => {
+            parts_for(&["expense_date", "amount", "category", "description"])
+        }
+        EntityType::BenefitDeadline => parts_for(&["benefit_type", "deadline_date", "description"]),
+        EntityType::HealthRecommendation => parts_for(&[
+            "title",
+            "description",
+            "recommendation_type",
+            "priority",
+            "confidence",
+            "status",
+        ]),
         _ => {
             // Fallback — include every short stringable field we
             // didn't explicitly drop. Cap the total length so we never
@@ -1541,5 +1641,97 @@ mod tests {
         let b = expand_children(&rec, Utc::now());
         assert_eq!(a[0].entity_id, b[0].entity_id); // reprocessing -> same id -> MERGE
         assert_eq!(a[0].entity_id, "REC1::evidence::0");
+    }
+
+    // ---- Health & Wellness (H1; migration 119) ----
+    #[test]
+    fn health_entities_normalize_with_title_summary_domain() {
+        let cases = [
+            (
+                "health_goal",
+                json!({"title": "Sleep 7.5h nightly", "goal_type": "sleep", "target_value": 7.5}),
+            ),
+            (
+                "wellness_habit",
+                json!({"name": "Evening wind-down", "cadence": "daily"}),
+            ),
+            (
+                "activity_log",
+                json!({"activity_type": "walk", "duration_min": 30, "steps": 4000}),
+            ),
+            (
+                "sleep_log",
+                json!({"night_of": "2026-06-07", "total_hours": 5.7, "efficiency": 0.82}),
+            ),
+            (
+                "vital",
+                json!({"kind": "heart_rate", "value": 62, "unit": "bpm"}),
+            ),
+            (
+                "lab_marker",
+                json!({"marker": "vitamin_d", "value": 28, "unit": "ng/mL"}),
+            ),
+            ("body_metric", json!({"weight_kg": 80, "body_fat_pct": 18})),
+            (
+                "health_spending_account",
+                json!({"account_type": "hsa", "balance": 1200}),
+            ),
+            (
+                "medical_expense",
+                json!({"amount": 150, "category": "dental"}),
+            ),
+            (
+                "benefit_deadline",
+                json!({"benefit_type": "fsa", "deadline_date": "2026-12-31"}),
+            ),
+            (
+                "health_recommendation",
+                json!({"title": "Improve your sleep consistency", "recommendation_type": "improve_sleep", "priority": "medium"}),
+            ),
+        ];
+        for (et, payload) in cases {
+            let c = normalize(&job_with(et, payload), Utc::now()).unwrap();
+            assert_eq!(c.entity_type, et, "{et}: entity_type mismatch");
+            assert_ne!(c.entity_type, "unknown", "{et}: deserialized to unknown");
+            assert!(!c.title.trim().is_empty(), "{et}: empty title");
+            assert!(!c.summary.trim().is_empty(), "{et}: empty summary");
+            assert_eq!(c.domain, "health", "{et}: wrong domain");
+        }
+    }
+
+    #[test]
+    fn health_recommendation_fans_out_to_health_recommendation() {
+        let mut job = job_with(
+            "health_recommendation",
+            json!({
+                "title": "Improve your sleep consistency",
+                "recommendation_type": "improve_sleep",
+                "evidence_json": [{"metric_name": "avg_sleep_hours", "metric_value": "5.7", "source_table": "health.sleep_logs", "confidence": 0.8, "explanation": "14-night average"}],
+                "assumptions_json": [{"assumption_text": "wearable sleep data is accurate", "confidence": 0.7}],
+                "governance_verdict": {"passed": true, "boundary_type": "medical", "disclaimer_text": "Wellness guidance, not medical advice"}
+            }),
+        );
+        job.entity_id = "HREC1".into();
+        let children = expand_children(&job, Utc::now());
+        assert_eq!(children.len(), 3); // 1 evidence + 1 assumption + 1 boundary
+        for c in &children {
+            // children link to the HEALTH recommendation (domain-generic fan-out)
+            assert!(
+                c.relationships
+                    .iter()
+                    .any(|r| r.target_entity_type == "health_recommendation"
+                        && r.target_entity_id == "HREC1"),
+                "{} not linked to health_recommendation",
+                c.entity_type
+            );
+            assert!(c.relationships.iter().all(|r| r.label != "RELATED_TO"));
+        }
+        let ev = children
+            .iter()
+            .find(|c| c.entity_type == "evidence")
+            .unwrap();
+        assert!(ev.relationships.iter().any(|r| r.label == "HAS_EVIDENCE"));
+        // medical boundary node present
+        assert!(children.iter().any(|c| c.entity_type == "advice_boundary"));
     }
 }

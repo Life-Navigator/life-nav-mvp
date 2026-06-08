@@ -222,4 +222,34 @@ mod tests {
             );
         }
     }
+
+    // ---- Health & Wellness (H1; migration 119) ----
+    #[test]
+    fn health_entities_user_anchored_no_fallback() {
+        for (et, rel) in [
+            (EntityType::HealthProfile, "HAS_WELLNESS"),
+            (EntityType::HealthGoal, "HAS_HEALTH_GOAL"),
+            (EntityType::WellnessHabit, "PURSUING"),
+            (EntityType::SleepLog, "LOGGED"),
+            (EntityType::ActivityLog, "LOGGED"),
+            (EntityType::NutritionLog, "LOGGED"),
+            (EntityType::SupplementLog, "LOGGED"),
+            (EntityType::WorkoutLog, "LOGGED"),
+            (EntityType::Vital, "TRACKS_METRIC"),
+            (EntityType::LabMarker, "TRACKS_METRIC"),
+            (EntityType::BodyMetric, "TRACKS_METRIC"),
+            (EntityType::HealthInsurancePlan, "HAS_INSURANCE_PLAN"),
+            (EntityType::HealthSpendingAccount, "HAS_SPENDING_ACCOUNT"),
+            (EntityType::MedicalExpense, "LOGGED"),
+            (EntityType::BenefitDeadline, "HAS_BENEFIT_DEADLINE"),
+            (EntityType::HealthRecommendation, "HAS_RECOMMENDATION"),
+        ] {
+            let r = registry_relationships(&et, "u1", &attrs(json!({}))).unwrap();
+            assert!(has(&r, rel, "user_profile"), "{et:?} missing {rel}");
+            assert!(
+                !r.iter().any(|x| x.label == "RELATED_TO"),
+                "{et:?} RELATED_TO"
+            );
+        }
+    }
 }
