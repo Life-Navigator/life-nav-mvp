@@ -29,6 +29,7 @@ from .grounding.context_builder import ContextBuilder
 from .grounding.retriever import Retriever
 from .services.compensation import CompensationIntelligenceEngine
 from .services.decision_engine import DecisionEngine
+from .services.readiness import LifeReadinessEngine
 from .services.report_engine import UniversalReportEngine
 from .services.cost_meter import CostMeter
 from .services.life_profile import LifeProfileService
@@ -138,6 +139,14 @@ def get_report_engine(
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> UniversalReportEngine:
     return UniversalReportEngine(domains=domains, education=education, supabase=supabase)
+
+
+def get_readiness_engine(
+    domains: dict[str, DomainService] = Depends(get_domain_services),
+    education: EducationService = Depends(get_education_service),
+    supabase: SupabaseClient = Depends(get_supabase),
+) -> LifeReadinessEngine:
+    return LifeReadinessEngine(domains=domains, education=education, supabase=supabase)
 
 
 def get_retriever(

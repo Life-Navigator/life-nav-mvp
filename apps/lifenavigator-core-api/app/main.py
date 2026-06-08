@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import get_settings
-from .routers import career_domain, chat, decision, education_domain, family_domain, finance, health, health_domain, life_profile, reports
+from .routers import career_domain, chat, decision, education_domain, family_domain, finance, health, health_domain, life_profile, readiness, reports
 
 
 def _configure_logging(level: str) -> None:
@@ -58,6 +58,7 @@ def create_app() -> FastAPI:
     app.include_router(family_domain.router)
     app.include_router(decision.router)
     app.include_router(reports.router)
+    app.include_router(readiness.router)
     app.include_router(finance.router)
     app.include_router(life_profile.router)
     app.include_router(chat.router)
