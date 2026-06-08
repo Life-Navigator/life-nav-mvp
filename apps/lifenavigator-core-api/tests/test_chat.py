@@ -10,8 +10,14 @@ from .conftest import make_jwt
 class FakeRetriever:
     """Hermetic stand-in — no Qdrant/Neo4j network in tests."""
 
+    def __init__(self, rec_evidence=None) -> None:
+        self._rec_evidence = rec_evidence or []
+
     async def retrieve_personal(self, query, ctx, *, domain=None, limit=10):
         return []
+
+    async def recommendation_evidence(self, ctx):
+        return list(self._rec_evidence)
 
 ACCOUNTS = [
     {"id": "a1", "name": "Checking", "institution_name": "Bank", "account_type": "depository", "current_balance": 5000, "currency": "USD"},

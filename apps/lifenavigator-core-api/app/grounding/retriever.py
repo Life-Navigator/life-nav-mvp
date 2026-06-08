@@ -79,3 +79,50 @@ class Retriever:
                 log.warning("graph retrieval degraded: %s", exc)
 
         return evidence
+
+    async def recommendation_evidence(self, ctx: UserContext) -> list[dict[str, Any]]:
+        """Traverse the user's recommendation evidence subgraph and return it as
+        authoritative facts, so the chat can answer "why are you recommending this?"
+        strictly from graph evidence (never invented rationale).
+
+        The Cypher is tenant-scoped (``tenant_id = $user_id``), so it can only ever
+        return the caller's own recommendations.
+        """
+        if not self._neo4j.configured:
+            return []
+        cypher = (
+            "MATCH (u:UserProfile {tenant_id: $user_id})-[:HAS_RECOMMENDATION]->(r:FinancialRecommendation) "
+            "OPTIONAL MATCH (r)-[:HAS_EVIDENCE]->(e:Evidence) "
+            "OPTIONAL MATCH (r)-[:HAS_ASSUMPTION]->(a:Assumption) "
+            "OPTIONAL MATCH (r)-[:REQUIRES_REVIEW]->(b:AdviceBoundary) "
+            "RETURN r.title AS title, "
+            "collect(DISTINCT [e.metric_name, e.metric_value, e.source_table, e.confidence]) AS evidence, "
+            "collect(DISTINCT a.assumption_text) AS assumptions, "
+            "collect(DISTINCT b.disclaimer_text) AS disclaimers"
+        )
+        facts: list[dict[str, Any]] = []
+        try:
+            rows = await self._neo4j.query_personal(cypher, user_id=ctx.user_id)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("recommendation evidence retrieval degraded: %s", exc)
+            return []
+        for row in rows:
+            title = row[0] if len(row) > 0 else "Recommendation"
+            evidence = row[1] if len(row) > 1 and row[1] else []
+            assumptions = row[2] if len(row) > 2 and row[2] else []
+            disclaimers = row[3] if len(row) > 3 and row[3] else []
+            for ev in evidence:
+                if ev and ev[0] is not None:
+                    facts.append(
+                        {
+                            "fact": f"[{title}] evidence: {ev[0]}",
+                            "value": f"{ev[1]} (source {ev[2]}, confidence {ev[3]})",
+                        }
+                    )
+            for a in assumptions:
+                if a:
+                    facts.append({"fact": f"[{title}] assumption", "value": a})
+            for d in disclaimers:
+                if d:
+                    facts.append({"fact": f"[{title}] governance", "value": d})
+        return facts

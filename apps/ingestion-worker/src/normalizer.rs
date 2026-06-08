@@ -139,6 +139,15 @@ fn build_child(
         "recommendation_id".into(),
         Value::String(rec_id.to_string()),
     );
+    // Preserve the fact's own provenance: an Evidence item carries the underlying
+    // source_table (e.g. finance.financial_accounts). Use it for the node's
+    // source_table so provenance points at the fact, not the recommendation row.
+    let node_source = item
+        .get("source_table")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .unwrap_or_else(|| source_table.to_string());
     let sanitized = sanitize(&item);
     let entity_id = format!("{rec_id}::{}::{idx}", child_et.as_str());
     CanonicalGraphObject {
@@ -147,7 +156,7 @@ fn build_child(
         entity_id,
         entity_type: child_et.as_str().to_string(),
         domain: child_et.domain().to_string(),
-        source_table: source_table.to_string(),
+        source_table: node_source,
         title: build_title(&child_et, &sanitized),
         summary: build_summary(&child_et, &sanitized),
         relationships: relationships_for(&child_et, &user_id.to_string(), &sanitized),
@@ -1491,6 +1500,13 @@ mod tests {
             .find(|c| c.entity_type == "evidence")
             .unwrap();
         assert!(ev.relationships.iter().any(|r| r.label == "HAS_EVIDENCE"));
+        // provenance: an Evidence node keeps the FACT's source_table, not the rec table
+        assert!(
+            children
+                .iter()
+                .any(|c| c.entity_type == "evidence"
+                    && c.source_table == "finance.financial_accounts")
+        );
         let asm = children
             .iter()
             .find(|c| c.entity_type == "assumption")

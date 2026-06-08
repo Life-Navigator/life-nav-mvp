@@ -49,6 +49,11 @@ class ContextBuilder:
             authoritative.extend(dctx.authoritative_facts)
             missing.extend(dctx.missing_facts)
 
+        # Recommendation evidence subgraph -> authoritative facts. Lets the chat
+        # answer "why are you recommending this?" strictly from graph evidence.
+        if "finance" in relevant:
+            authoritative.extend(await self._retriever.recommendation_evidence(ctx))
+
         # Only retrieve from the graph once we know there are facts worth grounding
         # against (saves a Gemini embed call + a Qdrant/Neo4j round-trip otherwise).
         graph_evidence: list[dict] = []
