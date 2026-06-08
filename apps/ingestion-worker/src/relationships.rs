@@ -153,4 +153,73 @@ mod tests {
             assert!(rels.iter().all(|r| !r.target_entity_id.is_empty()));
         }
     }
+
+    // ---- Finance elite schema + recommendation evidence graph (migration 117) ----
+
+    #[test]
+    fn financial_recommendation_emits_user_anchor_not_fallback() {
+        let r = registry_relationships(
+            &EntityType::FinancialRecommendation,
+            "u1",
+            &attrs(json!({})),
+        )
+        .unwrap();
+        assert!(has(&r, "HAS_RECOMMENDATION", "user_profile"));
+        assert!(!has(&r, "RELATED_TO", "user_profile"));
+    }
+
+    #[test]
+    fn evidence_graph_anchors_to_recommendation_via_fk() {
+        for (et, rel) in [
+            (EntityType::Evidence, "HAS_EVIDENCE"),
+            (EntityType::Assumption, "HAS_ASSUMPTION"),
+            (EntityType::Tradeoff, "HAS_TRADEOFF"),
+            (EntityType::AdviceBoundary, "REQUIRES_REVIEW"),
+        ] {
+            let r =
+                registry_relationships(&et, "u1", &attrs(json!({"recommendation_id": "rec-1"})))
+                    .unwrap();
+            assert!(
+                r.iter().any(|x| x.label == rel
+                    && x.target_entity_type == "financial_recommendation"
+                    && x.target_entity_id == "rec-1"),
+                "{et:?} missing {rel} -> financial_recommendation"
+            );
+            assert!(
+                !r.iter().any(|x| x.label == "RELATED_TO"),
+                "{et:?} fell back to RELATED_TO"
+            );
+        }
+    }
+
+    #[test]
+    fn evidence_without_recommendation_id_has_no_fallback_edge() {
+        // mapped entity: no RELATED_TO fallback; FK absent -> simply no edge.
+        let r = registry_relationships(&EntityType::Evidence, "u1", &attrs(json!({}))).unwrap();
+        assert!(r.is_empty());
+    }
+
+    #[test]
+    fn finance_elite_tables_have_user_anchor_no_fallback() {
+        for et in [
+            EntityType::Liability,
+            EntityType::CashFlowSnapshot,
+            EntityType::NetWorthSnapshot,
+            EntityType::BudgetCategory,
+            EntityType::IncomeSource,
+            EntityType::ExpenseCategory,
+            EntityType::FinancialEvent,
+        ] {
+            let r = registry_relationships(&et, "u1", &attrs(json!({}))).unwrap();
+            assert!(!r.is_empty(), "{et:?} emitted no edges");
+            assert_eq!(
+                r[0].target_entity_type, "user_profile",
+                "{et:?} not user-anchored"
+            );
+            assert!(
+                !r.iter().any(|x| x.label == "RELATED_TO"),
+                "{et:?} fell back to RELATED_TO"
+            );
+        }
+    }
 }

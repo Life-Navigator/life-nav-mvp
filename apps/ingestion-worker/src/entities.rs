@@ -175,6 +175,21 @@ pub enum EntityType {
     /// → Neo4j label :RiskAssessment. Without this variant the worker would
     /// deserialize it to Unknown and write a :Unknown node.
     RiskAssessment,
+    // ---- Finance elite schema (migration 117) — enum-before-trigger ----
+    // Tables exist; triggers are deferred until these variants ship + tests pass.
+    FinancialRecommendation,
+    Liability,
+    CashFlowSnapshot,
+    NetWorthSnapshot,
+    BudgetCategory,
+    IncomeSource,
+    ExpenseCategory,
+    FinancialEvent,
+    // ---- Recommendation evidence graph (RECOMMENDATION_EVIDENCE_GRAPH_SPEC.md) ----
+    Evidence,
+    Assumption,
+    Tradeoff,
+    AdviceBoundary,
     /// Catch-all so a new sync-queue entity_type doesn't crash the worker;
     /// the normalizer skips unknown types.
     #[serde(other)]
@@ -207,6 +222,18 @@ impl EntityType {
             EntityType::LifeEvent => "life_event",
             EntityType::PersonaProfile => "persona_profile",
             EntityType::RiskAssessment => "risk_assessment",
+            EntityType::FinancialRecommendation => "financial_recommendation",
+            EntityType::Liability => "liability",
+            EntityType::CashFlowSnapshot => "cash_flow_snapshot",
+            EntityType::NetWorthSnapshot => "net_worth_snapshot",
+            EntityType::BudgetCategory => "budget_category",
+            EntityType::IncomeSource => "income_source",
+            EntityType::ExpenseCategory => "expense_category",
+            EntityType::FinancialEvent => "financial_event",
+            EntityType::Evidence => "evidence",
+            EntityType::Assumption => "assumption",
+            EntityType::Tradeoff => "tradeoff",
+            EntityType::AdviceBoundary => "advice_boundary",
             EntityType::FinancialAccount => "financial_account",
             EntityType::FinancialGoal => "financial_goal",
             EntityType::TransactionSummary => "transaction_summary",
@@ -334,7 +361,19 @@ impl EntityType {
             | EntityType::LifeScenarioVersion
             | EntityType::LifeScenarioDecision
             | EntityType::LifeScenarioOutput
-            | EntityType::LifeTrajectorySnapshot => "financial",
+            | EntityType::LifeTrajectorySnapshot
+            | EntityType::FinancialRecommendation
+            | EntityType::Liability
+            | EntityType::CashFlowSnapshot
+            | EntityType::NetWorthSnapshot
+            | EntityType::BudgetCategory
+            | EntityType::IncomeSource
+            | EntityType::ExpenseCategory
+            | EntityType::FinancialEvent
+            | EntityType::Evidence
+            | EntityType::Assumption
+            | EntityType::Tradeoff
+            | EntityType::AdviceBoundary => "financial",
 
             EntityType::HealthProfile
             | EntityType::HealthMetric
@@ -490,8 +529,18 @@ impl EntityType {
             | EntityType::OptimizerRecommendation
             | EntityType::LifeScenarioOutput
             | EntityType::LifeTrajectorySnapshot
-            | EntityType::TransactionSummary => SensitivityLevel::Medium,
+            | EntityType::TransactionSummary
+            // Finance elite + evidence: money-bearing → Medium.
+            | EntityType::FinancialRecommendation
+            | EntityType::Liability
+            | EntityType::CashFlowSnapshot
+            | EntityType::NetWorthSnapshot
+            | EntityType::IncomeSource
+            | EntityType::FinancialEvent
+            | EntityType::Evidence => SensitivityLevel::Medium,
 
+            // Labels / meta (no raw figures) → Low: BudgetCategory, ExpenseCategory,
+            // Assumption, Tradeoff, AdviceBoundary fall through to the default.
             _ => SensitivityLevel::Low,
         }
     }
@@ -528,7 +577,11 @@ impl CanonicalGraphObject {
     /// Stable Qdrant point id, derived deterministically from tenant +
     /// entity_type + entity_id so re-runs are idempotent.
     pub fn qdrant_point_id(&self) -> String {
-        qdrant_point_uuid(&self.tenant_id.to_string(), &self.entity_type, &self.entity_id)
+        qdrant_point_uuid(
+            &self.tenant_id.to_string(),
+            &self.entity_type,
+            &self.entity_id,
+        )
     }
 }
 
@@ -547,7 +600,11 @@ mod point_id_tests {
 
     #[test]
     fn point_id_is_a_valid_uuid() {
-        let id = qdrant_point_uuid("11111111-1111-1111-1111-111111111111", "financial_account", "abc");
+        let id = qdrant_point_uuid(
+            "11111111-1111-1111-1111-111111111111",
+            "financial_account",
+            "abc",
+        );
         // Qdrant requires int or UUID — must parse as a UUID, not a pipe string.
         assert!(uuid::Uuid::parse_str(&id).is_ok(), "not a uuid: {id}");
         assert!(!id.contains('|'));

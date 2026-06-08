@@ -103,6 +103,44 @@ const INVESTMENT_HOLDING: &[IncomingEdge] = &[
 const RETIREMENT_PLAN: &[IncomingEdge] = &[user("CONTRIBUTES_TO")];
 const FINANCIAL_GOAL: &[IncomingEdge] = &[user("HAS_GOAL")];
 
+// ── Finance elite schema (migration 117) — user-ownership edges ──────────────
+const LIABILITY: &[IncomingEdge] = &[user("HAS_LIABILITY")];
+const CASH_FLOW_SNAPSHOT: &[IncomingEdge] = &[user("HAS_SNAPSHOT")];
+const NET_WORTH_SNAPSHOT: &[IncomingEdge] = &[user("HAS_SNAPSHOT")];
+const BUDGET_CATEGORY: &[IncomingEdge] = &[user("HAS_BUDGET_CATEGORY")];
+const INCOME_SOURCE: &[IncomingEdge] = &[user("HAS_INCOME_SOURCE")];
+const EXPENSE_CATEGORY: &[IncomingEdge] = &[user("HAS_EXPENSE_CATEGORY")];
+const FINANCIAL_EVENT: &[IncomingEdge] = &[user("LOGGED")];
+
+// ── Recommendation evidence graph (RECOMMENDATION_EVIDENCE_GRAPH_SPEC.md) ────
+// The recommendation is user-anchored; evidence/assumption/tradeoff/advice-boundary
+// nodes anchor to the recommendation via a `recommendation_id` FK (so traversal is
+// user -> recommendation -> evidence). ADDRESSES (rec -> goal/debt/budget) and
+// GOVERNED_BY (rec -> governance_rule) are EXTENSION POINTS: the recommendation is
+// the edge SOURCE, which needs outgoing-edge support in merge_cypher_for — tracked,
+// not faked here.
+const FINANCIAL_RECOMMENDATION: &[IncomingEdge] = &[user("HAS_RECOMMENDATION")];
+const EVIDENCE: &[IncomingEdge] = &[fk(
+    "HAS_EVIDENCE",
+    "financial_recommendation",
+    "recommendation_id",
+)];
+const ASSUMPTION: &[IncomingEdge] = &[fk(
+    "HAS_ASSUMPTION",
+    "financial_recommendation",
+    "recommendation_id",
+)];
+const TRADEOFF: &[IncomingEdge] = &[fk(
+    "HAS_TRADEOFF",
+    "financial_recommendation",
+    "recommendation_id",
+)];
+const ADVICE_BOUNDARY: &[IncomingEdge] = &[fk(
+    "REQUIRES_REVIEW",
+    "financial_recommendation",
+    "recommendation_id",
+)];
+
 /// Registry lookup: the declared incoming edges for an entity type.
 ///
 /// Returns a non-empty slice for entities the ontology registry owns (finance
@@ -118,6 +156,20 @@ pub fn incoming_edges(et: &EntityType) -> &'static [IncomingEdge] {
         EntityType::InvestmentHolding => INVESTMENT_HOLDING,
         EntityType::RetirementPlan => RETIREMENT_PLAN,
         EntityType::FinancialGoal => FINANCIAL_GOAL,
+        // Finance elite schema (migration 117).
+        EntityType::Liability => LIABILITY,
+        EntityType::CashFlowSnapshot => CASH_FLOW_SNAPSHOT,
+        EntityType::NetWorthSnapshot => NET_WORTH_SNAPSHOT,
+        EntityType::BudgetCategory => BUDGET_CATEGORY,
+        EntityType::IncomeSource => INCOME_SOURCE,
+        EntityType::ExpenseCategory => EXPENSE_CATEGORY,
+        EntityType::FinancialEvent => FINANCIAL_EVENT,
+        // Recommendation evidence graph.
+        EntityType::FinancialRecommendation => FINANCIAL_RECOMMENDATION,
+        EntityType::Evidence => EVIDENCE,
+        EntityType::Assumption => ASSUMPTION,
+        EntityType::Tradeoff => TRADEOFF,
+        EntityType::AdviceBoundary => ADVICE_BOUNDARY,
         _ => &[],
     }
 }
@@ -139,7 +191,19 @@ pub fn domain_of(et: &EntityType) -> Domain {
         | EntityType::RetirementPlan
         | EntityType::FinancialGoal
         | EntityType::TaxProfile
-        | EntityType::UserFinancialProfile => Domain::Finance,
+        | EntityType::UserFinancialProfile
+        | EntityType::FinancialRecommendation
+        | EntityType::Liability
+        | EntityType::CashFlowSnapshot
+        | EntityType::NetWorthSnapshot
+        | EntityType::BudgetCategory
+        | EntityType::IncomeSource
+        | EntityType::ExpenseCategory
+        | EntityType::FinancialEvent
+        | EntityType::Evidence
+        | EntityType::Assumption
+        | EntityType::Tradeoff
+        | EntityType::AdviceBoundary => Domain::Finance,
         _ => Domain::General,
     }
 }

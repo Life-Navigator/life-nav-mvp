@@ -119,6 +119,37 @@ fn build_title(et: &EntityType, attrs: &Map<String, Value>) -> String {
         EntityType::RiskAssessment => by_key(&["assessment_type", "risk_tolerance"])
             .map(|t| format!("{t} risk assessment"))
             .unwrap_or_else(|| "Risk assessment".into()),
+        // Finance elite + evidence graph (migration 117).
+        EntityType::FinancialRecommendation => {
+            by_key(&["title"]).unwrap_or_else(|| "Recommendation".into())
+        }
+        EntityType::Liability => by_key(&["name"]).unwrap_or_else(|| "Liability".into()),
+        EntityType::CashFlowSnapshot => by_key(&["period_end", "period_start"])
+            .map(|d| format!("Cash flow {d}"))
+            .unwrap_or_else(|| "Cash flow snapshot".into()),
+        EntityType::NetWorthSnapshot => by_key(&["as_of_date"])
+            .map(|d| format!("Net worth {d}"))
+            .unwrap_or_else(|| "Net worth snapshot".into()),
+        EntityType::BudgetCategory => by_key(&["name"]).unwrap_or_else(|| "Budget category".into()),
+        EntityType::IncomeSource => by_key(&["name"]).unwrap_or_else(|| "Income source".into()),
+        EntityType::ExpenseCategory => {
+            by_key(&["name"]).unwrap_or_else(|| "Expense category".into())
+        }
+        EntityType::FinancialEvent => {
+            by_key(&["event_type"]).unwrap_or_else(|| "Financial event".into())
+        }
+        EntityType::Evidence => {
+            by_key(&["metric_name", "explanation"]).unwrap_or_else(|| "Evidence".into())
+        }
+        EntityType::Assumption => {
+            by_key(&["assumption_text"]).unwrap_or_else(|| "Assumption".into())
+        }
+        EntityType::Tradeoff => by_key(&["option_a"])
+            .map(|a| format!("Tradeoff: {a}"))
+            .unwrap_or_else(|| "Tradeoff".into()),
+        EntityType::AdviceBoundary => by_key(&["boundary_type"])
+            .map(|b| format!("{b} review boundary"))
+            .unwrap_or_else(|| "Advice boundary".into()),
         _ => by_key(&["title", "name", "label", "action"]).unwrap_or_else(|| et.as_str().into()),
     }
 }
@@ -767,6 +798,85 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
         EntityType::ArcanaMembership => {
             parts_for(&["tier", "status", "started_at", "renewed_at", "ends_at"])
         }
+        // Finance elite schema (migration 117).
+        EntityType::FinancialRecommendation => parts_for(&[
+            "title",
+            "description",
+            "recommendation_type",
+            "priority",
+            "confidence",
+            "status",
+        ]),
+        EntityType::Liability => parts_for(&[
+            "name",
+            "liability_type",
+            "balance",
+            "interest_rate",
+            "minimum_payment",
+            "currency",
+        ]),
+        EntityType::CashFlowSnapshot => parts_for(&[
+            "period_start",
+            "period_end",
+            "total_income",
+            "total_expenses",
+            "net_cash_flow",
+            "currency",
+        ]),
+        EntityType::NetWorthSnapshot => parts_for(&[
+            "as_of_date",
+            "total_assets",
+            "total_liabilities",
+            "net_worth",
+            "currency",
+        ]),
+        EntityType::BudgetCategory => {
+            parts_for(&["name", "category_type", "monthly_limit", "currency"])
+        }
+        EntityType::IncomeSource => parts_for(&[
+            "name",
+            "source_type",
+            "monthly_amount",
+            "currency",
+            "is_active",
+        ]),
+        EntityType::ExpenseCategory => parts_for(&["name", "parent_category", "is_essential"]),
+        EntityType::FinancialEvent => parts_for(&[
+            "event_type",
+            "event_date",
+            "amount",
+            "description",
+            "related_entity_type",
+        ]),
+        // Recommendation evidence graph.
+        EntityType::Evidence => parts_for(&[
+            "metric_name",
+            "metric_value",
+            "source_table",
+            "observed_at",
+            "confidence",
+            "explanation",
+        ]),
+        EntityType::Assumption => parts_for(&[
+            "assumption_text",
+            "confidence",
+            "expires_at",
+            "user_confirmed",
+            "source",
+        ]),
+        EntityType::Tradeoff => parts_for(&[
+            "option_a",
+            "option_b",
+            "benefit",
+            "cost",
+            "affected_domains",
+        ]),
+        EntityType::AdviceBoundary => parts_for(&[
+            "boundary_type",
+            "disclaimer_text",
+            "requires_human_review",
+            "escalation_path",
+        ]),
         _ => {
             // Fallback — include every short stringable field we
             // didn't explicitly drop. Cap the total length so we never
@@ -1157,5 +1267,76 @@ mod tests {
         let r = rels("nonexistent_type", json!({"title": "x"}));
         assert_eq!(r.len(), 1);
         assert!(has_edge(&r, "RELATED_TO", "user_profile"));
+    }
+
+    // ---- Finance elite schema + evidence graph (migration 117) ----
+    // enum-before-trigger: every new entity_type round-trips (NOT unknown), gets a
+    // title + a non-empty summary (so it is embedded, not skipped), and is financial.
+    #[test]
+    fn finance_elite_and_evidence_normalize_with_title_and_summary() {
+        let cases = [
+            (
+                "financial_recommendation",
+                json!({"title": "Pay highest-APR debt first", "recommendation_type": "debt_optimization", "priority": "high", "confidence": 0.8}),
+            ),
+            (
+                "liability",
+                json!({"name": "Auto loan", "liability_type": "loan", "balance": 12000}),
+            ),
+            (
+                "cash_flow_snapshot",
+                json!({"period_start": "2026-06-01", "period_end": "2026-06-30", "net_cash_flow": 540}),
+            ),
+            (
+                "net_worth_snapshot",
+                json!({"as_of_date": "2026-06-30", "net_worth": 17000}),
+            ),
+            (
+                "budget_category",
+                json!({"name": "Dining", "monthly_limit": 300}),
+            ),
+            (
+                "income_source",
+                json!({"name": "Salary", "monthly_amount": 6000}),
+            ),
+            (
+                "expense_category",
+                json!({"name": "Rent", "is_essential": true}),
+            ),
+            (
+                "financial_event",
+                json!({"event_type": "large_purchase", "amount": 2500}),
+            ),
+            (
+                "evidence",
+                json!({"metric_name": "apr", "metric_value": "24.99", "explanation": "costly balance"}),
+            ),
+            (
+                "assumption",
+                json!({"assumption_text": "income stays flat", "confidence": 0.7}),
+            ),
+            (
+                "tradeoff",
+                json!({"option_a": "pay debt", "option_b": "invest"}),
+            ),
+            (
+                "advice_boundary",
+                json!({"boundary_type": "investment", "disclaimer_text": "not financial advice"}),
+            ),
+        ];
+        for (et, payload) in cases {
+            let canon = normalize(&job_with(et, payload), Utc::now()).unwrap();
+            assert_eq!(canon.entity_type, et, "{et}: entity_type mismatch");
+            assert_ne!(
+                canon.entity_type, "unknown",
+                "{et}: deserialized to unknown"
+            );
+            assert!(!canon.title.trim().is_empty(), "{et}: empty title");
+            assert!(
+                !canon.summary.trim().is_empty(),
+                "{et}: empty summary (would be skipped)"
+            );
+            assert_eq!(canon.domain, "financial", "{et}: wrong domain");
+        }
     }
 }
