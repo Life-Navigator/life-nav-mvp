@@ -171,6 +171,51 @@ class EvidencePacket(BaseModel):
         return len(self.authoritative_facts) > 0
 
 
+class DomainCard(BaseModel):
+    """Lightweight index entry for one domain in the life profile."""
+
+    domain: str
+    available: bool = True
+    headline: Optional[str] = None
+    score: Optional[float] = None
+    summary_ref: str
+    missing: list[str] = Field(default_factory=list)
+
+
+class MissingDataPrompt(BaseModel):
+    """Premium 'connect/add' prompt — never a fake zero."""
+
+    domain: str
+    field: str
+    title: str
+    body: str
+    cta: str
+
+
+class SystemStatus(BaseModel):
+    supabase: bool = False
+    qdrant: bool = False
+    neo4j: bool = False
+    gemini: bool = False
+
+
+class LifeProfileViewModel(BaseModel):
+    """Cross-domain command-center view. New domains plug in by registering a
+    DomainService — they appear in ``domains``/``summaries`` with no redesign.
+    """
+
+    user_id: str
+    generated_at: str
+    domains: dict[str, DomainCard] = Field(default_factory=dict)
+    summaries: dict[str, DomainViewModel] = Field(default_factory=dict)
+    recommendations: list[Recommendation] = Field(default_factory=list)
+    missing_data_prompts: list[MissingDataPrompt] = Field(default_factory=list)
+    missing_domains: list[str] = Field(default_factory=list)  # known but not yet live
+    freshness: Freshness = Field(default_factory=Freshness)
+    confidence: Confidence = Field(default_factory=Confidence)
+    system_status: SystemStatus = Field(default_factory=SystemStatus)
+
+
 class ChatTurnResponse(BaseModel):
     message: str
     grounded: bool = True

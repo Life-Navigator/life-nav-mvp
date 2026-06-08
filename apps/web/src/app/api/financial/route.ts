@@ -59,6 +59,37 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // ── Thin proxy to the Core API (orchestration tier) ───────────────────────
+  // When CORE_API_URL is set, forward the user's Supabase JWT to the Core API
+  // and return its response directly — NO business logic here, and only the
+  // user's own JWT travels (never the service-role or Gemini keys). Off by
+  // default, so behavior is unchanged until the Core API is deployed AND the
+  // finance page consumes the DomainViewModel shape. See FINANCE_PROXY_NOTES.md.
+  const coreApiUrl = process.env.CORE_API_URL;
+  if (coreApiUrl) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session?.access_token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    try {
+      const upstream = await fetch(`${coreApiUrl.replace(/\/$/, '')}/v1/finance/summary`, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
+      });
+      const text = await upstream.text();
+      return new NextResponse(text, {
+        status: upstream.status,
+        headers: { 'content-type': upstream.headers.get('content-type') ?? 'application/json' },
+      });
+    } catch {
+      return NextResponse.json({ error: 'finance_service_unavailable' }, { status: 502 });
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
+
   const sp = request.nextUrl.searchParams;
   const timeframe = (sp.get('timeframe') as Timeframe) || 'month';
   const { start, end } = rangeFor(timeframe);

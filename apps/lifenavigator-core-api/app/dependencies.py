@@ -20,9 +20,11 @@ from .clients.supabase import SupabaseClient
 from .config import Settings, get_settings
 from .domains.base import DomainService
 from .domains.finance import FinanceService
+from .domains.registry import DomainRegistry
 from .grounding.context_builder import ContextBuilder
 from .grounding.retriever import Retriever
 from .services.cost_meter import CostMeter
+from .services.life_profile import LifeProfileService
 from .services.trust_safety import TrustSafetyGate
 
 # Stateless singletons (no per-request state).
@@ -94,6 +96,21 @@ def get_trust_safety_agent() -> TrustSafetyAgent:
 
 def get_recommendation_agent() -> RecommendationAgent:
     return RecommendationAgent()
+
+
+def get_domain_registry(
+    services: dict[str, DomainService] = Depends(get_domain_services),
+) -> DomainRegistry:
+    """Live domain registry. Only registered services are live; unfinished
+    domains are never exposed as live (see DomainRegistry.unavailable())."""
+    return DomainRegistry(services)
+
+
+def get_life_profile_service(
+    registry: DomainRegistry = Depends(get_domain_registry),
+    recommendation_agent: RecommendationAgent = Depends(get_recommendation_agent),
+) -> LifeProfileService:
+    return LifeProfileService(registry, recommendation_agent)
 
 
 def get_orchestrator(
