@@ -30,6 +30,7 @@ from .grounding.retriever import Retriever
 from .services.analytics import AnalyticsService
 from .services.compensation import CompensationIntelligenceEngine
 from .services.decision_engine import DecisionEngine
+from .services.documents import DocumentIntelligenceService
 from .services.readiness import LifeReadinessEngine
 from .services.sharing import ShareService
 from .services.snapshots import SnapshotEngine, TrendAnalyzer
@@ -169,6 +170,10 @@ def get_trend_analyzer(supabase: SupabaseClient = Depends(get_supabase)) -> Tren
 
 def get_analytics_service(supabase: SupabaseClient = Depends(get_supabase)) -> AnalyticsService:
     return AnalyticsService(supabase=supabase)
+
+
+def get_document_service(supabase: SupabaseClient = Depends(get_supabase)) -> DocumentIntelligenceService:
+    return DocumentIntelligenceService(supabase=supabase)
 
 
 def get_retriever(
