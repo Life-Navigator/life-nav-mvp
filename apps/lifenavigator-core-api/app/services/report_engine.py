@@ -50,7 +50,10 @@ def _normalize(obj: Any) -> Any:
     if isinstance(obj, dict):
         return {k: _normalize(v) for k, v in sorted(obj.items()) if k not in _VOLATILE}
     if isinstance(obj, list):
-        return [_normalize(v) for v in obj]
+        # Sort lists in the hash-only normalized form so DB row / recommendation order can't
+        # affect reproducibility. The STORED content_json keeps its real (display) order.
+        items = [_normalize(v) for v in obj]
+        return sorted(items, key=lambda x: json.dumps(x, sort_keys=True, default=str))
     if isinstance(obj, str) and _TS_RE.match(obj):
         return "<ts>"  # neutralize any leaked ISO timestamp value
     return obj
