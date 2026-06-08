@@ -207,8 +207,13 @@ class FinanceService(DomainService):
 
     @staticmethod
     def _income_expense(txns: list[dict]) -> tuple[float, float]:
-        income = sum(FinanceService._bal(t) for t in txns if (t.get("type") or "").lower() == "income")
-        expense = sum(FinanceService._bal(t) for t in txns if (t.get("type") or "").lower() == "expense")
+        # The source column is finance.transactions.transaction_type ('income' |
+        # 'expense'); fall back to 'type' for legacy/synthetic rows.
+        def _tt(t: dict) -> str:
+            return (t.get("transaction_type") or t.get("type") or "").lower()
+
+        income = sum(FinanceService._bal(t) for t in txns if _tt(t) == "income")
+        expense = sum(FinanceService._bal(t) for t in txns if _tt(t) == "expense")
         return income, expense
 
     async def cash_flow(self, ctx: UserContext) -> DomainViewModel:
