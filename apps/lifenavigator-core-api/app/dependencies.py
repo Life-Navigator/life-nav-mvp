@@ -31,6 +31,7 @@ from .services.analytics import AnalyticsService
 from .services.comp_benefits import CompensationBenefitsEngine
 from .services.compensation import CompensationIntelligenceEngine
 from .services.decision_engine import DecisionEngine
+from .services.decision_workspace import DecisionWorkspaceService
 from .services.documents import DocumentIntelligenceService
 from .services.readiness import LifeReadinessEngine
 from .services.sharing import ShareService
@@ -179,6 +180,13 @@ def get_document_service(supabase: SupabaseClient = Depends(get_supabase)) -> Do
 
 def get_comp_benefits_engine(supabase: SupabaseClient = Depends(get_supabase)) -> CompensationBenefitsEngine:
     return CompensationBenefitsEngine(supabase=supabase)
+
+
+def get_decision_workspace(
+    decision: DecisionEngine = Depends(get_decision_engine),
+    readiness: LifeReadinessEngine = Depends(get_readiness_engine),
+) -> DecisionWorkspaceService:
+    return DecisionWorkspaceService(decision_engine=decision, readiness_engine=readiness)
 
 
 def get_retriever(

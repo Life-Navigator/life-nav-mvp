@@ -6,13 +6,14 @@ only (decision_guidance boundary) — not financial/legal/tax advice.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_analytics_service, get_decision_engine
+from ..dependencies import authenticated, get_analytics_service, get_decision_engine, get_decision_workspace
 from ..models.common import UserContext
 from ..services.analytics import AnalyticsService
 from ..services.decision_engine import DecisionEngine
+from ..services.decision_workspace import WORKSPACE_TYPES, DecisionWorkspaceService
 
 router = APIRouter(prefix="/v1/decision", tags=["decision"])
 
@@ -44,3 +45,24 @@ async def preview(
 ):
     """Build the decision without persisting (worst/expected/best + evidence)."""
     return await engine.decide(_ctx(user), question)
+
+
+@router.get("/workspace/types")
+async def workspace_types(user: AuthenticatedUser = Depends(authenticated)):
+    """The preset life decisions a workspace can be created for."""
+    return {"types": DecisionWorkspaceService.types()}
+
+
+@router.post("/workspace")
+async def create_workspace(
+    user: AuthenticatedUser = Depends(authenticated),
+    svc: DecisionWorkspaceService = Depends(get_decision_workspace),
+    analytics: AnalyticsService = Depends(get_analytics_service),
+    decision_type: str = Body(..., embed=True),
+):
+    if decision_type not in WORKSPACE_TYPES:
+        raise HTTPException(status_code=400, detail=f"decision_type must be one of {tuple(WORKSPACE_TYPES)}")
+    ctx = _ctx(user)
+    ws = await svc.create(ctx, decision_type)
+    await analytics.emit(ctx, "decision_generated", domain="decision", props={"decision_type": decision_type, "workspace": True})
+    return ws
