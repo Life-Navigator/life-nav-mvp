@@ -111,7 +111,15 @@ export default function FamilyPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900">Family &amp; Protection</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Family &amp; Protection</h1>
+        <a
+          href="/api/reports/family/pdf"
+          className="text-sm px-3 py-1.5 rounded-md border border-rose-600 text-rose-700 hover:bg-rose-50"
+        >
+          Download PDF
+        </a>
+      </div>
       <p className="text-sm text-gray-500 mt-1">
         Protection, readiness, and college — grounded in your own data.
       </p>

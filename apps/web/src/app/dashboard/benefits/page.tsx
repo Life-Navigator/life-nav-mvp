@@ -70,7 +70,15 @@ export default function BenefitsPage() {
   const fh = a.fsa_hsa;
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold text-gray-900">Compensation &amp; Benefits</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900">Compensation &amp; Benefits</h1>
+        <a
+          href="/api/reports/compensation/pdf"
+          className="text-sm px-3 py-1.5 rounded-md border border-indigo-600 text-indigo-700 hover:bg-indigo-50"
+        >
+          Download PDF
+        </a>
+      </div>
       <p className="text-sm text-gray-500 mt-1">
         Synthesized from your documents:{' '}
         {a.source_documents.join(', ') || 'none yet — upload an offer letter & benefits package'}.
