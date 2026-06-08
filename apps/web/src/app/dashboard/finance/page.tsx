@@ -1,29 +1,54 @@
-
 // Financial Dashboard Component
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, ResponsiveContainer,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  Cell,
 } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, DollarSign, Briefcase, CreditCard, Bitcoin, AlertTriangle, TrendingUp, Upload, Link2, PenLine } from 'lucide-react';
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  DollarSign,
+  Briefcase,
+  CreditCard,
+  Bitcoin,
+  AlertTriangle,
+  TrendingUp,
+  Upload,
+  Link2,
+  PenLine,
+} from 'lucide-react';
 // Import lodash with type definitions
 import { get, sum, groupBy } from 'lodash';
 import type { get as GetType, sum as SumType, groupBy as GroupByType } from 'lodash';
 import AddDataModal from '@/components/dashboard/AddDataModal';
+import { normalizeFinancePayload, type FinanceCore } from '@/lib/finance/domainViewModel';
 // Remove @types/lodash import since types are included in lodash-es
 
 // Main dashboard component
 const FinancialDashboard = () => {
   // State for financial data with proper typing
-  const [accounts, setAccounts] = useState<{
-    id: string;
-    name: string;
-    type: 'banking' | 'investment' | 'credit';
-    balance: number;
-    institution: string;
-  }[]>([]);
+  const [accounts, setAccounts] = useState<
+    {
+      id: string;
+      name: string;
+      type: 'banking' | 'investment' | 'credit';
+      balance: number;
+      institution: string;
+    }[]
+  >([]);
   const [transactions, setTransactions] = useState<{
     dailySpending: Array<{
       date: string;
@@ -44,7 +69,7 @@ const FinancialDashboard = () => {
   }>({
     dailySpending: [],
     categorySpending: [],
-    recentTransactions: []
+    recentTransactions: [],
   });
   const [investments, setInvestments] = useState<{
     portfolioPerformance: Array<{
@@ -71,25 +96,31 @@ const FinancialDashboard = () => {
     holdings: [],
     totalValue: 0,
     dayChange: 0,
-    dayChangePercent: 0
+    dayChangePercent: 0,
   });
-  const [cryptoAssets, setCryptoAssets] = useState<{
-    symbol: string;
-    name: string;
-    quantity: number;
-    price: number;
-    value: number;
-    change24h: number;
-  }[]>([]);
+  const [cryptoAssets, setCryptoAssets] = useState<
+    {
+      symbol: string;
+      name: string;
+      quantity: number;
+      price: number;
+      value: number;
+      change24h: number;
+    }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState('month'); // week, month, year
   const [selectedAccount, setSelectedAccount] = useState('all');
   const [showAddDataModal, setShowAddDataModal] = useState(false);
-  
+  // Core API DomainViewModel metadata (authoritative money tiles, recommendations,
+  // missing-data flags). Null until the first successful fetch. Source-agnostic:
+  // populated from either the Core API shape or the legacy payload via the mapper.
+  const [core, setCore] = useState<FinanceCore | null>(null);
+
   // Colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
-  
+
   // Fetch data on component mount with comprehensive error handling
   const fetchFinancialData = useCallback(async () => {
     try {
@@ -125,9 +156,10 @@ const FinancialDashboard = () => {
             holdings: [],
             totalValue: 0,
             dayChange: 0,
-            dayChangePercent: 0
+            dayChangePercent: 0,
           });
           setCryptoAssets([]);
+          setCore(null);
           setError(null);
           setLoading(false);
           return;
@@ -138,22 +170,15 @@ const FinancialDashboard = () => {
 
       const data = await response.json();
 
-      // Validate and set data with fallbacks
-      setAccounts(Array.isArray(data?.accounts) ? data.accounts : []);
-      setTransactions({
-        dailySpending: Array.isArray(data?.transactions?.dailySpending) ? data.transactions.dailySpending : [],
-        categorySpending: Array.isArray(data?.transactions?.categorySpending) ? data.transactions.categorySpending : [],
-        recentTransactions: Array.isArray(data?.transactions?.recentTransactions) ? data.transactions.recentTransactions : []
-      });
-      setInvestments({
-        portfolioPerformance: Array.isArray(data?.investments?.portfolioPerformance) ? data.investments.portfolioPerformance : [],
-        assetAllocation: Array.isArray(data?.investments?.assetAllocation) ? data.investments.assetAllocation : [],
-        holdings: Array.isArray(data?.investments?.holdings) ? data.investments.holdings : [],
-        totalValue: Number(data?.investments?.totalValue) || 0,
-        dayChange: Number(data?.investments?.dayChange) || 0,
-        dayChangePercent: Number(data?.investments?.dayChangePercent) || 0
-      });
-      setCryptoAssets(Array.isArray(data?.cryptoAssets) ? data.cryptoAssets : []);
+      // Normalize EITHER the Core API DomainViewModel (proxy on) or the legacy
+      // payload (proxy off) into the shape the dashboard renders. All shape /
+      // Plaid coupling lives in the mapper — never in this component.
+      const norm = normalizeFinancePayload(data);
+      setAccounts(norm.accounts);
+      setTransactions(norm.transactions);
+      setInvestments(norm.investments);
+      setCryptoAssets(norm.cryptoAssets);
+      setCore(norm.core);
 
       setError(null);
       setLoading(false);
@@ -171,9 +196,10 @@ const FinancialDashboard = () => {
         holdings: [],
         totalValue: 0,
         dayChange: 0,
-        dayChangePercent: 0
+        dayChangePercent: 0,
       });
       setCryptoAssets([]);
+      setCore(null);
       setError(null); // Don't show error, show empty state instead
       setLoading(false);
     }
@@ -188,19 +214,19 @@ const FinancialDashboard = () => {
     try {
       const bankingTotal = Array.isArray(accounts)
         ? accounts
-            .filter(account => account?.type === 'banking')
+            .filter((account) => account?.type === 'banking')
             .reduce((sum, account) => sum + (Number(account?.balance) || 0), 0)
         : 0;
 
       const investmentTotal = Array.isArray(accounts)
         ? accounts
-            .filter(account => account?.type === 'investment')
+            .filter((account) => account?.type === 'investment')
             .reduce((sum, account) => sum + (Number(account?.balance) || 0), 0)
         : 0;
 
       const creditTotal = Array.isArray(accounts)
         ? accounts
-            .filter(account => account?.type === 'credit')
+            .filter((account) => account?.type === 'credit')
             .reduce((sum, account) => sum + (Number(account?.balance) || 0), 0)
         : 0;
 
@@ -215,7 +241,7 @@ const FinancialDashboard = () => {
         investmentTotal,
         creditTotal,
         cryptoTotal,
-        netWorth
+        netWorth,
       };
     } catch (err) {
       console.error('Error calculating totals:', err);
@@ -224,37 +250,50 @@ const FinancialDashboard = () => {
         investmentTotal: 0,
         creditTotal: 0,
         cryptoTotal: 0,
-        netWorth: 0
+        netWorth: 0,
       };
     }
   };
-  
+
   // Format currency
   const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD',
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 2,
     }).format(amount);
   };
-  
+
   // Group transactions by category
-  const transactionsByCategory = transactions.categorySpending.map(item => ({
+  const transactionsByCategory = transactions.categorySpending.map((item) => ({
     name: item.category,
-    value: item.amount
+    value: item.amount,
   }));
-  
+
   // Format date for charts
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
-  
+
   // Safely calculate totals with error handling
   const totals = calculateTotals();
-  const hasData = Array.isArray(accounts) && accounts.length > 0 ||
-                  (transactions?.dailySpending && Array.isArray(transactions.dailySpending) && transactions.dailySpending.length > 0);
+
+  // Money-tile display: prefer the backend's authoritative figures (Core API),
+  // fall back to the client-side sum (legacy payload). NEVER render a fake $0 when
+  // data is absent — show an em dash + a premium "connect" prompt instead.
+  const hasFinanceData =
+    (core?.hasData ?? false) || (Array.isArray(accounts) && accounts.length > 0);
+  const displayNetWorth = core?.netWorth ?? totals.netWorth;
+  const moneyTile = (value: number | null): string =>
+    hasFinanceData && value != null ? formatCurrency(value) : '—';
+
+  const hasData =
+    (Array.isArray(accounts) && accounts.length > 0) ||
+    (transactions?.dailySpending &&
+      Array.isArray(transactions.dailySpending) &&
+      transactions.dailySpending.length > 0);
 
   // Show loading state
   if (loading) {
@@ -274,7 +313,9 @@ const FinancialDashboard = () => {
       <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen flex items-center justify-center">
         <div className="text-center max-w-md">
           <div className="text-red-600 dark:text-red-400 text-5xl mb-4">⚠️</div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Unable to Load Financial Data</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Unable to Load Financial Data
+          </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
           <button
             onClick={() => window.location.reload()}
@@ -293,7 +334,7 @@ const FinancialDashboard = () => {
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Financial Dashboard</h1>
         <p className="text-gray-600 dark:text-gray-400">Your complete financial picture</p>
       </header>
-      
+
       {/* Time period selector */}
       <div className="mb-6 flex space-x-4">
         <button
@@ -315,7 +356,7 @@ const FinancialDashboard = () => {
           This Year
         </button>
       </div>
-      
+
       {/* Financial summary cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow-md">
@@ -323,41 +364,84 @@ const FinancialDashboard = () => {
             <h2 className="text-lg font-semibold text-gray-700">Net Worth</h2>
             <DollarSign className="text-blue-600" size={24} />
           </div>
-          <div className="text-2xl font-bold text-gray-900">{formatCurrency(totals.netWorth)}</div>
-          <div className="text-sm text-gray-500 mt-2">Total assets minus liabilities</div>
+          <div className="text-2xl font-bold text-gray-900">{moneyTile(displayNetWorth)}</div>
+          <div className="text-sm text-gray-500 mt-2">
+            {hasFinanceData
+              ? 'Total assets minus liabilities'
+              : 'Connect your accounts to see your net worth'}
+          </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-700">Bank Accounts</h2>
             <CreditCard className="text-green-600" size={24} />
           </div>
-          <div className="text-2xl font-bold text-gray-900">{formatCurrency(totals.bankingTotal)}</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {moneyTile(core?.cash ?? totals.bankingTotal)}
+          </div>
           <div className="text-sm text-gray-500 mt-2">Total balance across all accounts</div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-700">Investments</h2>
             <Briefcase className="text-purple-600" size={24} />
           </div>
-          <div className="text-2xl font-bold text-gray-900">{formatCurrency(totals.investmentTotal)}</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {moneyTile(totals.investmentTotal)}
+          </div>
           <div className="flex items-center text-sm text-green-600 mt-2">
             <ArrowUpRight size={16} className="mr-1" />
             <span>{investments.dayChangePercent.toFixed(2)}% today</span>
           </div>
         </div>
-        
+
         <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-700">Crypto</h2>
             <Bitcoin className="text-yellow-600" size={24} />
           </div>
-          <div className="text-2xl font-bold text-gray-900">{formatCurrency(totals.cryptoTotal)}</div>
+          <div className="text-2xl font-bold text-gray-900">{moneyTile(totals.cryptoTotal)}</div>
           <div className="text-sm text-gray-500 mt-2">{cryptoAssets.length} assets</div>
         </div>
       </div>
-      
+
+      {/* Recommended next moves — Core API H-contract recommendations */}
+      {core && core.recommendations.length > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4">Recommended next moves</h2>
+          <div className="space-y-4">
+            {core.recommendations.map((rec) => (
+              <div key={rec.id} className="border-l-4 border-blue-600 pl-4 py-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900">{rec.title}</h3>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full ${
+                      rec.priority === 'high'
+                        ? 'bg-red-100 text-red-700'
+                        : rec.priority === 'medium'
+                          ? 'bg-yellow-100 text-yellow-700'
+                          : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {rec.priority}
+                  </span>
+                </div>
+                <p className="text-sm text-gray-600 mt-1">{rec.why_it_matters}</p>
+                {rec.action_steps.length > 0 && (
+                  <ul className="list-disc list-inside text-sm text-gray-700 mt-2">
+                    {rec.action_steps.map((s, i) => (
+                      <li key={i}>{s.step}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         {/* Connected accounts */}
         <div className="bg-white p-6 rounded-lg shadow-md lg:col-span-1">
@@ -365,13 +449,18 @@ const FinancialDashboard = () => {
           {accounts.length > 0 ? (
             <>
               <div className="space-y-4">
-                {accounts.map(account => (
-                  <div key={account.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-md">
+                {accounts.map((account) => (
+                  <div
+                    key={account.id}
+                    className="flex justify-between items-center p-3 bg-gray-50 rounded-md"
+                  >
                     <div>
                       <div className="font-medium">{account.name}</div>
                       <div className="text-sm text-gray-500">{account.institution}</div>
                     </div>
-                    <div className={`font-semibold ${account.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                    <div
+                      className={`font-semibold ${account.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}
+                    >
                       {formatCurrency(account.balance)}
                     </div>
                   </div>
@@ -384,7 +473,9 @@ const FinancialDashboard = () => {
           ) : (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <div className="text-5xl mb-4">🏦</div>
-              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Accounts Connected</p>
+              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">
+                No Accounts Connected
+              </p>
               <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
                 Add your financial data to start tracking
               </p>
@@ -397,7 +488,7 @@ const FinancialDashboard = () => {
             </div>
           )}
         </div>
-        
+
         {/* Monthly spending */}
         <div className="bg-white p-6 rounded-lg shadow-md lg:col-span-2">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Spending Trends</h2>
@@ -432,7 +523,7 @@ const FinancialDashboard = () => {
           )}
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         {/* Spending by category */}
         <div className="bg-white p-6 rounded-lg shadow-md">
@@ -470,7 +561,7 @@ const FinancialDashboard = () => {
             </div>
           )}
         </div>
-        
+
         {/* Investment performance */}
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Investment Performance</h2>
@@ -481,11 +572,7 @@ const FinancialDashboard = () => {
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={formatDate}
-                  interval={5}
-                />
+                <XAxis dataKey="date" tickFormatter={formatDate} interval={5} />
                 <YAxis tickFormatter={(value) => `$${value.toLocaleString()}`} />
                 <Tooltip
                   formatter={(value) => [`$${value.toLocaleString()}`, 'Portfolio Value']}
@@ -497,7 +584,9 @@ const FinancialDashboard = () => {
           ) : (
             <div className="flex flex-col items-center justify-center h-[300px] text-center">
               <div className="text-5xl mb-4">💼</div>
-              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Investment Data</p>
+              <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">
+                No Investment Data
+              </p>
               <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
                 Add your investment data to track portfolio performance
               </p>
@@ -511,7 +600,7 @@ const FinancialDashboard = () => {
           )}
         </div>
       </div>
-      
+
       {/* Recent transactions */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Transactions</h2>
@@ -521,14 +610,22 @@ const FinancialDashboard = () => {
               <table className="min-w-full bg-white">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Description
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {transactions.recentTransactions.map(transaction => (
+                  {transactions.recentTransactions.map((transaction) => (
                     <tr key={transaction.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(transaction.date)}
@@ -539,9 +636,11 @@ const FinancialDashboard = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {transaction.category}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
-                        transaction.amount < 0 ? 'text-red-600' : 'text-green-600'
-                      }`}>
+                      <td
+                        className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                          transaction.amount < 0 ? 'text-red-600' : 'text-green-600'
+                        }`}
+                      >
                         {formatCurrency(transaction.amount)}
                       </td>
                     </tr>
@@ -565,7 +664,7 @@ const FinancialDashboard = () => {
           </div>
         )}
       </div>
-      
+
       {/* Financial insights */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Financial Insights</h2>
@@ -576,7 +675,9 @@ const FinancialDashboard = () => {
         ) : (
           <div className="text-center py-8">
             <div className="text-5xl mb-4">💡</div>
-            <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">No Insights Available</p>
+            <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">
+              No Insights Available
+            </p>
             <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
               Connect your accounts to receive personalized financial insights
             </p>

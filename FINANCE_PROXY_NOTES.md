@@ -14,17 +14,30 @@ to the Core API.
 
 ## Cutover sequence (do in order)
 
-1. Deploy `lifenavigator-core-api` to Fly; smoke `/v1/finance/summary` (see `apps/lifenavigator-core-api/DEPLOYMENT.md`).
-2. Update the finance page (`dashboard/finance/page.tsx`) to consume the Core API
-   **`DomainViewModel`** shape (`data.net_worth`, `data.accounts`, …) instead of the
-   legacy `{accounts, transactions:{...}}` shape. This is the only frontend change
-   and is intentionally **not** done in F3 (scope = proxy wiring, not UI rework).
-3. Set `CORE_API_URL` on Vercel → the proxy activates.
-4. Verify the finance dashboard renders from the Core API; then remove the legacy
+1. ✅ **DONE** — Deploy `lifenavigator-core-api` to Fly; smoke `/v1/finance/summary`
+   (see `apps/lifenavigator-core-api/DEPLOYMENT.md`). Live at
+   `https://lifenavigator-core-api.fly.dev`.
+2. ✅ **DONE** — The finance page now consumes the Core API `DomainViewModel`
+   through the typed mapper `apps/web/src/lib/finance/domainViewModel.ts`. The page
+   accepts BOTH shapes (DVM when the proxy is on, legacy when off); all shape/Plaid
+   coupling lives in the mapper. Money tiles render an em dash + premium prompt when
+   absent — never a fake `$0`. H-contract recommendations render. `pnpm type-check`
+   clean; mapper unit tests green.
+3. ⏳ **GATING ITEM — do before flipping `CORE_API_URL`:** the proxy returns only
+   `/v1/finance/summary`, which has **no transactions / cash-flow / investments
+   detail**. With the proxy on, the hero tiles + accounts + recommendations render
+   from the Core API, but the **spending charts and recent-transactions sections go
+   empty** (graceful empty states, not errors). To preserve the full dashboard,
+   either (a) add thin proxy routes for `/v1/finance/transactions` + `/cash-flow` +
+   `/investments` and have the page fetch them, or (b) accept the interim reduced
+   detail. **`CORE_API_URL` is intentionally NOT set yet** for this reason.
+4. Set `CORE_API_URL=https://lifenavigator-core-api.fly.dev` on Vercel → the proxy
+   activates. Verify the dashboard renders from the Core API; then remove the legacy
    aggregation logic from the route (it becomes a pure proxy).
 
 ## Why gated
 
-The Core API view-model differs from the legacy `/api/financial` payload. Flipping
-the env before the page is updated would change the response shape. Gating keeps
-prod safe and makes the cutover a deliberate, reversible step.
+The Core API view-model differs from the legacy `/api/financial` payload, and the
+summary endpoint omits transaction/investment detail. Flipping before step 3 would
+empty the spending charts. Gating keeps prod premium and makes the cutover a
+deliberate, reversible step. The page itself is already cutover-ready (step 2).
