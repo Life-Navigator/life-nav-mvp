@@ -226,6 +226,16 @@ pub enum EntityType {
     Program,
     ProgramComparison,
     EducationRecommendation,
+    // ---- Family F1 (migration 131) ----
+    // Reuses legacy FamilyMember (lifestyle) — distinct from FamilyProfile.
+    FamilyProfile,
+    Dependent,
+    SpouseProfile,
+    GuardianshipPlan,
+    EstatePlan,
+    InsuranceProfile,
+    CollegePlanning,
+    FamilyRecommendation,
     /// Catch-all so a new sync-queue entity_type doesn't crash the worker;
     /// the normalizer skips unknown types.
     #[serde(other)]
@@ -406,6 +416,15 @@ impl EntityType {
             EntityType::Program => "program",
             EntityType::ProgramComparison => "program_comparison",
             EntityType::EducationRecommendation => "education_recommendation",
+            // Family F1
+            EntityType::FamilyProfile => "family_profile",
+            EntityType::Dependent => "dependent",
+            EntityType::SpouseProfile => "spouse_profile",
+            EntityType::GuardianshipPlan => "guardianship_plan",
+            EntityType::EstatePlan => "estate_plan",
+            EntityType::InsuranceProfile => "insurance_profile",
+            EntityType::CollegePlanning => "college_planning",
+            EntityType::FamilyRecommendation => "family_recommendation",
             EntityType::Unknown => "unknown",
         }
     }
@@ -504,6 +523,15 @@ impl EntityType {
             | EntityType::EducationRecommendation => "education",
 
             EntityType::FamilyMember | EntityType::LifestyleGoal => "lifestyle",
+
+            EntityType::FamilyProfile
+            | EntityType::Dependent
+            | EntityType::SpouseProfile
+            | EntityType::GuardianshipPlan
+            | EntityType::EstatePlan
+            | EntityType::InsuranceProfile
+            | EntityType::CollegePlanning
+            | EntityType::FamilyRecommendation => "family",
 
             EntityType::EstateProfile | EntityType::EstateBeneficiary => "estate",
 
@@ -628,7 +656,13 @@ impl EntityType {
             | EntityType::JobApplication
             | EntityType::Interview
             | EntityType::CompensationRecord
-            | EntityType::CompensationProjection => SensitivityLevel::High,
+            | EntityType::CompensationProjection
+            // Family: dependents (minors) / spouse / estate / guardianship / insurance → High.
+            | EntityType::Dependent
+            | EntityType::SpouseProfile
+            | EntityType::GuardianshipPlan
+            | EntityType::EstatePlan
+            | EntityType::InsuranceProfile => SensitivityLevel::High,
 
             EntityType::FinancialAccount
             | EntityType::Debt
@@ -678,7 +712,11 @@ impl EntityType {
             | EntityType::School
             | EntityType::Program
             | EntityType::ProgramComparison
-            | EntityType::EducationRecommendation => SensitivityLevel::Medium,
+            | EntityType::EducationRecommendation
+            // Family: household profile / college planning / recommendations → Medium.
+            | EntityType::FamilyProfile
+            | EntityType::CollegePlanning
+            | EntityType::FamilyRecommendation => SensitivityLevel::Medium,
 
             // Labels / meta (no raw figures) → Low: BudgetCategory, ExpenseCategory,
             // Assumption, Tradeoff, AdviceBoundary fall through to the default.
@@ -880,6 +918,40 @@ mod entity_type_tests {
                 matches!(got.sensitivity(), SensitivityLevel::Medium),
                 "{s} sensitivity"
             );
+        }
+    }
+
+    // ---- Family F1 ----
+    #[test]
+    fn family_entities_round_trip_domain_sensitivity() {
+        use super::SensitivityLevel;
+        let high = [
+            "dependent",
+            "spouse_profile",
+            "guardianship_plan",
+            "estate_plan",
+            "insurance_profile",
+        ];
+        for s in [
+            "family_profile",
+            "dependent",
+            "spouse_profile",
+            "guardianship_plan",
+            "estate_plan",
+            "insurance_profile",
+            "college_planning",
+            "family_recommendation",
+        ] {
+            let got = EntityType::from_queue_str(s);
+            assert!(!matches!(got, EntityType::Unknown), "{s} -> Unknown");
+            assert_eq!(got.as_str(), s, "round-trip {s}");
+            assert_eq!(got.domain(), "family", "{s} domain");
+            let want = if high.contains(&s) {
+                SensitivityLevel::High
+            } else {
+                SensitivityLevel::Medium
+            };
+            assert_eq!(got.sensitivity().as_str(), want.as_str(), "{s} sensitivity");
         }
     }
 }

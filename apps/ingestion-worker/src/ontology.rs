@@ -215,6 +215,29 @@ const PROGRAM: &[IncomingEdge] = &[
 const PROGRAM_COMPARISON: &[IncomingEdge] = &[user("HAS_PROGRAM_COMPARISON")];
 const EDUCATION_RECOMMENDATION: &[IncomingEdge] = &[user("HAS_RECOMMENDATION")];
 
+// ── Family ontology (migration 131) ──────────────────────────────────────────
+// User-anchored (required) so no mapped Family entity falls back to RELATED_TO.
+// Dependent COVERS_DEPENDENT edge declared because the X1 FK (dependents.
+// guardianship_plan_id) exists + reads naturally as (:GuardianshipPlan)-[:COVERS_
+// DEPENDENT]->(:Dependent). Cross-domain links (FamilyGoal FUNDED_BY FinancialGoal,
+// CollegePlanning -> Education cost, ProtectionItem ADDRESSES InsuranceNeed) are
+// documented extension points in CAREER_EDUCATION_FAMILY_ONTOLOGY — NOT faked here.
+const FAMILY_PROFILE: &[IncomingEdge] = &[user("HAS_FAMILY")];
+const DEPENDENT: &[IncomingEdge] = &[
+    user("HAS_DEPENDENT"),
+    fk(
+        "COVERS_DEPENDENT",
+        "guardianship_plan",
+        "guardianship_plan_id",
+    ),
+];
+const SPOUSE_PROFILE: &[IncomingEdge] = &[user("HAS_SPOUSE")];
+const GUARDIANSHIP_PLAN: &[IncomingEdge] = &[user("HAS_GUARDIANSHIP_PLAN")];
+const ESTATE_PLAN: &[IncomingEdge] = &[user("HAS_ESTATE_PLAN")];
+const INSURANCE_PROFILE: &[IncomingEdge] = &[user("HAS_INSURANCE_PROFILE")];
+const COLLEGE_PLANNING: &[IncomingEdge] = &[user("HAS_COLLEGE_PLAN")];
+const FAMILY_RECOMMENDATION: &[IncomingEdge] = &[user("HAS_RECOMMENDATION")];
+
 /// Registry lookup: the declared incoming edges for an entity type.
 ///
 /// Returns a non-empty slice for entities the ontology registry owns (finance
@@ -287,6 +310,15 @@ pub fn incoming_edges(et: &EntityType) -> &'static [IncomingEdge] {
         EntityType::Program => PROGRAM,
         EntityType::ProgramComparison => PROGRAM_COMPARISON,
         EntityType::EducationRecommendation => EDUCATION_RECOMMENDATION,
+        // Family (migration 131).
+        EntityType::FamilyProfile => FAMILY_PROFILE,
+        EntityType::Dependent => DEPENDENT,
+        EntityType::SpouseProfile => SPOUSE_PROFILE,
+        EntityType::GuardianshipPlan => GUARDIANSHIP_PLAN,
+        EntityType::EstatePlan => ESTATE_PLAN,
+        EntityType::InsuranceProfile => INSURANCE_PROFILE,
+        EntityType::CollegePlanning => COLLEGE_PLANNING,
+        EntityType::FamilyRecommendation => FAMILY_RECOMMENDATION,
         _ => &[],
     }
 }
@@ -361,6 +393,14 @@ pub fn domain_of(et: &EntityType) -> Domain {
         | EntityType::Program
         | EntityType::ProgramComparison
         | EntityType::EducationRecommendation => Domain::Education,
+        EntityType::FamilyProfile
+        | EntityType::Dependent
+        | EntityType::SpouseProfile
+        | EntityType::GuardianshipPlan
+        | EntityType::EstatePlan
+        | EntityType::InsuranceProfile
+        | EntityType::CollegePlanning
+        | EntityType::FamilyRecommendation => Domain::Family,
         _ => Domain::General,
     }
 }
@@ -480,5 +520,39 @@ mod career_tests {
             .filter(|e| matches!(e.from, EdgeFrom::PayloadFk { field, .. } if field == "school_id"))
             .collect();
         assert!(p.iter().any(|e| e.rel_type == "OFFERS" && !e.required));
+    }
+
+    #[test]
+    fn family_entities_registry_mapped_and_user_anchored() {
+        let cases = [
+            (EntityType::FamilyProfile, "HAS_FAMILY"),
+            (EntityType::Dependent, "HAS_DEPENDENT"),
+            (EntityType::SpouseProfile, "HAS_SPOUSE"),
+            (EntityType::GuardianshipPlan, "HAS_GUARDIANSHIP_PLAN"),
+            (EntityType::EstatePlan, "HAS_ESTATE_PLAN"),
+            (EntityType::InsuranceProfile, "HAS_INSURANCE_PROFILE"),
+            (EntityType::CollegePlanning, "HAS_COLLEGE_PLAN"),
+            (EntityType::FamilyRecommendation, "HAS_RECOMMENDATION"),
+        ];
+        for (et, rel) in cases {
+            assert!(
+                is_registry_mapped(&et),
+                "{et:?} not mapped (would RELATED_TO)"
+            );
+            assert_eq!(domain_of(&et), Domain::Family, "{et:?} domain_of");
+            let edges = incoming_edges(&et);
+            let anchor = edges
+                .iter()
+                .find(|e| matches!(e.from, EdgeFrom::UserAnchor))
+                .expect("anchor");
+            assert_eq!(anchor.rel_type, rel, "{et:?}");
+            assert!(edges.iter().all(|e| e.rel_type != "RELATED_TO"));
+        }
+        // Dependent COVERS_DEPENDENT via the X1 guardianship_plan_id FK (optional).
+        let d: Vec<_> = incoming_edges(&EntityType::Dependent).iter()
+            .filter(|e| matches!(e.from, EdgeFrom::PayloadFk { field, .. } if field == "guardianship_plan_id")).collect();
+        assert!(d
+            .iter()
+            .any(|e| e.rel_type == "COVERS_DEPENDENT" && !e.required));
     }
 }

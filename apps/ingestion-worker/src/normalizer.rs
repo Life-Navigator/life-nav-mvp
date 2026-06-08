@@ -74,11 +74,12 @@ pub fn expand_children(job: &SyncQueueJob, now: DateTime<Utc>) -> Vec<CanonicalG
             | EntityType::HealthRecommendation
             | EntityType::CareerRecommendation
             | EntityType::EducationRecommendation
+            | EntityType::FamilyRecommendation
     ) {
         return Vec::new();
     }
     // Children link to THIS recommendation's type (financial_/health_/career_/
-    // education_recommendation), so the fan-out is domain-generic.
+    // education_/family_recommendation), so the fan-out is domain-generic.
     let parent_label = parent.as_str();
     let payload = job.payload.as_object().cloned().unwrap_or_default();
     let rec_id = job.entity_id.clone();
@@ -365,6 +366,22 @@ fn build_title(et: &EntityType, attrs: &Map<String, Value>) -> String {
         EntityType::ProgramComparison => {
             by_key(&["title"]).unwrap_or_else(|| "Program comparison".into())
         }
+        // Family F1
+        EntityType::Dependent => by_key(&["relationship"])
+            .map(|r| format!("Dependent ({r})"))
+            .unwrap_or_else(|| "Dependent".into()),
+        EntityType::SpouseProfile => "Spouse/partner profile".into(),
+        EntityType::GuardianshipPlan => by_key(&["status"])
+            .map(|s| format!("Guardianship plan ({s})"))
+            .unwrap_or_else(|| "Guardianship plan".into()),
+        EntityType::EstatePlan => by_key(&["status"])
+            .map(|s| format!("Estate plan ({s})"))
+            .unwrap_or_else(|| "Estate plan".into()),
+        EntityType::InsuranceProfile => "Insurance profile".into(),
+        EntityType::CollegePlanning => by_key(&["vehicle"])
+            .map(|v| format!("College plan ({v})"))
+            .unwrap_or_else(|| "College planning".into()),
+        EntityType::FamilyProfile => "Family profile".into(),
         _ => by_key(&["title", "name", "label", "action"]).unwrap_or_else(|| et.as_str().into()),
     }
 }
@@ -1216,6 +1233,30 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
         ]),
         EntityType::ProgramComparison => parts_for(&["title", "status"]),
         EntityType::EducationRecommendation => parts_for(&[
+            "title",
+            "description",
+            "recommendation_type",
+            "priority",
+            "confidence",
+            "status",
+        ]),
+        // Family F1 — curated; minimal PII (relationships/bands/flags, never names).
+        EntityType::FamilyProfile => {
+            parts_for(&["household_size", "marital_status", "num_dependents"])
+        }
+        EntityType::Dependent => parts_for(&["relationship", "birth_year"]),
+        EntityType::SpouseProfile => parts_for(&["employment_status", "income_band"]),
+        EntityType::GuardianshipPlan => parts_for(&["status", "designated_guardian"]),
+        EntityType::EstatePlan => {
+            parts_for(&["status", "has_will", "has_poa", "has_beneficiaries"])
+        }
+        EntityType::InsuranceProfile => {
+            parts_for(&["life_coverage", "disability_coverage", "currency"])
+        }
+        EntityType::CollegePlanning => {
+            parts_for(&["target_year", "projected_cost", "saved_amount", "vehicle"])
+        }
+        EntityType::FamilyRecommendation => parts_for(&[
             "title",
             "description",
             "recommendation_type",
@@ -2198,6 +2239,112 @@ mod tests {
                 .iter()
                 .any(|r| r.target_entity_type == "education_recommendation"
                     && r.target_entity_id == "EREC1"));
+            assert!(c.relationships.iter().all(|r| r.label != "RELATED_TO"));
+        }
+        assert!(children.iter().any(|c| c.entity_type == "evidence"
+            && c.relationships.iter().any(|r| r.label == "HAS_EVIDENCE")));
+        assert!(children.iter().any(|c| c.entity_type == "advice_boundary"));
+    }
+
+    // ---- Family F1 ----
+    #[test]
+    fn family_entities_normalize_and_user_anchor_edges() {
+        let cases = [
+            (
+                "family_profile",
+                json!({"household_size": 4, "marital_status": "married", "num_dependents": 2}),
+                "HAS_FAMILY",
+            ),
+            (
+                "dependent",
+                json!({"relationship": "child", "birth_year": 2015}),
+                "HAS_DEPENDENT",
+            ),
+            (
+                "spouse_profile",
+                json!({"employment_status": "employed", "income_band": "80-100k"}),
+                "HAS_SPOUSE",
+            ),
+            (
+                "guardianship_plan",
+                json!({"status": "designated", "designated_guardian": "sibling"}),
+                "HAS_GUARDIANSHIP_PLAN",
+            ),
+            (
+                "estate_plan",
+                json!({"status": "incomplete", "has_will": false}),
+                "HAS_ESTATE_PLAN",
+            ),
+            (
+                "insurance_profile",
+                json!({"life_coverage": 500000, "disability_coverage": 0}),
+                "HAS_INSURANCE_PROFILE",
+            ),
+            (
+                "college_planning",
+                json!({"target_year": 2033, "projected_cost": 120000, "vehicle": "529"}),
+                "HAS_COLLEGE_PLAN",
+            ),
+            (
+                "family_recommendation",
+                json!({"title": "Add term life coverage", "recommendation_type": "insurance_gap", "priority": "high"}),
+                "HAS_RECOMMENDATION",
+            ),
+        ];
+        for (et, payload, rel) in cases {
+            let c = normalize(&job_with(et, payload), Utc::now()).unwrap();
+            assert_eq!(c.entity_type, et, "{et}: entity_type");
+            assert_ne!(c.entity_type, "unknown", "{et}: unknown");
+            assert!(!c.title.trim().is_empty(), "{et}: empty title");
+            assert!(!c.summary.trim().is_empty(), "{et}: empty summary");
+            assert_eq!(c.domain, "family", "{et}: domain");
+            assert!(
+                has_edge(&c.relationships, rel, "user_profile"),
+                "{et}: missing {rel}"
+            );
+            assert!(
+                c.relationships.iter().all(|r| r.label != "RELATED_TO"),
+                "{et}: RELATED_TO"
+            );
+        }
+    }
+
+    #[test]
+    fn dependent_covers_edge_only_with_guardian_fk() {
+        let gid = Uuid::new_v4().to_string();
+        let with_fk = rels(
+            "dependent",
+            json!({"relationship": "child", "guardianship_plan_id": gid}),
+        );
+        assert!(with_fk
+            .iter()
+            .any(|r| r.label == "COVERS_DEPENDENT" && r.target_entity_type == "guardianship_plan"));
+        let no_fk = rels("dependent", json!({"relationship": "child"}));
+        assert!(!no_fk.iter().any(|r| r.label == "COVERS_DEPENDENT"));
+        assert!(has_edge(&no_fk, "HAS_DEPENDENT", "user_profile"));
+    }
+
+    #[test]
+    fn family_recommendation_fans_out() {
+        let mut job = job_with(
+            "family_recommendation",
+            json!({
+                "title": "Close your life-insurance gap",
+                "recommendation_type": "insurance_gap",
+                "evidence_json": [{"metric_name": "coverage_gap", "metric_value": "400000", "source_table": "family.insurance_profiles", "confidence": 0.7, "explanation": "need minus coverage"}],
+                "assumptions_json": [{"assumption_text": "income replacement multiple = 10x", "confidence": 0.6}],
+                "governance_verdict": {"passed": true, "boundary_type": "family_planning", "disclaimer_text": "Planning guidance; consult a licensed agent/advisor"}
+            }),
+        );
+        job.entity_id = "FREC1".into();
+        let children = expand_children(&job, Utc::now());
+        assert_eq!(children.len(), 3);
+        for c in &children {
+            assert!(c
+                .relationships
+                .iter()
+                .any(|r| r.target_entity_type == "family_recommendation"
+                    && r.target_entity_id == "FREC1"));
             assert!(c.relationships.iter().all(|r| r.label != "RELATED_TO"));
         }
         assert!(children.iter().any(|c| c.entity_type == "evidence"
