@@ -202,6 +202,21 @@ pub enum EntityType {
     MedicalExpense,
     BenefitDeadline,
     HealthRecommendation,
+    // ---- Career X2 (migration 122) ----
+    // Reuses legacy CareerProfile / JobApplication / Skill / Certification above.
+    CareerGoal,
+    ExperienceRecord,
+    UserSkill,
+    SkillGap,
+    Credential,
+    Degree,
+    Resume,
+    PortfolioItem,
+    JobTarget,
+    Interview,
+    CompensationRecord,
+    CompensationProjection,
+    CareerRecommendation,
     /// Catch-all so a new sync-queue entity_type doesn't crash the worker;
     /// the normalizer skips unknown types.
     #[serde(other)]
@@ -360,6 +375,20 @@ impl EntityType {
             EntityType::LeadPackageConsent => "lead_package_consent",
             EntityType::ConciergePreference => "concierge_preference",
             EntityType::ArcanaMembership => "arcana_membership",
+            // Career X2
+            EntityType::CareerGoal => "career_goal",
+            EntityType::ExperienceRecord => "experience_record",
+            EntityType::UserSkill => "user_skill",
+            EntityType::SkillGap => "skill_gap",
+            EntityType::Credential => "credential",
+            EntityType::Degree => "degree",
+            EntityType::Resume => "resume",
+            EntityType::PortfolioItem => "portfolio_item",
+            EntityType::JobTarget => "job_target",
+            EntityType::Interview => "interview",
+            EntityType::CompensationRecord => "compensation_record",
+            EntityType::CompensationProjection => "compensation_projection",
+            EntityType::CareerRecommendation => "career_recommendation",
             EntityType::Unknown => "unknown",
         }
     }
@@ -427,7 +456,22 @@ impl EntityType {
             | EntityType::InsuranceDocument
             | EntityType::BenefitProfile => "insurance",
 
-            EntityType::CareerProfile | EntityType::JobApplication | EntityType::Skill => "career",
+            EntityType::CareerProfile
+            | EntityType::JobApplication
+            | EntityType::Skill
+            | EntityType::CareerGoal
+            | EntityType::ExperienceRecord
+            | EntityType::UserSkill
+            | EntityType::SkillGap
+            | EntityType::Credential
+            | EntityType::Degree
+            | EntityType::Resume
+            | EntityType::PortfolioItem
+            | EntityType::JobTarget
+            | EntityType::Interview
+            | EntityType::CompensationRecord
+            | EntityType::CompensationProjection
+            | EntityType::CareerRecommendation => "career",
 
             EntityType::Certification
             | EntityType::EducationRecord
@@ -553,7 +597,14 @@ impl EntityType {
             | EntityType::SleepLog
             | EntityType::ActivityLog
             | EntityType::BodyMetric
-            | EntityType::MedicalExpense => SensitivityLevel::High,
+            | EntityType::MedicalExpense
+            // Career: identity / employer history / actual compensation → High.
+            | EntityType::CareerProfile
+            | EntityType::Resume
+            | EntityType::JobApplication
+            | EntityType::Interview
+            | EntityType::CompensationRecord
+            | EntityType::CompensationProjection => SensitivityLevel::High,
 
             EntityType::FinancialAccount
             | EntityType::Debt
@@ -584,7 +635,18 @@ impl EntityType {
             | EntityType::WellnessHabit
             | EntityType::HealthSpendingAccount
             | EntityType::BenefitDeadline
-            | EntityType::HealthRecommendation => SensitivityLevel::Medium,
+            | EntityType::HealthRecommendation
+            // Career: goals / skills / credentials / aspirations / recommendations → Medium.
+            | EntityType::CareerGoal
+            | EntityType::ExperienceRecord
+            | EntityType::Skill
+            | EntityType::UserSkill
+            | EntityType::SkillGap
+            | EntityType::Credential
+            | EntityType::Degree
+            | EntityType::PortfolioItem
+            | EntityType::JobTarget
+            | EntityType::CareerRecommendation => SensitivityLevel::Medium,
 
             // Labels / meta (no raw figures) → Low: BudgetCategory, ExpenseCategory,
             // Assumption, Tradeoff, AdviceBoundary fall through to the default.
@@ -690,5 +752,78 @@ mod entity_type_tests {
         assert!(matches!(et, EntityType::RiskAssessment), "got {et:?}");
         assert!(!matches!(et, EntityType::Unknown));
         assert_eq!(EntityType::RiskAssessment.as_str(), "risk_assessment");
+    }
+
+    // ---- Career X2 ----
+    #[test]
+    fn career_entities_round_trip() {
+        for s in [
+            "career_goal",
+            "experience_record",
+            "user_skill",
+            "skill_gap",
+            "credential",
+            "degree",
+            "resume",
+            "portfolio_item",
+            "job_target",
+            "interview",
+            "compensation_record",
+            "compensation_projection",
+            "career_recommendation",
+        ] {
+            let got = EntityType::from_queue_str(s);
+            assert!(!matches!(got, EntityType::Unknown), "{s} -> Unknown");
+            assert_eq!(got.as_str(), s, "round-trip {s}");
+        }
+    }
+
+    #[test]
+    fn career_domain_is_career() {
+        for et in [
+            EntityType::CareerProfile,
+            EntityType::CareerGoal,
+            EntityType::JobTarget,
+            EntityType::CompensationRecord,
+            EntityType::CompensationProjection,
+            EntityType::UserSkill,
+            EntityType::SkillGap,
+            EntityType::CareerRecommendation,
+        ] {
+            assert_eq!(et.domain(), "career", "{et:?}");
+        }
+    }
+
+    #[test]
+    fn career_sensitivity_mapping() {
+        use super::SensitivityLevel;
+        for et in [
+            EntityType::CareerProfile,
+            EntityType::Resume,
+            EntityType::JobApplication,
+            EntityType::Interview,
+            EntityType::CompensationRecord,
+            EntityType::CompensationProjection,
+        ] {
+            assert!(
+                matches!(et.sensitivity(), SensitivityLevel::High),
+                "{et:?} expected High"
+            );
+        }
+        for et in [
+            EntityType::CareerGoal,
+            EntityType::Skill,
+            EntityType::UserSkill,
+            EntityType::SkillGap,
+            EntityType::Credential,
+            EntityType::Degree,
+            EntityType::JobTarget,
+            EntityType::CareerRecommendation,
+        ] {
+            assert!(
+                matches!(et.sensitivity(), SensitivityLevel::Medium),
+                "{et:?} expected Medium"
+            );
+        }
     }
 }

@@ -163,6 +163,41 @@ const MEDICAL_EXPENSE: &[IncomingEdge] = &[user("LOGGED")];
 const BENEFIT_DEADLINE: &[IncomingEdge] = &[user("HAS_BENEFIT_DEADLINE")];
 const HEALTH_RECOMMENDATION: &[IncomingEdge] = &[user("HAS_RECOMMENDATION")];
 
+// ── Career ontology (migration 122) ─────────────────────────────────────────
+// Every Career entity is user-anchored (required) so none falls back to RELATED_TO.
+// Inter-entity FK edges are declared ONLY where the X1 schema FK exists and reads
+// naturally as (:Source)-[rel]->(:Processed). Reverse-direction links (CareerGoal→
+// JobTarget, JobTarget→Skill, QUALIFIES_FOR, cross-domain IMPACTS/AFFECTS_CASHFLOW/
+// SUPPORTS_GOAL) are documented extension points in CAREER_EDUCATION_FAMILY_ONTOLOGY —
+// NOT faked here (no FK / outgoing-edge support yet).
+const CAREER_PROFILE: &[IncomingEdge] = &[user("HAS_CAREER")];
+const CAREER_GOAL: &[IncomingEdge] = &[user("HAS_GOAL")];
+const EXPERIENCE_RECORD: &[IncomingEdge] = &[user("HAS_EXPERIENCE")];
+const SKILL: &[IncomingEdge] = &[user("HAS_SKILL")];
+const USER_SKILL: &[IncomingEdge] = &[
+    user("HAS_SKILL"),
+    fk("HAS_PROFICIENCY", "skill", "skill_id"),
+];
+const SKILL_GAP: &[IncomingEdge] = &[user("HAS_SKILL_GAP")];
+const CREDENTIAL: &[IncomingEdge] = &[user("HAS_CREDENTIAL")];
+const CERTIFICATION: &[IncomingEdge] = &[user("HAS_CERTIFICATION")];
+const DEGREE: &[IncomingEdge] = &[user("HAS_DEGREE")];
+const RESUME: &[IncomingEdge] = &[user("HAS_RESUME")];
+const PORTFOLIO_ITEM: &[IncomingEdge] = &[user("HAS_PORTFOLIO_ITEM")];
+const JOB_TARGET: &[IncomingEdge] = &[user("TARGETS_ROLE")];
+const JOB_APPLICATION: &[IncomingEdge] = &[user("HAS_APPLICATION")];
+const INTERVIEW: &[IncomingEdge] = &[
+    user("HAS_INTERVIEW"),
+    fk(
+        "INCLUDES_INTERVIEW",
+        "job_application",
+        "job_application_id",
+    ),
+];
+const COMPENSATION_RECORD: &[IncomingEdge] = &[user("HAS_COMPENSATION")];
+const COMPENSATION_PROJECTION: &[IncomingEdge] = &[user("HAS_COMPENSATION_PROJECTION")];
+const CAREER_RECOMMENDATION: &[IncomingEdge] = &[user("HAS_RECOMMENDATION")];
+
 /// Registry lookup: the declared incoming edges for an entity type.
 ///
 /// Returns a non-empty slice for entities the ontology registry owns (finance
@@ -209,6 +244,24 @@ pub fn incoming_edges(et: &EntityType) -> &'static [IncomingEdge] {
         EntityType::MedicalExpense => MEDICAL_EXPENSE,
         EntityType::BenefitDeadline => BENEFIT_DEADLINE,
         EntityType::HealthRecommendation => HEALTH_RECOMMENDATION,
+        // Career (migration 122).
+        EntityType::CareerProfile => CAREER_PROFILE,
+        EntityType::CareerGoal => CAREER_GOAL,
+        EntityType::ExperienceRecord => EXPERIENCE_RECORD,
+        EntityType::Skill => SKILL,
+        EntityType::UserSkill => USER_SKILL,
+        EntityType::SkillGap => SKILL_GAP,
+        EntityType::Credential => CREDENTIAL,
+        EntityType::Certification => CERTIFICATION,
+        EntityType::Degree => DEGREE,
+        EntityType::Resume => RESUME,
+        EntityType::PortfolioItem => PORTFOLIO_ITEM,
+        EntityType::JobTarget => JOB_TARGET,
+        EntityType::JobApplication => JOB_APPLICATION,
+        EntityType::Interview => INTERVIEW,
+        EntityType::CompensationRecord => COMPENSATION_RECORD,
+        EntityType::CompensationProjection => COMPENSATION_PROJECTION,
+        EntityType::CareerRecommendation => CAREER_RECOMMENDATION,
         _ => &[],
     }
 }
@@ -259,6 +312,108 @@ pub fn domain_of(et: &EntityType) -> Domain {
         | EntityType::MedicalExpense
         | EntityType::BenefitDeadline
         | EntityType::HealthRecommendation => Domain::Health,
+        EntityType::CareerProfile
+        | EntityType::CareerGoal
+        | EntityType::ExperienceRecord
+        | EntityType::Skill
+        | EntityType::UserSkill
+        | EntityType::SkillGap
+        | EntityType::Credential
+        | EntityType::Certification
+        | EntityType::Degree
+        | EntityType::Resume
+        | EntityType::PortfolioItem
+        | EntityType::JobTarget
+        | EntityType::JobApplication
+        | EntityType::Interview
+        | EntityType::CompensationRecord
+        | EntityType::CompensationProjection
+        | EntityType::CareerRecommendation => Domain::Career,
         _ => Domain::General,
+    }
+}
+
+#[cfg(test)]
+mod career_tests {
+    use super::*;
+
+    /// Every mapped Career entity has at least one incoming edge → it can NEVER
+    /// fall back to RELATED_TO.
+    #[test]
+    fn all_career_entities_registry_mapped() {
+        for et in [
+            EntityType::CareerProfile,
+            EntityType::CareerGoal,
+            EntityType::ExperienceRecord,
+            EntityType::Skill,
+            EntityType::UserSkill,
+            EntityType::SkillGap,
+            EntityType::Credential,
+            EntityType::Certification,
+            EntityType::Degree,
+            EntityType::Resume,
+            EntityType::PortfolioItem,
+            EntityType::JobTarget,
+            EntityType::JobApplication,
+            EntityType::Interview,
+            EntityType::CompensationRecord,
+            EntityType::CompensationProjection,
+            EntityType::CareerRecommendation,
+        ] {
+            assert!(
+                is_registry_mapped(&et),
+                "{et:?} not registry-mapped (would RELATED_TO)"
+            );
+            assert_eq!(domain_of(&et), Domain::Career, "{et:?} wrong domain_of");
+        }
+    }
+
+    #[test]
+    fn career_user_anchor_edges_are_typed_and_required() {
+        let cases = [
+            (EntityType::CareerProfile, "HAS_CAREER"),
+            (EntityType::CareerGoal, "HAS_GOAL"),
+            (EntityType::ExperienceRecord, "HAS_EXPERIENCE"),
+            (EntityType::UserSkill, "HAS_SKILL"),
+            (EntityType::JobTarget, "TARGETS_ROLE"),
+            (EntityType::CompensationRecord, "HAS_COMPENSATION"),
+            (
+                EntityType::CompensationProjection,
+                "HAS_COMPENSATION_PROJECTION",
+            ),
+            (EntityType::CareerRecommendation, "HAS_RECOMMENDATION"),
+        ];
+        for (et, rel) in cases {
+            let edges = incoming_edges(&et);
+            let anchor = edges
+                .iter()
+                .find(|e| matches!(e.from, EdgeFrom::UserAnchor))
+                .expect("user anchor");
+            assert_eq!(anchor.rel_type, rel, "{et:?}");
+            assert!(anchor.required, "{et:?} user anchor must be required");
+            assert!(edges.iter().all(|e| e.rel_type != "RELATED_TO"));
+        }
+    }
+
+    /// Optional inter-entity FK edges are declared ONLY where the X1 FK exists,
+    /// and they are optional (not required).
+    #[test]
+    fn career_optional_fk_edges() {
+        let us: Vec<_> = incoming_edges(&EntityType::UserSkill)
+            .iter()
+            .filter(|e| matches!(e.from, EdgeFrom::PayloadFk { .. }))
+            .collect();
+        assert!(us
+            .iter()
+            .any(|e| e.rel_type == "HAS_PROFICIENCY" && !e.required));
+        let iv: Vec<_> = incoming_edges(&EntityType::Interview).iter()
+            .filter(|e| matches!(e.from, EdgeFrom::PayloadFk { field, .. } if field == "job_application_id")).collect();
+        assert!(iv
+            .iter()
+            .any(|e| e.rel_type == "INCLUDES_INTERVIEW" && !e.required));
+        // entities with no FK in the X1 schema declare ONLY the user anchor (no faked FK).
+        assert!(incoming_edges(&EntityType::CareerGoal)
+            .iter()
+            .all(|e| matches!(e.from, EdgeFrom::UserAnchor)));
     }
 }

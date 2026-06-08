@@ -70,12 +70,14 @@ pub fn expand_children(job: &SyncQueueJob, now: DateTime<Utc>) -> Vec<CanonicalG
     let parent = EntityType::from_queue_str(&job.entity_type);
     if !matches!(
         parent,
-        EntityType::FinancialRecommendation | EntityType::HealthRecommendation
+        EntityType::FinancialRecommendation
+            | EntityType::HealthRecommendation
+            | EntityType::CareerRecommendation
     ) {
         return Vec::new();
     }
-    // Children link to THIS recommendation's type (financial_recommendation OR
-    // health_recommendation), so the fan-out is domain-generic.
+    // Children link to THIS recommendation's type (financial_/health_/career_
+    // recommendation), so the fan-out is domain-generic.
     let parent_label = parent.as_str();
     let payload = job.payload.as_object().cloned().unwrap_or_default();
     let rec_id = job.entity_id.clone();
@@ -317,6 +319,36 @@ fn build_title(et: &EntityType, attrs: &Map<String, Value>) -> String {
         EntityType::HealthRecommendation => {
             by_key(&["title"]).unwrap_or_else(|| "Health recommendation".into())
         }
+        // Career X2
+        EntityType::CareerGoal => {
+            by_key(&["title", "target_role"]).unwrap_or_else(|| "Career goal".into())
+        }
+        EntityType::ExperienceRecord => format!(
+            "{} @ {}",
+            by_key(&["title"]).unwrap_or_else(|| "Role".into()),
+            by_key(&["employer"]).unwrap_or_else(|| "Employer".into())
+        ),
+        EntityType::Skill | EntityType::UserSkill => {
+            by_key(&["name"]).unwrap_or_else(|| "Skill".into())
+        }
+        EntityType::SkillGap => format!(
+            "Gap: {}",
+            by_key(&["skill_name"]).unwrap_or_else(|| "skill".into())
+        ),
+        EntityType::Degree => format!(
+            "{} {}",
+            by_key(&["level"]).unwrap_or_default(),
+            by_key(&["field"]).unwrap_or_else(|| "Degree".into())
+        )
+        .trim()
+        .to_string(),
+        EntityType::JobTarget => by_key(&["role_title"]).unwrap_or_else(|| "Job target".into()),
+        EntityType::CompensationRecord => by_key(&["role"])
+            .map(|r| format!("Compensation — {r}"))
+            .unwrap_or_else(|| "Compensation record".into()),
+        EntityType::CompensationProjection => by_key(&["scenario"])
+            .map(|s| format!("Projected compensation ({s})"))
+            .unwrap_or_else(|| "Compensation projection".into()),
         _ => by_key(&["title", "name", "label", "action"]).unwrap_or_else(|| et.as_str().into()),
     }
 }
@@ -401,14 +433,16 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "payoff_strategy",
         ]),
         EntityType::CareerProfile => parts_for(&[
+            // X1 career.career_profiles + legacy public.career_profiles field names
+            // (parts_for skips absent keys). No clearance/military in the embedding.
             "current_title",
+            "current_employer",
             "current_company",
             "industry",
+            "seniority_level",
+            "years_experience",
             "years_of_experience",
-            "desired_title",
-            "skills",
-            "skill_gaps",
-            "job_change_willingness",
+            "remote_preference",
         ]),
         EntityType::EducationRecord => parts_for(&[
             "institution_name",
@@ -1092,6 +1126,59 @@ fn build_summary(et: &EntityType, attrs: &Map<String, Value>) -> String {
             "confidence",
             "status",
         ]),
+        // Career X2 — curated field lists (never dump raw sensitive payloads:
+        // no resume content_ref, no clearance, no free-text notes).
+        // (CareerProfile arm is defined above, X1-aware.)
+        EntityType::CareerGoal => {
+            parts_for(&["title", "goal_type", "target_role", "target_date", "status"])
+        }
+        EntityType::ExperienceRecord => parts_for(&[
+            "title",
+            "employer",
+            "industry",
+            "start_date",
+            "end_date",
+            "is_current",
+        ]),
+        EntityType::Skill => parts_for(&["name", "category"]),
+        EntityType::UserSkill => parts_for(&["proficiency", "years_experience", "last_used"]),
+        EntityType::SkillGap => parts_for(&["skill_name", "target_role", "severity"]),
+        EntityType::Credential => parts_for(&["name", "credential_type", "issuer", "issued_date"]),
+        EntityType::Certification => parts_for(&["name", "issuer", "earned_date", "status"]),
+        EntityType::Degree => parts_for(&["level", "field", "institution", "conferred_date"]),
+        EntityType::Resume => parts_for(&["title", "version"]),
+        EntityType::PortfolioItem => parts_for(&["title", "kind", "description"]),
+        EntityType::JobTarget => parts_for(&[
+            "role_title",
+            "industry",
+            "location",
+            "target_comp_median",
+            "status",
+        ]),
+        EntityType::JobApplication => parts_for(&["employer", "role", "status", "applied_date"]),
+        EntityType::Interview => parts_for(&["stage", "outcome", "scheduled_at"]),
+        EntityType::CompensationRecord => parts_for(&[
+            "role",
+            "employer",
+            "comp_median",
+            "currency",
+            "effective_date",
+        ]),
+        EntityType::CompensationProjection => parts_for(&[
+            "scenario",
+            "value_low",
+            "value_median",
+            "value_high",
+            "confidence",
+        ]),
+        EntityType::CareerRecommendation => parts_for(&[
+            "title",
+            "description",
+            "recommendation_type",
+            "priority",
+            "confidence",
+            "status",
+        ]),
         _ => {
             // Fallback — include every short stringable field we
             // didn't explicitly drop. Cap the total length so we never
@@ -1733,5 +1820,246 @@ mod tests {
         assert!(ev.relationships.iter().any(|r| r.label == "HAS_EVIDENCE"));
         // medical boundary node present
         assert!(children.iter().any(|c| c.entity_type == "advice_boundary"));
+    }
+
+    // ---- Career X2 ----
+    #[test]
+    fn career_entities_normalize_with_title_summary_domain() {
+        let cases = [
+            (
+                "career_profile",
+                json!({"current_title": "Analyst", "industry": "tech", "years_experience": 5}),
+            ),
+            (
+                "career_goal",
+                json!({"title": "Become a senior engineer", "goal_type": "advancement", "target_role": "Senior SWE"}),
+            ),
+            (
+                "experience_record",
+                json!({"title": "Analyst", "employer": "Acme", "start_date": "2021-01-01"}),
+            ),
+            (
+                "skill",
+                json!({"name": "Python", "category": "programming"}),
+            ),
+            (
+                "user_skill",
+                json!({"proficiency": "advanced", "years_experience": 4}),
+            ),
+            (
+                "skill_gap",
+                json!({"skill_name": "Kubernetes", "target_role": "Platform Eng", "severity": "medium"}),
+            ),
+            (
+                "credential",
+                json!({"name": "AWS SAA", "credential_type": "certification", "issuer": "AWS"}),
+            ),
+            (
+                "degree",
+                json!({"level": "BS", "field": "Computer Science", "institution": "State U"}),
+            ),
+            (
+                "resume",
+                json!({"title": "Engineering resume", "version": 2}),
+            ),
+            (
+                "portfolio_item",
+                json!({"title": "Side project", "kind": "repo"}),
+            ),
+            (
+                "job_target",
+                json!({"role_title": "Staff Engineer", "industry": "tech", "location": "Remote"}),
+            ),
+            (
+                "job_application",
+                json!({"position": "Staff Engineer", "company": "BigCo", "status": "applied"}),
+            ),
+            (
+                "interview",
+                json!({"stage": "onsite", "outcome": "pending"}),
+            ),
+            (
+                "compensation_record",
+                json!({"role": "Analyst", "employer": "Acme", "comp_median": 120000}),
+            ),
+            (
+                "compensation_projection",
+                json!({"scenario": "after_degree", "value_median": 150000, "confidence": 0.6}),
+            ),
+            (
+                "career_recommendation",
+                json!({"title": "Close your Kubernetes gap", "recommendation_type": "skill_gap_closure", "priority": "high"}),
+            ),
+        ];
+        for (et, payload) in cases {
+            let c = normalize(&job_with(et, payload), Utc::now()).unwrap();
+            assert_eq!(c.entity_type, et, "{et}: entity_type mismatch");
+            assert_ne!(c.entity_type, "unknown", "{et}: deserialized to unknown");
+            assert!(!c.title.trim().is_empty(), "{et}: empty title");
+            assert!(!c.summary.trim().is_empty(), "{et}: empty summary");
+            assert_eq!(c.domain, "career", "{et}: wrong domain");
+            assert!(
+                c.relationships.iter().all(|r| r.label != "RELATED_TO"),
+                "{et}: RELATED_TO fallback"
+            );
+        }
+    }
+
+    #[test]
+    fn career_user_anchor_edges() {
+        assert!(has_edge(
+            &rels("career_profile", json!({"current_title": "A"})),
+            "HAS_CAREER",
+            "user_profile"
+        ));
+        assert!(has_edge(
+            &rels("career_goal", json!({"title": "g"})),
+            "HAS_GOAL",
+            "user_profile"
+        ));
+        assert!(has_edge(
+            &rels("experience_record", json!({"employer": "e"})),
+            "HAS_EXPERIENCE",
+            "user_profile"
+        ));
+        assert!(has_edge(
+            &rels("user_skill", json!({"proficiency": "x"})),
+            "HAS_SKILL",
+            "user_profile"
+        ));
+        assert!(has_edge(
+            &rels("job_target", json!({"role_title": "r"})),
+            "TARGETS_ROLE",
+            "user_profile"
+        ));
+        assert!(has_edge(
+            &rels("compensation_record", json!({"role": "r"})),
+            "HAS_COMPENSATION",
+            "user_profile"
+        ));
+        assert!(has_edge(
+            &rels("compensation_projection", json!({"scenario": "s"})),
+            "HAS_COMPENSATION_PROJECTION",
+            "user_profile"
+        ));
+        assert!(has_edge(
+            &rels("career_recommendation", json!({"title": "t"})),
+            "HAS_RECOMMENDATION",
+            "user_profile"
+        ));
+    }
+
+    #[test]
+    fn career_optional_fk_emits_only_when_present() {
+        let app = Uuid::new_v4().to_string();
+        // interview WITH job_application_id -> inter-entity edge from job_application
+        let with_fk = rels(
+            "interview",
+            json!({"stage": "onsite", "job_application_id": app}),
+        );
+        assert!(with_fk
+            .iter()
+            .any(|r| r.label == "INCLUDES_INTERVIEW" && r.target_entity_type == "job_application"));
+        assert!(has_edge(&with_fk, "HAS_INTERVIEW", "user_profile")); // still user-anchored
+                                                                      // interview WITHOUT the FK -> only the user anchor, no faked inter-entity edge
+        let no_fk = rels("interview", json!({"stage": "onsite"}));
+        assert!(!no_fk.iter().any(|r| r.label == "INCLUDES_INTERVIEW"));
+        assert!(has_edge(&no_fk, "HAS_INTERVIEW", "user_profile"));
+        assert!(no_fk.iter().all(|r| r.label != "RELATED_TO"));
+        // user_skill WITH skill_id -> HAS_PROFICIENCY from skill
+        let sk = Uuid::new_v4().to_string();
+        let us = rels(
+            "user_skill",
+            json!({"proficiency": "advanced", "skill_id": sk}),
+        );
+        assert!(us
+            .iter()
+            .any(|r| r.label == "HAS_PROFICIENCY" && r.target_entity_type == "skill"));
+    }
+
+    #[test]
+    fn career_recommendation_fans_out() {
+        let mut job = job_with(
+            "career_recommendation",
+            json!({
+                "title": "Close your Kubernetes gap",
+                "recommendation_type": "skill_gap_closure",
+                "evidence_json": [{"metric_name": "comp_uplift", "metric_value": "18000", "source_table": "ln_central.compensation_bands", "confidence": 0.7, "explanation": "OEWS band delta"}],
+                "assumptions_json": [{"assumption_text": "market demand stays stable", "confidence": 0.6}],
+                "governance_verdict": {"passed": true, "boundary_type": "career_guidance", "disclaimer_text": "Career coaching, not a guarantee of hire or pay"}
+            }),
+        );
+        job.entity_id = "CREC1".into();
+        let children = expand_children(&job, Utc::now());
+        assert_eq!(children.len(), 3); // evidence + assumption + boundary
+        for c in &children {
+            assert!(
+                c.relationships
+                    .iter()
+                    .any(|r| r.target_entity_type == "career_recommendation"
+                        && r.target_entity_id == "CREC1"),
+                "{} not linked to career_recommendation",
+                c.entity_type
+            );
+            assert!(c.relationships.iter().all(|r| r.label != "RELATED_TO"));
+        }
+        assert!(children.iter().any(|c| c.entity_type == "evidence"
+            && c.relationships.iter().any(|r| r.label == "HAS_EVIDENCE")));
+        assert!(children.iter().any(|c| c.entity_type == "advice_boundary"));
+    }
+
+    #[test]
+    fn career_recommendation_fan_out_is_deterministic() {
+        let mut job = job_with(
+            "career_recommendation",
+            json!({
+                "title": "x", "evidence_json": [{"metric_name": "m", "metric_value": "1", "source_table": "t"}]
+            }),
+        );
+        job.entity_id = "CRECDET".into();
+        let a = expand_children(&job, Utc::now());
+        let b = expand_children(&job, Utc::now());
+        let ids =
+            |v: &[CanonicalGraphObject]| v.iter().map(|c| c.entity_id.clone()).collect::<Vec<_>>();
+        assert_eq!(ids(&a), ids(&b)); // deterministic child ids -> idempotent MERGE
+    }
+
+    #[test]
+    fn career_summary_does_not_leak_raw_sensitive_fields() {
+        // resume content_ref must NOT be embedded
+        let r = normalize(&job_with("resume", json!({"title": "Resume", "version": 1, "content_ref": "s3://bucket/SECRETKEY/resume.pdf"})), Utc::now()).unwrap();
+        assert!(
+            !r.summary.contains("SECRETKEY"),
+            "resume leaked content_ref: {}",
+            r.summary
+        );
+        // compensation_record summary uses comp_median, not the raw base/bonus breakdown
+        let c = normalize(
+            &job_with(
+                "compensation_record",
+                json!({"role": "Analyst", "comp_median": 120000, "base": 999111, "bonus": 888222}),
+            ),
+            Utc::now(),
+        )
+        .unwrap();
+        assert!(
+            !c.summary.contains("999111") && !c.summary.contains("888222"),
+            "comp record leaked base/bonus: {}",
+            c.summary
+        );
+    }
+
+    #[test]
+    fn career_user_anchor_targets_owner_not_another_tenant() {
+        let job = job_with("career_profile", json!({"current_title": "A"}));
+        let owner = job.user_id.to_string();
+        let canon = normalize(&job, Utc::now()).unwrap();
+        let anchor = canon
+            .relationships
+            .iter()
+            .find(|r| r.label == "HAS_CAREER")
+            .unwrap();
+        // the edge always anchors to the row's own user_id -> never cross-tenant
+        assert_eq!(anchor.target_entity_id, owner);
     }
 }

@@ -13,6 +13,7 @@ use chrono::Utc;
 use serde_json::json;
 use uuid::Uuid;
 
+use ingestion_worker::entities::qdrant_point_uuid;
 use ingestion_worker::neo4j_client::Neo4jClient;
 use ingestion_worker::normalizer::normalize;
 use ingestion_worker::qdrant_client::QdrantClient;
@@ -71,8 +72,12 @@ fn delete_op_is_keyed_the_same_as_upsert() {
     let canon = normalize(&job, Utc::now()).unwrap();
     let upsert_point = canon.qdrant_point_id();
 
-    // The delete path builds the point id in processor.rs as:
-    //   "{user_id}|{entity_type}|{entity_id}"
-    let delete_point = format!("{}|{}|{}", job.user_id, "career_profile", job.entity_id);
+    // The delete path (processor.rs::process_delete) derives the point id with the
+    // SAME helper as upsert — qdrant_point_uuid(user_id, entity_type, entity_id) — so
+    // an upsert followed by a delete targets the same Qdrant point. (Updated from the
+    // retired "{user_id}|{entity_type}|{entity_id}" pipe format, which predates the
+    // UUID point-id contract; tenant_id == user_id for personal scope.)
+    let delete_point =
+        qdrant_point_uuid(&job.user_id.to_string(), "career_profile", &job.entity_id);
     assert_eq!(upsert_point, delete_point);
 }
