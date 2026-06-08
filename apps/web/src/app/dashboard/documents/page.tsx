@@ -37,6 +37,17 @@ export default function DocumentsPage() {
     } finally { setBusy(false); }
   };
 
+  const uploadFile = async (file: File) => {
+    setBusy(true); setResult(null);
+    try {
+      const form = new FormData();
+      form.append('doc_type', docType);
+      form.append('file', file);
+      const res = await fetch('/api/documents', { method: 'POST', body: form });
+      if (res.ok) { setResult(await res.json()); await loadReadiness(); }
+    } finally { setBusy(false); }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900">Document Intelligence</h1>
@@ -49,8 +60,13 @@ export default function DocumentsPage() {
             {DOC_TYPES.map(([v, l]) => (<option key={v} value={v}>{l}</option>))}
           </select>
           <button onClick={submit} disabled={busy} className="px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium disabled:opacity-50">
-            {busy ? 'Reading…' : 'Extract'}
+            {busy ? 'Reading…' : 'Extract text'}
           </button>
+          <label className="px-4 py-2 rounded-md border border-indigo-600 text-indigo-700 text-sm font-medium cursor-pointer hover:bg-indigo-50">
+            {busy ? '…' : 'Upload file'}
+            <input type="file" accept=".pdf,.txt,.png,.jpg,.jpeg" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); }} disabled={busy} />
+          </label>
         </div>
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5}
           placeholder="Paste the document text (e.g. Base Salary: $185,000  Start Date: 2026-08-01 …)"

@@ -27,6 +27,15 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const t = await token();
   if (!t) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const ct = req.headers.get('content-type') || '';
+  // multipart -> real file upload (forward to Core API /upload); else JSON register (paste text)
+  if (ct.includes('multipart/form-data')) {
+    const form = await req.formData();
+    const r = await fetch(`${CORE_API}/v1/documents/upload`, {
+      method: 'POST', headers: { Authorization: `Bearer ${t}` }, body: form, cache: 'no-store',
+    });
+    return NextResponse.json(await r.json().catch(() => ({})), { status: r.status });
+  }
   const body = await req.json().catch(() => ({}));
   const r = await fetch(`${CORE_API}/v1/documents`, {
     method: 'POST', headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store',
