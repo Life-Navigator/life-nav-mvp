@@ -429,11 +429,10 @@ const navigation = [
     comingSoon: true,
   },
   {
-    name: 'Healthcare',
-    href: '/dashboard/healthcare',
+    name: 'Health & Wellness',
+    href: '/dashboard/wellness',
     icon: HeartIcon,
     current: false,
-    comingSoon: true,
   },
   {
     name: 'Calendar',
