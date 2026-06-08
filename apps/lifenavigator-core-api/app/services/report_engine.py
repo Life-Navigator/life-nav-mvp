@@ -80,10 +80,11 @@ def _rec_refs(recs: list[Any]) -> list[RecommendationReference]:
 
 
 class UniversalReportEngine:
-    def __init__(self, domains: dict[str, DomainService], education: EducationService, supabase: SupabaseClient) -> None:
+    def __init__(self, domains: dict[str, DomainService], education: EducationService, supabase: SupabaseClient, trends: Any = None) -> None:
         self._domains = domains
         self._edu = education
         self._sb = supabase
+        self._trends = trends  # optional TrendAnalyzer — adds a finance progress-over-time section
 
     # ---- build (generate_report) ----
     async def build(self, ctx: UserContext, report_type: str) -> ReportDefinition:
@@ -105,12 +106,38 @@ class UniversalReportEngine:
             ])
         vm: DomainViewModel = await svc.summary(ctx)
         sections = self._sections_from_vm(vm)
+        charts: list[ChartDefinition] = []
+        if domain == "finance" and self._trends is not None:
+            sec, ch = await self._trend_section(ctx, ord_n=len(sections) + 1)
+            if sec:
+                sections.append(sec)
+                charts += ch
         return ReportDefinition(
             report_type="financial" if domain == "finance" else domain, title=title,
-            sections=sections, citations=self._citations(sections),
+            sections=sections, charts=charts, citations=self._citations(sections),
             confidence=vm.confidence.model_dump(), governance=_boundary(vm),
             metadata={"domain": domain, "missing": vm.missing},
         )
+
+    async def _trend_section(self, ctx: UserContext, ord_n: int) -> tuple[Optional[ReportSection], list[ChartDefinition]]:
+        t = await self._trends.trends(ctx)
+        if not t.get("has_history"):
+            return None, []
+        nw = t.get("net_worth", {})
+        charts = [ChartDefinition(key="net_worth_trend", type="line", title="Net Worth Over Time",
+                                  series=[{"label": str(p.get("date"))[:7], "value": p.get("value")} for p in nw.get("series", [])],
+                                  source="finance.net_worth_snapshots")]
+        section = ReportSection(
+            key="finance_trend", title="Progress Over Time", ord=ord_n,
+            body={"net_worth": {k: nw.get(k) for k in ("current", "prior", "delta", "pct_change", "trend")},
+                  "debt": {k: t.get("debt", {}).get(k) for k in ("current", "delta", "trend")},
+                  "cash_flow": {k: t.get("cash_flow", {}).get(k) for k in ("current", "delta", "trend")},
+                  "changes": t.get("change_detection", [])},
+            evidence=[EvidenceReference(metric_name="net_worth_delta", metric_value=nw.get("delta"),
+                                        source_table="finance.net_worth_snapshots", explanation="month-over-month change")] if nw.get("delta") is not None else [],
+            charts=["net_worth_trend"],
+        )
+        return section, charts
 
     def _sections_from_vm(self, vm: DomainViewModel, *, ord_base: int = 1) -> list[ReportSection]:
         overview = ReportSection(key=f"{vm.domain}_overview", title=f"{vm.domain.capitalize()} Overview", ord=ord_base,
@@ -197,8 +224,15 @@ class UniversalReportEngine:
             sec.ord = ordn
             ordn += 1
             sections.append(sec)
+        # finance progress-over-time (if snapshot history exists)
+        trend_charts: list[ChartDefinition] = []
+        if self._trends is not None:
+            tsec, tch = await self._trend_section(ctx, ord_n=ordn)
+            if tsec:
+                sections.append(tsec)
+                trend_charts = tch
         return ReportDefinition(report_type="full", title="Life Report", sections=sections,
-                                charts=edu.charts + dec.charts, citations=self._citations(sections),
+                                charts=edu.charts + dec.charts + trend_charts, citations=self._citations(sections),
                                 governance={"boundary_type": "mixed", "disclaimer_text": "Decision support across domains — not financial, medical, legal, or tax advice."},
                                 metadata={"domains": sorted(self._domains.keys())})
 

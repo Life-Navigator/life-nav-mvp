@@ -11,8 +11,9 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, Query
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_finance_service
+from ..dependencies import authenticated, get_finance_service, get_snapshot_engine, get_trend_analyzer
 from ..domains.finance import FinanceService
+from ..services.snapshots import SnapshotEngine, TrendAnalyzer
 from ..models.common import DomainViewModel, UserContext, WriteResult
 
 router = APIRouter(prefix="/v1/finance", tags=["finance"])
@@ -119,3 +120,15 @@ async def manual_liability(
 @router.post("/refresh", response_model=WriteResult)
 async def refresh(user: AuthenticatedUser = Depends(authenticated), svc: FinanceService = Depends(get_finance_service)):
     return await svc.refresh(_ctx(user))
+
+
+@router.post("/snapshot")
+async def take_snapshot(user: AuthenticatedUser = Depends(authenticated), engine: SnapshotEngine = Depends(get_snapshot_engine)):
+    """Capture this period's net-worth / cash-flow / debt snapshot (idempotent per month)."""
+    return await engine.take_snapshot(_ctx(user))
+
+
+@router.get("/trends")
+async def trends(user: AuthenticatedUser = Depends(authenticated), analyzer: TrendAnalyzer = Depends(get_trend_analyzer)):
+    """Trend direction + change detection ('what changed this month') from snapshot history."""
+    return await analyzer.trends(_ctx(user))

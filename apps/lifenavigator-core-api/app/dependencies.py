@@ -31,6 +31,7 @@ from .services.compensation import CompensationIntelligenceEngine
 from .services.decision_engine import DecisionEngine
 from .services.readiness import LifeReadinessEngine
 from .services.sharing import ShareService
+from .services.snapshots import SnapshotEngine, TrendAnalyzer
 from .services.report_engine import UniversalReportEngine
 from .services.cost_meter import CostMeter
 from .services.life_profile import LifeProfileService
@@ -139,7 +140,7 @@ def get_report_engine(
     education: EducationService = Depends(get_education_service),
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> UniversalReportEngine:
-    return UniversalReportEngine(domains=domains, education=education, supabase=supabase)
+    return UniversalReportEngine(domains=domains, education=education, supabase=supabase, trends=TrendAnalyzer(supabase))
 
 
 def get_readiness_engine(
@@ -155,6 +156,14 @@ def get_share_service(
     reports: UniversalReportEngine = Depends(get_report_engine),
 ) -> ShareService:
     return ShareService(supabase=supabase, reports=reports)
+
+
+def get_snapshot_engine(supabase: SupabaseClient = Depends(get_supabase)) -> SnapshotEngine:
+    return SnapshotEngine(supabase=supabase)
+
+
+def get_trend_analyzer(supabase: SupabaseClient = Depends(get_supabase)) -> TrendAnalyzer:
+    return TrendAnalyzer(supabase=supabase)
 
 
 def get_retriever(
