@@ -57,6 +57,36 @@ class SupabaseClient:
             "Content-Type": "application/json",
         }
 
+    async def storage_upload(self, bucket: str, path: str, data: bytes, content_type: str) -> bool:
+        """Service-role upload of bytes to a Storage bucket (upsert). Returns success."""
+        if not self.configured:
+            return False
+        headers = {"apikey": self._service_role_key, "Authorization": f"Bearer {self._service_role_key}",
+                   "Content-Type": content_type, "x-upsert": "true"}
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(f"{self._url}/storage/v1/object/{bucket}/{path}", headers=headers, content=data)
+                resp.raise_for_status()
+                return True
+        except Exception as exc:  # noqa: BLE001
+            log.warning("supabase storage_upload %s/%s failed: %s", bucket, path, exc)
+            return False
+
+    async def storage_signed_url(self, bucket: str, path: str, expires_in: int = 3600) -> Optional[str]:
+        """Service-role signed URL for an owner-scoped download. None on error."""
+        if not self.configured:
+            return None
+        headers = {"apikey": self._service_role_key, "Authorization": f"Bearer {self._service_role_key}", "Content-Type": "application/json"}
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(f"{self._url}/storage/v1/object/sign/{bucket}/{path}", headers=headers, json={"expiresIn": expires_in})
+                resp.raise_for_status()
+                signed = resp.json().get("signedURL") or resp.json().get("signedUrl")
+                return f"{self._url}/storage/v1{signed}" if signed else None
+        except Exception as exc:  # noqa: BLE001
+            log.warning("supabase storage_signed_url %s/%s failed: %s", bucket, path, exc)
+            return None
+
     async def select(
         self,
         table: str,

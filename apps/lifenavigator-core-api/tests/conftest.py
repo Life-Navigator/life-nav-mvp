@@ -73,6 +73,13 @@ class FakeSupabase:
     async def count(self, table: str, *, filters: Any = None, **_: Any) -> int:
         return len(await self.select(table, filters=filters))
 
+    async def storage_upload(self, bucket: str, path: str, data: bytes, content_type: str) -> bool:
+        self.inserts.append((f"storage:{bucket}", {"path": path, "bytes": len(data)}))
+        return True
+
+    async def storage_signed_url(self, bucket: str, path: str, expires_in: int = 3600) -> str:
+        return f"https://fake.storage/{bucket}/{path}?sig=test"
+
     async def insert(self, table: str, row: dict[str, Any], **_: Any) -> list[dict[str, Any]]:
         stored = {**row, "id": row.get("id", "new-id")}
         self.inserts.append((table, row))

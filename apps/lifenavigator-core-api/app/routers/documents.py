@@ -6,7 +6,7 @@ every domain. Extraction never invents: a field absent from the text is simply n
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, UploadFile
 
 from ..auth import AuthenticatedUser
 from ..dependencies import authenticated, get_document_service
@@ -14,6 +14,7 @@ from ..models.common import UserContext
 from ..services.documents import CATEGORIES, TAXONOMY, DocumentIntelligenceService
 
 router = APIRouter(prefix="/v1/documents", tags=["documents"])
+_MAX_BYTES = 25 * 1024 * 1024
 
 
 def _ctx(user: AuthenticatedUser) -> UserContext:
@@ -40,6 +41,25 @@ async def register(
     if doc_type not in TAXONOMY:
         raise HTTPException(status_code=400, detail="unknown doc_type (see /v1/documents/catalog)")
     return await svc.register(_ctx(user), doc_type=doc_type, text=text, title=title or None, file_ref=file_ref or None)
+
+
+@router.post("/upload")
+async def upload(
+    user: AuthenticatedUser = Depends(authenticated),
+    svc: DocumentIntelligenceService = Depends(get_document_service),
+    doc_type: str = Form(...),
+    file: UploadFile = File(...),
+):
+    """Upload a real file (PDF/text/image) → store → parse → extract → generate evidence."""
+    if doc_type not in TAXONOMY:
+        raise HTTPException(status_code=400, detail="unknown doc_type (see /v1/documents/catalog)")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="empty file")
+    if len(data) > _MAX_BYTES:
+        raise HTTPException(status_code=413, detail="file too large (max 25MB)")
+    return await svc.upload(_ctx(user), doc_type=doc_type, filename=file.filename or "document",
+                            content_type=file.content_type or "application/octet-stream", data=data)
 
 
 @router.get("")

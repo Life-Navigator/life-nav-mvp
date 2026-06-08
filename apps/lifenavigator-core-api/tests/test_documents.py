@@ -4,7 +4,12 @@ from __future__ import annotations
 import pytest
 
 from app.models.common import UserContext
-from app.services.documents import DocumentExtractor, DocumentIntelligenceService
+from app.services.documents import (
+    DocumentExtractor,
+    DocumentIntelligenceService,
+    DocumentParser,
+    evidence_from_fields,
+)
 
 from .conftest import FakeSupabase
 
@@ -86,3 +91,49 @@ async def test_timeline_and_recommendations():
 async def test_unknown_doc_type_rejected():
     with pytest.raises(ValueError):
         await DocumentIntelligenceService(FakeSupabase({})).register(CTX, doc_type="mystery", text="x")
+
+
+# ---- Sprint 11: parse + upload + generated evidence ----
+
+def test_parser_passthrough_text():
+    out = DocumentParser().parse("offer.txt", "text/plain", OFFER.encode())
+    assert out["kind"] == "text" and "Base Salary" in out["text"]
+
+
+def test_parser_pdf_extracts_text():
+    fpdf = pytest.importorskip("fpdf")
+    pdf = fpdf.FPDF()
+    pdf.add_page()
+    pdf.set_font("helvetica", size=12)
+    for line in OFFER.strip().splitlines():
+        ascii_line = line.encode("latin-1", "ignore").decode("latin-1")  # fpdf core fonts are latin-1
+        pdf.cell(0, 8, ascii_line, ln=1)
+    data = bytes(pdf.output())
+    out = DocumentParser().parse("offer.pdf", "application/pdf", data)
+    assert out["kind"] == "pdf"
+    assert "185,000" in out["text"] or "185000" in out["text"].replace(",", "")
+
+
+def test_parser_image_defers_to_ocr():
+    out = DocumentParser().parse("scan.png", "image/png", b"\x89PNG\r\n")
+    assert out["kind"] == "image" and out["text"] == ""
+
+
+def test_evidence_generated_from_fields():
+    ext = DocumentExtractor().extract("offer_letter", OFFER)
+    ev = evidence_from_fields("offer_letter", ext["fields"])
+    salary = next(e for e in ev if e["field_key"] == "base_salary")
+    assert "Offer Letter" in salary["statement"] and "$185,000" in salary["statement"]
+    assert "career" in salary["domains"] and "finance" in salary["domains"]
+
+
+@pytest.mark.asyncio
+async def test_upload_stores_parses_extracts_generates_evidence():
+    sb = FakeSupabase({})
+    svc = DocumentIntelligenceService(sb)
+    res = await svc.upload(CTX, doc_type="offer_letter", filename="offer.txt", content_type="text/plain", data=OFFER.encode())
+    assert res["parsed_kind"] == "text" and res["parsed_chars"] > 0
+    assert res["fields_extracted"] >= 4
+    assert res["evidence"] and any("Offer Letter" in e["statement"] for e in res["evidence"])
+    docs = await sb.select("documents", schema="documents")
+    assert docs[0]["file_ref"].startswith(CTX.user_id)  # stored under the user's folder

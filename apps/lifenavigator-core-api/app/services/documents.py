@@ -142,17 +142,82 @@ class DocumentExtractor:
         return None
 
 
+class DocumentParser:
+    """Parse uploaded bytes into text. PDF via pypdf (text-layer PDFs); text/* passthrough.
+    Scanned/image PDFs return empty text → status 'needs_review' (OCR is the upgrade path)."""
+
+    def parse(self, filename: str, content_type: str, data: bytes) -> dict[str, Any]:
+        ct = (content_type or "").lower()
+        name = (filename or "").lower()
+        if "pdf" in ct or name.endswith(".pdf"):
+            return {"text": self._pdf(data), "kind": "pdf"}
+        if ct.startswith("text/") or name.endswith((".txt", ".md", ".csv")):
+            return {"text": data.decode("utf-8", errors="replace"), "kind": "text"}
+        if ct.startswith("image/"):
+            return {"text": "", "kind": "image"}  # OCR upgrade path
+        return {"text": data.decode("utf-8", errors="replace"), "kind": "unknown"}
+
+    @staticmethod
+    def _pdf(data: bytes) -> str:
+        try:
+            import io
+
+            from pypdf import PdfReader  # type: ignore[import-not-found]
+            reader = PdfReader(io.BytesIO(data))
+            return "\n".join((page.extract_text() or "") for page in reader.pages)
+        except Exception:  # noqa: BLE001 — unparseable PDF -> empty text -> needs_review
+            return ""
+
+
+def evidence_from_fields(doc_type: str, fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Generate domain-citable evidence statements from extracted fields. Each field becomes an
+    evidence record sourced to the document, tagged with the domains it feeds — this is how an
+    uploaded document grounds future recommendations."""
+    spec = TAXONOMY.get(doc_type)
+    label = spec.label if spec else doc_type
+    domains = spec.domains if spec else []
+    out = []
+    for f in fields:
+        ftype = f.get("field_type")
+        val = f.get("field_value")
+        shown: Any = val
+        if ftype == "money" and str(val).replace(".", "").isdigit():
+            shown = f"${int(float(str(val))):,}"
+        elif ftype == "percent":
+            shown = f"{val}%"
+        out.append({"statement": f"{f['field_key'].replace('_', ' ').capitalize()}: {shown} (from your {label})",
+                    "field_key": f["field_key"], "value": val, "domains": domains,
+                    "confidence": f.get("confidence"), "source_document": label})
+    return out
+
+
 class DocumentIntelligenceService:
-    def __init__(self, supabase: SupabaseClient, extractor: Optional[DocumentExtractor] = None) -> None:
+    def __init__(self, supabase: SupabaseClient, extractor: Optional[DocumentExtractor] = None, parser: Optional[DocumentParser] = None) -> None:
         self._sb = supabase
         self._ex = extractor or DocumentExtractor()
+        self._parser = parser or DocumentParser()
 
-    async def register(self, ctx: UserContext, *, doc_type: str, text: str = "", title: Optional[str] = None, file_ref: Optional[str] = None) -> dict[str, Any]:
+    async def upload(self, ctx: UserContext, *, doc_type: str, filename: str, content_type: str, data: bytes, title: Optional[str] = None) -> dict[str, Any]:
+        """Upload → store binary → parse text → extract → register → generate evidence."""
+        if doc_type not in TAXONOMY:
+            raise ValueError(f"unknown doc_type {doc_type}")
+        doc_id = str(uuid.uuid4())
+        path = f"{ctx.user_id}/{doc_id}/{(filename or 'document')[:80]}"
+        await self._sb.storage_upload("documents", path, data, content_type or "application/octet-stream")
+        parsed = self._parser.parse(filename, content_type, data)
+        res = await self.register(ctx, doc_type=doc_type, text=parsed["text"], title=title or filename, file_ref=path, _doc_id=doc_id)
+        res["parsed_kind"] = parsed["kind"]
+        res["parsed_chars"] = len(parsed["text"])
+        if not parsed["text"]:
+            res["note"] = "No text layer found (likely a scan) — OCR pass needed before extraction."
+        return res
+
+    async def register(self, ctx: UserContext, *, doc_type: str, text: str = "", title: Optional[str] = None, file_ref: Optional[str] = None, _doc_id: Optional[str] = None) -> dict[str, Any]:
         spec = TAXONOMY.get(doc_type)
         if not spec:
             raise ValueError(f"unknown doc_type {doc_type}")
         ext = self._ex.extract(doc_type, text)
-        doc_id = str(uuid.uuid4())
+        doc_id = _doc_id or str(uuid.uuid4())
         extracted_json = {f["field_key"]: f["field_value"] for f in ext["fields"]}
         await self._sb.insert("documents", {
             "id": doc_id, "user_id": ctx.user_id, "tenant_id": ctx.user_id, "doc_type": doc_type,
@@ -171,7 +236,7 @@ class DocumentIntelligenceService:
         return {"document_id": doc_id, "doc_type": doc_type, "category": spec.category,
                 "fields_extracted": len(ext["fields"]), "confidence": ext["confidence"],
                 "affects_domains": spec.domains, "status": "extracted" if ext["fields"] else "needs_review",
-                "fields": ext["fields"]}
+                "fields": ext["fields"], "evidence": evidence_from_fields(doc_type, ext["fields"])}
 
     async def _docs(self, ctx: UserContext) -> list[dict]:
         return await self._sb.select("documents", filters={"user_id": f"eq.{ctx.user_id}"}, limit=500, schema=DOCS)
