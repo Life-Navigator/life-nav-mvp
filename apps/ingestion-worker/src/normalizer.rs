@@ -799,9 +799,14 @@ fn relationships_for(
     if user_id.is_empty() {
         return Vec::new();
     }
-    // Typed user -> entity edge label. Finance entities get real labels here
-    // (OWNS_ACCOUNT, HAS_TRANSACTION, …) instead of the generic RELATED_TO
-    // fallback. Inter-entity edges (e.g. account -> transaction) are added below.
+    // Registry-driven domains (finance today) own their typed edges via the
+    // ontology registry — typed user edge + inter-entity FK edges. Mapped
+    // entities NEVER fall back to RELATED_TO. See ontology.rs / relationships.rs.
+    if let Some(rels) = crate::relationships::registry_relationships(et, user_id, attrs) {
+        return rels;
+    }
+    // Legacy typed-label match for not-yet-migrated domains; unmapped types fall
+    // back to RELATED_TO. Migrate these into the ontology registry over time.
     let user_label: &str = match et {
         EntityType::Goal => "HAS_GOAL",
         EntityType::Constraint => "HAS_CONSTRAINT",
@@ -900,64 +905,17 @@ fn relationships_for(
         EntityType::LeadPackageConsent => "GRANTED_LEAD_CONSENT",
         EntityType::ConciergePreference => "HAS_CONCIERGE_PREFERENCE",
         EntityType::ArcanaMembership => "HAS_ARCANA_MEMBERSHIP",
-        // --- Finance (typed user edges; previously fell through to RELATED_TO) ---
-        EntityType::FinancialAccount => "OWNS_ACCOUNT",
-        EntityType::TransactionSummary => "HAS_TRANSACTION",
-        EntityType::Asset => "HAS_ASSET",
-        EntityType::Debt => "HAS_DEBT",
-        EntityType::InvestmentHolding => "HAS_HOLDING",
-        EntityType::RetirementPlan => "CONTRIBUTES_TO",
-        EntityType::FinancialGoal => "HAS_GOAL",
+        // Finance is handled by the ontology registry above (early return).
         _ => "RELATED_TO",
     };
 
-    // The always-present user -> entity edge: (:UserProfile)-[:LABEL]->(:Entity).
-    let mut rels = vec![Relationship {
+    // Non-registry domains: the single user -> entity edge.
+    // (:UserProfile)-[:LABEL]->(:Entity).
+    vec![Relationship {
         label: user_label.into(),
         target_entity_type: "user_profile".into(),
         target_entity_id: user_id.to_string(),
-    }];
-
-    // Inter-entity edges, emitted ONLY when the source payload carries the
-    // foreign key. Direction matches merge_cypher_for: (target)-[r]->(node), and
-    // the target node is MERGEd under the same tenant_id (no cross-user edges).
-    let id_of = |key: &str| -> Option<String> {
-        attrs
-            .get(key)
-            .and_then(|v| v.as_str())
-            .map(str::to_string)
-            .filter(|s| !s.is_empty())
-    };
-    match et {
-        // (:FinancialAccount)-[:HAS_TRANSACTION]->(:TransactionSummary)
-        EntityType::TransactionSummary => {
-            if let Some(account_id) = id_of("account_id") {
-                rels.push(Relationship {
-                    label: "HAS_TRANSACTION".into(),
-                    target_entity_type: "financial_account".into(),
-                    target_entity_id: account_id,
-                });
-            }
-        }
-        // (:FinancialAccount)-[:HAS_HOLDING]->(:InvestmentHolding)
-        EntityType::InvestmentHolding => {
-            if let Some(account_id) = id_of("account_id") {
-                rels.push(Relationship {
-                    label: "HAS_HOLDING".into(),
-                    target_entity_type: "financial_account".into(),
-                    target_entity_id: account_id,
-                });
-            }
-        }
-        // Extension points (deferred — no data yet; SECURED_BY / SUPPORTS_GOAL /
-        // BLOCKS_GOAL / FUNDED_BY need reverse-direction edge support and linkage
-        // fields in the source payload):
-        //   (:Debt)-[:SECURED_BY]->(:Asset)
-        //   (:Asset|:IncomeSource)-[:SUPPORTS_GOAL]->(:FinancialGoal)
-        //   (:Debt)-[:BLOCKS_GOAL]->(:FinancialGoal)
-        _ => {}
-    }
-    rels
+    }]
 }
 
 fn parse_ts(map: &Map<String, Value>, key: &str) -> Option<DateTime<Utc>> {
