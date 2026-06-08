@@ -408,6 +408,12 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Life Decisions',
+    href: '/dashboard/life-decisions',
+    icon: TargetIcon,
+    current: false,
+  },
+  {
     name: 'Finance',
     href: '/dashboard/finance',
     icon: CurrencyDollarIcon,
