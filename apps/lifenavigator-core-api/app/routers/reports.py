@@ -12,7 +12,7 @@ from ..auth import AuthenticatedUser
 from ..dependencies import authenticated, get_analytics_service, get_report_engine, get_share_service
 from ..services.analytics import AnalyticsService
 from ..models.common import UserContext
-from ..services.pdf_renderer import render_education_pdf
+from ..services.pdf_renderer import render_report_pdf
 from ..services.report_engine import REPORT_TYPES, UniversalReportEngine
 from ..services.sharing import AUDIENCES, ShareService
 
@@ -50,19 +50,23 @@ async def preview(
     return engine.render(definition)
 
 
-@router.get("/education/pdf")
-async def education_pdf(
+@router.get("/{report_type}/pdf")
+async def report_pdf(
+    report_type: str,
     user: AuthenticatedUser = Depends(authenticated),
     engine: UniversalReportEngine = Depends(get_report_engine),
 ):
-    """One-click branded Education PDF (downloadable). Rendered from the reproducible
-    ReportDefinition — every figure traces to the evidence appendix."""
-    definition = await engine.build(_ctx(user), "education")
-    pdf = render_education_pdf(definition.model_dump())
+    """One-click branded PDF for ANY report type (full / financial / decision / family /
+    compensation / education), rendered from the reproducible ReportDefinition — every figure
+    traces to its evidence. Same reporting framework across all reports."""
+    if report_type not in REPORT_TYPES:
+        raise HTTPException(status_code=400, detail=f"report_type must be one of {REPORT_TYPES}")
+    definition = await engine.build(_ctx(user), report_type)
+    pdf = render_report_pdf(definition.model_dump(), report_type)
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": 'attachment; filename="lifenavigator-education-report.pdf"'},
+        headers={"Content-Disposition": f'attachment; filename="lifenavigator-{report_type}-report.pdf"'},
     )
 
 

@@ -35,7 +35,7 @@ _VOLATILE = {"generated_at", "observed_at", "as_of", "created_at", "updated_at",
 # an unexpected key name can't break reproducibility (same inputs -> same hash).
 _TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
 
-REPORT_TYPES = ("full", "financial", "education", "decision", "compensation")
+REPORT_TYPES = ("full", "financial", "education", "decision", "compensation", "family")
 
 
 def _now() -> str:
@@ -91,6 +91,8 @@ class UniversalReportEngine:
     async def build(self, ctx: UserContext, report_type: str) -> ReportDefinition:
         if report_type == "financial":
             return await self._domain_report(ctx, "finance", "Financial Report")
+        if report_type == "family":
+            return await self._domain_report(ctx, "family", "Family & Protection Report")
         if report_type == "education":
             return await self._education_report(ctx)
         if report_type == "decision":

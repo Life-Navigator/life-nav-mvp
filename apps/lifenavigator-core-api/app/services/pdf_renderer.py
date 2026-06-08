@@ -64,6 +64,121 @@ def render_education_pdf(definition: dict[str, Any]) -> bytes:
     return HTML(string=_education_html(definition)).write_pdf()
 
 
+# ── Generic renderer: turns ANY ReportDefinition into a branded PDF (same framework) ──
+_SUBTITLE = {
+    "full": "Your complete life intelligence report",
+    "financial": "Your financial position, trends, and recommendations",
+    "decision": "Your analyzed life decisions",
+    "family": "Your family protection, readiness, and planning",
+    "compensation": "Your total compensation & benefits analysis",
+    "education": "Programs ranked against your life goals",
+}
+_MONEY_HINT = ("salary", "value", "cost", "balance", "amount", "comp", "savings", "benefit",
+               "premium", "coverage", "contribution", "net_worth", "income", "bonus", "equity",
+               "gap", "need", "pay", "match", "total", "tuition", "fund")
+
+
+def render_report_pdf(definition: dict[str, Any], report_type: str = "full") -> bytes:
+    """Branded PDF for any report type, rendered from its ReportDefinition. Education keeps its
+    bespoke layout; every other type flows through this generic renderer (same framework)."""
+    from weasyprint import HTML  # type: ignore[import-not-found]
+
+    if report_type == "education":
+        return HTML(string=_education_html(definition)).write_pdf()
+    return HTML(string=_generic_html(definition, report_type)).write_pdf()
+
+
+def _human(key: str) -> str:
+    return str(key).replace("_", " ").strip().capitalize()
+
+
+def _looks_money(key: str, val: Any) -> bool:
+    return isinstance(val, (int, float)) and not isinstance(val, bool) and any(h in str(key).lower() for h in _MONEY_HINT) and abs(val) >= 100
+
+
+def _fmt_scalar(key: str, val: Any) -> str:
+    if val is None or val == "":
+        return "—"
+    if isinstance(val, bool):
+        return "Yes" if val else "No"
+    if _looks_money(key, val):
+        return f"${val:,.0f}"
+    if isinstance(val, float):
+        return (f"{val:,.2f}".rstrip("0").rstrip("."))
+    return _esc(val)
+
+
+def _render_value(val: Any, key: str = "") -> str:
+    """Recursively render a section-body value as readable HTML."""
+    if isinstance(val, dict):
+        rows = []
+        for k, v in val.items():
+            if isinstance(v, (dict, list)) and v:
+                rows.append(f'<tr><td colspan="2"><div class="sub"><b>{_esc(_human(k))}</b>{_render_value(v, k)}</div></td></tr>')
+            elif not isinstance(v, (dict, list)):
+                rows.append(f"<tr><th>{_esc(_human(k))}</th><td>{_fmt_scalar(k, v)}</td></tr>")
+        return f"<table>{''.join(rows)}</table>" if rows else ""
+    if isinstance(val, list):
+        if val and isinstance(val[0], dict):
+            cols: list[str] = []
+            for row in val:
+                for c in row:
+                    if c not in cols:
+                        cols.append(c)
+            head = "".join(f"<th>{_esc(_human(c))}</th>" for c in cols)
+            body = "".join("<tr>" + "".join(f"<td>{_fmt_scalar(c, r.get(c))}</td>" for c in cols) + "</tr>" for r in val)
+            return f"<table><tr>{head}</tr>{body}</table>"
+        return "<ul>" + "".join(f"<li>{_esc(x)}</li>" for x in val) + "</ul>"
+    return f"<p>{_fmt_scalar(key, val)}</p>"
+
+
+def _generic_html(d: dict[str, Any], report_type: str) -> str:
+    sections = sorted(d.get("sections", []), key=lambda s: s.get("ord", 0))
+    charts = {c["key"]: c for c in d.get("charts", [])}
+    now = datetime.now(timezone.utc).strftime("%B %d, %Y")
+    title = _esc(d.get("title", "LifeNavigator Report"))
+    subtitle = _SUBTITLE.get(report_type, "Your life intelligence report")
+
+    cover = f"""
+    <div class="cover">
+      <div style="font-size:12pt;letter-spacing:3px;opacity:.7;">LIFENAVIGATOR</div>
+      <h1>{title}</h1>
+      <div class="sub">{_esc(subtitle)}</div>
+      <div class="meta">Generated {now} · v{_esc(d.get('version', 1))} · evidence-grounded</div>
+    </div>"""
+
+    blocks = []
+    for s in sections:
+        body = _render_value(s.get("body", {}))
+        cblocks = "".join(_chart_block(charts, ck) for ck in (s.get("charts") or []))
+        ev = s.get("evidence") or []
+        ev_html = ""
+        if ev:
+            ev_html = "<div class='ev'><b>Evidence</b><ul>" + "".join(
+                f"<li>{_esc(e.get('metric_name'))}{(': ' + _esc(e.get('metric_value'))) if e.get('metric_value') not in (None, '') else ''} <span class='cite'>({_esc(e.get('source_table'))})</span></li>"
+                for e in ev) + "</ul></div>"
+        asm = s.get("assumptions") or []
+        asm_html = ("<div class='muted'>Assumptions: " + " · ".join(_esc(a.get("text")) for a in asm) + "</div>") if asm else ""
+        blocks.append(f'<div class="section"><h2>{_esc(s.get("title", ""))}</h2>{body}{cblocks}{ev_html}{asm_html}</div>')
+
+    cites = " · ".join(_esc(c) for c in (d.get("citations") or []))
+    cite_html = f'<div class="section"><h2>Sources</h2><p class="cite">{cites or "—"}</p></div>' if cites else ""
+    boundary = (d.get("governance") or {}).get("disclaimer_text") or "Decision support — not financial, medical, legal, or tax advice."
+    foot = f'<div class="boundary">{_esc(boundary)}</div>'
+    return f"<!doctype html><html><head><meta charset='utf-8'><style>{_css()}{_generic_css()}</style></head><body>{cover}{''.join(blocks)}{cite_html}{foot}</body></html>"
+
+
+def _generic_css() -> str:
+    return """
+    .section { page-break-inside: avoid; margin-bottom: 6px; }
+    .sub { margin: 4px 0 4px 10px; padding-left: 8px; border-left: 2px solid #eef2ff; }
+    .ev { background: #f9fafb; border-radius: 4px; padding: 6px 10px; margin-top: 6px; font-size: 9pt; }
+    .ev ul, table ul { margin: 2px 0; padding-left: 16px; }
+    th { width: 45%; vertical-align: top; }
+    h2 { page-break-after: avoid; }
+    """
+
+
 def _education_html(d: dict[str, Any]) -> str:
     sections = {s["key"]: s for s in d.get("sections", [])}
     charts = {c["key"]: c for c in d.get("charts", [])}
