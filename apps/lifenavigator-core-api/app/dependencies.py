@@ -74,10 +74,12 @@ def get_health_service(
 
 def get_domain_services(
     finance: FinanceService = Depends(get_finance_service),
+    health: HealthService = Depends(get_health_service),
 ) -> dict[str, DomainService]:
-    """Registry of domain services. F2: finance only. New domains register here
-    and auto-join chat-context, life-profile, and recommendations."""
-    return {finance.domain: finance}
+    """Registry of live domain services. A registered domain auto-joins chat-context,
+    life-profile, and recommendations. Health is live as of H-unlock; the life-profile
+    aggregation degrades gracefully if any single domain summary fails."""
+    return {finance.domain: finance, health.domain: health}
 
 
 def get_retriever(

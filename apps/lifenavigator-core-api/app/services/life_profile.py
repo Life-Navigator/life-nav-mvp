@@ -7,6 +7,7 @@ fabricated. Extensible: a newly-registered domain appears with no code change he
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -22,6 +23,8 @@ from ..models.common import (
     SystemStatus,
     UserContext,
 )
+
+log = logging.getLogger("core.life_profile")
 
 # Premium copy for known missing fields. Fallback is generic but never a fake zero.
 _PROMPT_COPY: dict[tuple[str, str], tuple[str, str, str]] = {
@@ -55,6 +58,21 @@ _PROMPT_COPY: dict[tuple[str, str], tuple[str, str, str]] = {
         "Add a 401(k)/IRA to project your retirement readiness.",
         "add_retirement",
     ),
+    ("health", "sleep_logs"): (
+        "Add your sleep",
+        "Log or connect sleep to get wellness coaching grounded in your real data. Not medical advice.",
+        "add_data",
+    ),
+    ("health", "activity_logs"): (
+        "Add your activity",
+        "Log activity or workouts to see consistency coaching grounded in your data. Not medical advice.",
+        "add_data",
+    ),
+    ("health", "nutrition_logs"): (
+        "Add your nutrition",
+        "Log meals to unlock nutrition-consistency coaching grounded in your data. Not medical advice.",
+        "add_data",
+    ),
 }
 
 
@@ -76,7 +94,14 @@ class LifeProfileService:
         any_data = False
 
         for name, svc in services.items():
-            vm = await svc.summary(ctx)
+            try:
+                vm = await svc.summary(ctx)
+            except Exception as exc:  # noqa: BLE001
+                # A single domain's summary failure must NEVER take down the life
+                # profile. The domain simply doesn't appear as live this build —
+                # graceful degradation, not a 5xx.
+                log.warning("domain %s summary failed; omitting from live profile: %s", name, exc)
+                continue
             summaries[name] = vm
             sources.extend(vm.freshness.sources)
             available = vm.confidence.basis != "missing"
@@ -118,6 +143,11 @@ class LifeProfileService:
             if nw and isinstance(nw, dict):
                 return f"Net worth ${nw.get('amount', 0):,.0f}"
             return "Connect your finances to begin"
+        if domain == "health":
+            avg = vm.data.get("avg_sleep_hours")
+            if avg is not None:
+                return f"Avg sleep {avg}h"
+            return "Add your wellness data to begin"
         return domain.capitalize()
 
     @staticmethod

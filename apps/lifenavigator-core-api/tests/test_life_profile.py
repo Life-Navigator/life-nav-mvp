@@ -1,6 +1,8 @@
 """F3 — /v1/life-profile aggregation."""
 from __future__ import annotations
 
+import pytest
+
 from .conftest import make_jwt
 
 ACCOUNT = {"id": "a1", "name": "Checking", "institution_name": "Bank", "account_type": "depository", "current_balance": 6000, "currency": "USD"}
@@ -49,12 +51,72 @@ def test_empty_finance_yields_missing_prompts_not_fake_zero(client):
     assert body["confidence"]["basis"] == "missing"
 
 
-def test_unfinished_domains_not_exposed_as_live(make_client):
+def test_finance_and_health_live_after_unlock(make_client):
     client = make_client({"financial_accounts": [ACCOUNT]})
     body = client.get("/v1/life-profile", headers=_auth()).json()
     live = set(body["domains"].keys())
-    assert live == {"finance"}  # only finance is live
-    for d in ("health", "career", "family", "education"):
-        assert d in body["missing_domains"]   # known, but metadata only
+    assert live == {"finance", "health"}  # both live after H-unlock
+    assert "health" not in body["missing_domains"]  # unlocked
+    for d in ("career", "family", "education"):
+        assert d in body["missing_domains"]   # still known-but-metadata-only
         assert d not in body["domains"]        # never exposed as live
-        assert d not in body["summaries"]      # never fake data
+        assert d not in body["summaries"]
+
+
+def test_health_live_but_no_data_shows_prompts_not_fake(make_client):
+    client = make_client({"financial_accounts": [ACCOUNT]})  # no health tables seeded
+    body = client.get("/v1/life-profile", headers=_auth()).json()
+    hcard = body["domains"]["health"]
+    assert hcard["available"] is False  # live, but no data
+    assert body["summaries"]["health"]["data"]["avg_sleep_hours"] is None  # never fake 0
+    assert any(p["domain"] == "health" for p in body["missing_data_prompts"])
+    # safety posture is always present on the health summary
+    assert body["summaries"]["health"]["data"]["safety_boundaries"][0]["boundary_type"] == "medical"
+
+
+class _BoomHealth:
+    domain = "health"
+
+    async def summary(self, ctx):  # noqa: ANN001
+        raise RuntimeError("health backend down")
+
+
+class _OKFinance:
+    domain = "finance"
+
+    async def summary(self, ctx):  # noqa: ANN001
+        from app.models.common import Confidence, DomainViewModel
+
+        return DomainViewModel(
+            domain="finance", user_id=ctx.user_id, generated_at="t",
+            confidence=Confidence(score=0.6, basis="partial"),
+            data={"net_worth": {"amount": 100, "currency": "USD"}}, missing=[],
+        )
+
+
+class _Registry:
+    def live(self):
+        return {"finance": _OKFinance(), "health": _BoomHealth()}
+
+    def unavailable(self):
+        return ["career", "family", "education"]
+
+
+class _Rec:
+    async def collect(self, ctx, services):  # noqa: ANN001
+        return []
+
+
+@pytest.mark.asyncio
+async def test_health_summary_failure_degrades_gracefully():
+    from app.models.common import SystemStatus, UserContext
+    from app.services.life_profile import LifeProfileService
+
+    svc = LifeProfileService(_Registry(), _Rec())
+    vm = await svc.build(
+        UserContext(user_id="u-1"),
+        SystemStatus(supabase=True, qdrant=True, neo4j=True, gemini=True),
+    )
+    # finance survives; health (failed summary) is omitted — NO exception, no 5xx.
+    assert "finance" in vm.domains
+    assert "health" not in vm.domains
