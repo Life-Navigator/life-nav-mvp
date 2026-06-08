@@ -15,6 +15,7 @@ an honest missing-data state until then.
 """
 from __future__ import annotations
 
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -47,6 +48,16 @@ def _money(amount: float, currency: str = "USD") -> dict[str, Any]:
 
 def _src(table: str) -> SourceRef:
     return SourceRef(system="supabase", table=f"finance.{table}", as_of=_now())
+
+
+# Stable namespace so a recommendation's row id is deterministic per (user, slug):
+# repeated generation upserts the SAME row (idempotent) and keeps a stable graph
+# node id, so the evidence subgraph MERGEs in place rather than duplicating.
+_REC_NS = uuid.UUID("6f3b1e22-0000-4000-8000-000000000001")
+
+
+def _rec_id(user_id: str, slug: str) -> str:
+    return str(uuid.uuid5(_REC_NS, f"{user_id}:{slug}"))
 
 
 class FinanceService(DomainService):
@@ -369,6 +380,150 @@ class FinanceService(DomainService):
                     governance_verdict=GovernanceVerdict(passed=True),
                 ))
         return recs
+
+    # -------------------------------------------------- persisted recommendations
+    def _rec_row(
+        self,
+        ctx: UserContext,
+        *,
+        slug: str,
+        rtype: str,
+        title: str,
+        description: str,
+        priority: str,
+        confidence: float,
+        evidence: list[dict[str, Any]],
+        assumptions: list[dict[str, Any]],
+        tradeoffs: list[dict[str, Any]],
+        governance: dict[str, Any],
+        source_tables: list[str],
+    ) -> dict[str, Any]:
+        """Map a computed recommendation to a finance.financial_recommendations row.
+
+        ``id`` is deterministic (uuid5 of user+slug) so upserts dedup; ``user_id`` /
+        ``tenant_id`` come from the verified JWT, never the request body.
+        """
+        return {
+            "id": _rec_id(ctx.user_id, slug),
+            "user_id": ctx.user_id,
+            "tenant_id": ctx.user_id,
+            "title": title,
+            "description": description,
+            "recommendation_type": rtype,
+            "priority": priority,
+            "confidence": confidence,
+            "governance_verdict": governance,
+            "status": "active",
+            "evidence_json": evidence,
+            "assumptions_json": assumptions,
+            "tradeoffs_json": tradeoffs,
+            "source_tables": source_tables,
+            "source_graph_nodes": [],
+            "derived_by": "finance-recommendation-engine",
+        }
+
+    async def persist_recommendations(self, ctx: UserContext) -> list[dict[str, Any]]:
+        """Compute, govern, and idempotently persist recommendation rows with full
+        structured evidence/assumptions. Never fabricates: no accounts -> nothing; a
+        recommendation is only persisted when it has evidence and required inputs.
+        Repeated calls upsert the same deterministic ids (no duplicates)."""
+        accounts = await self._rows("financial_accounts", ctx)
+        if not accounts:
+            return []  # missing inputs -> no recommendation (the view returns a prompt)
+        debts = await self._rows("asset_loans", ctx)
+        txns = await self._rows("transactions", ctx, limit=1000)
+        cash = sum(
+            self._bal(a)
+            for a in accounts
+            if (a.get("account_type") or "").lower()
+            in {"depository", "checking", "savings", "cash"}
+        )
+        _, expense = self._income_expense(txns)
+        observed = _now()
+        disclaimer = {
+            "boundary_type": "financial_planning",
+            "disclaimer_text": "General financial planning guidance, not individualized investment advice.",
+            "requires_human_review": False,
+            "escalation_path": "licensed_advisor",
+        }
+        rows: list[dict[str, Any]] = []
+
+        # Emergency fund gap — requires a monthly expense estimate.
+        if expense and expense > 0:
+            months = cash / expense
+            target = 3.0
+            if months < target:
+                gap = expense * target - cash
+                rows.append(
+                    self._rec_row(
+                        ctx,
+                        slug="emergency-fund-gap",
+                        rtype="emergency_fund",
+                        title="Close your emergency fund gap",
+                        description=(
+                            f"Your liquid reserve covers ~{months:.1f} months of expenses; "
+                            f"the planning baseline is {target:.0f} months (gap ≈ ${gap:,.0f})."
+                        ),
+                        priority="high",
+                        confidence=0.7,
+                        evidence=[
+                            {"metric_name": "cash", "metric_value": round(cash, 2), "source_table": "finance.financial_accounts", "observed_at": observed, "confidence": 1.0, "explanation": "current liquid cash across deposit accounts"},
+                            {"metric_name": "monthly_expenses", "metric_value": round(expense, 2), "source_table": "finance.transactions", "observed_at": observed, "confidence": 0.7, "explanation": "recent monthly expense estimate"},
+                            {"metric_name": "emergency_reserve_months", "metric_value": round(months, 1), "source_table": "derived", "observed_at": observed, "confidence": 0.7, "explanation": "cash divided by monthly expenses"},
+                            {"metric_name": "target_reserve_months", "metric_value": target, "source_table": "policy", "observed_at": observed, "confidence": 1.0, "explanation": "planning baseline of 3 months"},
+                            {"metric_name": "gap", "metric_value": round(gap, 2), "source_table": "derived", "observed_at": observed, "confidence": 0.7, "explanation": "target reserve minus current cash"},
+                        ],
+                        assumptions=[
+                            {"assumption_text": "monthly expense estimate remains stable", "confidence": 0.7, "expires_at": None, "user_confirmed": False, "source": "model"},
+                            {"assumption_text": "account balances are current as of the latest sync", "confidence": 0.9, "expires_at": None, "user_confirmed": False, "source": "model"},
+                            {"assumption_text": "no major upcoming liquidity need unless stated", "confidence": 0.6, "expires_at": None, "user_confirmed": False, "source": "model"},
+                        ],
+                        tradeoffs=[{"option_a": "build cash reserve first", "option_b": "invest surplus", "benefit": "liquidity and downside protection", "cost": "lower expected return on reserved cash", "affected_domains": ["finance", "risk"]}],
+                        governance={"passed": True, **disclaimer},
+                        source_tables=["finance.financial_accounts", "finance.transactions"],
+                    )
+                )
+
+        # Debt avalanche — only when debt data with an APR exists.
+        apr_debts = [d for d in debts if float(d.get("interest_rate") or d.get("apr") or 0) > 0]
+        if apr_debts:
+            top = max(apr_debts, key=lambda d: float(d.get("interest_rate") or d.get("apr") or 0))
+            apr = float(top.get("interest_rate") or top.get("apr") or 0)
+            bal = self._bal(top)
+            rows.append(
+                self._rec_row(
+                    ctx,
+                    slug=f"debt-payoff-{top.get('id')}",
+                    rtype="debt_optimization",
+                    title="Pay down your highest-interest debt first",
+                    description=(
+                        f"Your highest-APR balance ({apr:.1f}%) costs the most in interest; "
+                        "clearing it first (avalanche) minimizes total interest paid."
+                    ),
+                    priority="high",
+                    confidence=0.8,
+                    evidence=[
+                        {"metric_name": "apr", "metric_value": round(apr, 2), "source_table": "finance.asset_loans", "source_entity_id": str(top.get("id")), "observed_at": observed, "confidence": 1.0, "explanation": "highest-APR balance"},
+                        {"metric_name": "balance", "metric_value": round(bal, 2), "source_table": "finance.asset_loans", "source_entity_id": str(top.get("id")), "observed_at": observed, "confidence": 1.0, "explanation": "outstanding balance"},
+                    ],
+                    assumptions=[
+                        {"assumption_text": "APR is fixed", "confidence": 0.8, "expires_at": None, "user_confirmed": False, "source": "model"},
+                        {"assumption_text": "no prepayment penalty", "confidence": 0.7, "expires_at": None, "user_confirmed": False, "source": "model"},
+                    ],
+                    tradeoffs=[{"option_a": "avalanche (highest APR first)", "option_b": "snowball (smallest balance first)", "benefit": "minimizes total interest paid", "cost": "fewer early psychological wins", "affected_domains": ["finance"]}],
+                    governance={"passed": True, **disclaimer},
+                    source_tables=["finance.asset_loans"],
+                )
+            )
+
+        persisted: list[dict[str, Any]] = []
+        for row in rows:
+            if not row["evidence_json"]:
+                continue  # never persist a recommendation without evidence
+            res = await self._supabase.upsert("financial_recommendations", row, schema=FINANCE)
+            if res:
+                persisted.append(res[0])
+        return persisted
 
     # ---------------------------------------------------------------- writes
     async def create_goal(self, ctx: UserContext, payload: dict[str, Any]) -> WriteResult:

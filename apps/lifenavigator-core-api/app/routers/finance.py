@@ -72,6 +72,22 @@ async def recommendations(user: AuthenticatedUser = Depends(authenticated), svc:
     return await svc.recommendations_view(_ctx(user))
 
 
+@router.post("/recommendations/generate")
+async def generate_recommendations(
+    user: AuthenticatedUser = Depends(authenticated),
+    svc: FinanceService = Depends(get_finance_service),
+) -> dict[str, Any]:
+    """Compute + idempotently persist grounded recommendations (with evidence) for the
+    signed-in user. Repeated calls upsert the same rows. The worker fans each persisted
+    recommendation into its Neo4j evidence subgraph."""
+    persisted = await svc.persist_recommendations(_ctx(user))
+    return {
+        "count": len(persisted),
+        "recommendation_ids": [r.get("id") for r in persisted],
+        "recommendation_types": [r.get("recommendation_type") for r in persisted],
+    }
+
+
 # ------------------------------------------------------------------ writes
 @router.post("/goals", response_model=WriteResult)
 async def create_goal(

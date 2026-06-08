@@ -124,6 +124,39 @@ class SupabaseClient:
             log.warning("supabase insert %s failed: %s", table, exc)
             return []
 
+    async def upsert(
+        self,
+        table: str,
+        row: dict[str, Any],
+        *,
+        schema: str = "public",
+        on_conflict: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Service-role idempotent upsert (PostgREST ``resolution=merge-duplicates``).
+
+        The caller supplies a deterministic primary key (or sets ``on_conflict`` to a
+        unique column) so repeated calls update in place rather than duplicating.
+        ``user_id`` MUST come from the verified JWT, never the request body.
+        """
+        if not self.configured:
+            return []
+        headers = self._headers()
+        headers["Prefer"] = "return=representation,resolution=merge-duplicates"
+        if schema != "public":
+            headers["Content-Profile"] = schema
+        endpoint = f"{self._url}/rest/v1/{table}"
+        if on_conflict:
+            endpoint += f"?on_conflict={on_conflict}"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(endpoint, headers=headers, json=row)
+                resp.raise_for_status()
+                data = resp.json()
+                return data if isinstance(data, list) else [data]
+        except Exception as exc:  # noqa: BLE001
+            log.warning("supabase upsert %s failed: %s", table, exc)
+            return []
+
     async def ready(self) -> bool:
         """Readiness ping — never raises."""
         if not self.configured:

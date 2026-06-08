@@ -66,6 +66,11 @@ class FakeSupabase:
         self.inserts.append((table, row))
         return [{**row, "id": "new-id"}]
 
+    async def upsert(self, table: str, row: dict[str, Any], **_: Any) -> list[dict[str, Any]]:
+        # Idempotent: return the row with its caller-supplied deterministic id.
+        self.inserts.append((table, row))
+        return [dict(row)]
+
     async def ready(self) -> bool:
         return True
 
