@@ -28,6 +28,7 @@ from .domains.registry import DomainRegistry
 from .grounding.context_builder import ContextBuilder
 from .grounding.retriever import Retriever
 from .services.analytics import AnalyticsService
+from .services.comp_benefits import CompensationBenefitsEngine
 from .services.compensation import CompensationIntelligenceEngine
 from .services.decision_engine import DecisionEngine
 from .services.documents import DocumentIntelligenceService
@@ -142,7 +143,7 @@ def get_report_engine(
     education: EducationService = Depends(get_education_service),
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> UniversalReportEngine:
-    return UniversalReportEngine(domains=domains, education=education, supabase=supabase, trends=TrendAnalyzer(supabase))
+    return UniversalReportEngine(domains=domains, education=education, supabase=supabase, trends=TrendAnalyzer(supabase), comp_benefits=CompensationBenefitsEngine(supabase))
 
 
 def get_readiness_engine(
@@ -174,6 +175,10 @@ def get_analytics_service(supabase: SupabaseClient = Depends(get_supabase)) -> A
 
 def get_document_service(supabase: SupabaseClient = Depends(get_supabase)) -> DocumentIntelligenceService:
     return DocumentIntelligenceService(supabase=supabase)
+
+
+def get_comp_benefits_engine(supabase: SupabaseClient = Depends(get_supabase)) -> CompensationBenefitsEngine:
+    return CompensationBenefitsEngine(supabase=supabase)
 
 
 def get_retriever(

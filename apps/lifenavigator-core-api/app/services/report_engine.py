@@ -35,7 +35,7 @@ _VOLATILE = {"generated_at", "observed_at", "as_of", "created_at", "updated_at",
 # an unexpected key name can't break reproducibility (same inputs -> same hash).
 _TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}")
 
-REPORT_TYPES = ("full", "financial", "education", "decision")
+REPORT_TYPES = ("full", "financial", "education", "decision", "compensation")
 
 
 def _now() -> str:
@@ -80,11 +80,12 @@ def _rec_refs(recs: list[Any]) -> list[RecommendationReference]:
 
 
 class UniversalReportEngine:
-    def __init__(self, domains: dict[str, DomainService], education: EducationService, supabase: SupabaseClient, trends: Any = None) -> None:
+    def __init__(self, domains: dict[str, DomainService], education: EducationService, supabase: SupabaseClient, trends: Any = None, comp_benefits: Any = None) -> None:
         self._domains = domains
         self._edu = education
         self._sb = supabase
         self._trends = trends  # optional TrendAnalyzer — adds a finance progress-over-time section
+        self._comp = comp_benefits  # optional CompensationBenefitsEngine — the compensation report
 
     # ---- build (generate_report) ----
     async def build(self, ctx: UserContext, report_type: str) -> ReportDefinition:
@@ -96,7 +97,35 @@ class UniversalReportEngine:
             return await self._decision_report(ctx)
         if report_type == "full":
             return await self._full_report(ctx)
+        if report_type == "compensation":
+            return await self._compensation_report(ctx)
         raise ValueError(f"unknown report_type {report_type}")
+
+    async def _compensation_report(self, ctx: UserContext) -> ReportDefinition:
+        if self._comp is None:
+            return ReportDefinition(report_type="compensation", title="Compensation & Benefits Report",
+                                    sections=[ReportSection(key="unavailable", title="Not available", ord=1, body={"reason": "engine not wired"})])
+        a = await self._comp.analyze(ctx)
+        tc = a["total_compensation"]
+        sections = [
+            ReportSection(key="1_total_compensation", title="Total Compensation", ord=1, body=tc),
+            ReportSection(key="2_five_year_value", title="Five-Year Value", ord=2, body=a["five_year_value"]),
+            ReportSection(key="3_benefit_valuation", title="Benefit Valuation", ord=3, body={"benefits": a["benefit_valuation"]}),
+            ReportSection(key="4_retirement_impact", title="Retirement Impact", ord=4, body=a["retirement_impact"]),
+            ReportSection(key="5_insurance_impact", title="Insurance Impact", ord=5, body=a["insurance_impact"]),
+            ReportSection(key="6_fsa_hsa_optimization", title="FSA / HSA Optimization", ord=6, body=a["fsa_hsa"]),
+            ReportSection(key="7_evidence", title="Evidence & Assumptions", ord=7,
+                          body={"missing_documents": a["missing_documents"]},
+                          evidence=[EvidenceReference(metric_name=e.get("statement", "evidence"), metric_value="", source_table=e.get("source_table", "documents.documents")) for e in a.get("evidence", [])],
+                          assumptions=[AssumptionReference(text=x.get("assumption_text", str(x)), confidence=x.get("confidence")) for x in a.get("assumptions", [])]),
+        ]
+        charts = [ChartDefinition(key="five_year_value", type="bar", title="Five-Year Total Comp",
+                                  series=[{"label": f"Yr {y['year']}", "value": y["total"]} for y in a["five_year_value"]["by_year"]],
+                                  source="documents.documents")]
+        return ReportDefinition(report_type="compensation", title="Compensation & Benefits Report",
+                                sections=sections, charts=charts, citations=self._citations(sections),
+                                confidence=a.get("confidence"), governance=a.get("boundary"),
+                                metadata={"source_documents": a.get("source_documents", [])})
 
     async def _domain_report(self, ctx: UserContext, domain: str, title: str) -> ReportDefinition:
         svc = self._domains.get(domain)
