@@ -240,6 +240,10 @@ pub enum EntityType {
     // New cross-domain decision root + scenario (distinct from legacy Decision/LifeScenario).
     LifeDecision,
     DecisionScenario,
+    // ---- Document Intelligence Platform (Elite Sprint 10) ----
+    // Uploaded source document + its extracted structured fields (the data-acquisition layer).
+    Document,
+    DocumentField,
     /// Catch-all so a new sync-queue entity_type doesn't crash the worker;
     /// the normalizer skips unknown types.
     #[serde(other)]
@@ -432,6 +436,9 @@ impl EntityType {
             // Decision Engine D1
             EntityType::LifeDecision => "life_decision",
             EntityType::DecisionScenario => "decision_scenario",
+            // Document Intelligence Platform
+            EntityType::Document => "document",
+            EntityType::DocumentField => "document_field",
             EntityType::Unknown => "unknown",
         }
     }
@@ -541,6 +548,7 @@ impl EntityType {
             | EntityType::FamilyRecommendation => "family",
 
             EntityType::LifeDecision | EntityType::DecisionScenario => "decision",
+            EntityType::Document | EntityType::DocumentField => "documents",
 
             EntityType::EstateProfile | EntityType::EstateBeneficiary => "estate",
 
@@ -671,7 +679,10 @@ impl EntityType {
             | EntityType::SpouseProfile
             | EntityType::GuardianshipPlan
             | EntityType::EstatePlan
-            | EntityType::InsuranceProfile => SensitivityLevel::High,
+            | EntityType::InsuranceProfile
+            // Documents: uploaded source docs + extracted fields carry salary/SSN/estate → High.
+            | EntityType::Document
+            | EntityType::DocumentField => SensitivityLevel::High,
 
             EntityType::FinancialAccount
             | EntityType::Debt

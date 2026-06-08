@@ -247,6 +247,11 @@ const FAMILY_RECOMMENDATION: &[IncomingEdge] = &[user("HAS_RECOMMENDATION")];
 const LIFE_DECISION: &[IncomingEdge] = &[user("HAS_DECISION")];
 const DECISION_SCENARIO: &[IncomingEdge] = &[fk("HAS_SCENARIO", "life_decision", "decision_id")];
 
+// ---- Document Intelligence Platform (Elite Sprint 10) ----
+// The user owns each uploaded document; extracted fields anchor to their document via FK.
+const DOCUMENT: &[IncomingEdge] = &[user("HAS_DOCUMENT")];
+const DOCUMENT_FIELD: &[IncomingEdge] = &[fk("HAS_EXTRACTED_FIELD", "document", "document_id")];
+
 /// Registry lookup: the declared incoming edges for an entity type.
 ///
 /// Returns a non-empty slice for entities the ontology registry owns (finance
@@ -331,6 +336,8 @@ pub fn incoming_edges(et: &EntityType) -> &'static [IncomingEdge] {
         // Decision Engine (migration 134).
         EntityType::LifeDecision => LIFE_DECISION,
         EntityType::DecisionScenario => DECISION_SCENARIO,
+        EntityType::Document => DOCUMENT,
+        EntityType::DocumentField => DOCUMENT_FIELD,
         _ => &[],
     }
 }
