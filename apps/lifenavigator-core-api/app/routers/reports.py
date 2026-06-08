@@ -9,7 +9,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends, HTTPException, Response
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_report_engine, get_share_service
+from ..dependencies import authenticated, get_analytics_service, get_report_engine, get_share_service
+from ..services.analytics import AnalyticsService
 from ..models.common import UserContext
 from ..services.pdf_renderer import render_education_pdf
 from ..services.report_engine import REPORT_TYPES, UniversalReportEngine
@@ -26,11 +27,15 @@ def _ctx(user: AuthenticatedUser) -> UserContext:
 async def generate(
     user: AuthenticatedUser = Depends(authenticated),
     engine: UniversalReportEngine = Depends(get_report_engine),
+    analytics: AnalyticsService = Depends(get_analytics_service),
     report_type: str = Body("full", embed=True),
 ):
     if report_type not in REPORT_TYPES:
         raise HTTPException(status_code=400, detail=f"report_type must be one of {REPORT_TYPES}")
-    return await engine.generate(_ctx(user), report_type)
+    ctx = _ctx(user)
+    result = await engine.generate(ctx, report_type)
+    await analytics.emit(ctx, "report_generated", domain="report", props={"report_type": report_type})
+    return result
 
 
 @router.get("/{report_type}/preview")
@@ -66,6 +71,7 @@ async def create_share(
     report_type: str,
     user: AuthenticatedUser = Depends(authenticated),
     svc: ShareService = Depends(get_share_service),
+    analytics: AnalyticsService = Depends(get_analytics_service),
     audience: str = Body(..., embed=True),
     expires_in_days: int = Body(14, embed=True),
     purpose: str = Body("", embed=True),
@@ -75,7 +81,10 @@ async def create_share(
         raise HTTPException(status_code=400, detail=f"report_type must be one of {REPORT_TYPES}")
     if audience not in AUDIENCES:
         raise HTTPException(status_code=400, detail=f"audience must be one of {AUDIENCES}")
-    return await svc.create_share(_ctx(user), report_type=report_type, audience=audience, expires_in_days=expires_in_days, purpose=purpose or None)
+    ctx = _ctx(user)
+    result = await svc.create_share(ctx, report_type=report_type, audience=audience, expires_in_days=expires_in_days, purpose=purpose or None)
+    await analytics.emit(ctx, "share_created", domain="share", props={"audience": audience, "report_type": report_type})
+    return result
 
 
 @router.get("/shares")

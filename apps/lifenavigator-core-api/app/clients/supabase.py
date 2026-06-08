@@ -124,6 +124,28 @@ class SupabaseClient:
             log.warning("supabase insert %s failed: %s", table, exc)
             return []
 
+    async def count(self, table: str, *, filters: Optional[dict[str, str]] = None, schema: str = "public") -> int:
+        """Exact row count via PostgREST ``Prefer: count=exact`` (Content-Range). Aggregate-only
+        — returns 0 on error. Used by the Executive Dashboard (no rows/PII fetched)."""
+        if not self.configured:
+            return 0
+        headers = self._headers()
+        headers["Prefer"] = "count=exact"
+        headers["Range"] = "0-0"
+        if schema != "public":
+            headers["Accept-Profile"] = schema
+        params: dict[str, str] = {"select": "id"}
+        if filters:
+            params.update(filters)
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.get(f"{self._url}/rest/v1/{table}", headers=headers, params=params)
+                cr = resp.headers.get("content-range", "")
+                return int(cr.split("/")[-1]) if "/" in cr and cr.split("/")[-1].isdigit() else 0
+        except Exception as exc:  # noqa: BLE001
+            log.warning("supabase count %s failed: %s", table, exc)
+            return 0
+
     async def update(
         self,
         table: str,

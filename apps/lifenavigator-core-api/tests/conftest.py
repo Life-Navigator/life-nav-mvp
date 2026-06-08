@@ -70,6 +70,9 @@ class FakeSupabase:
                 rows = [r for r in rows if field not in r or str(r.get(field)) == want]
         return rows
 
+    async def count(self, table: str, *, filters: Any = None, **_: Any) -> int:
+        return len(await self.select(table, filters=filters))
+
     async def insert(self, table: str, row: dict[str, Any], **_: Any) -> list[dict[str, Any]]:
         stored = {**row, "id": row.get("id", "new-id")}
         self.inserts.append((table, row))

@@ -9,8 +9,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_decision_engine
+from ..dependencies import authenticated, get_analytics_service, get_decision_engine
 from ..models.common import UserContext
+from ..services.analytics import AnalyticsService
 from ..services.decision_engine import DecisionEngine
 
 router = APIRouter(prefix="/v1/decision", tags=["decision"])
@@ -24,10 +25,15 @@ def _ctx(user: AuthenticatedUser) -> UserContext:
 async def decide(
     user: AuthenticatedUser = Depends(authenticated),
     engine: DecisionEngine = Depends(get_decision_engine),
+    analytics: AnalyticsService = Depends(get_analytics_service),
     question: str = Body(..., embed=True),
 ):
     """Resolve + persist a cross-domain decision graph for the question."""
-    return await engine.persist(_ctx(user), question)
+    ctx = _ctx(user)
+    result = await engine.persist(ctx, question)
+    await analytics.emit(ctx, "decision_generated", domain="decision",
+                         props={"decision_type": (result.get("decision") or {}).get("decision_type"), "stored": result.get("stored")})
+    return result
 
 
 @router.post("/preview")

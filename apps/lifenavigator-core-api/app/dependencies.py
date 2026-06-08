@@ -27,6 +27,7 @@ from .domains.health import HealthService
 from .domains.registry import DomainRegistry
 from .grounding.context_builder import ContextBuilder
 from .grounding.retriever import Retriever
+from .services.analytics import AnalyticsService
 from .services.compensation import CompensationIntelligenceEngine
 from .services.decision_engine import DecisionEngine
 from .services.readiness import LifeReadinessEngine
@@ -164,6 +165,10 @@ def get_snapshot_engine(supabase: SupabaseClient = Depends(get_supabase)) -> Sna
 
 def get_trend_analyzer(supabase: SupabaseClient = Depends(get_supabase)) -> TrendAnalyzer:
     return TrendAnalyzer(supabase=supabase)
+
+
+def get_analytics_service(supabase: SupabaseClient = Depends(get_supabase)) -> AnalyticsService:
+    return AnalyticsService(supabase=supabase)
 
 
 def get_retriever(
