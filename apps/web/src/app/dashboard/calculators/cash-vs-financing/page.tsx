@@ -1,10 +1,37 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import FinancialResolverPanel from '@/components/finance/FinancialResolverPanel';
 import Link from 'next/link';
 import { Card } from '@/components/ui/cards/Card';
-import { ArrowLeft, Wallet, TrendingUp, AlertTriangle, DollarSign, BarChart3, Calendar, TrendingDown, Download, CheckCircle, XCircle } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import {
+  ArrowLeft,
+  Wallet,
+  TrendingUp,
+  AlertTriangle,
+  DollarSign,
+  BarChart3,
+  Calendar,
+  TrendingDown,
+  Download,
+  CheckCircle,
+  XCircle,
+} from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ReferenceLine,
+} from 'recharts';
 
 interface CalculatorInputs {
   assetPrice: number;
@@ -137,7 +164,9 @@ export default function CashVsFinancingCalculator() {
   });
 
   const [result, setResult] = useState<ComprehensiveResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'summary' | 'accounts' | 'networth' | 'strategies'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'accounts' | 'networth' | 'strategies'>(
+    'summary'
+  );
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
@@ -145,11 +174,11 @@ export default function CashVsFinancingCalculator() {
   // Calculate optimal down payment (20% for homes, 10-20% for cars)
   const calculateOptimalDownPayment = (): number => {
     if (inputs.assetType === 'home') {
-      return inputs.assetPrice * 0.20; // 20% down
+      return inputs.assetPrice * 0.2; // 20% down
     } else if (inputs.assetType === 'car') {
       return inputs.assetPrice * 0.15; // 15% down
     }
-    return inputs.assetPrice * 0.20;
+    return inputs.assetPrice * 0.2;
   };
 
   // Calculate withdrawal strategy from accounts
@@ -196,11 +225,12 @@ export default function CashVsFinancingCalculator() {
       const contributions = inputs.rothIRA * 0.6; // Assume 60% contributions
       const earnings = inputs.rothIRA * 0.4;
 
-      const grossNeeded = remaining / (1 - (hasEarlyPenalty ? 0.1 + inputs.taxBracket/100 : 0) * 0.4);
+      const grossNeeded =
+        remaining / (1 - (hasEarlyPenalty ? 0.1 + inputs.taxBracket / 100 : 0) * 0.4);
       const amount = Math.min(inputs.rothIRA, grossNeeded);
 
       const earningsPortion = amount * 0.4;
-      const penalty = hasEarlyPenalty ? earningsPortion * 0.10 : 0;
+      const penalty = hasEarlyPenalty ? earningsPortion * 0.1 : 0;
       const taxes = hasEarlyPenalty ? earningsPortion * (inputs.taxBracket / 100) : 0;
       const netAmount = amount - penalty - taxes;
 
@@ -217,12 +247,13 @@ export default function CashVsFinancingCalculator() {
     // 4. Traditional IRA (full amount taxed + 10% penalty if under 59.5)
     if (remaining > 0 && inputs.traditionalIRA > 0) {
       const hasEarlyPenalty = inputs.age < 59.5;
-      const totalTaxRate = (hasEarlyPenalty ? 0.10 : 0) + (inputs.taxBracket / 100) + (inputs.stateTaxRate / 100);
+      const totalTaxRate =
+        (hasEarlyPenalty ? 0.1 : 0) + inputs.taxBracket / 100 + inputs.stateTaxRate / 100;
       const grossNeeded = remaining / (1 - totalTaxRate);
       const amount = Math.min(inputs.traditionalIRA, grossNeeded);
 
-      const penalty = hasEarlyPenalty ? amount * 0.10 : 0;
-      const taxes = amount * ((inputs.taxBracket / 100) + (inputs.stateTaxRate / 100));
+      const penalty = hasEarlyPenalty ? amount * 0.1 : 0;
+      const taxes = amount * (inputs.taxBracket / 100 + inputs.stateTaxRate / 100);
       const netAmount = amount - penalty - taxes;
 
       withdrawals.push({
@@ -238,12 +269,13 @@ export default function CashVsFinancingCalculator() {
     // 5. 401(k) (same as Traditional IRA)
     if (remaining > 0 && inputs.account401k > 0) {
       const hasEarlyPenalty = inputs.age < 59.5;
-      const totalTaxRate = (hasEarlyPenalty ? 0.10 : 0) + (inputs.taxBracket / 100) + (inputs.stateTaxRate / 100);
+      const totalTaxRate =
+        (hasEarlyPenalty ? 0.1 : 0) + inputs.taxBracket / 100 + inputs.stateTaxRate / 100;
       const grossNeeded = remaining / (1 - totalTaxRate);
       const amount = Math.min(inputs.account401k, grossNeeded);
 
-      const penalty = hasEarlyPenalty ? amount * 0.10 : 0;
-      const taxes = amount * ((inputs.taxBracket / 100) + (inputs.stateTaxRate / 100));
+      const penalty = hasEarlyPenalty ? amount * 0.1 : 0;
+      const taxes = amount * (inputs.taxBracket / 100 + inputs.stateTaxRate / 100);
       const netAmount = amount - penalty - taxes;
 
       withdrawals.push({
@@ -262,14 +294,17 @@ export default function CashVsFinancingCalculator() {
       const gainsPortion = 0.5;
       const hasEarlyPenalty = inputs.age < 59.5;
 
-      const totalRate = surrenderCharge + (gainsPortion * ((hasEarlyPenalty ? 0.10 : 0) + (inputs.taxBracket / 100) + (inputs.stateTaxRate / 100)));
+      const totalRate =
+        surrenderCharge +
+        gainsPortion *
+          ((hasEarlyPenalty ? 0.1 : 0) + inputs.taxBracket / 100 + inputs.stateTaxRate / 100);
       const grossNeeded = remaining / (1 - totalRate);
       const amount = Math.min(inputs.annuity, grossNeeded);
 
       const surrender = amount * surrenderCharge;
       const taxableGains = amount * gainsPortion;
-      const penalty = hasEarlyPenalty ? taxableGains * 0.10 : 0;
-      const taxes = taxableGains * ((inputs.taxBracket / 100) + (inputs.stateTaxRate / 100));
+      const penalty = hasEarlyPenalty ? taxableGains * 0.1 : 0;
+      const taxes = taxableGains * (inputs.taxBracket / 100 + inputs.stateTaxRate / 100);
       const netAmount = amount - surrender - penalty - taxes;
 
       withdrawals.push({
@@ -295,18 +330,24 @@ export default function CashVsFinancingCalculator() {
       paymentsPerYear = 12;
       ratePerPeriod = inputs.loanInterestRate / 100 / 12;
       const numPayments = inputs.loanTerm * 12;
-      paymentAmount = loanAmount * (ratePerPeriod * Math.pow(1 + ratePerPeriod, numPayments)) / (Math.pow(1 + ratePerPeriod, numPayments) - 1);
+      paymentAmount =
+        (loanAmount * (ratePerPeriod * Math.pow(1 + ratePerPeriod, numPayments))) /
+        (Math.pow(1 + ratePerPeriod, numPayments) - 1);
     } else if (inputs.paymentStrategy === 'bi-weekly') {
       paymentsPerYear = 26;
       ratePerPeriod = inputs.loanInterestRate / 100 / 26;
       const monthlyRate = inputs.loanInterestRate / 100 / 12;
-      const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, inputs.loanTerm * 12)) / (Math.pow(1 + monthlyRate, inputs.loanTerm * 12) - 1);
+      const monthlyPayment =
+        (loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, inputs.loanTerm * 12))) /
+        (Math.pow(1 + monthlyRate, inputs.loanTerm * 12) - 1);
       paymentAmount = monthlyPayment / 2;
     } else {
       paymentsPerYear = 52;
       ratePerPeriod = inputs.loanInterestRate / 100 / 52;
       const monthlyRate = inputs.loanInterestRate / 100 / 12;
-      const monthlyPayment = loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, inputs.loanTerm * 12)) / (Math.pow(1 + monthlyRate, inputs.loanTerm * 12) - 1);
+      const monthlyPayment =
+        (loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, inputs.loanTerm * 12))) /
+        (Math.pow(1 + monthlyRate, inputs.loanTerm * 12) - 1);
       paymentAmount = monthlyPayment / 4;
     }
 
@@ -323,11 +364,20 @@ export default function CashVsFinancingCalculator() {
 
       let extraPrincipal = 0;
       if (inputs.extraPrincipalFrequency !== 'none' && inputs.extraPrincipalAmount > 0) {
-        if (inputs.extraPrincipalFrequency === 'monthly' && period % Math.round(paymentsPerYear / 12) === 0) {
+        if (
+          inputs.extraPrincipalFrequency === 'monthly' &&
+          period % Math.round(paymentsPerYear / 12) === 0
+        ) {
           extraPrincipal = Math.min(inputs.extraPrincipalAmount, balance - principalPayment);
-        } else if (inputs.extraPrincipalFrequency === 'quarterly' && period % Math.round(paymentsPerYear / 4) === 0) {
+        } else if (
+          inputs.extraPrincipalFrequency === 'quarterly' &&
+          period % Math.round(paymentsPerYear / 4) === 0
+        ) {
           extraPrincipal = Math.min(inputs.extraPrincipalAmount, balance - principalPayment);
-        } else if (inputs.extraPrincipalFrequency === 'annually' && period % paymentsPerYear === 0) {
+        } else if (
+          inputs.extraPrincipalFrequency === 'annually' &&
+          period % paymentsPerYear === 0
+        ) {
           extraPrincipal = Math.min(inputs.extraPrincipalAmount, balance - principalPayment);
         }
       }
@@ -350,7 +400,10 @@ export default function CashVsFinancingCalculator() {
     }
 
     return {
-      monthlyPayment: inputs.paymentStrategy === 'monthly' ? paymentAmount : paymentAmount * (paymentsPerYear / 12),
+      monthlyPayment:
+        inputs.paymentStrategy === 'monthly'
+          ? paymentAmount
+          : paymentAmount * (paymentsPerYear / 12),
       totalInterest,
       monthsToPayoff: period / (paymentsPerYear / 12),
       schedule,
@@ -365,8 +418,13 @@ export default function CashVsFinancingCalculator() {
     financing: FinancingDetails
   ): NetWorthTimeline[] => {
     const timeline: NetWorthTimeline[] = [];
-    const totalAvailableFunds = inputs.checkingSavings + inputs.taxableAccount + inputs.traditionalIRA +
-                                 inputs.rothIRA + inputs.account401k + inputs.annuity;
+    const totalAvailableFunds =
+      inputs.checkingSavings +
+      inputs.taxableAccount +
+      inputs.traditionalIRA +
+      inputs.rothIRA +
+      inputs.account401k +
+      inputs.annuity;
 
     // Cash scenario: withdraw full amount upfront (with penalties/taxes)
     const totalWithdrawn = fullWithdrawals.reduce((sum, w) => sum + w.amountWithdrawn, 0);
@@ -386,18 +444,18 @@ export default function CashVsFinancingCalculator() {
       // For year 0, no growth yet
       if (year > 0) {
         // Cash scenario: simple annual compounding (no monthly cash flows)
-        cashInvestments *= (1 + inputs.expectedReturn / 100);
+        cashInvestments *= 1 + inputs.expectedReturn / 100;
 
         // Financing scenario: monthly compounding with monthly payment outflows
         // Model the differential equation: dI/dt = r*I - P
         // Where I = investment balance, r = monthly rate, P = monthly payment
         const monthsInYear = 12;
-        const loanMonthsRemaining = Math.max(0, (inputs.loanTerm * 12) - ((year - 1) * 12));
+        const loanMonthsRemaining = Math.max(0, inputs.loanTerm * 12 - (year - 1) * 12);
         const monthsWithPayments = Math.min(monthsInYear, loanMonthsRemaining);
 
         for (let month = 0; month < monthsInYear; month++) {
           // Grow investments for this month
-          financingInvestments *= (1 + monthlyRate);
+          financingInvestments *= 1 + monthlyRate;
 
           // Subtract monthly payment if loan is still active
           if (month < monthsWithPayments) {
@@ -411,7 +469,9 @@ export default function CashVsFinancingCalculator() {
       const monthsElapsed = year * 12;
 
       if (monthsElapsed < financing.schedule.length) {
-        const scheduleEntry = financing.schedule.find(entry => Math.floor(entry.period) === monthsElapsed);
+        const scheduleEntry = financing.schedule.find(
+          (entry) => Math.floor(entry.period) === monthsElapsed
+        );
         loanBalance = scheduleEntry?.balance || 0;
       }
 
@@ -437,8 +497,13 @@ export default function CashVsFinancingCalculator() {
   };
 
   useEffect(() => {
-    const totalAvailableFunds = inputs.checkingSavings + inputs.taxableAccount + inputs.traditionalIRA +
-                                 inputs.rothIRA + inputs.account401k + inputs.annuity;
+    const totalAvailableFunds =
+      inputs.checkingSavings +
+      inputs.taxableAccount +
+      inputs.traditionalIRA +
+      inputs.rothIRA +
+      inputs.account401k +
+      inputs.annuity;
 
     const optimalDownPayment = calculateOptimalDownPayment();
     const downPaymentWithdrawals = calculateWithdrawalStrategy(optimalDownPayment);
@@ -460,13 +525,15 @@ export default function CashVsFinancingCalculator() {
 
     let affordabilityMessage = '';
     if (!isAffordable && !canAffordDownPayment) {
-      affordabilityMessage = 'Neither option is possible: insufficient funds for down payment and monthly payment exceeds available income.';
+      affordabilityMessage =
+        'Neither option is possible: insufficient funds for down payment and monthly payment exceeds available income.';
     } else if (!canAffordDownPayment) {
       affordabilityMessage = 'Financing not possible: insufficient funds for down payment.';
     } else if (!isAffordable) {
       affordabilityMessage = `Financing not affordable: monthly payment of ${formatCurrency(financing.monthlyPayment)} exceeds available income of ${formatCurrency(availableForPayment)}.`;
     } else if (!hasSufficientFunds) {
-      affordabilityMessage = 'Cash purchase not possible: insufficient funds even with early withdrawal penalties. Financing recommended.';
+      affordabilityMessage =
+        'Cash purchase not possible: insufficient funds even with early withdrawal penalties. Financing recommended.';
     } else {
       affordabilityMessage = 'Both options are financially feasible.';
     }
@@ -476,7 +543,12 @@ export default function CashVsFinancingCalculator() {
     const totalWithdrawn = fullWithdrawals.reduce((sum, w) => sum + w.amountWithdrawn, 0);
 
     // Calculate timeline
-    const timeline = calculateNetWorthTimeline(optimalDownPayment, fullWithdrawals, downPaymentWithdrawals, financing);
+    const timeline = calculateNetWorthTimeline(
+      optimalDownPayment,
+      fullWithdrawals,
+      downPaymentWithdrawals,
+      financing
+    );
 
     const finalTimeline = timeline[timeline.length - 1];
     const breakevenYear = timeline.findIndex((t, i) => i > 0 && t.advantage > 0);
@@ -504,7 +576,8 @@ export default function CashVsFinancingCalculator() {
         recommendation = 'cash';
       } else {
         // If equal, prefer whichever has lower immediate cost
-        recommendation = totalPenalties + totalTaxes > financing.totalInterest ? 'financing' : 'cash';
+        recommendation =
+          totalPenalties + totalTaxes > financing.totalInterest ? 'financing' : 'cash';
       }
     }
 
@@ -544,7 +617,7 @@ export default function CashVsFinancingCalculator() {
   }, [inputs]);
 
   const updateInput = (key: keyof CalculatorInputs, value: any) => {
-    setInputs(prev => ({ ...prev, [key]: value }));
+    setInputs((prev) => ({ ...prev, [key]: value }));
   };
 
   const importAccounts = async () => {
@@ -562,7 +635,7 @@ export default function CashVsFinancingCalculator() {
       const data = await response.json();
 
       // Map the categorized accounts to calculator inputs
-      setInputs(prev => ({
+      setInputs((prev) => ({
         ...prev,
         checkingSavings: data.categorized.checking + data.categorized.savings,
         taxableAccount: data.categorized.taxable,
@@ -574,7 +647,6 @@ export default function CashVsFinancingCalculator() {
 
       setImportSuccess(true);
       setTimeout(() => setImportSuccess(false), 3000);
-
     } catch (error) {
       console.error('Import error:', error);
       setImportError('Failed to import accounts. Please try again.');
@@ -593,12 +665,23 @@ export default function CashVsFinancingCalculator() {
     }).format(value);
   };
 
-  const totalAvailable = inputs.checkingSavings + inputs.taxableAccount + inputs.traditionalIRA +
-                         inputs.rothIRA + inputs.account401k + inputs.annuity;
+  const totalAvailable =
+    inputs.checkingSavings +
+    inputs.taxableAccount +
+    inputs.traditionalIRA +
+    inputs.rothIRA +
+    inputs.account401k +
+    inputs.annuity;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 dark:from-gray-900 dark:to-gray-800 p-6">
       <div className="max-w-7xl mx-auto">
+        <div className="mb-6">
+          <FinancialResolverPanel
+            title="Your canonical inputs"
+            keys={['cash_balance', 'debt_apr']}
+          />
+        </div>
         <div className="mb-6">
           <Link
             href="/dashboard/calculators"
@@ -611,7 +694,8 @@ export default function CashVsFinancingCalculator() {
             💰 Smart Purchase Funding Calculator
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-400">
-            Optimize your funding strategy with retirement account analysis and net worth projections
+            Optimize your funding strategy with retirement account analysis and net worth
+            projections
           </p>
         </div>
 
@@ -687,7 +771,12 @@ export default function CashVsFinancingCalculator() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      {inputs.assetType === 'home' ? 'Appreciation' : inputs.assetType === 'car' ? 'Depreciation' : 'Growth'} Rate: {inputs.assetAppreciationRate}%/year
+                      {inputs.assetType === 'home'
+                        ? 'Appreciation'
+                        : inputs.assetType === 'car'
+                          ? 'Depreciation'
+                          : 'Growth'}{' '}
+                      Rate: {inputs.assetAppreciationRate}%/year
                     </label>
                     <input
                       type="range"
@@ -695,7 +784,9 @@ export default function CashVsFinancingCalculator() {
                       max={inputs.assetType === 'home' ? 10 : 5}
                       step="0.5"
                       value={inputs.assetAppreciationRate}
-                      onChange={(e) => updateInput('assetAppreciationRate', parseFloat(e.target.value))}
+                      onChange={(e) =>
+                        updateInput('assetAppreciationRate', parseFloat(e.target.value))
+                      }
                       className="w-full"
                     />
                   </div>
@@ -737,19 +828,45 @@ export default function CashVsFinancingCalculator() {
 
                 <div className="space-y-3">
                   {[
-                    { key: 'checkingSavings' as keyof CalculatorInputs, label: 'Checking/Savings', info: 'No penalties' },
-                    { key: 'taxableAccount' as keyof CalculatorInputs, label: 'Taxable Account', info: '15% capital gains' },
-                    { key: 'rothIRA' as keyof CalculatorInputs, label: 'Roth IRA', info: inputs.age < 59.5 ? 'Penalties on earnings' : 'No penalties' },
-                    { key: 'traditionalIRA' as keyof CalculatorInputs, label: 'Traditional IRA', info: inputs.age < 59.5 ? '10% penalty + taxes' : 'Taxes only' },
-                    { key: 'account401k' as keyof CalculatorInputs, label: '401(k)', info: inputs.age < 59.5 ? '10% penalty + taxes' : 'Taxes only' },
-                    { key: 'annuity' as keyof CalculatorInputs, label: 'Annuity', info: 'Surrender charges + penalties' },
+                    {
+                      key: 'checkingSavings' as keyof CalculatorInputs,
+                      label: 'Checking/Savings',
+                      info: 'No penalties',
+                    },
+                    {
+                      key: 'taxableAccount' as keyof CalculatorInputs,
+                      label: 'Taxable Account',
+                      info: '15% capital gains',
+                    },
+                    {
+                      key: 'rothIRA' as keyof CalculatorInputs,
+                      label: 'Roth IRA',
+                      info: inputs.age < 59.5 ? 'Penalties on earnings' : 'No penalties',
+                    },
+                    {
+                      key: 'traditionalIRA' as keyof CalculatorInputs,
+                      label: 'Traditional IRA',
+                      info: inputs.age < 59.5 ? '10% penalty + taxes' : 'Taxes only',
+                    },
+                    {
+                      key: 'account401k' as keyof CalculatorInputs,
+                      label: '401(k)',
+                      info: inputs.age < 59.5 ? '10% penalty + taxes' : 'Taxes only',
+                    },
+                    {
+                      key: 'annuity' as keyof CalculatorInputs,
+                      label: 'Annuity',
+                      info: 'Surrender charges + penalties',
+                    },
                   ].map((account) => (
                     <div key={account.key}>
                       <div className="flex justify-between items-center mb-1">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                           {account.label}
                         </label>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">{account.info}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {account.info}
+                        </span>
                       </div>
                       <input
                         type="number"
@@ -762,7 +879,9 @@ export default function CashVsFinancingCalculator() {
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex justify-between">
                       <span className="text-sm font-semibold">Total:</span>
-                      <span className="font-bold text-gray-900 dark:text-white">{formatCurrency(totalAvailable)}</span>
+                      <span className="font-bold text-gray-900 dark:text-white">
+                        {formatCurrency(totalAvailable)}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -806,8 +925,10 @@ export default function CashVsFinancingCalculator() {
                         onChange={(e) => updateInput('taxBracket', parseInt(e.target.value))}
                         className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-gray-800 text-sm"
                       >
-                        {[10, 12, 22, 24, 32, 35, 37].map(rate => (
-                          <option key={rate} value={rate}>{rate}%</option>
+                        {[10, 12, 22, 24, 32, 35, 37].map((rate) => (
+                          <option key={rate} value={rate}>
+                            {rate}%
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -836,7 +957,9 @@ export default function CashVsFinancingCalculator() {
                       <input
                         type="number"
                         value={inputs.monthlyIncome}
-                        onChange={(e) => updateInput('monthlyIncome', parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateInput('monthlyIncome', parseFloat(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border rounded-lg text-sm"
                       />
                     </div>
@@ -848,15 +971,21 @@ export default function CashVsFinancingCalculator() {
                       <input
                         type="number"
                         value={inputs.monthlyExpenses}
-                        onChange={(e) => updateInput('monthlyExpenses', parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateInput('monthlyExpenses', parseFloat(e.target.value) || 0)
+                        }
                         className="w-full px-3 py-2 border rounded-lg text-sm"
                       />
                     </div>
                   </div>
                   <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Available for Payment:</span>
-                      <span className={`font-semibold ${(inputs.monthlyIncome - inputs.monthlyExpenses) > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <span className="text-gray-600 dark:text-gray-400">
+                        Available for Payment:
+                      </span>
+                      <span
+                        className={`font-semibold ${inputs.monthlyIncome - inputs.monthlyExpenses > 0 ? 'text-green-600' : 'text-red-600'}`}
+                      >
                         {formatCurrency(inputs.monthlyIncome - inputs.monthlyExpenses)}
                       </span>
                     </div>
@@ -883,7 +1012,9 @@ export default function CashVsFinancingCalculator() {
                         max="15"
                         step="0.25"
                         value={inputs.loanInterestRate}
-                        onChange={(e) => updateInput('loanInterestRate', parseFloat(e.target.value))}
+                        onChange={(e) =>
+                          updateInput('loanInterestRate', parseFloat(e.target.value))
+                        }
                         className="w-full"
                       />
                     </div>
@@ -951,7 +1082,9 @@ export default function CashVsFinancingCalculator() {
                     <input
                       type="number"
                       value={inputs.extraPrincipalAmount}
-                      onChange={(e) => updateInput('extraPrincipalAmount', parseFloat(e.target.value) || 0)}
+                      onChange={(e) =>
+                        updateInput('extraPrincipalAmount', parseFloat(e.target.value) || 0)
+                      }
                       className="w-full px-3 py-2 border rounded-lg text-sm mb-2"
                     />
                     <select
@@ -982,21 +1115,24 @@ export default function CashVsFinancingCalculator() {
                         <AlertTriangle className="h-6 w-6" />
                         ⚠️ Purchase Not Recommended
                       </h2>
-                      <p className="text-sm opacity-90 mb-4">
-                        {result.affordabilityMessage}
-                      </p>
+                      <p className="text-sm opacity-90 mb-4">{result.affordabilityMessage}</p>
                       <div className="bg-white/20 rounded-lg p-4">
                         <p className="text-xs">
-                          Consider: increasing income, reducing expenses, choosing a less expensive asset, or saving more before purchase.
+                          Consider: increasing income, reducing expenses, choosing a less expensive
+                          asset, or saving more before purchase.
                         </p>
                       </div>
                     </div>
                   </Card>
                 ) : (
-                  <Card className={`${result.recommendation === 'financing' ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-blue-500 to-cyan-600'}`}>
+                  <Card
+                    className={`${result.recommendation === 'financing' ? 'bg-gradient-to-br from-green-500 to-emerald-600' : 'bg-gradient-to-br from-blue-500 to-cyan-600'}`}
+                  >
                     <div className="p-6 text-white">
                       <h2 className="text-2xl font-bold mb-4">
-                        {result.recommendation === 'financing' ? '🏦 Financing Recommended' : '💵 Pay Cash Recommended'}
+                        {result.recommendation === 'financing'
+                          ? '🏦 Financing Recommended'
+                          : '💵 Pay Cash Recommended'}
                       </h2>
                       <div className="text-4xl font-bold mb-2">
                         {formatCurrency(result.netDifference)}
@@ -1012,11 +1148,19 @@ export default function CashVsFinancingCalculator() {
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <div className="opacity-75">Recommended Down</div>
-                          <div className="font-bold">{formatCurrency(result.recommendedDownPayment)}</div>
+                          <div className="font-bold">
+                            {formatCurrency(result.recommendedDownPayment)}
+                          </div>
                         </div>
                         <div>
                           <div className="opacity-75">Final Net Worth</div>
-                          <div className="font-bold">{formatCurrency(result.recommendation === 'financing' ? result.financingOption.finalNetWorth : result.cashOption.finalNetWorth)}</div>
+                          <div className="font-bold">
+                            {formatCurrency(
+                              result.recommendation === 'financing'
+                                ? result.financingOption.finalNetWorth
+                                : result.cashOption.finalNetWorth
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1047,7 +1191,9 @@ export default function CashVsFinancingCalculator() {
                       <div className="space-y-4">
                         <div>
                           <div className="flex items-center justify-between mb-3">
-                            <h3 className="font-semibold text-gray-900 dark:text-white">Pay Cash</h3>
+                            <h3 className="font-semibold text-gray-900 dark:text-white">
+                              Pay Cash
+                            </h3>
                             {result.cashOption.isPossible ? (
                               <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                 Possible
@@ -1061,22 +1207,32 @@ export default function CashVsFinancingCalculator() {
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                               <div className="text-gray-600 dark:text-gray-400 mb-1">Penalties</div>
-                              <div className="font-bold text-red-600">{formatCurrency(result.cashOption.totalPenalties)}</div>
+                              <div className="font-bold text-red-600">
+                                {formatCurrency(result.cashOption.totalPenalties)}
+                              </div>
                             </div>
                             <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                               <div className="text-gray-600 dark:text-gray-400 mb-1">Taxes</div>
-                              <div className="font-bold text-red-600">{formatCurrency(result.cashOption.totalTaxes)}</div>
+                              <div className="font-bold text-red-600">
+                                {formatCurrency(result.cashOption.totalTaxes)}
+                              </div>
                             </div>
                             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg col-span-2">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Final Net Worth</div>
-                              <div className="font-bold text-gray-900 dark:text-white">{formatCurrency(result.cashOption.finalNetWorth)}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Final Net Worth
+                              </div>
+                              <div className="font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(result.cashOption.finalNetWorth)}
+                              </div>
                             </div>
                           </div>
                         </div>
 
                         <div>
                           <div className="flex items-center justify-between mb-3">
-                            <h3 className="font-semibold text-gray-900 dark:text-white">Financing</h3>
+                            <h3 className="font-semibold text-gray-900 dark:text-white">
+                              Financing
+                            </h3>
                             {result.financingOption.isPossible ? (
                               <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                 Affordable
@@ -1089,20 +1245,34 @@ export default function CashVsFinancingCalculator() {
                           </div>
                           <div className="grid grid-cols-2 gap-3 text-sm">
                             <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Down Payment</div>
-                              <div className="font-bold text-gray-900 dark:text-white">{formatCurrency(result.financingOption.downPayment)}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Down Payment
+                              </div>
+                              <div className="font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(result.financingOption.downPayment)}
+                              </div>
                             </div>
                             <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                               <div className="text-gray-600 dark:text-gray-400 mb-1">Interest</div>
-                              <div className="font-bold text-red-600">{formatCurrency(result.financingOption.totalInterest)}</div>
+                              <div className="font-bold text-red-600">
+                                {formatCurrency(result.financingOption.totalInterest)}
+                              </div>
                             </div>
                             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Monthly Payment</div>
-                              <div className="font-bold text-gray-900 dark:text-white">{formatCurrency(result.financingOption.monthlyPayment)}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Monthly Payment
+                              </div>
+                              <div className="font-bold text-gray-900 dark:text-white">
+                                {formatCurrency(result.financingOption.monthlyPayment)}
+                              </div>
                             </div>
                             <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                              <div className="text-gray-600 dark:text-gray-400 mb-1">Final Net Worth</div>
-                              <div className="font-bold text-green-600">{formatCurrency(result.financingOption.finalNetWorth)}</div>
+                              <div className="text-gray-600 dark:text-gray-400 mb-1">
+                                Final Net Worth
+                              </div>
+                              <div className="font-bold text-green-600">
+                                {formatCurrency(result.financingOption.finalNetWorth)}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -1113,19 +1283,29 @@ export default function CashVsFinancingCalculator() {
                     {activeTab === 'accounts' && (
                       <div className="space-y-4">
                         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Recommended Down Payment Strategy</h4>
+                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                            Recommended Down Payment Strategy
+                          </h4>
                           <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">
-                            {result.recommendedDownPayment > 0 ? `We recommend ${formatCurrency(result.recommendedDownPayment)} down payment (${Math.round((result.recommendedDownPayment/inputs.assetPrice)*100)}%)` : 'Minimal down payment recommended'}
+                            {result.recommendedDownPayment > 0
+                              ? `We recommend ${formatCurrency(result.recommendedDownPayment)} down payment (${Math.round((result.recommendedDownPayment / inputs.assetPrice) * 100)}%)`
+                              : 'Minimal down payment recommended'}
                           </p>
                         </div>
 
-                        <h3 className="font-semibold text-gray-900 dark:text-white">Withdrawal Strategy</h3>
+                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                          Withdrawal Strategy
+                        </h3>
                         <div className="space-y-2">
                           {result.downPaymentSource.map((withdrawal, idx) => (
                             <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                               <div className="flex justify-between items-start mb-2">
-                                <span className="font-semibold text-sm">{withdrawal.accountType}</span>
-                                <span className="text-sm font-medium">{formatCurrency(withdrawal.netAmount)}</span>
+                                <span className="font-semibold text-sm">
+                                  {withdrawal.accountType}
+                                </span>
+                                <span className="text-sm font-medium">
+                                  {formatCurrency(withdrawal.netAmount)}
+                                </span>
                               </div>
                               {(withdrawal.penalties > 0 || withdrawal.taxes > 0) && (
                                 <div className="text-xs space-y-1">
@@ -1159,15 +1339,36 @@ export default function CashVsFinancingCalculator() {
                           <ResponsiveContainer width="100%" height={300}>
                             <LineChart data={result.timeline}>
                               <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis dataKey="year" label={{ value: 'Years', position: 'insideBottom', offset: -5 }} />
+                              <XAxis
+                                dataKey="year"
+                                label={{ value: 'Years', position: 'insideBottom', offset: -5 }}
+                              />
                               <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
                               <Tooltip formatter={(value: number) => formatCurrency(value)} />
                               <Legend />
                               {result.breakevenYear && (
-                                <ReferenceLine x={result.breakevenYear} stroke="#f59e0b" strokeWidth={2} label="Breakeven" strokeDasharray="5 5" />
+                                <ReferenceLine
+                                  x={result.breakevenYear}
+                                  stroke="#f59e0b"
+                                  strokeWidth={2}
+                                  label="Breakeven"
+                                  strokeDasharray="5 5"
+                                />
                               )}
-                              <Line type="monotone" dataKey="cashNetWorth" stroke="#3b82f6" strokeWidth={2} name="Pay Cash" />
-                              <Line type="monotone" dataKey="financingNetWorth" stroke="#10b981" strokeWidth={2} name="Financing" />
+                              <Line
+                                type="monotone"
+                                dataKey="cashNetWorth"
+                                stroke="#3b82f6"
+                                strokeWidth={2}
+                                name="Pay Cash"
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="financingNetWorth"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                name="Financing"
+                              />
                             </LineChart>
                           </ResponsiveContainer>
                         </div>
@@ -1180,12 +1381,12 @@ export default function CashVsFinancingCalculator() {
                             <AreaChart data={result.timeline}>
                               <defs>
                                 <linearGradient id="cashInv" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1} />
                                 </linearGradient>
                                 <linearGradient id="finInv" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
+                                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.1} />
                                 </linearGradient>
                               </defs>
                               <CartesianGrid strokeDasharray="3 3" />
@@ -1193,8 +1394,20 @@ export default function CashVsFinancingCalculator() {
                               <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
                               <Tooltip formatter={(value: number) => formatCurrency(value)} />
                               <Legend />
-                              <Area type="monotone" dataKey="cashRemainingInvestments" stroke="#3b82f6" fill="url(#cashInv)" name="Cash - Investments" />
-                              <Area type="monotone" dataKey="financingRemainingInvestments" stroke="#10b981" fill="url(#finInv)" name="Financing - Investments" />
+                              <Area
+                                type="monotone"
+                                dataKey="cashRemainingInvestments"
+                                stroke="#3b82f6"
+                                fill="url(#cashInv)"
+                                name="Cash - Investments"
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="financingRemainingInvestments"
+                                stroke="#10b981"
+                                fill="url(#finInv)"
+                                name="Financing - Investments"
+                              />
                             </AreaChart>
                           </ResponsiveContainer>
                         </div>
@@ -1207,12 +1420,12 @@ export default function CashVsFinancingCalculator() {
                             <AreaChart data={result.timeline}>
                               <defs>
                                 <linearGradient id="asset" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8} />
+                                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1} />
                                 </linearGradient>
                                 <linearGradient id="loan" x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8}/>
-                                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1}/>
+                                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.8} />
+                                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1} />
                                 </linearGradient>
                               </defs>
                               <CartesianGrid strokeDasharray="3 3" />
@@ -1220,8 +1433,20 @@ export default function CashVsFinancingCalculator() {
                               <YAxis tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
                               <Tooltip formatter={(value: number) => formatCurrency(value)} />
                               <Legend />
-                              <Area type="monotone" dataKey="financingAssetValue" stroke="#8b5cf6" fill="url(#asset)" name="Asset Value" />
-                              <Area type="monotone" dataKey="financingLoanBalance" stroke="#ef4444" fill="url(#loan)" name="Loan Balance" />
+                              <Area
+                                type="monotone"
+                                dataKey="financingAssetValue"
+                                stroke="#8b5cf6"
+                                fill="url(#asset)"
+                                name="Asset Value"
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="financingLoanBalance"
+                                stroke="#ef4444"
+                                fill="url(#loan)"
+                                name="Loan Balance"
+                              />
                             </AreaChart>
                           </ResponsiveContainer>
                         </div>
@@ -1241,7 +1466,10 @@ export default function CashVsFinancingCalculator() {
                               <li>• Weekly = 52 payments/year ≈ 13 monthly payments</li>
                             )}
                             {inputs.extraPrincipalAmount > 0 && (
-                              <li>• Extra ${inputs.extraPrincipalAmount} {inputs.extraPrincipalFrequency} accelerates payoff</li>
+                              <li>
+                                • Extra ${inputs.extraPrincipalAmount}{' '}
+                                {inputs.extraPrincipalFrequency} accelerates payoff
+                              </li>
                             )}
                             <li>• More frequent payments = less interest over loan life</li>
                           </ul>
@@ -1253,13 +1481,18 @@ export default function CashVsFinancingCalculator() {
                             <div className="font-bold">{inputs.loanInterestRate}%</div>
                           </div>
                           <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <div className="text-gray-600 dark:text-gray-400 mb-1">Investment Return</div>
+                            <div className="text-gray-600 dark:text-gray-400 mb-1">
+                              Investment Return
+                            </div>
                             <div className="font-bold">{inputs.expectedReturn}%</div>
                           </div>
                           <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg col-span-2">
-                            <div className="text-gray-600 dark:text-gray-400 mb-1">Return Spread</div>
+                            <div className="text-gray-600 dark:text-gray-400 mb-1">
+                              Return Spread
+                            </div>
                             <div className="font-bold text-gray-900 dark:text-white">
-                              {inputs.expectedReturn - inputs.loanInterestRate > 0 ? '+' : ''}{(inputs.expectedReturn - inputs.loanInterestRate).toFixed(2)}%
+                              {inputs.expectedReturn - inputs.loanInterestRate > 0 ? '+' : ''}
+                              {(inputs.expectedReturn - inputs.loanInterestRate).toFixed(2)}%
                               {inputs.expectedReturn > inputs.loanInterestRate
                                 ? ' (Favor financing)'
                                 : ' (Favor paying cash)'}
@@ -1280,20 +1513,32 @@ export default function CashVsFinancingCalculator() {
                     <ul className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                       <li className="flex gap-2">
                         <span className="text-emerald-600 font-bold">•</span>
-                        <span><strong>Smart withdrawals:</strong> We prioritize low-penalty accounts first to minimize tax impact.</span>
+                        <span>
+                          <strong>Smart withdrawals:</strong> We prioritize low-penalty accounts
+                          first to minimize tax impact.
+                        </span>
                       </li>
                       <li className="flex gap-2">
                         <span className="text-emerald-600 font-bold">•</span>
-                        <span><strong>Net worth focus:</strong> The best option maximizes your wealth over time, not just minimizes payments.</span>
+                        <span>
+                          <strong>Net worth focus:</strong> The best option maximizes your wealth
+                          over time, not just minimizes payments.
+                        </span>
                       </li>
                       <li className="flex gap-2">
                         <span className="text-emerald-600 font-bold">•</span>
-                        <span><strong>Rate arbitrage:</strong> If investment returns exceed loan rate, keep money invested.</span>
+                        <span>
+                          <strong>Rate arbitrage:</strong> If investment returns exceed loan rate,
+                          keep money invested.
+                        </span>
                       </li>
                       {inputs.age < 59.5 && (
                         <li className="flex gap-2">
                           <span className="text-orange-600 font-bold">•</span>
-                          <span><strong>Age consideration:</strong> At {inputs.age}, early withdrawal penalties significantly favor financing.</span>
+                          <span>
+                            <strong>Age consideration:</strong> At {inputs.age}, early withdrawal
+                            penalties significantly favor financing.
+                          </span>
                         </li>
                       )}
                     </ul>

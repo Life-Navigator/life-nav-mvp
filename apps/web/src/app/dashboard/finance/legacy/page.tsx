@@ -1,8 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import FinancialResolverPanel from '@/components/finance/FinancialResolverPanel';
 
-type TabType = 'overview' | 'wills-trusts' | 'beneficiaries' | 'digital-assets' | 'healthcare-directives' | 'tax-planning';
+type TabType =
+  | 'overview'
+  | 'wills-trusts'
+  | 'beneficiaries'
+  | 'digital-assets'
+  | 'healthcare-directives'
+  | 'tax-planning';
 
 interface Will {
   id: string;
@@ -76,11 +83,11 @@ export default function LegacyPlanningPage() {
 
   const calculateEstateCompleteness = () => {
     let score = 0;
-    if (wills.some(w => w.type === 'will' && w.status === 'current')) score += 25;
-    if (wills.some(w => w.type === 'living-will' && w.status === 'current')) score += 15;
+    if (wills.some((w) => w.type === 'will' && w.status === 'current')) score += 25;
+    if (wills.some((w) => w.type === 'living-will' && w.status === 'current')) score += 15;
     if (beneficiaries.length > 0) score += 20;
-    if (digitalAssets.some(a => a.hasSuccessionPlan)) score += 20;
-    if (wills.some(w => w.type === 'trust')) score += 20;
+    if (digitalAssets.some((a) => a.hasSuccessionPlan)) score += 20;
+    if (wills.some((w) => w.type === 'trust')) score += 20;
     return score;
   };
 
@@ -91,8 +98,8 @@ export default function LegacyPlanningPage() {
         Start Your Legacy Planning
       </h3>
       <p className="text-gray-600 dark:text-gray-400 text-center max-w-md mb-6">
-        Protect your loved ones and ensure your wishes are carried out by creating a comprehensive estate plan.
-        Start with a will, designate beneficiaries, and plan for your digital legacy.
+        Protect your loved ones and ensure your wishes are carried out by creating a comprehensive
+        estate plan. Start with a will, designate beneficiaries, and plan for your digital legacy.
       </p>
       <button className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
         Begin Estate Planning
@@ -102,10 +109,10 @@ export default function LegacyPlanningPage() {
 
   const renderOverview = () => {
     const completeness = calculateEstateCompleteness();
-    const hasWill = wills.some(w => w.type === 'will' && w.status === 'current');
-    const hasLivingWill = wills.some(w => w.type === 'living-will' && w.status === 'current');
-    const hasTrust = wills.some(w => w.type === 'trust');
-    const beneficiariesCurrent = beneficiaries.filter(b => {
+    const hasWill = wills.some((w) => w.type === 'will' && w.status === 'current');
+    const hasLivingWill = wills.some((w) => w.type === 'living-will' && w.status === 'current');
+    const hasTrust = wills.some((w) => w.type === 'trust');
+    const beneficiariesCurrent = beneficiaries.filter((b) => {
       const lastVerified = new Date(b.lastVerified);
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
@@ -122,7 +129,13 @@ export default function LegacyPlanningPage() {
           <div className="flex items-end gap-4 mb-4">
             <div className="text-6xl font-bold">{completeness}%</div>
             <div className="text-xl mb-2">
-              {completeness >= 80 ? 'Excellent' : completeness >= 60 ? 'Good' : completeness >= 40 ? 'Fair' : 'Needs Attention'}
+              {completeness >= 80
+                ? 'Excellent'
+                : completeness >= 60
+                  ? 'Good'
+                  : completeness >= 40
+                    ? 'Fair'
+                    : 'Needs Attention'}
             </div>
           </div>
           <div className="w-full bg-white/20 rounded-full h-3">
@@ -132,7 +145,9 @@ export default function LegacyPlanningPage() {
             />
           </div>
           <p className="mt-4 text-blue-100">
-            {completeness < 100 ? `Complete ${100 - completeness}% more to have a comprehensive estate plan` : 'Your estate plan is comprehensive!'}
+            {completeness < 100
+              ? `Complete ${100 - completeness}% more to have a comprehensive estate plan`
+              : 'Your estate plan is comprehensive!'}
           </p>
         </div>
 
@@ -140,7 +155,9 @@ export default function LegacyPlanningPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Estimated Estate Value</h3>
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Estimated Estate Value
+              </h3>
               <span className="text-2xl">💎</span>
             </div>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -157,7 +174,7 @@ export default function LegacyPlanningPage() {
               <span className="text-2xl">📜</span>
             </div>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
-              {wills.filter(w => w.status === 'current').length}
+              {wills.filter((w) => w.status === 'current').length}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
               Current estate documents
@@ -166,7 +183,9 @@ export default function LegacyPlanningPage() {
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Beneficiaries</h3>
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Beneficiaries
+              </h3>
               <span className="text-2xl">👥</span>
             </div>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -179,46 +198,73 @@ export default function LegacyPlanningPage() {
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Digital Assets</h3>
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                Digital Assets
+              </h3>
               <span className="text-2xl">💻</span>
             </div>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">
               {digitalAssets.length}
             </p>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {digitalAssets.filter(a => a.hasSuccessionPlan).length} with succession plan
+              {digitalAssets.filter((a) => a.hasSuccessionPlan).length} with succession plan
             </p>
           </div>
         </div>
 
         {/* Estate Planning Checklist */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Estate Planning Checklist</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Estate Planning Checklist
+          </h3>
           <div className="space-y-3">
             {[
               { label: 'Last Will and Testament', completed: hasWill, importance: 'Critical' },
-              { label: 'Living Will / Healthcare Directive', completed: hasLivingWill, importance: 'Critical' },
+              {
+                label: 'Living Will / Healthcare Directive',
+                completed: hasLivingWill,
+                importance: 'Critical',
+              },
               { label: 'Durable Power of Attorney', completed: false, importance: 'Critical' },
               { label: 'Healthcare Power of Attorney', completed: false, importance: 'Critical' },
-              { label: 'Beneficiary Designations (All Accounts)', completed: beneficiaries.length > 0, importance: 'High' },
+              {
+                label: 'Beneficiary Designations (All Accounts)',
+                completed: beneficiaries.length > 0,
+                importance: 'High',
+              },
               { label: 'Trust Documents', completed: hasTrust, importance: 'Medium' },
-              { label: 'Digital Asset Inventory', completed: digitalAssets.length > 0, importance: 'Medium' },
+              {
+                label: 'Digital Asset Inventory',
+                completed: digitalAssets.length > 0,
+                importance: 'Medium',
+              },
               { label: 'Letter of Intent', completed: false, importance: 'Medium' },
-              { label: 'Guardian Designations (if applicable)', completed: false, importance: 'High' },
+              {
+                label: 'Guardian Designations (if applicable)',
+                completed: false,
+                importance: 'High',
+              },
               { label: 'Funeral/Burial Instructions', completed: false, importance: 'Low' },
             ].map((item, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <div
+                key={index}
+                className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+              >
                 <div className="flex items-center gap-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                    item.completed
-                      ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400'
-                      : 'bg-gray-200 dark:bg-gray-600 text-gray-400'
-                  }`}>
+                  <div
+                    className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                      item.completed
+                        ? 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400'
+                        : 'bg-gray-200 dark:bg-gray-600 text-gray-400'
+                    }`}
+                  >
                     {item.completed && '✓'}
                   </div>
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">{item.label}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Importance: {item.importance}</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      Importance: {item.importance}
+                    </p>
                   </div>
                 </div>
                 {!item.completed && (
@@ -234,17 +280,23 @@ export default function LegacyPlanningPage() {
         {/* Action Items */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-3">⚠️ Action Required</h3>
+            <h3 className="text-lg font-semibold text-yellow-900 dark:text-yellow-100 mb-3">
+              ⚠️ Action Required
+            </h3>
             <ul className="space-y-2 text-sm text-yellow-800 dark:text-yellow-200">
               {!hasWill && <li>• Create a Last Will and Testament</li>}
               {!hasLivingWill && <li>• Establish a Living Will / Healthcare Directive</li>}
               {beneficiaries.length === 0 && <li>• Designate beneficiaries on all accounts</li>}
-              {wills.some(w => w.status === 'needs-update') && <li>• Update outdated estate documents</li>}
+              {wills.some((w) => w.status === 'needs-update') && (
+                <li>• Update outdated estate documents</li>
+              )}
             </ul>
           </div>
 
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">💡 Recommendations</h3>
+            <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">
+              💡 Recommendations
+            </h3>
             <ul className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
               <li>• Review and update documents every 3-5 years</li>
               <li>• Update after major life events (marriage, divorce, children)</li>
@@ -268,8 +320,8 @@ export default function LegacyPlanningPage() {
                 No Estate Documents on File
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-2xl mx-auto">
-                A will is the foundation of any estate plan. It specifies how your assets should be distributed,
-                who should care for minor children, and who will execute your wishes.
+                A will is the foundation of any estate plan. It specifies how your assets should be
+                distributed, who should care for minor children, and who will execute your wishes.
               </p>
               <button className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
                 Create Your Will
@@ -280,9 +332,12 @@ export default function LegacyPlanningPage() {
           {/* Educational Content */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Last Will &amp; Testament</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                Last Will &amp; Testament
+              </h4>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Specifies asset distribution, guardianship, and executors. Essential for everyone with assets or dependents.
+                Specifies asset distribution, guardianship, and executors. Essential for everyone
+                with assets or dependents.
               </p>
               <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                 <li>• Asset distribution instructions</li>
@@ -293,9 +348,12 @@ export default function LegacyPlanningPage() {
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Living Trust</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                Living Trust
+              </h4>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Holds assets during lifetime and distributes them after death. Avoids probate and provides privacy.
+                Holds assets during lifetime and distributes them after death. Avoids probate and
+                provides privacy.
               </p>
               <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                 <li>• Avoids probate process</li>
@@ -306,9 +364,12 @@ export default function LegacyPlanningPage() {
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Living Will</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                Living Will
+              </h4>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                Specifies end-of-life care preferences. Ensures your healthcare wishes are known and followed.
+                Specifies end-of-life care preferences. Ensures your healthcare wishes are known and
+                followed.
               </p>
               <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                 <li>• End-of-life care wishes</li>
@@ -332,20 +393,26 @@ export default function LegacyPlanningPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {wills.map(will => (
+          {wills.map((will) => (
             <div key={will.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {will.name}
                   </h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">{will.type.replace('-', ' ')}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                    {will.type.replace('-', ' ')}
+                  </p>
                 </div>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  will.status === 'current' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                  will.status === 'needs-update' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                  'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                }`}>
+                <span
+                  className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    will.status === 'current'
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      : will.status === 'needs-update'
+                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                  }`}
+                >
                   {will.status === 'needs-update' ? 'Needs Update' : will.status}
                 </span>
               </div>
@@ -391,9 +458,12 @@ export default function LegacyPlanningPage() {
 
         {/* Trust Planning Section */}
         <div className="bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Consider a Living Trust</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+            Consider a Living Trust
+          </h3>
           <p className="text-gray-700 dark:text-gray-300 mb-4">
-            A living trust can help your estate avoid probate, maintain privacy, and provide greater control over asset distribution.
+            A living trust can help your estate avoid probate, maintain privacy, and provide greater
+            control over asset distribution.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
@@ -434,8 +504,8 @@ export default function LegacyPlanningPage() {
                 No Beneficiaries on Record
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-2xl mx-auto">
-                Designating beneficiaries ensures your assets go directly to your loved ones without probate.
-                Review and update beneficiaries on all accounts regularly.
+                Designating beneficiaries ensures your assets go directly to your loved ones without
+                probate. Review and update beneficiaries on all accounts regularly.
               </p>
               <button className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
                 Add Beneficiaries
@@ -449,22 +519,24 @@ export default function LegacyPlanningPage() {
             </h3>
             <div className="space-y-3 text-sm text-yellow-800 dark:text-yellow-200">
               <p>
-                <strong>Supersede Your Will:</strong> Beneficiary designations on accounts like life insurance, retirement plans,
-                and bank accounts override instructions in your will.
+                <strong>Supersede Your Will:</strong> Beneficiary designations on accounts like life
+                insurance, retirement plans, and bank accounts override instructions in your will.
               </p>
               <p>
-                <strong>Avoid Probate:</strong> Assets with designated beneficiaries transfer directly without going through probate,
-                saving time and money.
+                <strong>Avoid Probate:</strong> Assets with designated beneficiaries transfer
+                directly without going through probate, saving time and money.
               </p>
               <p>
-                <strong>Regular Updates Needed:</strong> Life changes like marriage, divorce, births, and deaths require updating
-                beneficiary designations.
+                <strong>Regular Updates Needed:</strong> Life changes like marriage, divorce,
+                births, and deaths require updating beneficiary designations.
               </p>
             </div>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Accounts to Review</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Accounts to Review
+            </h3>
             <div className="space-y-3">
               {[
                 'Life Insurance Policies',
@@ -475,7 +547,10 @@ export default function LegacyPlanningPage() {
                 'Annuities',
                 'Real Estate (TOD/POD deeds)',
               ].map((account, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                >
                   <span className="text-gray-900 dark:text-white">{account}</span>
                   <button className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors">
                     Review
@@ -491,7 +566,9 @@ export default function LegacyPlanningPage() {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Beneficiary Designations</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Beneficiary Designations
+          </h3>
           <button className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">
             Add Beneficiary
           </button>
@@ -500,24 +577,34 @@ export default function LegacyPlanningPage() {
         {/* Summary Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Total Designations</h4>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{beneficiaries.length}</p>
-          </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Primary Beneficiaries</h4>
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+              Total Designations
+            </h4>
             <p className="text-3xl font-bold text-gray-900 dark:text-white">
-              {beneficiaries.filter(b => b.isPrimary).length}
+              {beneficiaries.length}
             </p>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Needs Review</h4>
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+              Primary Beneficiaries
+            </h4>
+            <p className="text-3xl font-bold text-gray-900 dark:text-white">
+              {beneficiaries.filter((b) => b.isPrimary).length}
+            </p>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <h4 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
+              Needs Review
+            </h4>
             <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">
-              {beneficiaries.filter(b => {
-                const lastVerified = new Date(b.lastVerified);
-                const oneYearAgo = new Date();
-                oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-                return lastVerified < oneYearAgo;
-              }).length}
+              {
+                beneficiaries.filter((b) => {
+                  const lastVerified = new Date(b.lastVerified);
+                  const oneYearAgo = new Date();
+                  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+                  return lastVerified < oneYearAgo;
+                }).length
+              }
             </p>
           </div>
         </div>
@@ -549,7 +636,7 @@ export default function LegacyPlanningPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {beneficiaries.map(beneficiary => {
+                {beneficiaries.map((beneficiary) => {
                   const lastVerified = new Date(beneficiary.lastVerified);
                   const oneYearAgo = new Date();
                   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
@@ -559,22 +646,32 @@ export default function LegacyPlanningPage() {
                     <tr key={beneficiary.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4">
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-white">{beneficiary.name}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">{beneficiary.relationship}</p>
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            {beneficiary.name}
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {beneficiary.relationship}
+                          </p>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <p className="text-sm text-gray-900 dark:text-white">{beneficiary.accountName}</p>
-                          <p className="text-xs text-gray-600 dark:text-gray-400">{beneficiary.accountType}</p>
+                          <p className="text-sm text-gray-900 dark:text-white">
+                            {beneficiary.accountName}
+                          </p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            {beneficiary.accountType}
+                          </p>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          beneficiary.isPrimary
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                        }`}>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            beneficiary.isPrimary
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                          }`}
+                        >
                           {beneficiary.isPrimary ? 'Primary' : 'Contingent'}
                         </span>
                       </td>
@@ -583,11 +680,19 @@ export default function LegacyPlanningPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
-                          <p className={needsReview ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-900 dark:text-white'}>
+                          <p
+                            className={
+                              needsReview
+                                ? 'text-yellow-600 dark:text-yellow-400'
+                                : 'text-gray-900 dark:text-white'
+                            }
+                          >
                             {lastVerified.toLocaleDateString()}
                           </p>
                           {needsReview && (
-                            <p className="text-xs text-yellow-600 dark:text-yellow-400">Needs review</p>
+                            <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                              Needs review
+                            </p>
                           )}
                         </div>
                       </td>
@@ -611,10 +716,13 @@ export default function LegacyPlanningPage() {
     return (
       <div className="space-y-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Digital Asset Planning</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Digital Asset Planning
+          </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Your digital assets include online accounts, cryptocurrencies, digital files, and intellectual property.
-            Creating a digital estate plan ensures your loved ones can access and manage these assets.
+            Your digital assets include online accounts, cryptocurrencies, digital files, and
+            intellectual property. Creating a digital estate plan ensures your loved ones can access
+            and manage these assets.
           </p>
 
           {(!hasData || digitalAssets.length === 0) && (
@@ -635,7 +743,9 @@ export default function LegacyPlanningPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">💰</span>
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Financial Accounts</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Financial Accounts
+              </h4>
             </div>
             <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
               <li>• Online banking</li>
@@ -646,7 +756,7 @@ export default function LegacyPlanningPage() {
             </ul>
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Assets tracked: {digitalAssets.filter(a => a.type === 'financial').length}
+                Assets tracked: {digitalAssets.filter((a) => a.type === 'financial').length}
               </p>
             </div>
           </div>
@@ -665,7 +775,7 @@ export default function LegacyPlanningPage() {
             </ul>
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Assets tracked: {digitalAssets.filter(a => a.type === 'social').length}
+                Assets tracked: {digitalAssets.filter((a) => a.type === 'social').length}
               </p>
             </div>
           </div>
@@ -673,7 +783,9 @@ export default function LegacyPlanningPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">💼</span>
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Business Assets</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Business Assets
+              </h4>
             </div>
             <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
               <li>• Domain names</li>
@@ -684,7 +796,7 @@ export default function LegacyPlanningPage() {
             </ul>
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Assets tracked: {digitalAssets.filter(a => a.type === 'business').length}
+                Assets tracked: {digitalAssets.filter((a) => a.type === 'business').length}
               </p>
             </div>
           </div>
@@ -692,7 +804,9 @@ export default function LegacyPlanningPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">🖼️</span>
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Personal Files</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Personal Files
+              </h4>
             </div>
             <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
               <li>• Photos and videos</li>
@@ -703,7 +817,7 @@ export default function LegacyPlanningPage() {
             </ul>
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Assets tracked: {digitalAssets.filter(a => a.type === 'personal').length}
+                Assets tracked: {digitalAssets.filter((a) => a.type === 'personal').length}
               </p>
             </div>
           </div>
@@ -711,7 +825,9 @@ export default function LegacyPlanningPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">₿</span>
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Cryptocurrency</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Cryptocurrency
+              </h4>
             </div>
             <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
               <li>• Hardware wallets</li>
@@ -722,7 +838,7 @@ export default function LegacyPlanningPage() {
             </ul>
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
               <p className="text-xs text-gray-600 dark:text-gray-400">
-                Assets tracked: {digitalAssets.filter(a => a.type === 'crypto').length}
+                Assets tracked: {digitalAssets.filter((a) => a.type === 'crypto').length}
               </p>
             </div>
           </div>
@@ -787,10 +903,13 @@ export default function LegacyPlanningPage() {
     return (
       <div className="space-y-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Healthcare Directives</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Healthcare Directives
+          </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            Healthcare directives ensure your medical wishes are known and followed if you're unable to communicate them yourself.
-            These critical documents give guidance to your family and healthcare providers during difficult times.
+            Healthcare directives ensure your medical wishes are known and followed if you're unable
+            to communicate them yourself. These critical documents give guidance to your family and
+            healthcare providers during difficult times.
           </p>
         </div>
 
@@ -801,12 +920,15 @@ export default function LegacyPlanningPage() {
               <span className="text-3xl">📋</span>
               <div>
                 <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Living Will</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Advance Healthcare Directive</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Advance Healthcare Directive
+                </p>
               </div>
             </div>
 
             <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
-              Specifies your wishes regarding end-of-life medical care, including life support, resuscitation, and pain management.
+              Specifies your wishes regarding end-of-life medical care, including life support,
+              resuscitation, and pain management.
             </p>
 
             <div className="space-y-3 mb-4">
@@ -839,14 +961,16 @@ export default function LegacyPlanningPage() {
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">👨‍⚕️</span>
               <div>
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Healthcare Power of Attorney</h4>
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Healthcare Power of Attorney
+                </h4>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Medical Proxy</p>
               </div>
             </div>
 
             <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
-              Designates someone to make medical decisions on your behalf if you're unable to do so. This person should understand
-              your values and wishes.
+              Designates someone to make medical decisions on your behalf if you're unable to do so.
+              This person should understand your values and wishes.
             </p>
 
             <div className="space-y-3 mb-4">
@@ -854,7 +978,9 @@ export default function LegacyPlanningPage() {
                 <div className="w-5 h-5 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center text-xs">
                   <span className="text-gray-400">?</span>
                 </div>
-                <span className="text-sm text-gray-700 dark:text-gray-300">No healthcare agent designated</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  No healthcare agent designated
+                </span>
               </div>
             </div>
 
@@ -879,18 +1005,24 @@ export default function LegacyPlanningPage() {
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">🔐</span>
               <div>
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">HIPAA Authorization</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Medical Information Release</p>
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  HIPAA Authorization
+                </h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Medical Information Release
+                </p>
               </div>
             </div>
 
             <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
-              Authorizes specific individuals to access your protected health information. Important for family members
-              who may need to coordinate your care.
+              Authorizes specific individuals to access your protected health information. Important
+              for family members who may need to coordinate your care.
             </p>
 
             <div className="space-y-3 mb-4">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Authorized individuals:</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Authorized individuals:
+              </p>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 No one currently authorized
               </div>
@@ -907,13 +1039,15 @@ export default function LegacyPlanningPage() {
               <span className="text-3xl">🚑</span>
               <div>
                 <h4 className="text-lg font-semibold text-gray-900 dark:text-white">DNR/POLST</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Do Not Resuscitate / POLST</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Do Not Resuscitate / POLST
+                </p>
               </div>
             </div>
 
             <p className="text-sm text-gray-700 dark:text-gray-300 mb-4">
-              Medical orders that specify treatment preferences for life-threatening situations. Particularly important
-              for those with serious illnesses or advanced age.
+              Medical orders that specify treatment preferences for life-threatening situations.
+              Particularly important for those with serious illnesses or advanced age.
             </p>
 
             <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300 mb-4">
@@ -939,20 +1073,22 @@ export default function LegacyPlanningPage() {
           </h3>
           <div className="space-y-3 text-sm text-yellow-800 dark:text-yellow-200">
             <p>
-              <strong>Discuss with Family:</strong> Have conversations with family members about your healthcare wishes.
-              Make sure your healthcare agent understands your values and preferences.
+              <strong>Discuss with Family:</strong> Have conversations with family members about
+              your healthcare wishes. Make sure your healthcare agent understands your values and
+              preferences.
             </p>
             <p>
-              <strong>Keep Accessible:</strong> Store copies where they can be quickly accessed in an emergency. Give copies
-              to your healthcare agent, family members, and primary care physician.
+              <strong>Keep Accessible:</strong> Store copies where they can be quickly accessed in
+              an emergency. Give copies to your healthcare agent, family members, and primary care
+              physician.
             </p>
             <p>
-              <strong>Review Regularly:</strong> Review and update your healthcare directives every few years or after
-              major life events or changes in health status.
+              <strong>Review Regularly:</strong> Review and update your healthcare directives every
+              few years or after major life events or changes in health status.
             </p>
             <p>
-              <strong>State-Specific Forms:</strong> Healthcare directive forms vary by state. Ensure you use the correct
-              forms for your state of residence.
+              <strong>State-Specific Forms:</strong> Healthcare directive forms vary by state.
+              Ensure you use the correct forms for your state of residence.
             </p>
           </div>
         </div>
@@ -980,16 +1116,20 @@ export default function LegacyPlanningPage() {
     return (
       <div className="space-y-6">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Estate Tax Planning</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Estate Tax Planning
+          </h3>
           <p className="text-gray-600 dark:text-gray-400">
-            Proper estate tax planning can significantly reduce the tax burden on your beneficiaries and maximize
-            the wealth transfer to your loved ones.
+            Proper estate tax planning can significantly reduce the tax burden on your beneficiaries
+            and maximize the wealth transfer to your loved ones.
           </p>
         </div>
 
         {/* Estate Tax Calculation */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">Federal Estate Tax Estimate</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+            Federal Estate Tax Estimate
+          </h3>
 
           <div className="space-y-4 mb-6">
             <div className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
@@ -1014,7 +1154,9 @@ export default function LegacyPlanningPage() {
             </div>
 
             <div className="flex justify-between items-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-              <span className="font-semibold text-red-900 dark:text-red-100">Estimated Estate Tax (40%)</span>
+              <span className="font-semibold text-red-900 dark:text-red-100">
+                Estimated Estate Tax (40%)
+              </span>
               <span className="text-2xl font-bold text-red-600 dark:text-red-400">
                 ${estateTax.toLocaleString()}
               </span>
@@ -1024,7 +1166,8 @@ export default function LegacyPlanningPage() {
           {estateValue > estateExemption2024 && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
               <p className="text-sm text-yellow-900 dark:text-yellow-100">
-                ⚠️ Your estate may be subject to federal estate tax. Consider tax reduction strategies below.
+                ⚠️ Your estate may be subject to federal estate tax. Consider tax reduction
+                strategies below.
               </p>
             </div>
           )}
@@ -1032,7 +1175,8 @@ export default function LegacyPlanningPage() {
           {estateValue <= estateExemption2024 && estateValue > 0 && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
               <p className="text-sm text-green-900 dark:text-green-100">
-                ✓ Your estate is currently below the federal exemption threshold. No federal estate tax estimated.
+                ✓ Your estate is currently below the federal exemption threshold. No federal estate
+                tax estimated.
               </p>
             </div>
           )}
@@ -1040,21 +1184,26 @@ export default function LegacyPlanningPage() {
 
         {/* Tax Reduction Strategies */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Tax Reduction Strategies</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Tax Reduction Strategies
+          </h3>
 
           <div className="space-y-4">
             <div className="p-4 bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 border border-green-200 dark:border-green-800 rounded-lg">
               <div className="flex items-start gap-3">
                 <span className="text-2xl">🎁</span>
                 <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Annual Gift Tax Exclusion</h4>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                    Annual Gift Tax Exclusion
+                  </h4>
                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    Give up to $18,000 per person ($36,000 for married couples) annually without gift tax or reducing your lifetime exemption.
+                    Give up to $18,000 per person ($36,000 for married couples) annually without
+                    gift tax or reducing your lifetime exemption.
                   </p>
                   <div className="bg-white/50 dark:bg-gray-800/50 rounded p-3 text-sm">
                     <p className="text-gray-700 dark:text-gray-300">
-                      <strong>Example:</strong> A couple with 3 children can gift $108,000/year ($36k × 3) tax-free,
-                      removing $1.08M from their estate in 10 years.
+                      <strong>Example:</strong> A couple with 3 children can gift $108,000/year
+                      ($36k × 3) tax-free, removing $1.08M from their estate in 10 years.
                     </p>
                   </div>
                 </div>
@@ -1065,13 +1214,17 @@ export default function LegacyPlanningPage() {
               <div className="flex items-start gap-3">
                 <span className="text-2xl">🏦</span>
                 <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Irrevocable Life Insurance Trust (ILIT)</h4>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                    Irrevocable Life Insurance Trust (ILIT)
+                  </h4>
                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    Remove life insurance proceeds from your taxable estate by transferring ownership to an ILIT.
+                    Remove life insurance proceeds from your taxable estate by transferring
+                    ownership to an ILIT.
                   </p>
                   <div className="bg-white/50 dark:bg-gray-800/50 rounded p-3 text-sm">
                     <p className="text-gray-700 dark:text-gray-300">
-                      <strong>Benefit:</strong> A $2M policy in an ILIT could save your heirs $800,000 in estate taxes.
+                      <strong>Benefit:</strong> A $2M policy in an ILIT could save your heirs
+                      $800,000 in estate taxes.
                     </p>
                   </div>
                 </div>
@@ -1082,14 +1235,17 @@ export default function LegacyPlanningPage() {
               <div className="flex items-start gap-3">
                 <span className="text-2xl">🏛️</span>
                 <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Charitable Remainder Trust (CRT)</h4>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                    Charitable Remainder Trust (CRT)
+                  </h4>
                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    Donate assets to charity while receiving income during your lifetime. Provides immediate tax deduction
-                    and removes assets from estate.
+                    Donate assets to charity while receiving income during your lifetime. Provides
+                    immediate tax deduction and removes assets from estate.
                   </p>
                   <div className="bg-white/50 dark:bg-gray-800/50 rounded p-3 text-sm">
                     <p className="text-gray-700 dark:text-gray-300">
-                      <strong>Benefits:</strong> Immediate charitable deduction, income stream, estate tax reduction, capital gains avoidance.
+                      <strong>Benefits:</strong> Immediate charitable deduction, income stream,
+                      estate tax reduction, capital gains avoidance.
                     </p>
                   </div>
                 </div>
@@ -1100,13 +1256,17 @@ export default function LegacyPlanningPage() {
               <div className="flex items-start gap-3">
                 <span className="text-2xl">👨‍👩‍👧‍👦</span>
                 <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Family Limited Partnership (FLP)</h4>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                    Family Limited Partnership (FLP)
+                  </h4>
                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    Transfer business interests or real estate to family members at discounted values using valuation discounts.
+                    Transfer business interests or real estate to family members at discounted
+                    values using valuation discounts.
                   </p>
                   <div className="bg-white/50 dark:bg-gray-800/50 rounded p-3 text-sm">
                     <p className="text-gray-700 dark:text-gray-300">
-                      <strong>Strategy:</strong> Valuation discounts of 25-40% can significantly reduce gift and estate taxes.
+                      <strong>Strategy:</strong> Valuation discounts of 25-40% can significantly
+                      reduce gift and estate taxes.
                     </p>
                   </div>
                 </div>
@@ -1117,13 +1277,17 @@ export default function LegacyPlanningPage() {
               <div className="flex items-start gap-3">
                 <span className="text-2xl">🎓</span>
                 <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">529 Education Plans &amp; Direct Payments</h4>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                    529 Education Plans &amp; Direct Payments
+                  </h4>
                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    Contribute to 529 plans for grandchildren or pay tuition/medical expenses directly without gift tax.
+                    Contribute to 529 plans for grandchildren or pay tuition/medical expenses
+                    directly without gift tax.
                   </p>
                   <div className="bg-white/50 dark:bg-gray-800/50 rounded p-3 text-sm">
                     <p className="text-gray-700 dark:text-gray-300">
-                      <strong>Tip:</strong> Direct payments to educational or medical institutions don't count toward annual gift limits.
+                      <strong>Tip:</strong> Direct payments to educational or medical institutions
+                      don't count toward annual gift limits.
                     </p>
                   </div>
                 </div>
@@ -1134,13 +1298,17 @@ export default function LegacyPlanningPage() {
               <div className="flex items-start gap-3">
                 <span className="text-2xl">💍</span>
                 <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Spousal Lifetime Access Trust (SLAT)</h4>
+                  <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                    Spousal Lifetime Access Trust (SLAT)
+                  </h4>
                   <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
-                    Remove assets from your estate while maintaining indirect access through your spouse.
+                    Remove assets from your estate while maintaining indirect access through your
+                    spouse.
                   </p>
                   <div className="bg-white/50 dark:bg-gray-800/50 rounded p-3 text-sm">
                     <p className="text-gray-700 dark:text-gray-300">
-                      <strong>Advantage:</strong> Uses lifetime exemption now before potential future reductions.
+                      <strong>Advantage:</strong> Uses lifetime exemption now before potential
+                      future reductions.
                     </p>
                   </div>
                 </div>
@@ -1151,18 +1319,23 @@ export default function LegacyPlanningPage() {
 
         {/* State Estate Tax */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">State Estate Tax Considerations</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            State Estate Tax Considerations
+          </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            12 states and DC impose their own estate or inheritance taxes, often with lower exemptions than federal.
+            12 states and DC impose their own estate or inheritance taxes, often with lower
+            exemptions than federal.
           </p>
 
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
             <p className="text-sm text-blue-900 dark:text-blue-100 mb-2">
-              <strong>States with Estate Tax:</strong> Connecticut, Hawaii, Illinois, Maine, Maryland, Massachusetts,
-              Minnesota, New York, Oregon, Rhode Island, Vermont, Washington, and DC.
+              <strong>States with Estate Tax:</strong> Connecticut, Hawaii, Illinois, Maine,
+              Maryland, Massachusetts, Minnesota, New York, Oregon, Rhode Island, Vermont,
+              Washington, and DC.
             </p>
             <p className="text-sm text-blue-900 dark:text-blue-100">
-              <strong>States with Inheritance Tax:</strong> Iowa, Kentucky, Maryland, Nebraska, New Jersey, Pennsylvania.
+              <strong>States with Inheritance Tax:</strong> Iowa, Kentucky, Maryland, Nebraska, New
+              Jersey, Pennsylvania.
             </p>
           </div>
         </div>
@@ -1193,16 +1366,24 @@ export default function LegacyPlanningPage() {
     <div className="p-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
       {/* Header */}
       <header className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Legacy &amp; Estate Planning</h1>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Legacy &amp; Estate Planning
+        </h1>
         <p className="text-gray-600 dark:text-gray-400">
           Protect your legacy and ensure your wishes are carried out
         </p>
       </header>
+      <div className="mb-6">
+        <FinancialResolverPanel
+          title="Your canonical assets"
+          keys={['investment_balance', 'retirement_balance', 'cash_balance']}
+        />
+      </div>
 
       {/* Tabs */}
       <div className="mb-6 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
         <nav className="flex space-x-8 min-w-max">
-          {tabs.map(tab => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}

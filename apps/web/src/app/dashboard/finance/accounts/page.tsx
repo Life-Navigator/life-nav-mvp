@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import FinancialResolverPanel from '@/components/finance/FinancialResolverPanel';
 import { AccountType } from '@/types/financial';
 import AccountTypeFilter from '@/components/financial/accounts/AccountTypeFilter';
 import NetWorthSummary from '@/components/financial/accounts/NetWorthSummary';
@@ -75,6 +76,12 @@ export default function AccountsPage() {
         <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-4 md:mb-0">
           Financial Accounts
         </h1>
+        <div className="mb-6">
+          <FinancialResolverPanel
+            title="Account balances (canonical)"
+            keys={['cash_balance', 'investment_balance', 'retirement_balance', 'debt_total']}
+          />
+        </div>
         <button
           onClick={() => setIsConnectModalOpen(true)}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"

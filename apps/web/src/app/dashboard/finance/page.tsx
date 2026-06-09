@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import FinancialResolverPanel from '@/components/finance/FinancialResolverPanel';
 import {
   BarChart,
   Bar,
@@ -334,6 +335,12 @@ const FinancialDashboard = () => {
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Financial Dashboard</h1>
         <p className="text-gray-600 dark:text-gray-400">Your complete financial picture</p>
       </header>
+      <div className="mb-6">
+        <FinancialResolverPanel
+          title="What we know (from your data)"
+          keys={['cash_balance', 'investment_balance', 'retirement_balance', 'debt_total']}
+        />
+      </div>
 
       {/* Time period selector */}
       <div className="mb-6 flex space-x-4">

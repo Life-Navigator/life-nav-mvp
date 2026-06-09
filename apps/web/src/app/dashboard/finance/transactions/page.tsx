@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import FinancialResolverPanel from '@/components/finance/FinancialResolverPanel';
 import TransactionFilters from '@/components/financial/transactions/TransactionFilters';
 import TransactionList from '@/components/financial/transactions/TransactionList';
 import { EnhancedTransaction } from '@/types/financial';
@@ -126,6 +127,9 @@ export default function TransactionsPage() {
       <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-6">
         Transactions
       </h1>
+      <div className="mb-6">
+        <FinancialResolverPanel title="Canonical balances" keys={['cash_balance']} />
+      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
