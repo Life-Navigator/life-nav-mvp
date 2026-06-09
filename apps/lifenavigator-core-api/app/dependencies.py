@@ -52,6 +52,7 @@ from .services.life_profile import LifeProfileService
 from .services.market_intelligence import MarketPositionAnalyzer
 from .services.platform_access import PlatformAccess
 from .services.military import MilitaryService
+from .services.tools import ToolRunner
 from .services.trust_safety import TrustSafetyGate
 
 # Stateless singletons (no per-request state).
@@ -351,3 +352,7 @@ def get_orchestrator(
 def authenticated(user: AuthenticatedUser = Depends(current_user)) -> AuthenticatedUser:
     """Alias dependency for protected routes."""
     return user
+
+
+def get_tool_runner(supabase: SupabaseClient = Depends(get_supabase)) -> ToolRunner:
+    return ToolRunner(supabase)
