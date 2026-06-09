@@ -1,45 +1,47 @@
-import { NextResponse } from 'next/server';
-import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
-import { getRecommendations } from '@/lib/finance/recommendations';
-import { recordUserEvent } from '@/lib/analytics/events';
-
+/** Recommendation Inbox proxy. GET → prioritized list; POST → sync; PUT {id,status} → lifecycle. */
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
-
-/**
- * GET /api/recommendations
- *
- * Returns the persona-aware recommendation set (>=3 categorized recs) for the
- * authenticated user, computed deterministically from persisted finance data.
- * No model call — safe, fast, and always available (no 502 surface).
- */
-export async function GET() {
-  const supabase = await createServerSupabaseClient();
-  if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
-
+const CORE_API = (process.env.CORE_API_URL || 'https://lifenavigator-core-api.fly.dev').replace(
+  /\/$/,
+  ''
+);
+async function tok() {
+  const s = await createServerSupabaseClient();
+  if (!s) return null;
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const svc = createServiceRoleClient();
-  if (!svc) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
-
-  const set = await getRecommendations(svc, user.id);
-
-  if (set.has_data && set.recommendations.length > 0) {
-    await recordUserEvent(svc, {
-      user_id: user.id,
-      event_type: 'recommendation_generated',
-      event_metadata: {
-        persona_id: set.persona_id ?? null,
-        count: set.recommendations.length,
-        categories: set.recommendations.map((r) => r.category),
-      },
-      subject_kind: 'recommendation',
-      subject_id: null,
-    }).catch(() => {});
-  }
-
-  return NextResponse.json(set);
+    data: { session },
+  } = await s.auth.getSession();
+  return session?.access_token ?? null;
+}
+export async function GET() {
+  const t = await tok();
+  if (!t) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const r = await fetch(`${CORE_API}/v1/recommendations/prioritize?top=20`, {
+    headers: { Authorization: `Bearer ${t}` },
+    cache: 'no-store',
+  });
+  return NextResponse.json(await r.json().catch(() => ({})), { status: r.status });
+}
+export async function POST() {
+  const t = await tok();
+  if (!t) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const r = await fetch(`${CORE_API}/v1/recommendations/sync`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${t}` },
+    cache: 'no-store',
+  });
+  return NextResponse.json(await r.json().catch(() => ({})), { status: r.status });
+}
+export async function PUT(req: NextRequest) {
+  const t = await tok();
+  if (!t) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { id, status } = await req.json().catch(() => ({}));
+  const r = await fetch(`${CORE_API}/v1/recommendations/${id}/status`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+    cache: 'no-store',
+  });
+  return NextResponse.json(await r.json().catch(() => ({})), { status: r.status });
 }
