@@ -420,6 +420,12 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Decision Graph',
+    href: '/dashboard/life-decisions/graph',
+    icon: PuzzlePieceIcon,
+    current: false,
+  },
+  {
     name: 'Documents',
     href: '/dashboard/documents',
     icon: DocumentIcon,
