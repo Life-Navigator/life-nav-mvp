@@ -30,6 +30,7 @@ from .grounding.retriever import Retriever
 from .services.analytics import AnalyticsService
 from .services.comp_benefits import CompensationBenefitsEngine
 from .services.compensation import CompensationIntelligenceEngine
+from .services.family_office import FamilyOfficeService
 from .services.financial_planning import FinancialPlanningEngine
 from .services.decision_engine import DecisionEngine
 from .services.decision_graph import DecisionGraphService
@@ -210,6 +211,13 @@ def get_scenario_tree(
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> ScenarioTreeService:
     return ScenarioTreeService(readiness=readiness, planning=planning, supabase=supabase)
+
+
+def get_family_office(
+    supabase: SupabaseClient = Depends(get_supabase),
+    family: FamilyService = Depends(get_family_service),
+) -> FamilyOfficeService:
+    return FamilyOfficeService(supabase=supabase, family_service=family, comp_benefits=CompensationBenefitsEngine(supabase))
 
 
 def get_retriever(

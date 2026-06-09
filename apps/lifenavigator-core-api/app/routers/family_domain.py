@@ -9,8 +9,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_family_service
+from ..dependencies import authenticated, get_family_office, get_family_service
 from ..domains.family import FamilyService
+from ..services.family_office import FamilyOfficeService
 from ..models.common import DomainViewModel, UserContext
 
 router = APIRouter(prefix="/v1/family", tags=["family"])
@@ -41,3 +42,9 @@ async def generate(user: AuthenticatedUser = Depends(authenticated), svc: Family
         "recommendation_ids": [r.get("id") for r in rows],
         "recommendation_types": [r.get("recommendation_type") for r in rows],
     }
+
+
+@router.get("/office")
+async def family_office(user: AuthenticatedUser = Depends(authenticated), svc: FamilyOfficeService = Depends(get_family_office)):
+    """Family Office: estate / trust / beneficiary / survivor / legacy readiness. Not legal advice."""
+    return await svc.assess(_ctx(user))
