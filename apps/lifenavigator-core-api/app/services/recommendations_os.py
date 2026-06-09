@@ -18,6 +18,8 @@ RECOS = "recommendations"
 _NS = uuid.UUID("6f3b1e22-0000-4000-8000-00000000000c")
 _PRIORITY_W = {"high": 1.0, "medium": 0.6, "low": 0.3}
 _EFFORT_PEN = {"low": 0.0, "medium": 0.1, "high": 0.25}
+_CONF_FLOOR = 0.25  # below this a recommendation cannot rank (renders as "needs more information")
+REC_TYPES = {"ACTION", "RISK", "OPPORTUNITY", "DEPENDENCY", "INFORMATION"}
 LIFECYCLE = {"new", "viewed", "accepted", "in_progress", "deferred", "completed", "dismissed"}
 
 
@@ -46,9 +48,11 @@ class RecommendationOS:
 
     # ---- write (the ONLY way a recommendation enters the platform) ----
     async def write(self, ctx: UserContext, *, title: str, source_module: str, category: str,
-                    description: str = "", priority: str = "medium", confidence: Optional[float] = None,
+                    rec_type: str = "ACTION", description: str = "", priority: str = "medium", confidence: Optional[float] = None,
                     evidence: Optional[list] = None, assumptions: Optional[list] = None,
                     impacted_domains: Optional[list] = None, readiness_impact: Optional[dict] = None,
+                    current_state: str = "", target_state: str = "", delta_text: str = "",
+                    quantified_impact: Optional[dict] = None,
                     recommended_action: str = "", estimated_effort: str = "medium",
                     estimated_benefit: str = "", resource: str = "", time_sensitive: bool = False,
                     chat_visibility: bool = True, report_visibility: bool = True) -> Optional[str]:
@@ -57,12 +61,17 @@ class RecommendationOS:
         if not ev:
             return None
         rid = _rid(ctx.user_id, source_module, title)
+        narrative = {"current": current_state or None, "target": target_state or None, "delta": delta_text or None,
+                     "why": description or None, "expected_impact": quantified_impact or readiness_impact or {},
+                     "confidence": confidence, "evidence": [e.get("statement") for e in ev], "action": recommended_action or None}
         row = {
-            "id": rid, "user_id": ctx.user_id, "tenant_id": ctx.user_id, "title": title,
+            "id": rid, "user_id": ctx.user_id, "tenant_id": ctx.user_id, "title": title, "rec_type": rec_type,
             "description": description, "category": category, "source_module": source_module,
             "priority": priority, "confidence": confidence, "evidence": ev,
             "assumptions": assumptions or [], "impacted_domains": impacted_domains or [],
             "readiness_impact": {**(readiness_impact or {}), "resource": resource, "time_sensitive": time_sensitive},
+            "current_state": current_state or None, "target_state": target_state or None, "delta_text": delta_text or None,
+            "quantified_impact": quantified_impact or {}, "narrative": narrative,
             "recommended_action": recommended_action, "estimated_effort": estimated_effort,
             "estimated_benefit": estimated_benefit, "chat_visibility": chat_visibility,
             "report_visibility": report_visibility, "updated_at": _now(),
@@ -83,7 +92,16 @@ class RecommendationOS:
             rows = [r for r in rows if r.get("report_visibility", True)]
         return rows
 
-    # ---- the collector: every module's recommendations -> the one registry ----
+    # ---- the collector: quantified, classified recommendations -> the one registry ----
+    async def _facts(self, ctx: UserContext) -> dict:
+        rows = await self._sb.select("documents", filters={"user_id": f"eq.{ctx.user_id}"}, limit=500, order="uploaded_at.desc", schema="documents")
+        out: dict = {}
+        for r in rows:
+            dt = r.get("doc_type")
+            if dt and dt not in out:
+                out[dt] = r.get("extracted_json") or {}
+        return out
+
     async def sync(self, ctx: UserContext) -> dict[str, Any]:
         written: list[str] = []
         sources: dict[str, int] = {}
@@ -94,96 +112,123 @@ class RecommendationOS:
                 written.append(rid)
                 sources[kw["source_module"]] = sources.get(kw["source_module"], 0) + 1
 
-        # 1) Readiness gaps -> recommendations (Deliverable 4)
-        if self._readiness:
-            r = await self._readiness.assess(ctx)
-            for d in r.get("domains", []):
-                if d["status"] in ("red", "orange") and d["gap"] not in ("On track", "No data yet — get started"):
-                    await emit(title=f"Address {d['domain']} gap: {d['gap']}", source_module=f"readiness:{d['domain']}",
-                               category=d["domain"], priority="high" if d["status"] == "red" else "medium",
-                               confidence=round(d.get("confidence", 0.5), 2),
-                               evidence=[{"statement": f"{d['domain'].capitalize()} readiness {d['progress']}% — {d['gap']}", "source_table": f"{d['domain']} domain"}],
-                               impacted_domains=[d["domain"]], readiness_impact={"domain": d["domain"], "current": d["progress"], "expected_improvement": "raises this domain's readiness"},
-                               recommended_action=(d.get("recommendations") or [{}])[0].get("title", "") if d.get("recommendations") else d["timeline"],
-                               resource="savings_dollars" if d["domain"] == "finance" else d["domain"])
-
-        # 2) Financial planning -> retirement recommendation
-        if self._planning:
-            try:
-                p = await self._planning.plan(ctx)
-            except Exception:  # noqa: BLE001
-                p = {"available": False}
-            if p.get("available"):
-                rr = p.get("retirement_readiness", {})
-                if rr.get("readiness_ratio") is not None and not rr.get("on_track"):
-                    await emit(title="Increase retirement contributions", source_module="financial_planning", category="finance",
-                               description=f"Projected {rr['readiness_ratio']:.0%} of your target nest egg.", priority="high",
-                               confidence=p.get("confidence", {}).get("overall_fraction", 0.5),
-                               evidence=[{"statement": f"Projected median ${rr.get('projected_median', 0):,.0f} vs target ${rr.get('target_nest_egg', 0):,.0f}", "source_table": "finance.net_worth_snapshots + Monte Carlo"}],
-                               assumptions=p.get("assumptions_used", []), impacted_domains=["finance"],
-                               readiness_impact={"domain": "finance", "expected_improvement": "raises retirement readiness toward target"},
-                               recommended_action="Raise your 401(k)/IRA contribution; capture the full employer match first.",
-                               resource="savings_dollars", time_sensitive=True, estimated_benefit="Higher retirement success probability")
-
-        # 3) Compensation -> maximize 401(k) match
+        facts = await self._facts(ctx)
+        readiness = await self._readiness.assess(ctx) if self._readiness else {"domains": []}
+        prog = {d["domain"]: float(d["progress"]) for d in readiness.get("domains", [])}
+        analysis = {}
+        income = 0.0
         if self._comp:
             try:
-                a = await self._comp.analyze(ctx)
+                analysis = await self._comp.analyze(ctx)
+                income = _num(analysis.get("total_compensation", {}).get("base")) or 0.0
             except Exception:  # noqa: BLE001
-                a = {}
-            match = next((b for b in a.get("benefit_valuation", []) if "401" in b.get("benefit", "")), None)
-            if match:
-                await emit(title="Maximize your 401(k) employer match", source_module="comp_benefits", category="finance", priority="high",
-                           confidence=a.get("confidence", {}).get("score", 0.6),
-                           evidence=[{"statement": f"Employer match worth ${match['annual_value']:,.0f}/yr ({match.get('basis', '')})", "source_table": "documents:401k_statement"}],
-                           impacted_domains=["finance"], readiness_impact={"domain": "finance", "expected_improvement": "free money + compounding"},
-                           recommended_action="Contribute at least enough to capture the full employer match.",
-                           resource="savings_dollars", estimated_benefit=f"${match['annual_value']:,.0f}/yr free money")
+                analysis = {}
 
-        # 4) Family Office pillars
+        # === 1) 401(k) match — the headline ACTION (current -> target -> quantified $ + readiness) ===
+        k = facts.get("401k_statement")
+        if k and income:
+            rate = _num(k.get("contribution_rate"))
+            match = _num(k.get("employer_match"))
+            if rate is not None and match is not None:
+                if rate < match:
+                    uncaptured = round(income * (match - rate) / 100.0)
+                    fin_before = round(prog.get("finance", 50))
+                    fin_after = min(100, fin_before + 5)
+                    await emit(rec_type="ACTION", source_module="comp_benefits", category="finance", priority="high", confidence=0.9,
+                               title=f"Increase your 401(k) from {rate:.0f}% to {match:.0f}%",
+                               description=f"Your employer matches up to {match:.0f}% — you're leaving ${uncaptured:,.0f}/yr on the table.",
+                               current_state=f"{rate:.0f}%", target_state=f"{match:.0f}%", delta_text=f"+{match - rate:.0f}%",
+                               recommended_action=f"Raise your 401(k) contribution to {match:.0f}% to capture the full employer match.",
+                               quantified_impact={"readiness_before": fin_before, "readiness_after": fin_after, "readiness_delta": fin_after - fin_before,
+                                                  "financial_impact_annual": uncaptured, "description": f"+${uncaptured:,.0f}/yr captured match"},
+                               estimated_benefit=f"+${uncaptured:,.0f}/yr free money", estimated_effort="low", resource="savings_dollars",
+                               evidence=[{"statement": f"401(k) statement: contributing {rate:.0f}% vs {match:.0f}% match available", "source_table": "documents:401k_statement"}],
+                               impacted_domains=["finance"])
+                elif rate < 15:
+                    await emit(rec_type="OPPORTUNITY", source_module="financial_planning", category="finance", priority="medium", confidence=0.6,
+                               title=f"Consider raising your 401(k) from {rate:.0f}% toward 15%",
+                               description="You're capturing the full match; increasing further accelerates retirement.",
+                               current_state=f"{rate:.0f}%", target_state="15%", delta_text=f"+{15 - rate:.0f}%",
+                               recommended_action="Increase contributions gradually toward 15% of income.",
+                               quantified_impact={"note": "compounds retirement balance"}, resource="savings_dollars",
+                               evidence=[{"statement": f"401(k) at {rate:.0f}%, match already captured", "source_table": "documents:401k_statement"}],
+                               impacted_domains=["finance"])
+        elif income and not k:
+            await emit(rec_type="DEPENDENCY", source_module="financial_planning", category="finance", priority="high", confidence=0.95,
+                       title="Upload your 401(k) statement to optimize your retirement contributions",
+                       description="We can't compute your current contribution rate or unclaimed employer match without it.",
+                       recommended_action="Upload your latest 401(k) statement.", estimated_effort="low",
+                       evidence=[{"statement": "Income on file but no 401(k) statement", "source_table": "documents"}], impacted_domains=["finance"])
+
+        # === 2) Life-insurance protection gap — RISK (current -> target -> delta), quantified ===
+        ins = (analysis.get("insurance_impact") or {}).get("life") or {}
+        coverage = _num(ins.get("coverage"))
+        need = _num(ins.get("need_10x_income"))
+        gap = _num(ins.get("gap"))
+        if coverage is not None and need is not None and gap and gap > 0:
+            fam_before = round(prog.get("family", 50))
+            await emit(rec_type="RISK", source_module="family_office", category="family", priority="high", confidence=0.7,
+                       title=f"Life coverage is ${gap:,.0f} below your protection target",
+                       description=f"If you died today, your survivors would be ${gap:,.0f} short of replacing your income.",
+                       current_state=f"${coverage:,.0f}", target_state=f"${need:,.0f}", delta_text=f"+${gap:,.0f}",
+                       recommended_action=f"Increase term life coverage to ${need:,.0f} (≈10× income).",
+                       quantified_impact={"coverage_gap": gap, "readiness_before": fam_before, "readiness_after": min(100, fam_before + 8), "readiness_delta": 8},
+                       estimated_benefit="Closes the survivor income gap", resource="insurance",
+                       evidence=[{"statement": f"Coverage ${coverage:,.0f} vs ${need:,.0f} need (10× income)", "source_table": "documents:life_insurance_policy"}],
+                       impacted_domains=["family"])
+
+        # === 3) Estate — DEPENDENCY (missing documents), not a vague 'see an attorney' ===
         if self._fo:
             try:
                 fo = await self._fo.assess(ctx)
             except Exception:  # noqa: BLE001
                 fo = {}
-            for key in ("estate_readiness", "trust_readiness", "beneficiary_readiness", "survivor_planning"):
-                pillar = fo.get(key) or {}
-                if pillar.get("status") in ("red", "orange") and pillar.get("recommendation"):
-                    await emit(title=f"{pillar['pillar']}: {pillar['recommendation'][:60]}", source_module="family_office", category="family",
-                               priority="high" if pillar["status"] == "red" else "medium", confidence=0.6,
-                               evidence=pillar.get("evidence", [{"statement": pillar["pillar"], "source_table": "family + documents"}]),
-                               impacted_domains=["family"], readiness_impact={"domain": "family", "expected_improvement": "improves legacy readiness"},
-                               recommended_action=pillar["recommendation"], resource="legal_time")
+            est = fo.get("estate_readiness") or {}
+            missing = est.get("missing") or []
+            if missing:
+                await emit(rec_type="DEPENDENCY", source_module="family_office", category="family", priority="high" if est.get("status") == "red" else "medium", confidence=0.6,
+                           title=f"Complete your estate documents: {', '.join(missing[:3])}",
+                           description="These documents direct who makes decisions and inherits if something happens to you.",
+                           current_state=f"{len(est.get('in_place', []))}/4 in place", target_state="4/4 in place", delta_text=f"+{len(missing)} documents",
+                           recommended_action="Work with an estate attorney to create the missing documents (this is not legal advice).",
+                           quantified_impact={"documents_missing": len(missing)}, resource="legal_time",
+                           evidence=[{"statement": f"Estate readiness {est.get('score')}/100; missing {', '.join(missing)}", "source_table": "family + documents"}],
+                           impacted_domains=["family"])
 
-        # 5) Health action items (medical boundary preserved — informational)
+        # === 4) Health — INFORMATION only (flags, never actions; medical boundary) ===
         if self._health:
             try:
                 h = await self._health.assess(ctx)
             except Exception:  # noqa: BLE001
                 h = {}
-            for item in (h.get("action_items") or [])[:3]:
-                await emit(title=item[:70], source_module="health_intelligence", category="health", priority="medium", confidence=0.5,
-                           evidence=[{"statement": item, "source_table": "documents:lab_report (vs reference range)"}],
-                           impacted_domains=["health"], readiness_impact={"domain": "health", "expected_improvement": "discuss with clinician"},
-                           recommended_action="Review with your clinician — informational, not medical advice.", resource="health_time")
+            for m in (h.get("labs", {}).get("markers") or []):
+                if m.get("flag") == "outside_range":
+                    await emit(rec_type="INFORMATION", source_module="health_intelligence", category="health", priority="low", confidence=0.5,
+                               title=f"{m['label']} is outside the general reference range",
+                               description=f"Your {m['label']} is {m['value']} {m['unit']} (general range {m['ideal']}). This is a fact, not a diagnosis.",
+                               current_state=f"{m['value']} {m['unit']}", target_state=m["ideal"], delta_text="",
+                               recommended_action="Discuss with your clinician — informational only, not medical advice.",
+                               evidence=[{"statement": f"{m['label']} {m['value']} {m['unit']} vs reference {m['ideal']}", "source_table": "documents:lab_report"}],
+                               impacted_domains=["health"], chat_visibility=True)
 
-        # 6) Military pillars (only reachable for military users — endpoint is gated)
+        # === 5) Military — only for service-connected users (endpoint gated); actionable items only ===
         if self._mil:
             try:
-                m = await self._mil.assess(ctx)
+                mil = await self._mil.assess(ctx)
             except Exception:  # noqa: BLE001
-                m = {}
-            if m.get("is_service_connected"):
-                for key in ("transition_readiness", "gi_bill_readiness", "va_benefits_readiness"):
-                    p2 = m.get(key) or {}
-                    if p2.get("status") in ("red", "orange", "yellow") and p2.get("recommendation"):
-                        await emit(title=f"{p2['pillar']}: {p2['recommendation'][:55]}", source_module="military", category="military",
-                                   priority="medium", confidence=0.6,
-                                   evidence=p2.get("evidence", [{"statement": p2["pillar"], "source_table": "documents:dd214/va"}]),
-                                   impacted_domains=["finance", "career"], readiness_impact={"expected_improvement": "improves benefits readiness"},
-                                   recommended_action=p2["recommendation"], resource="benefits_time", chat_visibility=True)
+                mil = {}
+            if mil.get("is_service_connected"):
+                gi = mil.get("gi_bill_readiness") or {}
+                if gi.get("eligible"):
+                    await emit(rec_type="OPPORTUNITY", source_module="military", category="military", priority="medium", confidence=0.6,
+                               title="Apply for your Post-9/11 GI Bill education benefit",
+                               description="Your honorable service likely qualifies you for up to 36 months of tuition + housing.",
+                               recommended_action="Apply at va.gov/education and check Yellow Ribbon schools.",
+                               quantified_impact={"note": "up to 36 months tuition + housing"}, resource="benefits_time",
+                               evidence=gi.get("evidence") or [{"statement": "GI Bill eligible (honorable discharge)", "source_table": "documents:dd214"}],
+                               impacted_domains=["finance", "career"])
+        # NOTE: decision-confidence / counts are METRICS — deliberately NOT emitted as recommendations.
 
-        # rank everything after writing
         await self._rank(ctx)
         return {"written": len(written), "by_source": sources}
 
@@ -204,17 +249,29 @@ class RecommendationOS:
 
     async def prioritize(self, ctx: UserContext, top: int = 3) -> dict[str, Any]:
         recs = await self.active(ctx)
-        ranked = sorted(recs, key=self._score, reverse=True)
-        top_actions = [{
-            "id": r["id"], "title": r["title"], "category": r["category"], "source_module": r["source_module"],
-            "priority": r["priority"], "confidence": r.get("confidence"), "rank_score": self._score(r),
-            "why": (r.get("evidence") or [{}])[0].get("statement", ""), "recommended_action": r.get("recommended_action"),
-            "expected_benefit": r.get("estimated_benefit") or (r.get("readiness_impact") or {}).get("expected_improvement"),
-            "evidence": r.get("evidence"), "impacted_domains": r.get("impacted_domains"),
-        } for r in ranked[:top]]
-        return {"total": len(recs), "top_actions": top_actions,
-                "conflicts": await self.conflicts(ctx, recs),
-                "note": "One prioritized answer for the whole platform — the dashboard and chat read this same list."}
+        # Confidence floor (Sprint 27): a < 0.25-confidence rec can never rank — it renders as
+        # "needs more information", not a top action. DEPENDENCY/INFORMATION never rank as actions.
+        rankable = [r for r in recs if _num(r.get("confidence")) is not None and (_num(r.get("confidence")) or 0) >= _CONF_FLOOR
+                    and r.get("rec_type") not in ("DEPENDENCY", "INFORMATION")]
+        needs_info = [r for r in recs if r not in rankable]
+        ranked = sorted(rankable, key=self._score, reverse=True)
+
+        def shape(r: dict) -> dict:
+            return {
+                "id": r["id"], "title": r["title"], "rec_type": r.get("rec_type", "ACTION"), "category": r["category"],
+                "source_module": r["source_module"], "priority": r["priority"], "confidence": r.get("confidence"),
+                "rank_score": self._score(r), "current_state": r.get("current_state"), "target_state": r.get("target_state"),
+                "delta": r.get("delta_text"), "quantified_impact": r.get("quantified_impact") or {},
+                "why": r.get("description") or (r.get("evidence") or [{}])[0].get("statement", ""),
+                "recommended_action": r.get("recommended_action"),
+                "expected_benefit": r.get("estimated_benefit") or (r.get("quantified_impact") or {}).get("description"),
+                "narrative": r.get("narrative") or {}, "evidence": r.get("evidence"), "impacted_domains": r.get("impacted_domains"),
+            }
+        return {"total": len(recs), "top_actions": [shape(r) for r in ranked[:top]],
+                "needs_more_information": [{"id": r["id"], "title": r["title"], "rec_type": r.get("rec_type"),
+                                            "why": r.get("description") or r.get("recommended_action")} for r in needs_info[:5]],
+                "conflicts": await self.conflicts(ctx, rankable),
+                "note": "One prioritized answer for the whole platform — the dashboard, chat, reports, and graph read this same list."}
 
     # ---- conflict engine: competing actions on the same resource ----
     async def conflicts(self, ctx: UserContext, recs: Optional[list] = None) -> list[dict[str, Any]]:

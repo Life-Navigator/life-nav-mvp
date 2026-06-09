@@ -18,6 +18,15 @@ DOMAIN_OUTCOME = {
     "health": "your health foundation", "education": "your education ROI", "decision": "your decision confidence",
 }
 # Critical first documents and what each unlocks (empty-state framework, Deliverable 4).
+# focus_decision -> the documents that decision needs first (Sprint 27 — activates the field).
+FOCUS_DOCS = {
+    "mba": ["program_details", "financial_aid_letter", "401k_statement", "offer_letter"],
+    "new_job": ["offer_letter", "medical_plan", "401k_statement", "life_insurance_policy"],
+    "retirement": ["401k_statement", "social_security_estimate", "life_insurance_policy", "medical_plan"],
+    "buy_house": ["offer_letter", "401k_statement", "brokerage_statement", "medical_plan"],
+    "family_planning": ["life_insurance_policy", "medical_plan", "offer_letter", "401k_statement"],
+    "military_transition": ["dd214", "va_award_letter", "401k_statement", "offer_letter"],
+}
 DOC_UNLOCKS = [
     ("offer_letter", "Upload your offer letter", "Unlocks the true value of your job offer — base, bonus, equity, and total comp vs market."),
     ("medical_plan", "Add your benefits package", "Unlocks FSA/HSA tax optimization and the real value of your benefits."),
@@ -35,6 +44,10 @@ class GuidanceEngine:
 
     async def dashboard(self, ctx: UserContext) -> dict[str, Any]:
         readiness = await self._readiness.assess(ctx)
+        # focus_decision (Sprint 27): the decision the user said they're weighing tailors which
+        # documents we ask for first — so the dead field now influences the journey.
+        settings = await self._sb.select("user_settings", columns="focus_decision", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema="platform")
+        focus = (settings[0].get("focus_decision") if settings else None) or None
         docs = await self._sb.select("documents", columns="doc_type", filters={"user_id": f"eq.{ctx.user_id}"}, limit=200, schema="documents")
         have_doc_types = {d.get("doc_type") for d in docs}
         decisions = await self._sb.select("decisions", filters={"user_id": f"eq.{ctx.user_id}"}, limit=50, schema="decision")
@@ -47,6 +60,10 @@ class GuidanceEngine:
                     for d in domains_sorted[:3] if d["status"] in ("red", "orange", "yellow")]
         missing_docs = [{"doc_type": dt, "title": title, "why": why}
                         for dt, title, why in DOC_UNLOCKS if dt not in have_doc_types]
+        # focus_decision tailors document order: the docs that decision needs come first.
+        if focus and focus in FOCUS_DOCS:
+            wanted = FOCUS_DOCS[focus]
+            missing_docs.sort(key=lambda m: wanted.index(m["doc_type"]) if m["doc_type"] in wanted else 99)
 
         next_action = self._next_best_action(have_doc_types, top_gaps, len(decisions), len(reports), missing_docs)
         # Unify with the Recommendation OS: if the spine has a prioritized top action, it IS the
@@ -64,6 +81,7 @@ class GuidanceEngine:
         return {
             "status": {"index": idx["score"], "status": idx["status"], "headline": idx["headline"],
                        "summary": f"You're at {idx['score']}/100 readiness. Your weakest area is {DOMAIN_OUTCOME.get(idx.get('weakest_domain'), idx.get('weakest_domain') or 'unknown')}."},
+            "focus_decision": focus,
             "next_best_action": next_action,
             "top_gaps": top_gaps,
             "missing_critical_documents": missing_docs[:3],

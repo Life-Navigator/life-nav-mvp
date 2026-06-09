@@ -130,3 +130,41 @@ async def test_report_recommendations_come_from_os():
     pri = await os_engine.prioritize(CTX, top=5)
     assert sec is not None
     assert sec.recommendations[0].id == pri["top_actions"][0]["id"]  # report == OS, no report-only recs
+
+
+# ---- Sprint 27: quality engine ----
+@pytest.mark.asyncio
+async def test_confidence_floor_excludes_low_confidence_from_top():
+    os = _os()
+    ev = [{"statement": "e", "source_table": "d"}]
+    await os.write(CTX, title="Solid action", source_module="m", category="finance", priority="high", confidence=0.9, evidence=ev)
+    await os.write(CTX, title="Shaky guess", source_module="m2", category="finance", priority="high", confidence=0.1, evidence=ev)
+    p = await os.prioritize(CTX, top=5)
+    titles = [a["title"] for a in p["top_actions"]]
+    assert "Solid action" in titles and "Shaky guess" not in titles  # <0.25 cannot rank
+    assert any(n["title"] == "Shaky guess" for n in p["needs_more_information"])
+
+
+@pytest.mark.asyncio
+async def test_dependency_and_information_never_rank_as_actions():
+    os = _os()
+    ev = [{"statement": "e", "source_table": "d"}]
+    await os.write(CTX, title="Upload your 401k", source_module="m", category="finance", rec_type="DEPENDENCY", priority="high", confidence=0.9, evidence=ev)
+    await os.write(CTX, title="Your cholesterol is 210", source_module="h", category="health", rec_type="INFORMATION", priority="low", confidence=0.5, evidence=ev)
+    await os.write(CTX, title="Increase 401k 6% to 10%", source_module="c", category="finance", rec_type="ACTION", priority="high", confidence=0.9, evidence=ev)
+    p = await os.prioritize(CTX, top=5)
+    assert [a["title"] for a in p["top_actions"]] == ["Increase 401k 6% to 10%"]
+    assert {n["title"] for n in p["needs_more_information"]} == {"Upload your 401k", "Your cholesterol is 210"}
+
+
+@pytest.mark.asyncio
+async def test_quantified_fields_persisted_and_surfaced():
+    os = _os()
+    await os.write(CTX, title="Increase your 401(k) from 6% to 10%", source_module="comp_benefits", category="finance",
+                   rec_type="ACTION", priority="high", confidence=0.9, current_state="6%", target_state="10%", delta_text="+4%",
+                   quantified_impact={"readiness_before": 45, "readiness_after": 51, "financial_impact_annual": 4800},
+                   recommended_action="Raise to 10%", evidence=[{"statement": "401k at 6% vs 10% match", "source_table": "documents:401k_statement"}])
+    a = (await os.prioritize(CTX, top=1))["top_actions"][0]
+    assert a["current_state"] == "6%" and a["target_state"] == "10%" and a["delta"] == "+4%"
+    assert a["quantified_impact"]["financial_impact_annual"] == 4800
+    assert a["rec_type"] == "ACTION" and a["narrative"]["current"] == "6%"
