@@ -39,9 +39,11 @@ from .services.decision_engine import DecisionEngine
 from .services.decision_graph import DecisionGraphService
 from .services.decision_workspace import DecisionWorkspaceService
 from .services.documents import DocumentIntelligenceService
+from .services.life_bridge import LifeBridgeService
 from .services.life_discovery import LifeDiscoveryService
 from .services.readiness import LifeReadinessEngine
 from .services.recommendations_os import RecommendationOS
+from .services.relationship_manager import RelationshipManager
 from .services.sharing import ShareService
 from .services.scenario_compare import ScenarioComparisonEngine
 from .services.scenario_tree import ScenarioTreeService
@@ -247,6 +249,14 @@ def get_platform_access(
 
 def get_life_discovery(supabase: SupabaseClient = Depends(get_supabase)) -> LifeDiscoveryService:
     return LifeDiscoveryService(supabase)
+
+
+def get_life_bridge(supabase: SupabaseClient = Depends(get_supabase)) -> LifeBridgeService:
+    return LifeBridgeService(supabase, LifeDiscoveryService(supabase))
+
+
+def get_relationship_manager(supabase: SupabaseClient = Depends(get_supabase)) -> RelationshipManager:
+    return RelationshipManager(supabase, LifeDiscoveryService(supabase), LifeBridgeService(supabase, LifeDiscoveryService(supabase)))
 
 
 def get_recommendation_os(

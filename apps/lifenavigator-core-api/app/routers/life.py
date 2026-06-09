@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_life_discovery
+from ..dependencies import authenticated, get_life_bridge, get_life_discovery, get_relationship_manager
 from ..models.common import UserContext
 from ..services.life_discovery import LifeDiscoveryService
 
@@ -49,3 +49,30 @@ async def plan(user: AuthenticatedUser = Depends(authenticated), svc: LifeDiscov
 async def health(user: AuthenticatedUser = Depends(authenticated), svc: LifeDiscoveryService = Depends(get_life_discovery)):
     """Discovery health: coverage, confidence, gaps + prompts to improve the life model."""
     return await svc.discovery_health(_ctx(user))
+
+
+from ..services.life_bridge import LifeBridgeService  # noqa: E402
+from ..services.relationship_manager import RelationshipManager  # noqa: E402
+
+
+@router.post("/bridge")
+async def bridge(user: AuthenticatedUser = Depends(authenticated), svc: LifeBridgeService = Depends(get_life_bridge)):
+    """Fold setup-wizard / persona onboarding data into the canonical Life Model."""
+    return await svc.sync(_ctx(user))
+
+
+@router.get("/discovery/next")
+async def discovery_next(user: AuthenticatedUser = Depends(authenticated), svc: RelationshipManager = Depends(get_relationship_manager)):
+    """Relationship Manager: the next discovery question (primary, conversational onboarding)."""
+    return await svc.state(_ctx(user))
+
+
+@router.post("/discovery/answer")
+async def discovery_answer(user: AuthenticatedUser = Depends(authenticated), svc: RelationshipManager = Depends(get_relationship_manager),
+                           key: str = Body(..., embed=True), answer: str = Body(..., embed=True)):
+    """Record one answer → write it to the canonical Life Model immediately, then advance."""
+    from fastapi import HTTPException
+    try:
+        return await svc.answer(_ctx(user), key, answer)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

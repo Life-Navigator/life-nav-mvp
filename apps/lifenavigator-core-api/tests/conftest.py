@@ -87,12 +87,17 @@ class FakeSupabase:
         return [stored]
 
     async def upsert(self, table: str, row: dict[str, Any], **_: Any) -> list[dict[str, Any]]:
-        # Idempotent: replace any existing row with the same id, else append (stateful store).
+        # Idempotent like PostgREST merge-duplicates: replace the row matching the PK. Most tables
+        # key on `id`; single-row-per-user tables (life_vision, risk_profiles, sync_state) key on
+        # user_id with no id — mirror real PK-based upsert by deduping on user_id when id is absent.
         self.inserts.append((table, row))
         bucket = self._by_table.setdefault(table, [])
-        rid = row.get("id")
+        # dedupe on the row's actual PK column: id / edge_id / tool_run_id, else (single-row-per-user
+        # tables like life_vision / risk_profiles / sync_state) on user_id.
+        key = next((k for k in ("id", "edge_id", "tool_run_id") if row.get(k) is not None), "user_id")
+        val = row.get(key)
         for i, existing in enumerate(bucket):
-            if rid is not None and existing.get("id") == rid:
+            if val is not None and existing.get(key) == val:
                 bucket[i] = dict(row)
                 return [dict(row)]
         bucket.append(dict(row))
