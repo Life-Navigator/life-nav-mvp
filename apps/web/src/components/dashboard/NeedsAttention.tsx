@@ -8,8 +8,12 @@ import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
 
 interface Action {
+  kind?: 'action' | 'priority_issue';
+  label?: string;
   title: string;
   why?: string;
+  priority?: string;
+  needed_to_act?: string;
   confidence_pct: number;
   quantified_impact?: Record<string, number>;
   source: string;
@@ -48,25 +52,39 @@ export default function NeedsAttention() {
 
   return (
     <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* Next Best Action — exactly one */}
+      {/* Next Best Action OR Highest Priority Issue (P4 — never mislabel a risk as an action) */}
       {a && (
-        <section className="rounded-2xl border border-indigo-100 bg-white shadow-sm p-5">
-          <div className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">
-            Your next best action
+        <section
+          className={`rounded-2xl border bg-white shadow-sm p-5 ${a.kind === 'priority_issue' ? 'border-amber-200' : 'border-indigo-100'}`}
+        >
+          <div
+            className={`text-[11px] uppercase tracking-wide font-semibold ${a.kind === 'priority_issue' ? 'text-amber-600' : 'text-indigo-500'}`}
+          >
+            {a.label ||
+              (a.kind === 'priority_issue' ? 'Highest priority issue' : 'Your next best action')}
           </div>
           <div className="text-lg font-bold text-gray-900 mt-1">{a.title}</div>
           {a.why && <div className="text-sm text-gray-600 mt-1">{a.why}</div>}
-          <div className="mt-2 text-sm text-emerald-700 font-medium">
-            {qi.financial_impact_annual
-              ? `+$${Number(qi.financial_impact_annual).toLocaleString()}/yr · `
-              : ''}
-            confidence {a.confidence_pct}%
-          </div>
+          {a.kind === 'priority_issue' ? (
+            <div className="mt-2 text-sm text-gray-600">
+              {a.priority && (
+                <span className="text-amber-700 font-medium">Priority: {a.priority}. </span>
+              )}
+              {a.needed_to_act}
+            </div>
+          ) : (
+            <div className="mt-2 text-sm text-emerald-700 font-medium">
+              {qi.financial_impact_annual
+                ? `+$${Number(qi.financial_impact_annual).toLocaleString()}/yr · `
+                : ''}
+              confidence {a.confidence_pct}%
+            </div>
+          )}
           <Link
-            href="/dashboard/recommendations"
+            href={a.kind === 'priority_issue' ? '/dashboard/advisor' : '/dashboard/recommendations'}
             className="mt-3 inline-block text-sm text-indigo-600 font-medium"
           >
-            View recommendation →
+            {a.kind === 'priority_issue' ? 'Provide the missing info →' : 'View recommendation →'}
           </Link>
         </section>
       )}

@@ -42,6 +42,7 @@ from .services.decision_workspace import DecisionWorkspaceService
 from .services.documents import DocumentIntelligenceService
 from .services.life_bridge import LifeBridgeService
 from .services.life_discovery import LifeDiscoveryService
+from .services.discovery_coverage import DiscoveryCoverageService
 from .services.my_life import MyLifeService
 from .services.readiness import LifeReadinessEngine
 from .services.recommendations_os import RecommendationOS
@@ -328,6 +329,11 @@ def get_life_profile_service(
 
 def get_financial_resolver(supabase: SupabaseClient = Depends(get_supabase)) -> FinancialInputResolver:
     return FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase))
+
+
+def get_discovery_coverage(supabase: SupabaseClient = Depends(get_supabase)) -> DiscoveryCoverageService:
+    return DiscoveryCoverageService(LifeDiscoveryService(supabase), supabase,
+                                    FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)))
 
 
 def get_my_life(

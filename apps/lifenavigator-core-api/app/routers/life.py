@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_life_bridge, get_life_discovery, get_my_life, get_relationship_manager
+from ..dependencies import authenticated, get_discovery_coverage, get_life_bridge, get_life_discovery, get_my_life, get_relationship_manager
 from ..models.common import UserContext
 from ..services.life_discovery import LifeDiscoveryService
 
@@ -99,3 +99,12 @@ async def my_life(user: AuthenticatedUser = Depends(authenticated), svc: MyLifeS
 async def attention(user: AuthenticatedUser = Depends(authenticated), svc: MyLifeService = Depends(get_my_life)):
     """Disciplined dashboard feed: one next best action + up to 3 attention alerts (not the full list)."""
     return await svc.attention(_ctx(user))
+
+
+from ..services.discovery_coverage import DiscoveryCoverageService  # noqa: E402
+
+
+@router.get("/discovery/coverage")
+async def discovery_coverage(user: AuthenticatedUser = Depends(authenticated), svc: DiscoveryCoverageService = Depends(get_discovery_coverage)):
+    """Per-domain discovery coverage (started/partial/complete + %, missing, unlocks) — never blank."""
+    return await svc.coverage(_ctx(user))

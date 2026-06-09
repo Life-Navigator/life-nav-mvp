@@ -116,19 +116,27 @@ class MyLifeService:
         except Exception:  # noqa: BLE001
             readiness = {"overall": None, "domains": [], "source": "Life Readiness Engine"}
 
-        # Section 4 — Next Best Action (exactly one). Bias toward something the user can DO: prefer
-        # the top ACTION/OPPORTUNITY over a RISK (a RISK is "what to watch", not "what to do next" —
-        # risks surface in the attention alerts instead).
+        # Section 4 — Next Best Action OR Highest Priority Issue (P4). Prefer the top ACTION/
+        # OPPORTUNITY (something the user can DO). If only RISK/DEPENDENCY recs exist, DON'T mislabel
+        # a risk as an action — reframe it as the highest-priority issue with what's needed to make
+        # it actionable.
         next_action = None
         try:
             pri = await self._os.prioritize(ctx, top=6)
             ranked = pri.get("top_actions") or []
-            a = next((x for x in ranked if (x.get("rec_type") or "ACTION") in ("ACTION", "OPPORTUNITY")), ranked[0] if ranked else None)
-            if a:
-                next_action = {"title": a["title"], "why": a.get("why"), "recommended_action": a.get("recommended_action"),
-                               "expected_benefit": a.get("expected_benefit"), "confidence_pct": round((a.get("confidence") or 0) * 100),
-                               "quantified_impact": a.get("quantified_impact"), "rec_type": a.get("rec_type", "ACTION"),
+            action = next((x for x in ranked if (x.get("rec_type") or "ACTION") in ("ACTION", "OPPORTUNITY")), None)
+            if action:
+                next_action = {"kind": "action", "label": "Your next best action", "title": action["title"],
+                               "why": action.get("why"), "recommended_action": action.get("recommended_action"),
+                               "expected_benefit": action.get("expected_benefit"), "confidence_pct": round((action.get("confidence") or 0) * 100),
+                               "quantified_impact": action.get("quantified_impact"), "rec_type": action.get("rec_type", "ACTION"),
                                "source": "Recommendation OS"}
+            elif ranked:
+                issue = ranked[0]
+                next_action = {"kind": "priority_issue", "label": "Highest priority issue", "title": issue["title"],
+                               "why": issue.get("why"), "priority": "high", "rec_type": issue.get("rec_type", "RISK"),
+                               "needed_to_act": "Add your income, savings rate, and retirement details so we can turn this into a concrete recommendation.",
+                               "confidence_pct": round((issue.get("confidence") or 0) * 100), "source": "Recommendation OS"}
         except Exception:  # noqa: BLE001
             pass
 
