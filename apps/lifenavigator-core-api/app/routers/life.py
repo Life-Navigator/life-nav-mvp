@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_life_bridge, get_life_discovery, get_relationship_manager
+from ..dependencies import authenticated, get_life_bridge, get_life_discovery, get_my_life, get_relationship_manager
 from ..models.common import UserContext
 from ..services.life_discovery import LifeDiscoveryService
 
@@ -84,3 +84,12 @@ async def discovery_chat(user: AuthenticatedUser = Depends(authenticated), svc: 
     """Chat-native Relationship Manager: one advisor turn — answer the pending question (if any),
     show what updated, reflect, and ask the next. The advisor IS the onboarding."""
     return await svc.converse(_ctx(user), message, pending_key or None)
+
+
+from ..services.my_life import MyLifeService  # noqa: E402
+
+
+@router.get("/my-life")
+async def my_life(user: AuthenticatedUser = Depends(authenticated), svc: MyLifeService = Depends(get_my_life)):
+    """The flagship Life-OS aggregate: vision, what-matters-most, readiness, next action, constraints, recent intelligence."""
+    return await svc.my_life(_ctx(user))

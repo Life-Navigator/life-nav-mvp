@@ -216,8 +216,8 @@ class RelationshipManager:
 
         nq = st.get("next_question")
         if st.get("complete") or not nq:
-            assistant = (reflection + "That's everything I need to start. Your life model is built — "
-                         "head to your dashboard to see your readiness, roadmap, and first recommendations.")
+            assistant = (reflection + "That's everything I need to start — let's build your life plan. "
+                         "Open **My Life** to see your vision, what matters most, your readiness, and your next best action.")
         else:
             opener = "" if pending_key else "Let's build your plan together — I'll ask a few quick questions. "
             assistant = f"{reflection}{opener}{nq['prompt']}"

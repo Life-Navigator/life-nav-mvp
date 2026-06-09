@@ -41,6 +41,7 @@ from .services.decision_workspace import DecisionWorkspaceService
 from .services.documents import DocumentIntelligenceService
 from .services.life_bridge import LifeBridgeService
 from .services.life_discovery import LifeDiscoveryService
+from .services.my_life import MyLifeService
 from .services.readiness import LifeReadinessEngine
 from .services.recommendations_os import RecommendationOS
 from .services.relationship_manager import RelationshipManager
@@ -322,6 +323,13 @@ def get_life_profile_service(
     recommendation_agent: RecommendationAgent = Depends(get_recommendation_agent),
 ) -> LifeProfileService:
     return LifeProfileService(registry, recommendation_agent)
+
+
+def get_my_life(
+    supabase: SupabaseClient = Depends(get_supabase),
+    readiness: LifeReadinessEngine = Depends(get_readiness_engine),
+) -> MyLifeService:
+    return MyLifeService(LifeDiscoveryService(supabase), readiness, RecommendationOS(supabase), supabase)
 
 
 def get_scenario_compare(
