@@ -45,6 +45,7 @@ from .services.report_engine import UniversalReportEngine
 from .services.cost_meter import CostMeter
 from .services.life_profile import LifeProfileService
 from .services.market_intelligence import MarketPositionAnalyzer
+from .services.platform_access import PlatformAccess
 from .services.military import MilitaryService
 from .services.trust_safety import TrustSafetyGate
 
@@ -228,6 +229,13 @@ def get_health_intelligence(supabase: SupabaseClient = Depends(get_supabase)) ->
 
 def get_military_service(supabase: SupabaseClient = Depends(get_supabase)) -> MilitaryService:
     return MilitaryService(supabase=supabase)
+
+
+def get_platform_access(
+    supabase: SupabaseClient = Depends(get_supabase),
+    settings: Settings = Depends(get_settings),
+) -> PlatformAccess:
+    return PlatformAccess(supabase=supabase, admin_emails=settings.admin_email_set())
 
 
 def get_retriever(

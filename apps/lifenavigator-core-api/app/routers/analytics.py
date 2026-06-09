@@ -8,9 +8,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_analytics_service
+from ..dependencies import authenticated, get_analytics_service, get_platform_access
 from ..models.common import UserContext
 from ..services.analytics import EVENT_TYPES, AnalyticsService
+from ..services.platform_access import PlatformAccess
 
 router = APIRouter(prefix="/v1", tags=["analytics"])
 
@@ -33,6 +34,12 @@ async def emit_event(
 async def metrics(
     user: AuthenticatedUser = Depends(authenticated),
     svc: AnalyticsService = Depends(get_analytics_service),
+    access: PlatformAccess = Depends(get_platform_access),
 ):
-    """Executive Dashboard — Users / Reports / Shares / Goals / Domain Usage / funnel. Counts only."""
+    """Executive Dashboard — admin-only. Authenticated alone is INSUFFICIENT."""
+    ctx = UserContext(user_id=user.user_id)
+    if not access.is_admin(user.email):
+        await access.log_admin_access(ctx, user.email, "/v1/admin/metrics", "denied")
+        raise HTTPException(status_code=403, detail="Admin access required")
+    await access.log_admin_access(ctx, user.email, "/v1/admin/metrics", "granted")
     return await svc.dashboard()

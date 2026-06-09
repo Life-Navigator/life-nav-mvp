@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # HTTP client timeout for downstream calls (seconds).
     http_timeout_seconds: float = 8.0
 
+    # Comma-separated allow-list of admin emails (platform-wide metrics access).
+    admin_emails: str = ""
+
+    def admin_email_set(self) -> set[str]:
+        return {e.strip().lower() for e in self.admin_emails.split(",") if e.strip()}
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
