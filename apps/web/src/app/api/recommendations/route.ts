@@ -17,7 +17,7 @@ async function tok() {
 export async function GET() {
   const t = await tok();
   if (!t) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  const r = await fetch(`${CORE_API}/v1/recommendations/prioritize?top=20`, {
+  const r = await fetch(`${CORE_API}/v1/recommendations/roadmap`, {
     headers: { Authorization: `Bearer ${t}` },
     cache: 'no-store',
   });
