@@ -45,6 +45,7 @@ from .services.report_engine import UniversalReportEngine
 from .services.cost_meter import CostMeter
 from .services.life_profile import LifeProfileService
 from .services.market_intelligence import MarketPositionAnalyzer
+from .services.military import MilitaryService
 from .services.trust_safety import TrustSafetyGate
 
 # Stateless singletons (no per-request state).
@@ -223,6 +224,10 @@ def get_family_office(
 
 def get_health_intelligence(supabase: SupabaseClient = Depends(get_supabase)) -> HealthIntelligenceService:
     return HealthIntelligenceService(supabase=supabase)
+
+
+def get_military_service(supabase: SupabaseClient = Depends(get_supabase)) -> MilitaryService:
+    return MilitaryService(supabase=supabase)
 
 
 def get_retriever(
