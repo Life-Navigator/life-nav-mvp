@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_analytics_service, get_decision_engine, get_decision_graph, get_decision_workspace, get_scenario_tree
+from ..dependencies import get_decision_brain, authenticated, get_analytics_service, get_decision_engine, get_decision_graph, get_decision_workspace, get_scenario_tree
 from ..models.common import UserContext
 from ..services.analytics import AnalyticsService
 from ..services.decision_engine import DecisionEngine
@@ -98,3 +98,18 @@ async def scenario_tree(
     """Build a multi-scenario decision tree; each path returns readiness / net worth /
     retirement / confidence."""
     return await svc.build(_ctx(user), decisions)
+
+
+from ..services.decision_brain import DecisionBrainService  # noqa: E402
+
+
+@router.get("/brain/decisions")
+async def brain_decisions(user: AuthenticatedUser = Depends(authenticated)):
+    return {"decisions": DecisionBrainService.decisions()}
+
+
+@router.get("/brain/{decision}")
+async def brain(decision: str, user: AuthenticatedUser = Depends(authenticated),
+                svc: DecisionBrainService = Depends(get_decision_brain)):
+    """The Explainable Decision Brain: decision-centric weighted factors + missing + excluded + tools."""
+    return await svc.build(UserContext(user_id=user.user_id), decision)

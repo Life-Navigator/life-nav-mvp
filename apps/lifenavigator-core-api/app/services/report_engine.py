@@ -91,12 +91,40 @@ class UniversalReportEngine:
     # ---- build (generate_report) ----
     async def build(self, ctx: UserContext, report_type: str) -> ReportDefinition:
         definition = await self._build(ctx, report_type)
+        # Sprint 36: lead with the user's life model (vision/objective/themes/constraints/tradeoffs).
+        life_sec = await self._life_model_section(ctx, 0)
+        if life_sec:
+            definition.sections.insert(0, life_sec)
+            for i, s in enumerate(definition.sections):
+                s.ord = i + 1
         # Sprint 26: every report's recommendations come from the ONE Recommendation OS.
         if self._os is not None:
             sec = await self._os_recommendations_section(ctx, len(definition.sections) + 1)
             if sec:
                 definition.sections.append(sec)
         return definition
+
+    async def _life_model_section(self, ctx: UserContext, ord_n: int) -> Optional[ReportSection]:
+        """Advisor-grade life-model section: vision, primary objective, themes, constraints, tradeoffs."""
+        try:
+            from .life_discovery import LifeDiscoveryService
+            life = LifeDiscoveryService(self._sb)
+            snap = await life.snapshot(ctx)
+            if not snap.get("objectives"):
+                return None
+            plan = await life.objectives_plan(ctx)
+        except Exception:  # noqa: BLE001
+            return None
+        po = snap.get("primary_objective") or {}
+        return ReportSection(
+            key="life_model", title="Your Life Model", ord=ord_n,
+            body={"life_vision": snap.get("life_vision"),
+                  "primary_objective": {"title": po.get("title"), "confidence": po.get("confidence"), "reasoning": po.get("reasoning")},
+                  "themes": snap.get("top_themes"),
+                  "constraints": snap.get("active_constraints"),
+                  "opportunities": snap.get("top_opportunities"),
+                  "tradeoffs": [{"between": c["between"], "reason": c["reason"], "focus": c["suggested_focus"]} for c in plan.get("conflicts", [])],
+                  "discovery_note": "Recommendations in this report are evaluated against these objectives + constraints."})
 
     async def _build(self, ctx: UserContext, report_type: str) -> ReportDefinition:
         if report_type == "financial":
