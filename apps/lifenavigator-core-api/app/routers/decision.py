@@ -9,12 +9,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_analytics_service, get_decision_engine, get_decision_graph, get_decision_workspace
+from ..dependencies import authenticated, get_analytics_service, get_decision_engine, get_decision_graph, get_decision_workspace, get_scenario_tree
 from ..models.common import UserContext
 from ..services.analytics import AnalyticsService
 from ..services.decision_engine import DecisionEngine
 from ..services.decision_graph import DecisionGraphService
 from ..services.decision_workspace import WORKSPACE_TYPES, DecisionWorkspaceService
+from ..services.scenario_tree import ScenarioTreeService
 
 router = APIRouter(prefix="/v1/decision", tags=["decision"])
 
@@ -80,3 +81,20 @@ async def workspace_graph(
     if decision_type not in WORKSPACE_TYPES:
         raise HTTPException(status_code=400, detail=f"decision_type must be one of {tuple(WORKSPACE_TYPES)}")
     return await svc.build(_ctx(user), decision_type)
+
+
+@router.get("/scenarios/decisions")
+async def scenario_decisions(user: AuthenticatedUser = Depends(authenticated)):
+    """The decision points a scenario tree can branch on."""
+    return {"decisions": ScenarioTreeService.available_decisions()}
+
+
+@router.post("/scenarios")
+async def scenario_tree(
+    user: AuthenticatedUser = Depends(authenticated),
+    svc: ScenarioTreeService = Depends(get_scenario_tree),
+    decisions: list[str] = Body(default=["mba", "new_job"], embed=True),
+):
+    """Build a multi-scenario decision tree; each path returns readiness / net worth /
+    retirement / confidence."""
+    return await svc.build(_ctx(user), decisions)

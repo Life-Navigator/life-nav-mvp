@@ -37,6 +37,7 @@ from .services.decision_workspace import DecisionWorkspaceService
 from .services.documents import DocumentIntelligenceService
 from .services.readiness import LifeReadinessEngine
 from .services.sharing import ShareService
+from .services.scenario_tree import ScenarioTreeService
 from .services.snapshots import SnapshotEngine, TrendAnalyzer
 from .services.report_engine import UniversalReportEngine
 from .services.cost_meter import CostMeter
@@ -201,6 +202,14 @@ def get_decision_graph(
 
 def get_financial_planning(supabase: SupabaseClient = Depends(get_supabase)) -> FinancialPlanningEngine:
     return FinancialPlanningEngine(supabase=supabase, comp_benefits=CompensationBenefitsEngine(supabase))
+
+
+def get_scenario_tree(
+    readiness: LifeReadinessEngine = Depends(get_readiness_engine),
+    planning: FinancialPlanningEngine = Depends(get_financial_planning),
+    supabase: SupabaseClient = Depends(get_supabase),
+) -> ScenarioTreeService:
+    return ScenarioTreeService(readiness=readiness, planning=planning, supabase=supabase)
 
 
 def get_retriever(
