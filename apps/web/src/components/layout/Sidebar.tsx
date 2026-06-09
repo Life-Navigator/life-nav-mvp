@@ -438,6 +438,12 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Financial Plan',
+    href: '/dashboard/planning',
+    icon: ChartBarIcon,
+    current: false,
+  },
+  {
     name: 'Finance',
     href: '/dashboard/finance',
     icon: CurrencyDollarIcon,
