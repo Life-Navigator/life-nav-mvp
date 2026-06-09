@@ -111,17 +111,29 @@ export async function GET() {
     // Sprint 46 cohesion: the dashboard must reflect what the ADVISOR knows. Read canonical
     // life.life_objectives so each domain card surfaces the user's real objective — even when the
     // legacy domain tables are empty. One life model, one truth (no advisor/dashboard mismatch).
+    // Objectives are tagged with a root_objective_key (the real domain signal — `domain` is
+    // 'cross_domain'). Map root + title keywords onto the dashboard's domain cards.
     const objByDomain: Record<string, string> = {};
+    const cardFor = (root: string, title: string): string | null => {
+      const s = `${root} ${title}`.toLowerCase();
+      if (/career|job|professional|promotion|work/.test(s)) return 'career';
+      if (/health|wellness|fitness|longevity|medical/.test(s)) return 'health';
+      if (/education|degree|school|college|study|learn/.test(s)) return 'education';
+      if (/family|child|parent|spouse|home|housing/.test(s)) return 'family';
+      if (/financ|retire|wealth|money|debt|saving|invest/.test(s)) return 'finance';
+      return null;
+    };
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: lifeObjs } = await (sb as any)
         .schema('life')
         .from('life_objectives')
-        .select('title, domain, status')
+        .select('title, root_objective_key, status')
         .eq('user_id', user.id)
         .eq('status', 'active');
       for (const o of lifeObjs || []) {
-        if (o.domain && !objByDomain[o.domain]) objByDomain[o.domain] = o.title;
+        const card = cardFor(o.root_objective_key || '', o.title || '');
+        if (card && !objByDomain[card]) objByDomain[card] = o.title;
       }
     } catch {
       /* canonical objectives are additive; never block the summary */
