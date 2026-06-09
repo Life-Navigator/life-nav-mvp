@@ -39,6 +39,7 @@ from .services.decision_graph import DecisionGraphService
 from .services.decision_workspace import DecisionWorkspaceService
 from .services.documents import DocumentIntelligenceService
 from .services.readiness import LifeReadinessEngine
+from .services.recommendations_os import RecommendationOS
 from .services.sharing import ShareService
 from .services.scenario_tree import ScenarioTreeService
 from .services.snapshots import SnapshotEngine, TrendAnalyzer
@@ -240,12 +241,26 @@ def get_platform_access(
     return PlatformAccess(supabase=supabase, admin_emails=settings.admin_email_set())
 
 
+def get_recommendation_os(
+    supabase: SupabaseClient = Depends(get_supabase),
+    readiness: LifeReadinessEngine = Depends(get_readiness_engine),
+    family_office: FamilyOfficeService = Depends(get_family_office),
+    health: HealthIntelligenceService = Depends(get_health_intelligence),
+    military: MilitaryService = Depends(get_military_service),
+) -> RecommendationOS:
+    comp = CompensationBenefitsEngine(supabase)
+    planning = FinancialPlanningEngine(supabase, comp)
+    return RecommendationOS(supabase, readiness=readiness, family_office=family_office, health=health,
+                            military=military, comp=comp, planning=planning)
+
+
 def get_guidance(
     readiness: LifeReadinessEngine = Depends(get_readiness_engine),
     documents: DocumentIntelligenceService = Depends(get_document_service),
     supabase: SupabaseClient = Depends(get_supabase),
+    reco_os: RecommendationOS = Depends(get_recommendation_os),
 ) -> GuidanceEngine:
-    return GuidanceEngine(readiness=readiness, documents=documents, supabase=supabase)
+    return GuidanceEngine(readiness=readiness, documents=documents, supabase=supabase, reco_os=reco_os)
 
 
 def get_retriever(

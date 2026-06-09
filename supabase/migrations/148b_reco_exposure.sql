@@ -1,0 +1,3 @@
+GRANT USAGE ON SCHEMA recommendations TO authenticated, service_role, anon;
+ALTER ROLE authenticator SET pgrst.db_schemas = 'public, graphql_public, storage, core, finance, graphrag, health_meta, health, career, ln_central, education, family, decision, reporting, analytics, documents, platform, recommendations';
+NOTIFY pgrst, 'reload config'; NOTIFY pgrst, 'reload schema';

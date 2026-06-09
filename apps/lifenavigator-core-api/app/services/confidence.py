@@ -31,8 +31,9 @@ def build(*, document_coverage: float, reference_quality: float, missing_inputs:
         {"label": "Scenario complexity", "value": -complexity_pen, "kind": "penalty",
          "why": f"{scenario_depth} chained decisions compound uncertainty." if scenario_depth > 1 else "Single decision."},
     ]
-    overall = max(0, min(100, sum(int(c["value"]) for c in components)))  # type: ignore[arg-type]
-    improvers = [c["label"] for c in components if c["kind"] == "penalty" and int(c["value"]) < 0]  # type: ignore[arg-type]
+    vals: list[int] = [int(c["value"]) for c in components]  # type: ignore[call-overload]
+    overall = max(0, min(100, sum(vals)))
+    improvers = [c["label"] for c, v in zip(components, vals) if c["kind"] == "penalty" and v < 0]
     return {"overall": overall, "overall_fraction": round(overall / 100, 2), "components": components,
             "what_would_improve": ("Upload missing documents and reduce assumptions to raise confidence."
                                    if improvers else "Confidence is strong — well-grounded in your data.")}

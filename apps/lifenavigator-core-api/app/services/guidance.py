@@ -27,10 +27,11 @@ DOC_UNLOCKS = [
 
 
 class GuidanceEngine:
-    def __init__(self, readiness: Any, documents: Any, supabase: Any) -> None:
+    def __init__(self, readiness: Any, documents: Any, supabase: Any, reco_os: Any = None) -> None:
         self._readiness = readiness
         self._documents = documents
         self._sb = supabase
+        self._os = reco_os  # the Recommendation OS — single source for "next best action"
 
     async def dashboard(self, ctx: UserContext) -> dict[str, Any]:
         readiness = await self._readiness.assess(ctx)
@@ -48,6 +49,18 @@ class GuidanceEngine:
                         for dt, title, why in DOC_UNLOCKS if dt not in have_doc_types]
 
         next_action = self._next_best_action(have_doc_types, top_gaps, len(decisions), len(reports), missing_docs)
+        # Unify with the Recommendation OS: if the spine has a prioritized top action, it IS the
+        # next best action — so the dashboard and chat give the SAME answer (Sprint 25).
+        if self._os is not None and have_doc_types:
+            try:
+                pri = await self._os.prioritize(ctx, top=1)
+                if pri.get("top_actions"):
+                    ta = pri["top_actions"][0]
+                    next_action = {"title": ta["title"], "why": ta.get("why") or "", "cta_label": "Review",
+                                   "href": "/dashboard/readiness", "step": "recommendation",
+                                   "source": "recommendation_os", "recommendation_id": ta["id"]}
+            except Exception:  # noqa: BLE001 — never break the dashboard
+                pass
         return {
             "status": {"index": idx["score"], "status": idx["status"], "headline": idx["headline"],
                        "summary": f"You're at {idx['score']}/100 readiness. Your weakest area is {DOMAIN_OUTCOME.get(idx.get('weakest_domain'), idx.get('weakest_domain') or 'unknown')}."},
