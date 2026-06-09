@@ -426,6 +426,12 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Scenarios',
+    href: '/dashboard/life-decisions/scenarios',
+    icon: MapIcon,
+    current: false,
+  },
+  {
     name: 'Documents',
     href: '/dashboard/documents',
     icon: DocumentIcon,
