@@ -9,7 +9,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from ..auth import AuthenticatedUser
-from ..dependencies import get_decision_brain, authenticated, get_analytics_service, get_decision_engine, get_decision_graph, get_decision_workspace, get_scenario_tree
+from ..dependencies import get_decision_brain, get_scenario_compare, authenticated, get_analytics_service, get_decision_engine, get_decision_graph, get_decision_workspace, get_scenario_tree
 from ..models.common import UserContext
 from ..services.analytics import AnalyticsService
 from ..services.decision_engine import DecisionEngine
@@ -113,3 +113,21 @@ async def brain(decision: str, user: AuthenticatedUser = Depends(authenticated),
                 svc: DecisionBrainService = Depends(get_decision_brain)):
     """The Explainable Decision Brain: decision-centric weighted factors + missing + excluded + tools."""
     return await svc.build(UserContext(user_id=user.user_id), decision)
+
+
+from ..services.scenario_compare import ScenarioComparisonEngine  # noqa: E402
+
+
+@router.get("/compare/sets")
+async def compare_sets(user: AuthenticatedUser = Depends(authenticated)):
+    return {"sets": ScenarioComparisonEngine.sets()}
+
+
+@router.get("/compare/{set_key}")
+async def compare(set_key: str, user: AuthenticatedUser = Depends(authenticated),
+                  svc: ScenarioComparisonEngine = Depends(get_scenario_compare)):
+    """Compare competing futures: per-objective impacts + tradeoffs + confidence + assumptions."""
+    try:
+        return await svc.compare(UserContext(user_id=user.user_id), set_key)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))

@@ -43,6 +43,7 @@ from .services.life_discovery import LifeDiscoveryService
 from .services.readiness import LifeReadinessEngine
 from .services.recommendations_os import RecommendationOS
 from .services.sharing import ShareService
+from .services.scenario_compare import ScenarioComparisonEngine
 from .services.scenario_tree import ScenarioTreeService
 from .services.snapshots import SnapshotEngine, TrendAnalyzer
 from .services.report_engine import UniversalReportEngine
@@ -310,6 +311,14 @@ def get_life_profile_service(
     recommendation_agent: RecommendationAgent = Depends(get_recommendation_agent),
 ) -> LifeProfileService:
     return LifeProfileService(registry, recommendation_agent)
+
+
+def get_scenario_compare(
+    supabase: SupabaseClient = Depends(get_supabase),
+    readiness: LifeReadinessEngine = Depends(get_readiness_engine),
+    life: LifeDiscoveryService = Depends(get_life_discovery),
+) -> ScenarioComparisonEngine:
+    return ScenarioComparisonEngine(readiness=readiness, life=life, supabase=supabase)
 
 
 def get_decision_brain(
