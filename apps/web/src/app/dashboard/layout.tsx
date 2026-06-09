@@ -12,19 +12,20 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
-  const isChatPage = pathname === '/dashboard/roadmap/chat';
+  // P0: the Advisor (chat-native onboarding) + roadmap chat are immersive — collapse the sidebar +
+  // drop the header/navbar so onboarding is full-screen. Sidebar stays collapsed (not removed) so a
+  // user is never trapped mid-onboarding.
+  const isImmersive = pathname === '/dashboard/roadmap/chat' || pathname === '/dashboard/advisor';
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       {/* Sidebar component */}
-      <Sidebar collapsed={isChatPage} />
+      <Sidebar collapsed={isImmersive} />
 
       {/* Main content area */}
-      {isChatPage ? (
-        // Chat page takes full width with no padding/header
-        <main className="flex-1 overflow-hidden">
-          {children}
-        </main>
+      {isImmersive ? (
+        // Immersive page takes full width with no padding/header
+        <main className="flex-1 overflow-hidden">{children}</main>
       ) : (
         <div className="flex flex-col flex-1 w-full">
           {/* Header component */}
@@ -36,9 +37,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
 
           {/* Main content with scrolling */}
-          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-            {children}
-          </main>
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">{children}</main>
         </div>
       )}
     </div>

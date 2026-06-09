@@ -62,7 +62,9 @@ export default function SampleFinancialProfile() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || 'Activation failed. Please try again.');
-      router.push('/dashboard');
+      // P0: persona data is persisted — route into chat-native Advisor onboarding (NOT the
+      // dashboard). The Advisor collects the missing life model before the dashboard is useful.
+      router.push('/dashboard/advisor?onboarding=1');
       router.refresh();
     } catch (e) {
       setError((e as Error).message);
