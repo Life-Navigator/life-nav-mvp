@@ -118,3 +118,24 @@ async def test_converse_context_panel_reflects_model():
     turn = await rm.converse(CTX, "reach financial independence", pending_key="financial_goal")
     panel = turn["context_panel"]
     assert panel["life_vision"] and panel["primary_objective"] and "discovery_completion_pct" in panel
+
+
+# ---- Sprint 43: the Discovery Reveal "magic moment" + warmer copy ----
+@pytest.mark.asyncio
+async def test_converse_returns_discovery_reveal():
+    sb = FakeSupabase({})
+    rm = _rm(sb)
+    turn = await rm.converse(CTX, "buy a house because we want to start a family", pending_key="primary_goal")
+    rev = turn["reveal"]
+    assert rev and rev["you_said"] == "buy a house because we want to start a family"
+    assert rev["we_discovered"] == "Build family stability"
+    assert len(rev["dependencies"]) >= 4 and rev["recommendations_unlocked"] == len(rev["dependencies"])
+    assert rev["confidence_pct"] > 0
+
+
+def test_advisor_copy_is_human_not_procedural():
+    # the questions should sound like an advisor, not a form ("Question 3 of 9")
+    from app.services.relationship_manager import FLOW
+    prompts = " ".join(s["prompt"] for s in FLOW).lower()
+    assert "what is your primary goal" not in prompts and "risk tolerance" not in prompts
+    assert "how do you usually react" in prompts  # the warm risk phrasing

@@ -21,32 +21,32 @@ LIFE = "life"
 # The discovery interview. Each step writes to the canonical model the moment it's answered.
 FLOW: list[dict[str, Any]] = [
     {"key": "vision", "kind": "vision", "domain": "core",
-     "prompt": "To start — what would a successful life look like for you over the next 3–5 years?",
+     "prompt": "Let's start with the big picture — what would you most like your life to look like over the next few years?",
      "why": "Your vision anchors every recommendation we make."},
     {"key": "primary_goal", "kind": "goal", "domain": "core",
-     "prompt": "What's the one big thing you're working toward right now — and why does it matter to you?",
+     "prompt": "What's the one thing you'd most like to make progress on right now — and what's behind that for you?",
      "why": "We find the real objective behind the goal, then map what it depends on."},
     {"key": "family_goal", "kind": "goal", "domain": "family",
-     "prompt": "Tell me about your family situation and any family goals (kids, a home, caring for parents).",
+     "prompt": "Tell me a little about your family — and anything you're hoping to do for them (a home, kids, caring for parents)?",
      "why": "Family goals drive protection, housing, and survivor planning."},
     {"key": "career_goal", "kind": "goal", "domain": "career",
-     "prompt": "What are you trying to achieve in your career over the next few years?",
+     "prompt": "Where would you like your career to go over the next few years?",
      "why": "Career trajectory shapes income, timing, and several other goals."},
     {"key": "financial_goal", "kind": "goal", "domain": "finance",
-     "prompt": "What financial goal matters most to you — and what happens if you don't reach it?",
+     "prompt": "When it comes to money, what matters most to you right now — and what would it mean to get there?",
      "why": "This becomes the spine of your readiness + roadmap."},
     {"key": "risk", "kind": "risk", "domain": "finance",
-     "prompt": "If your investments dropped 20% in a month, would you sell, hold, or buy more?",
-     "why": "Your real risk behavior (not a survey) drives projections + recommendations.",
-     "options": ["Sell", "Hold", "Buy more"]},
+     "prompt": "When an outcome is uncertain — say your investments dropped sharply — how do you usually react?",
+     "why": "Your real instincts (not a survey) drive projections + recommendations.",
+     "options": ["I'd sell to protect myself", "I'd hold steady", "I'd buy more"]},
     {"key": "time_horizon", "kind": "time_horizon", "domain": "core",
-     "prompt": "When do you need to reach your most important goal? (e.g. 3 years, 10 years, retirement)",
+     "prompt": "When are you hoping to reach the thing that matters most? (a few years, ten years, by retirement…)",
      "why": "Time horizon changes the right strategy entirely."},
     {"key": "health_goal", "kind": "goal", "domain": "health",
-     "prompt": "Any health or wellness goals you want to factor in?",
+     "prompt": "Anything on the health or energy side you'd like us to keep in mind?",
      "why": "Health goals affect longevity planning and energy for everything else.", "optional": True},
     {"key": "constraint", "kind": "constraint", "domain": "core",
-     "prompt": "What's the biggest constraint working against your goals right now (money, time, debt, health)?",
+     "prompt": "Last one — what feels like the biggest thing standing in your way right now?",
      "why": "We plan around real constraints instead of pretending they don't exist."},
 ]
 _FLOW_BY_KEY = {s["key"]: s for s in FLOW}
@@ -133,6 +133,10 @@ class RelationshipManager:
             written["wrote"] = "life.life_objectives + dependencies + graph edges"
             written["objective"] = res.get("root_label") or res.get("followup_question")
             written["needs_followup"] = res.get("needs_followup", False)
+            # capture the full discovery for the "reveal" moment (D2)
+            written["surface_goal"] = ans
+            written["dependencies"] = [d["label"] for d in (res.get("dependencies") or [])]
+            written["confidence"] = res.get("confidence")
         elif step["kind"] == "risk":
             label, tol = next(((lbl, t) for k, (lbl, t) in _RISK_MAP.items() if k in ans.lower()), ("moderate", 60))
             await self._sb.upsert("risk_profiles", {"user_id": ctx.user_id, "tenant_id": ctx.user_id,
@@ -183,13 +187,23 @@ class RelationshipManager:
         what updated); then reflect + ask the next question. Stateless — the caller threads pending_key."""
         updates: list[str] = []
         reflection = ""
+        reveal = None
         if pending_key and message.strip():
             res = await self.answer(ctx, pending_key, message)
             rec = res.get("recorded", {})
             updates = list(self._WROTE_UPDATES.get(rec.get("wrote", ""), []))
             if updates:
                 updates += ["✓ Recommendations refreshed", "✓ Roadmap updated"]  # OS re-syncs on next read
-            # reflect the discovered need-behind-the-need (D4) when a goal produced a root objective
+            # The "magic moment" (D2): surface goal → discovered objective → dependencies → confidence.
+            if rec.get("objective") and rec.get("dependencies"):
+                reveal = {
+                    "you_said": rec.get("surface_goal"),
+                    "we_discovered": rec["objective"],
+                    "dependencies": rec["dependencies"],
+                    "recommendations_unlocked": len(rec["dependencies"]),
+                    "confidence_pct": round((rec.get("confidence") or 0) * 100),
+                }
+            # reflect the discovered need-behind-the-need when a goal produced a root objective
             if rec.get("objective"):
                 reflection = f"Got it. The real objective behind that looks like **{rec['objective']}** — I've mapped what it depends on. "
             elif rec.get("risk_behavior"):
@@ -213,6 +227,7 @@ class RelationshipManager:
             "pending_key": None if (st.get("complete") or not nq) else nq["key"],
             "options": (nq or {}).get("options"),
             "updates": updates,
+            "reveal": reveal,  # the "magic moment" — render it prominently (D2)
             "progress": st.get("progress"),
             "complete": st.get("complete", False),
             "context_panel": panel,

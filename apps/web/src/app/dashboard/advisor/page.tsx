@@ -19,11 +19,19 @@ interface Panel {
   covered_areas?: string[];
   missing_areas?: string[];
 }
+interface Reveal {
+  you_said: string;
+  we_discovered: string;
+  dependencies: string[];
+  recommendations_unlocked: number;
+  confidence_pct: number;
+}
 interface Turn {
   assistant_message: string;
   pending_key: string | null;
   options?: string[] | null;
   updates: string[];
+  reveal?: Reveal | null;
   progress?: { answered: number; total: number };
   complete: boolean;
   context_panel: Panel;
@@ -32,6 +40,7 @@ interface Msg {
   role: 'advisor' | 'user';
   text: string;
   updates?: string[];
+  reveal?: Reveal | null;
 }
 
 export default function AdvisorPage() {
@@ -47,7 +56,10 @@ export default function AdvisorPage() {
 
   const apply = (t: Turn | null) => {
     if (!t) return;
-    setMsgs((m) => [...m, { role: 'advisor', text: t.assistant_message, updates: t.updates }]);
+    setMsgs((m) => [
+      ...m,
+      { role: 'advisor', text: t.assistant_message, updates: t.updates, reveal: t.reveal },
+    ]);
     setPending(t.pending_key);
     setOptions(t.options ?? null);
     setPanel(t.context_panel || {});
@@ -108,6 +120,41 @@ export default function AdvisorPage() {
                       {u}
                     </span>
                   ))}
+                </div>
+              )}
+              {m.reveal && (
+                <div className="mt-2 max-w-[95%] rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4">
+                  <div className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">
+                    ✨ Here&apos;s what I just learned
+                  </div>
+                  <div className="mt-1 text-sm text-gray-600">
+                    You said: <span className="text-gray-900">“{m.reveal.you_said}”</span>
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    The real objective:{' '}
+                    <span className="text-lg font-bold text-gray-900">
+                      {m.reveal.we_discovered}
+                    </span>
+                  </div>
+                  <div className="mt-2 text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+                    What it depends on
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {m.reveal.dependencies.map((d) => (
+                      <span
+                        key={d}
+                        className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-indigo-100 text-gray-700"
+                      >
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex gap-4 text-sm">
+                    <span className="text-emerald-700 font-semibold">
+                      {m.reveal.recommendations_unlocked} actions unlocked
+                    </span>
+                    <span className="text-gray-500">Confidence {m.reveal.confidence_pct}%</span>
+                  </div>
                 </div>
               )}
             </div>
