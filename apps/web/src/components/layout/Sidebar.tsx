@@ -488,6 +488,18 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Health Intelligence',
+    href: '/dashboard/health-intelligence',
+    icon: HeartIcon,
+    current: false,
+  },
+  {
+    name: 'Military / VA',
+    href: '/dashboard/military',
+    icon: AcademicCapIcon,
+    current: false,
+  },
+  {
     name: 'Calendar',
     href: '/dashboard/calendar',
     icon: CalendarNavIcon,
