@@ -116,15 +116,19 @@ class MyLifeService:
         except Exception:  # noqa: BLE001
             readiness = {"overall": None, "domains": [], "source": "Life Readiness Engine"}
 
-        # Section 4 — Next Best Action (exactly one)
+        # Section 4 — Next Best Action (exactly one). Bias toward something the user can DO: prefer
+        # the top ACTION/OPPORTUNITY over a RISK (a RISK is "what to watch", not "what to do next" —
+        # risks surface in the attention alerts instead).
         next_action = None
         try:
-            pri = await self._os.prioritize(ctx, top=1)
-            if pri.get("top_actions"):
-                a = pri["top_actions"][0]
+            pri = await self._os.prioritize(ctx, top=6)
+            ranked = pri.get("top_actions") or []
+            a = next((x for x in ranked if (x.get("rec_type") or "ACTION") in ("ACTION", "OPPORTUNITY")), ranked[0] if ranked else None)
+            if a:
                 next_action = {"title": a["title"], "why": a.get("why"), "recommended_action": a.get("recommended_action"),
                                "expected_benefit": a.get("expected_benefit"), "confidence_pct": round((a.get("confidence") or 0) * 100),
-                               "quantified_impact": a.get("quantified_impact"), "source": "Recommendation OS"}
+                               "quantified_impact": a.get("quantified_impact"), "rec_type": a.get("rec_type", "ACTION"),
+                               "source": "Recommendation OS"}
         except Exception:  # noqa: BLE001
             pass
 

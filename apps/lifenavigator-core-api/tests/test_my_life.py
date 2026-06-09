@@ -81,3 +81,26 @@ async def test_attention_returns_one_action_and_capped_alerts():
     assert sev == sorted(sev)
     # each alert is source-labeled with a CTA
     assert all(a.get("source") and a.get("cta") for a in out["alerts"])
+
+
+# ---- Sprint 46: next best action biases to ACTION, not RISK ----
+@pytest.mark.asyncio
+async def test_next_best_action_prefers_action_over_risk(monkeypatch):
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    await life.discover_goal(CTX, surface_goal="buy a house", why_chain=[{"a": "start a family"}])
+    comp = CompensationIntelligenceEngine(sb)
+    domains = {"finance": FinanceService(supabase=sb), "health": HealthService(supabase=sb),
+               "career": CareerService(sb, comp, MarketPositionAnalyzer(sb)), "family": FamilyService(sb, comp)}
+    readiness = LifeReadinessEngine(domains=domains, education=EducationService(sb, comp), supabase=sb)
+    svc = MyLifeService(life, readiness, RecommendationOS(sb), sb)
+
+    async def fake_prioritize(ctx, top=3):
+        return {"top_actions": [
+            {"title": "Income loss risk", "rec_type": "RISK", "confidence": 0.9, "quantified_impact": {}},
+            {"title": "Increase 401(k) to capture match", "rec_type": "ACTION", "confidence": 0.85, "quantified_impact": {}},
+        ]}
+    monkeypatch.setattr(svc._os, "prioritize", fake_prioritize)
+    out = await svc.my_life(CTX)
+    nba = out["next_best_action"]
+    assert nba and nba["rec_type"] == "ACTION" and "401(k)" in nba["title"]  # RISK was skipped
