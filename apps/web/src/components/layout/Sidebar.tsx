@@ -422,12 +422,14 @@ const navigation = [
   {
     name: 'Decision Graph',
     href: '/dashboard/life-decisions/graph',
+    moduleId: 'decision_graph',
     icon: PuzzlePieceIcon,
     current: false,
   },
   {
     name: 'Scenarios',
     href: '/dashboard/life-decisions/scenarios',
+    moduleId: 'scenarios',
     icon: MapIcon,
     current: false,
   },
@@ -440,12 +442,14 @@ const navigation = [
   {
     name: 'Comp & Benefits',
     href: '/dashboard/benefits',
+    moduleId: 'comp_benefits',
     icon: CurrencyDollarIcon,
     current: false,
   },
   {
     name: 'Financial Plan',
     href: '/dashboard/planning',
+    moduleId: 'financial_plan',
     icon: ChartBarIcon,
     current: false,
   },
@@ -471,6 +475,7 @@ const navigation = [
   {
     name: 'Family Office',
     href: '/dashboard/family-office',
+    moduleId: 'family_office',
     icon: HeartIcon,
     current: false,
   },
@@ -490,12 +495,14 @@ const navigation = [
   {
     name: 'Health Intelligence',
     href: '/dashboard/health-intelligence',
+    moduleId: 'health_intelligence',
     icon: HeartIcon,
     current: false,
   },
   {
     name: 'Military / VA',
     href: '/dashboard/military',
+    moduleId: 'military',
     icon: AcademicCapIcon,
     current: false,
   },
@@ -516,6 +523,7 @@ const navigation = [
   {
     name: 'Executive Dashboard',
     href: '/dashboard/metrics',
+    moduleId: 'metrics',
     icon: ChartBarIcon,
     current: false,
   },
@@ -556,6 +564,41 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
   const [isMobile, setIsMobile] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [hoveredDropdown, setHoveredDropdown] = useState<string | null>(null);
+  // Server-authoritative module visibility + maturity (Sprint 22). The UI only reflects this.
+  const [moduleVis, setModuleVis] = useState<
+    Record<string, { visible: boolean; badge: string | null }>
+  >({});
+  const [askMilitary, setAskMilitary] = useState(false);
+  useEffect(() => {
+    let on = true;
+    fetch('/api/platform/modules')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!on || !d) return;
+        if (d.modules) setModuleVis(d.modules);
+        setAskMilitary(!!d.ask_military_question);
+      })
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, []);
+  const answerMilitary = async (military: boolean) => {
+    setAskMilitary(false);
+    await fetch('/api/platform/military', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ military_status: military ? 'military_affiliated' : 'civilian' }),
+    }).catch(() => {});
+    const r = await fetch('/api/platform/modules')
+      .then((x) => (x.ok ? x.json() : null))
+      .catch(() => null);
+    if (r?.modules) setModuleVis(r.modules);
+  };
+  const skipMilitary = async () => {
+    setAskMilitary(false);
+    await fetch('/api/platform/military', { method: 'POST' }).catch(() => {});
+  };
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const parentSection = getParentSection(pathname);
@@ -710,11 +753,40 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
 
         {/* Navigation */}
         <nav className={classNames('py-4', isCollapsed && !isMobile ? 'px-1' : 'px-2')}>
+          {askMilitary && (!effectiveCollapsed || isMobile) && (
+            <div className="mb-3 mx-1 rounded-lg border border-indigo-200 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-800 p-3">
+              <p className="text-xs text-gray-700 dark:text-gray-200">
+                Are you active duty, a veteran, a military family member, or affiliated with the
+                military?
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => answerMilitary(true)}
+                  className="text-xs px-2.5 py-1 rounded-md bg-indigo-600 text-white font-medium"
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => answerMilitary(false)}
+                  className="text-xs px-2.5 py-1 rounded-md bg-white border border-gray-300 text-gray-700"
+                >
+                  No
+                </button>
+                <button onClick={skipMilitary} className="text-xs px-2 py-1 text-gray-400">
+                  Skip
+                </button>
+              </div>
+            </div>
+          )}
           {navigation.map((item) => {
             const isActive = isItemActive(item.href);
             const isExpanded = expandedSections[item.name];
             const isHovered = hoveredDropdown === item.name;
             const isComingSoon = (item as any).comingSoon;
+            // Server-authoritative gating: hide any module the server says this user can't see.
+            const mid = (item as any).moduleId as string | undefined;
+            if (mid && moduleVis[mid] && moduleVis[mid].visible === false) return null;
+            const maturityBadge = mid ? moduleVis[mid]?.badge : null;
 
             return (
               <div
@@ -774,7 +846,26 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
                         aria-hidden="true"
                       />
                       {(!effectiveCollapsed || isMobile) && (
-                        <span className="flex-grow">{item.name}</span>
+                        <span className="flex-grow flex items-center gap-1.5">
+                          {item.name}
+                          {maturityBadge && (
+                            <span
+                              className={classNames(
+                                'text-[9px] font-bold px-1 py-0.5 rounded leading-none',
+                                maturityBadge === 'BETA'
+                                  ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                              )}
+                              title={
+                                maturityBadge === 'BETA'
+                                  ? 'Beta — still maturing; results may be limited'
+                                  : 'Experimental — illustrative only'
+                              }
+                            >
+                              {maturityBadge}
+                            </span>
+                          )}
+                        </span>
                       )}
                     </Link>
                   )}
