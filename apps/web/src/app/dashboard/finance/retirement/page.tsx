@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import FinancialResolverPanel from '@/components/finance/FinancialResolverPanel';
 
 // Tab types for retirement planning
 type TabType =
@@ -472,6 +473,17 @@ export default function RetirementPlanningPage() {
   // Overview Tab
   const renderOverview = () => (
     <div className="space-y-6">
+      {/* Sprint 45C — canonical, source-labeled truth (resolver) above the analytics */}
+      <FinancialResolverPanel
+        title="What we know (from your data)"
+        keys={[
+          'retirement_balance',
+          'retirement_contribution_rate',
+          'employer_match_rate',
+          'income',
+          'time_horizon',
+        ]}
+      />
       <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>

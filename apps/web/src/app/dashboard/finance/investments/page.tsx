@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import FinancialResolverPanel from '@/components/finance/FinancialResolverPanel';
 // PlaidLinkButton removed during Supabase migration
 const PlaidLinkButton = ({ className }: any) => (
   <button className={className} disabled>
@@ -947,6 +948,11 @@ export default function InvestmentPage() {
 
     return (
       <div className="space-y-6">
+        {/* Sprint 45C — canonical, source-labeled truth (resolver) above the analytics */}
+        <FinancialResolverPanel
+          title="What we know (from your data)"
+          keys={['investment_balance', 'cash_balance']}
+        />
         {/* Portfolio Value Hero */}
         <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-6 text-white">
           <div className="flex items-center justify-between">

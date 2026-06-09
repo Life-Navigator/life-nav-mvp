@@ -27,11 +27,18 @@ def _num(v: Any) -> Optional[float]:
         return None
 
 
-def _field(value: Any, source: str, *, present: Optional[bool] = None, confidence: float = 0.8, prompt: str = "") -> dict[str, Any]:
+def _band(c: float) -> str:
+    return "High" if c >= 0.8 else "Medium" if c >= 0.5 else "Low"
+
+
+def _field(value: Any, source: str, *, origin: str = "", present: Optional[bool] = None,
+           confidence: float = 0.8, prompt: str = "", unlocks: Optional[list] = None) -> dict[str, Any]:
     has = present if present is not None else (value not in (None, "", [], 0, 0.0))
+    conf = confidence if has else 0.0
     return {"value": value if has else None, "present": bool(has),
-            "source": source if has else MISSING, "confidence": confidence if has else 0.0,
-            "prompt": prompt if not has else None}
+            "source": source if has else MISSING, "confidence": round(conf, 2), "confidence_band": _band(conf) if has else "—",
+            "origin": origin if has else None, "prompt": prompt if not has else None,
+            "unlocks": unlocks or []}
 
 
 class FinancialInputResolver:
@@ -77,22 +84,35 @@ class FinancialInputResolver:
         match = _num(k.get("employer_match"))
         th = (vis[0].get("prompts") or {}).get("time_horizon") if vis else None
 
+        last_updated = next((a.get("last_synced_at") for a in accounts if a.get("last_synced_at")), None)
         inputs = {
-            "income": _field(income, income_src, prompt="What's your annual income?"),
-            "cash_balance": _field(cash, acct_source, prompt="Connect a sample profile or enter your cash balance."),
-            "investment_balance": _field(invest, PLAID if assets else MISSING, prompt="No investment balances on file — connect a profile or add them."),
-            "retirement_balance": _field(retire, PLAID if plans else MISSING, prompt="No retirement balances on file — connect a profile or add them."),
-            "debt_total": _field(debt_total, acct_source if debt_accts else MISSING, prompt="Add your debts to optimize payoff."),
-            "debt_apr": _field(apr, acct_source if apr else MISSING, prompt="What APR are you paying on your debt?"),
-            "retirement_contribution_rate": _field(rate, DOC if rate is not None else MISSING, prompt="Enter your 401(k) contribution rate to unlock retirement projection + match analysis."),
-            "employer_match_rate": _field(match, DOC if match is not None else MISSING, prompt="What's your employer's 401(k) match?"),
-            "risk_profile": _field(risk[0].get("behavior") if risk else None, ADVISOR, prompt="Tell your advisor how you handle uncertainty."),
-            "time_horizon": _field(th, ADVISOR, prompt="When do you hope to reach your goal?"),
-            "housing_target": _field(None, MISSING, prompt="What home price are you considering?"),  # only ever user-entered
+            "income": _field(income, income_src, origin="documents:offer_letter / compensation", confidence=0.85,
+                             prompt="What's your annual income?", unlocks=["retirement projection", "home affordability", "savings rate"]),
+            "cash_balance": _field(cash, acct_source, origin="finance.financial_accounts", confidence=0.95,
+                                   prompt="Connect a sample profile or enter your cash balance.", unlocks=["emergency-fund analysis"]),
+            "investment_balance": _field(invest, PLAID if assets else MISSING, origin="finance.assets", confidence=0.95,
+                                         prompt="No investment balances on file — connect a profile or add them.", unlocks=["net worth", "allocation view"]),
+            "retirement_balance": _field(retire, PLAID if plans else MISSING, origin="finance.retirement_plans", confidence=0.95,
+                                         prompt="No retirement balances on file — connect a profile or add them.", unlocks=["retirement projection", "readiness"]),
+            "debt_total": _field(debt_total, acct_source if debt_accts else MISSING, origin="finance.financial_accounts", confidence=0.9,
+                                 prompt="Add your debts to optimize payoff.", unlocks=["debt payoff optimizer"]),
+            "debt_apr": _field(apr, acct_source if apr else MISSING, origin="finance.financial_accounts.interest_rate", confidence=0.8,
+                               prompt="What APR are you paying on your debt?"),
+            "retirement_contribution_rate": _field(rate, DOC if rate is not None else MISSING, origin="documents:401k_statement", confidence=0.85,
+                                                   prompt="Enter your 401(k) contribution rate to unlock retirement projections, 401(k) match optimization, and scenario planning.",
+                                                   unlocks=["retirement projection", "401(k) match optimization", "scenario planning"]),
+            "employer_match_rate": _field(match, DOC if match is not None else MISSING, origin="documents:401k_statement", confidence=0.85,
+                                          prompt="What's your employer's 401(k) match?", unlocks=["match-gap analysis"]),
+            "risk_profile": _field(risk[0].get("behavior") if risk else None, ADVISOR, origin="life.risk_profiles", confidence=0.8,
+                                   prompt="Tell your advisor how you handle uncertainty.", unlocks=["projection volatility", "allocation guidance"]),
+            "time_horizon": _field(th, ADVISOR, origin="life.life_vision", confidence=0.75,
+                                   prompt="When do you hope to reach your goal?", unlocks=["strategy selection"]),
+            "housing_target": _field(None, MISSING, origin="user-entered", prompt="What home price are you considering?",
+                                     unlocks=["home affordability", "rent-vs-buy"]),  # only ever user-entered
         }
-        missing = [{"input": k2, "prompt": v["prompt"]} for k2, v in inputs.items() if not v["present"]]
+        missing = [{"input": k2, "prompt": v["prompt"], "unlocks": v["unlocks"]} for k2, v in inputs.items() if not v["present"]]
         return {"inputs": inputs, "present_count": sum(1 for v in inputs.values() if v["present"]),
-                "total": len(inputs), "missing": missing,
+                "total": len(inputs), "missing": missing, "last_updated": last_updated,
                 "note": "Every value resolves from Supabase with its source; missing inputs are named, never defaulted."}
 
     async def tool_inputs(self, ctx: UserContext) -> dict[str, Any]:
