@@ -145,3 +145,13 @@ async def financial_plan(
     """Advanced financial plan: retirement readiness + Monte Carlo + goal funding + Social
     Security + insurance optimization + withdrawal planning."""
     return await engine.plan(_ctx(user), current_age=current_age, retirement_age=retirement_age)
+
+
+from ..dependencies import get_financial_resolver  # noqa: E402
+from ..services.financial_resolver import FinancialInputResolver  # noqa: E402
+
+
+@router.get("/resolved-inputs")
+async def resolved_inputs(user: AuthenticatedUser = Depends(authenticated), svc: FinancialInputResolver = Depends(get_financial_resolver)):
+    """Canonical financial inputs resolved from Supabase — each with its source + present/missing."""
+    return await svc.resolve(UserContext(user_id=user.user_id))

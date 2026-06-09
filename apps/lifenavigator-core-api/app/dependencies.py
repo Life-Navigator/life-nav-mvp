@@ -33,6 +33,7 @@ from .services.compensation import CompensationIntelligenceEngine
 from .services.family_office import FamilyOfficeService
 from .services.guidance import GuidanceEngine
 from .services.financial_planning import FinancialPlanningEngine
+from .services.financial_resolver import FinancialInputResolver
 from .services.health_intelligence import HealthIntelligenceService
 from .services.decision_brain import DecisionBrainService
 from .services.decision_engine import DecisionEngine
@@ -323,6 +324,10 @@ def get_life_profile_service(
     recommendation_agent: RecommendationAgent = Depends(get_recommendation_agent),
 ) -> LifeProfileService:
     return LifeProfileService(registry, recommendation_agent)
+
+
+def get_financial_resolver(supabase: SupabaseClient = Depends(get_supabase)) -> FinancialInputResolver:
+    return FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase))
 
 
 def get_my_life(
