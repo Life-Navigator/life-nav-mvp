@@ -57,3 +57,27 @@ async def test_my_life_recent_intelligence_feed():
 async def test_my_life_empty_for_no_discovery():
     out = await _svc(FakeSupabase({})).my_life(CTX)
     assert out["has_discovery"] is False
+
+
+# ---- Addendum: disciplined dashboard attention feed (one action + <=3 alerts) ----
+@pytest.mark.asyncio
+async def test_attention_returns_one_action_and_capped_alerts():
+    from app.services.financial_resolver import FinancialInputResolver
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    await life.save_vision(CTX, vision_text="Retire by 60 and raise a secure family")
+    await life.discover_goal(CTX, surface_goal="buy a house", why_chain=[{"a": "start a family"}])
+    comp = CompensationIntelligenceEngine(sb)
+    domains = {"finance": FinanceService(supabase=sb), "health": HealthService(supabase=sb),
+               "career": CareerService(sb, comp, MarketPositionAnalyzer(sb)), "family": FamilyService(sb, comp)}
+    readiness = LifeReadinessEngine(domains=domains, education=EducationService(sb, comp), supabase=sb)
+    svc = MyLifeService(life, readiness, RecommendationOS(sb), sb, FinancialInputResolver(sb, comp))
+    out = await svc.attention(CTX)
+    assert "next_best_action" in out and "life_vision" in out
+    assert len(out["alerts"]) <= 3 and out["view_all"] == "/dashboard/recommendations"
+    # alerts are severity-ordered (high before low)
+    rank = {"high": 0, "medium": 1, "low": 2}
+    sev = [rank[a["severity"]] for a in out["alerts"]]
+    assert sev == sorted(sev)
+    # each alert is source-labeled with a CTA
+    assert all(a.get("source") and a.get("cta") for a in out["alerts"])

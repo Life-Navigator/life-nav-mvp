@@ -93,3 +93,9 @@ from ..services.my_life import MyLifeService  # noqa: E402
 async def my_life(user: AuthenticatedUser = Depends(authenticated), svc: MyLifeService = Depends(get_my_life)):
     """The flagship Life-OS aggregate: vision, what-matters-most, readiness, next action, constraints, recent intelligence."""
     return await svc.my_life(_ctx(user))
+
+
+@router.get("/attention")
+async def attention(user: AuthenticatedUser = Depends(authenticated), svc: MyLifeService = Depends(get_my_life)):
+    """Disciplined dashboard feed: one next best action + up to 3 attention alerts (not the full list)."""
+    return await svc.attention(_ctx(user))

@@ -14,11 +14,68 @@ from ..models.common import UserContext
 
 
 class MyLifeService:
-    def __init__(self, life: Any, readiness: Any, reco_os: Any, supabase: Any) -> None:
+    def __init__(self, life: Any, readiness: Any, reco_os: Any, supabase: Any, resolver: Any = None) -> None:
         self._life = life
         self._readiness = readiness
         self._os = reco_os
         self._sb = supabase
+        self._resolver = resolver
+
+    async def attention(self, ctx: UserContext) -> dict[str, Any]:
+        """The DISCIPLINED dashboard feed: exactly one next best action + up to 3 'needs your
+        attention' alerts (urgent recs, missing inputs, incomplete discovery, document issues) — the
+        full list lives on /dashboard/recommendations. Same canonical source as everything else."""
+        ml = await self.my_life(ctx)
+        next_action = ml.get("next_best_action")
+        alerts: list[dict[str, Any]] = []
+
+        # urgent risk recommendations (severity high)
+        try:
+            active = await self._os.active(ctx)
+            for r in (active.get("recommendations") or []):
+                if r.get("classification") == "RISK":
+                    alerts.append({"title": r.get("title"), "severity": "high", "source": "Recommendation OS",
+                                   "detail": r.get("why") or r.get("recommended_action"), "cta": "/dashboard/recommendations"})
+        except Exception:  # noqa: BLE001
+            pass
+
+        # missing financial inputs (severity medium) — only the high-leverage ones
+        if self._resolver is not None:
+            try:
+                res = await self._resolver.resolve(ctx)
+                for m in (res.get("missing") or []):
+                    unlocks = m.get("unlocks") or []
+                    if unlocks:
+                        alerts.append({"title": f"Missing {m['input'].replace('_', ' ')}", "severity": "medium",
+                                       "source": "Financial resolver", "detail": f"Affects {', '.join(unlocks[:2])}",
+                                       "cta": "/dashboard/finance/retirement"})
+            except Exception:  # noqa: BLE001
+                pass
+
+        # incomplete discovery (severity low)
+        try:
+            health = await self._life.discovery_health(ctx)
+            for area in (health.get("missing_areas") or []):
+                alerts.append({"title": f"Complete {area} discovery", "severity": "low", "source": "Discovery health",
+                               "detail": "Sharpens your plan + unlocks more recommendations.", "cta": "/dashboard/advisor"})
+        except Exception:  # noqa: BLE001
+            pass
+
+        # document issues (severity medium)
+        try:
+            docs = await self._sb.select("documents", filters={"user_id": f"eq.{ctx.user_id}"}, limit=50, schema="documents")
+            for d in docs:
+                if d.get("status") == "needs_review":
+                    alerts.append({"title": f"Document needs attention: {d.get('title') or d.get('doc_type')}",
+                                   "severity": "medium", "source": "Documents", "detail": d.get("status_reason") or "Upload a digital PDF or paste the text.",
+                                   "cta": "/dashboard/documents"})
+        except Exception:  # noqa: BLE001
+            pass
+
+        rank = {"high": 0, "medium": 1, "low": 2}
+        alerts.sort(key=lambda a: rank.get(a["severity"], 3))
+        return {"next_best_action": next_action, "alerts": alerts[:3], "alert_count": len(alerts),
+                "view_all": "/dashboard/recommendations", "life_vision": ml["life_vision"]}
 
     async def my_life(self, ctx: UserContext) -> dict[str, Any]:
         snap = await self._life.snapshot(ctx)

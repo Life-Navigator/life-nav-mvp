@@ -334,7 +334,8 @@ def get_my_life(
     supabase: SupabaseClient = Depends(get_supabase),
     readiness: LifeReadinessEngine = Depends(get_readiness_engine),
 ) -> MyLifeService:
-    return MyLifeService(LifeDiscoveryService(supabase), readiness, RecommendationOS(supabase), supabase)
+    return MyLifeService(LifeDiscoveryService(supabase), readiness, RecommendationOS(supabase), supabase,
+                         FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)))
 
 
 def get_scenario_compare(
