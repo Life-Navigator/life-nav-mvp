@@ -24,6 +24,7 @@ interface DashboardData {
     } | null;
     wellnessScore: number | null;
     medicationsDue: number;
+    lifeObjective?: string | null;
     hasData: boolean;
   };
   career: {
@@ -31,15 +32,31 @@ interface DashboardData {
     company: string | null;
     networkSize: number;
     activeApplications: number;
+    lifeObjective?: string | null;
     hasData: boolean;
   };
   education: {
     activeCourses: number;
     completionRate: number;
     studyStreak: number;
+    lifeObjective?: string | null;
     hasData: boolean;
   };
   hasAnyData: boolean;
+}
+
+// Sprint 46 cohesion: a small canonical line shown atop every domain card so the dashboard reflects
+// what the Advisor knows (life.life_objectives) even when the legacy domain tables are empty.
+function WorkingToward({ objective }: { objective?: string | null }) {
+  if (!objective) return null;
+  return (
+    <div className="mb-3 rounded-md bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2">
+      <p className="text-xs text-gray-700 dark:text-gray-200">
+        Working toward: <span className="font-semibold">{objective}</span>
+      </p>
+      <p className="text-[10px] text-gray-400">Source: Advisor Discovery</p>
+    </div>
+  );
 }
 
 interface CalendarTask {
@@ -529,6 +546,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                   Healthcare Overview
                 </h3>
               </Link>
+              <WorkingToward objective={dashboardData?.health.lifeObjective} />
               {dashboardData?.health.hasData ? (
                 <>
                   {dashboardData.health.nextAppointment && (
@@ -594,6 +612,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                   Career Overview
                 </h3>
               </Link>
+              <WorkingToward objective={dashboardData?.career.lifeObjective} />
               {dashboardData?.career.hasData ? (
                 <>
                   {(dashboardData.career.title || dashboardData.career.company) && (
@@ -645,6 +664,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                   Education Overview
                 </h3>
               </Link>
+              <WorkingToward objective={dashboardData?.education.lifeObjective} />
               {dashboardData?.education.hasData ? (
                 <div className="grid grid-cols-3 gap-4">
                   <div>

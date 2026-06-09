@@ -108,11 +108,31 @@ export async function GET() {
     const completionRate =
       totalCourses > 0 ? Math.round((completedCourses / totalCourses) * 100) : 0;
 
+    // Sprint 46 cohesion: the dashboard must reflect what the ADVISOR knows. Read canonical
+    // life.life_objectives so each domain card surfaces the user's real objective — even when the
+    // legacy domain tables are empty. One life model, one truth (no advisor/dashboard mismatch).
+    const objByDomain: Record<string, string> = {};
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: lifeObjs } = await (sb as any)
+        .schema('life')
+        .from('life_objectives')
+        .select('title, domain, status')
+        .eq('user_id', user.id)
+        .eq('status', 'active');
+      for (const o of lifeObjs || []) {
+        if (o.domain && !objByDomain[o.domain]) objByDomain[o.domain] = o.title;
+      }
+    } catch {
+      /* canonical objectives are additive; never block the summary */
+    }
+
     const hasAnyData = !!(
       financial.hasData ||
       careerProfile ||
       (activeApplications && activeApplications > 0) ||
-      totalCourses > 0
+      totalCourses > 0 ||
+      Object.keys(objByDomain).length > 0
     );
 
     return NextResponse.json({
@@ -123,14 +143,21 @@ export async function GET() {
         company: careerProfile?.current_company || null,
         networkSize: networkSize ?? 0,
         activeApplications: activeApplications ?? 0,
+        lifeObjective: objByDomain['career'] || null,
         hasData: !!(careerProfile || (activeApplications && activeApplications > 0)),
       },
       education: {
         activeCourses,
         completionRate,
         studyStreak: 0,
+        lifeObjective: objByDomain['education'] || null,
         hasData: totalCourses > 0,
       },
+      health: {
+        ...emptyDashboard.health,
+        lifeObjective: objByDomain['health'] || null,
+      },
+      family: { lifeObjective: objByDomain['family'] || null, hasData: false },
       hasAnyData,
     });
   } catch (err) {
