@@ -272,9 +272,11 @@ export default function InvestmentPage() {
           dayChange: (h.dayChange || 0) * (h.shares || 0),
           dayChangePercent: (h.dayChangePercent || 0) * 100,
           dividendYield: (h.dividendYield || 0) * 100,
-          peRatio: 25,
-          fiftyTwoWeekHigh: h.currentPrice * 1.2,
-          fiftyTwoWeekLow: h.currentPrice * 0.8,
+          // Sprint 45B: no fabricated market data. These come from the holdings source if present,
+          // else 0 (unknown) — never a hardcoded P/E or a synthesized ±20% 52-week range.
+          peRatio: h.peRatio || 0,
+          fiftyTwoWeekHigh: h.fiftyTwoWeekHigh || 0,
+          fiftyTwoWeekLow: h.fiftyTwoWeekLow || 0,
         })
       );
 
@@ -296,7 +298,7 @@ export default function InvestmentPage() {
           threeYearReturn: (pm.threeYearReturn || 0) * 100,
           fiveYearReturn: (pm.fiveYearReturn || 0) * 100,
           dividendIncome: pm.annualDividendIncome || 0,
-          cashBalance: 15000,
+          cashBalance: pm.cashBalance || 0, // Sprint 45B: real cash or 0 — no hardcoded $15,000
         });
       }
 
@@ -400,7 +402,7 @@ export default function InvestmentPage() {
             .map((m: { month: string; amount: number }) => ({
               month: m.month,
               expected: m.amount,
-              stocks: ['AAPL', 'MSFT', 'JNJ'],
+              stocks: [], // Sprint 45B: no fabricated tickers (real per-month payers not provided)
             })),
           topPayers: (da.topPayers || []).map(
             (p: { ticker: string; name: string; annualIncome: number; yield: number }) => ({
@@ -408,7 +410,7 @@ export default function InvestmentPage() {
               name: p.name,
               annualDividend: p.annualIncome,
               yield: (p.yield || 0) * 100,
-              growthRate: 7.5,
+              growthRate: 0, // Sprint 45B: no fabricated 7.5% dividend-growth rate
             })
           ),
           growthProjection: Array.from({ length: 10 }, (_, i) => ({
