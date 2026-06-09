@@ -138,10 +138,73 @@ export async function persistPlaidItem(
  * Best-effort per table so a missing-grant on one doesn't strand the others.
  */
 export async function clearPriorFinanceData(svc: Svc, userId: string): Promise<void> {
-  for (const table of ['transactions', 'financial_accounts', 'plaid_items']) {
+  // Sprint 42: also clear assets (holdings) + retirement_plans so re-activation is idempotent
+  // and the investments/retirement pages reflect only the current connect.
+  for (const table of [
+    'transactions',
+    'financial_accounts',
+    'plaid_items',
+    'assets',
+    'retirement_plans',
+  ]) {
     const { error } = await svc.schema('finance').from(table).delete().eq('user_id', userId);
     if (error) console.warn(`clearPriorFinanceData(${table}): ${error.message}`);
   }
+}
+
+/**
+ * Sprint 42 — hydrate the Investments + Retirement pages. After accounts are persisted, project
+ * each investment/retirement-type account into finance.assets (a holding) and finance.retirement_plans
+ * using the account's REAL balance (not a placeholder) plus clearly-stated default planning
+ * assumptions. Closes the audit's "successful connect, empty page" finding.
+ */
+export async function persistInvestmentsAndRetirement(
+  svc: Svc,
+  userId: string,
+  accounts: PlaidAccountLike[]
+): Promise<{ holdings: number; retirementPlans: number }> {
+  const assets: Record<string, unknown>[] = [];
+  const plans: Record<string, unknown>[] = [];
+  for (const a of accounts) {
+    const kind = mapAccountType(a.type, a.subtype);
+    const balance = a.balances?.current ?? 0;
+    if (balance <= 0) continue;
+    const name = a.name || a.official_name || 'Account';
+    if (kind === 'investment') {
+      assets.push({
+        user_id: userId,
+        asset_name: name,
+        asset_type: 'investment',
+        current_value: balance,
+        description: 'Imported from a connected investment account.',
+        metadata: { source: 'connected_account', plaid_account_id: a.account_id },
+      });
+    } else if (kind === 'retirement') {
+      plans.push({
+        user_id: userId,
+        plan_name: name,
+        current_savings: balance,
+        target_retirement_age: 65, // default planning assumption (editable)
+        expected_return_rate: 0.06,
+        inflation_rate: 0.025,
+        withdrawal_strategy: '4% rule',
+        metadata: {
+          source: 'connected_account',
+          plaid_account_id: a.account_id,
+          assumptions_are_defaults: true,
+        },
+      });
+    }
+  }
+  if (assets.length) {
+    const { error } = await svc.schema('finance').from('assets').insert(assets);
+    if (error) console.warn(`persistInvestmentsAndRetirement(assets): ${error.message}`);
+  }
+  if (plans.length) {
+    const { error } = await svc.schema('finance').from('retirement_plans').insert(plans);
+    if (error) console.warn(`persistInvestmentsAndRetirement(retirement_plans): ${error.message}`);
+  }
+  return { holdings: assets.length, retirementPlans: plans.length };
 }
 
 /** Upsert accounts; returns a map of plaid_account_id → finance.financial_accounts.id. */

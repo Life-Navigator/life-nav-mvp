@@ -16,6 +16,7 @@ import {
 import {
   persistPlaidItem,
   persistAccounts,
+  persistInvestmentsAndRetirement,
   persistTransactions,
   persistPersonaProfile,
   clearPriorFinanceData,
@@ -156,6 +157,14 @@ export async function POST(request: NextRequest) {
     });
     const accountIdMap = await persistAccounts(svc, user.id, accountsWithApr);
 
+    // 2b) Sprint 42: hydrate Investments + Retirement from the real investment/retirement balances.
+    let invRet = { holdings: 0, retirementPlans: 0 };
+    try {
+      invRet = await persistInvestmentsAndRetirement(svc, user.id, accountsWithApr);
+    } catch (irErr) {
+      console.warn('persistInvestmentsAndRetirement failed (non-fatal):', irErr);
+    }
+
     // 3) Transactions (last 30 days).
     const end = new Date();
     const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -247,6 +256,8 @@ export async function POST(request: NextRequest) {
       persona_id: persona.persona_id,
       accounts_linked: accounts.length,
       transactions_synced: txnCount,
+      holdings_synced: invRet.holdings,
+      retirement_plans_synced: invRet.retirementPlans,
       graph_promotion: 'enqueued',
     });
   } catch (err) {
