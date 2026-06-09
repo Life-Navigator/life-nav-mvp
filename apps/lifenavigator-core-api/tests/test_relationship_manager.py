@@ -83,3 +83,38 @@ async def test_bridge_projects_persona_goals_into_canonical_model():
     assert objs  # persona goals became canonical life objectives
     rp = await sb.select("risk_profiles", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
     assert rp and rp[0]["behavior"] == "moderate"
+
+
+# ---- Sprint 41: chat-native Relationship Manager ----
+@pytest.mark.asyncio
+async def test_converse_opens_with_a_question_no_answer_consumed():
+    sb = FakeSupabase({})
+    rm = _rm(sb)
+    turn = await rm.converse(CTX, "hi", pending_key=None)
+    assert turn["pending_key"] == "vision" and "?" in turn["assistant_message"]
+    assert turn["complete"] is False and "context_panel" in turn
+    # nothing was written from the greeting
+    assert not (await sb.select("life_vision", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life"))
+
+
+@pytest.mark.asyncio
+async def test_converse_answers_writes_and_shows_updates():
+    sb = FakeSupabase({})
+    rm = _rm(sb)
+    turn = await rm.converse(CTX, "buy a house because we want to start a family", pending_key="primary_goal")
+    assert any("Objective added" in u for u in turn["updates"])  # visible learning (D2)
+    assert any("Recommendations refreshed" in u for u in turn["updates"])
+    assert "family stability" in turn["assistant_message"].lower()  # reflects the need behind the need (D4)
+    assert turn["pending_key"] and turn["pending_key"] != "primary_goal"  # advanced
+    # it actually wrote canonically
+    assert await sb.select("life_objectives", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
+
+
+@pytest.mark.asyncio
+async def test_converse_context_panel_reflects_model():
+    sb = FakeSupabase({})
+    rm = _rm(sb)
+    await rm.converse(CTX, "Retire by 60 and raise a family", pending_key="vision")
+    turn = await rm.converse(CTX, "reach financial independence", pending_key="financial_goal")
+    panel = turn["context_panel"]
+    assert panel["life_vision"] and panel["primary_objective"] and "discovery_completion_pct" in panel

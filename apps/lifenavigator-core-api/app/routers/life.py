@@ -76,3 +76,11 @@ async def discovery_answer(user: AuthenticatedUser = Depends(authenticated), svc
         return await svc.answer(_ctx(user), key, answer)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/discovery/chat")
+async def discovery_chat(user: AuthenticatedUser = Depends(authenticated), svc: RelationshipManager = Depends(get_relationship_manager),
+                         message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True)):
+    """Chat-native Relationship Manager: one advisor turn — answer the pending question (if any),
+    show what updated, reflect, and ask the next. The advisor IS the onboarding."""
+    return await svc.converse(_ctx(user), message, pending_key or None)

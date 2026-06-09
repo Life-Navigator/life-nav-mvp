@@ -153,3 +153,67 @@ class RelationshipManager:
         nxt = await self.state(ctx)
         return {"recorded": written, **nxt,
                 "note": "Saved to your canonical Life Model — your dashboard, recommendations, and advisor now reflect this."}
+
+    # ---- chat-native conversation (Sprint 41): the advisor IS the Relationship Manager ----
+    _WROTE_UPDATES = {
+        "life.life_vision": ["✓ Life Vision updated"],
+        "life.life_objectives + dependencies + graph edges": ["✓ Objective added", "✓ Dependencies mapped", "✓ Life Graph updated"],
+        "life.risk_profiles": ["✓ Risk profile updated"],
+        "life.constraints": ["✓ Constraint added"],
+        "life.life_vision.prompts.time_horizon": ["✓ Time horizon noted"],
+    }
+
+    async def _context_panel(self, ctx: UserContext) -> dict[str, Any]:
+        """The advisor's live view of the user — always reflects the current canonical model (D8)."""
+        try:
+            snap = await self._life.snapshot(ctx)
+            health = await self._life.discovery_health(ctx)
+        except Exception:  # noqa: BLE001
+            return {}
+        po = snap.get("primary_objective") or {}
+        return {"life_vision": snap.get("life_vision"), "primary_objective": po.get("title"),
+                "top_themes": snap.get("top_themes"), "top_risks": snap.get("top_risks"),
+                "top_constraints": [c["label"] for c in snap.get("active_constraints", [])],
+                "top_opportunities": snap.get("top_opportunities"),
+                "discovery_completion_pct": round((health.get("model_quality") or 0) * 100),
+                "covered_areas": health.get("covered_areas"), "missing_areas": health.get("missing_areas")}
+
+    async def converse(self, ctx: UserContext, message: str, pending_key: Optional[str] = None) -> dict[str, Any]:
+        """One advisor turn. If pending_key is set, the message answers it (write canonically + show
+        what updated); then reflect + ask the next question. Stateless — the caller threads pending_key."""
+        updates: list[str] = []
+        reflection = ""
+        if pending_key and message.strip():
+            res = await self.answer(ctx, pending_key, message)
+            rec = res.get("recorded", {})
+            updates = list(self._WROTE_UPDATES.get(rec.get("wrote", ""), []))
+            if updates:
+                updates += ["✓ Recommendations refreshed", "✓ Roadmap updated"]  # OS re-syncs on next read
+            # reflect the discovered need-behind-the-need (D4) when a goal produced a root objective
+            if rec.get("objective"):
+                reflection = f"Got it. The real objective behind that looks like **{rec['objective']}** — I've mapped what it depends on. "
+            elif rec.get("risk_behavior"):
+                reflection = f"Noted — your instinct is to **{rec['risk_behavior']}**, so I'll plan with that risk posture. "
+            else:
+                reflection = "Thanks — saved. "
+            st = res  # answer() already returns the advanced state
+        else:
+            st = await self.state(ctx)
+
+        nq = st.get("next_question")
+        if st.get("complete") or not nq:
+            assistant = (reflection + "That's everything I need to start. Your life model is built — "
+                         "head to your dashboard to see your readiness, roadmap, and first recommendations.")
+        else:
+            opener = "" if pending_key else "Let's build your plan together — I'll ask a few quick questions. "
+            assistant = f"{reflection}{opener}{nq['prompt']}"
+        panel = await self._context_panel(ctx)
+        return {
+            "assistant_message": assistant,
+            "pending_key": None if (st.get("complete") or not nq) else nq["key"],
+            "options": (nq or {}).get("options"),
+            "updates": updates,
+            "progress": st.get("progress"),
+            "complete": st.get("complete", False),
+            "context_panel": panel,
+        }
