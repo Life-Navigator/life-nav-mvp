@@ -19,6 +19,7 @@ _NS = uuid.UUID("6f3b1e22-0000-4000-8000-00000000000c")
 _PRIORITY_W = {"high": 1.0, "medium": 0.6, "low": 0.3}
 _EFFORT_PEN = {"low": 0.0, "medium": 0.1, "high": 0.25}
 _CONF_FLOOR = 0.25  # below this a recommendation cannot rank (renders as "needs more information")
+_EFFORT_MAP = {"low": 0.2, "medium": 0.5, "high": 0.8}
 REC_TYPES = {"ACTION", "RISK", "OPPORTUNITY", "DEPENDENCY", "INFORMATION"}
 LIFECYCLE = {"new", "viewed", "accepted", "in_progress", "deferred", "completed", "dismissed"}
 
@@ -52,7 +53,8 @@ class RecommendationOS:
                     evidence: Optional[list] = None, assumptions: Optional[list] = None,
                     impacted_domains: Optional[list] = None, readiness_impact: Optional[dict] = None,
                     current_state: str = "", target_state: str = "", delta_text: str = "",
-                    quantified_impact: Optional[dict] = None,
+                    quantified_impact: Optional[dict] = None, finding_key: str = "", finding_label: str = "",
+                    impact: Optional[float] = None, urgency: Optional[float] = None,
                     recommended_action: str = "", estimated_effort: str = "medium",
                     estimated_benefit: str = "", resource: str = "", time_sensitive: bool = False,
                     chat_visibility: bool = True, report_visibility: bool = True) -> Optional[str]:
@@ -64,6 +66,17 @@ class RecommendationOS:
         narrative = {"current": current_state or None, "target": target_state or None, "delta": delta_text or None,
                      "why": description or None, "expected_impact": quantified_impact or readiness_impact or {},
                      "confidence": confidence, "evidence": [e.get("statement") for e in ev], "action": recommended_action or None}
+        # Visible prioritization formula: Impact × Confidence × Urgency × Evidence ÷ Effort.
+        qi = quantified_impact or {}
+        impact_v = impact if impact is not None else min(1.0, abs(_num(qi.get("readiness_delta")) or 0) / 10 + (0.4 if qi.get("financial_impact_annual") else 0) + 0.2)
+        urgency_v = urgency if urgency is not None else (0.8 if time_sensitive else 0.5)
+        ev_strength = min(1.0, len(ev) * 0.3 + (0.4 if any("documents:" in str(e.get("source_table", "")) for e in ev) else 0.2))
+        effort_v = _EFFORT_MAP.get(estimated_effort, 0.5)
+        conf_v = _num(confidence) or 0.5
+        priority_score = round(impact_v * conf_v * urgency_v * ev_strength / max(0.1, effort_v), 4)
+        formula = {"impact": round(impact_v, 2), "confidence": round(conf_v, 2), "urgency": round(urgency_v, 2),
+                   "evidence_strength": round(ev_strength, 2), "effort": round(effort_v, 2), "priority_score": priority_score,
+                   "formula": "Impact × Confidence × Urgency × Evidence ÷ Effort"}
         row = {
             "id": rid, "user_id": ctx.user_id, "tenant_id": ctx.user_id, "title": title, "rec_type": rec_type,
             "description": description, "category": category, "source_module": source_module,
@@ -71,7 +84,9 @@ class RecommendationOS:
             "assumptions": assumptions or [], "impacted_domains": impacted_domains or [],
             "readiness_impact": {**(readiness_impact or {}), "resource": resource, "time_sensitive": time_sensitive},
             "current_state": current_state or None, "target_state": target_state or None, "delta_text": delta_text or None,
-            "quantified_impact": quantified_impact or {}, "narrative": narrative,
+            "quantified_impact": qi, "narrative": narrative,
+            "finding_key": finding_key or f"{source_module}:{title[:40]}", "finding_label": finding_label or title,
+            "formula": formula, "rank_score": priority_score,
             "recommended_action": recommended_action, "estimated_effort": estimated_effort,
             "estimated_benefit": estimated_benefit, "chat_visibility": chat_visibility,
             "report_visibility": report_visibility, "updated_at": _now(),
@@ -85,6 +100,9 @@ class RecommendationOS:
             r.setdefault("status", "new")
             r.setdefault("chat_visibility", True)
             r.setdefault("report_visibility", True)
+            r.setdefault("rec_type", "ACTION")
+            r.setdefault("formula", {})
+            r.setdefault("finding_key", r["id"])
         rows = [r for r in rows if r.get("status") not in ("dismissed", "completed")]
         if only_visible_to == "chat":
             rows = [r for r in rows if r.get("chat_visibility", True)]
@@ -135,7 +153,7 @@ class RecommendationOS:
                     fin_before = round(prog.get("finance", 50))
                     fin_after = min(100, fin_before + 5)
                     await emit(rec_type="ACTION", source_module="comp_benefits", category="finance", priority="high", confidence=0.9,
-                               title=f"Increase your 401(k) from {rate:.0f}% to {match:.0f}%",
+                               title=f"Increase your 401(k) from {rate:.0f}% to {match:.0f}%", finding_key="retirement_contribution", finding_label="401(k) contribution rate",
                                description=f"Your employer matches up to {match:.0f}% — you're leaving ${uncaptured:,.0f}/yr on the table.",
                                current_state=f"{rate:.0f}%", target_state=f"{match:.0f}%", delta_text=f"+{match - rate:.0f}%",
                                recommended_action=f"Raise your 401(k) contribution to {match:.0f}% to capture the full employer match.",
@@ -168,7 +186,7 @@ class RecommendationOS:
         if coverage is not None and need is not None and gap and gap > 0:
             fam_before = round(prog.get("family", 50))
             await emit(rec_type="RISK", source_module="family_office", category="family", priority="high", confidence=0.7,
-                       title=f"Life coverage is ${gap:,.0f} below your protection target",
+                       title=f"Life coverage is ${gap:,.0f} below your protection target", finding_key="protection_gap", finding_label="Life-insurance protection gap",
                        description=f"If you died today, your survivors would be ${gap:,.0f} short of replacing your income.",
                        current_state=f"${coverage:,.0f}", target_state=f"${need:,.0f}", delta_text=f"+${gap:,.0f}",
                        recommended_action=f"Increase term life coverage to ${need:,.0f} (≈10× income).",
@@ -187,7 +205,7 @@ class RecommendationOS:
             missing = est.get("missing") or []
             if missing:
                 await emit(rec_type="DEPENDENCY", source_module="family_office", category="family", priority="high" if est.get("status") == "red" else "medium", confidence=0.6,
-                           title=f"Complete your estate documents: {', '.join(missing[:3])}",
+                           title=f"Complete your estate documents: {', '.join(missing[:3])}", finding_key="estate_documents", finding_label="Estate documents",
                            description="These documents direct who makes decisions and inherits if something happens to you.",
                            current_state=f"{len(est.get('in_place', []))}/4 in place", target_state="4/4 in place", delta_text=f"+{len(missing)} documents",
                            recommended_action="Work with an estate attorney to create the missing documents (this is not legal advice).",
@@ -232,64 +250,134 @@ class RecommendationOS:
         await self._rank(ctx)
         return {"written": len(written), "by_source": sources}
 
-    # ---- prioritization: ONE answer to "what should I do first?" ----
+    # ---- prioritization: ONE answer, via the visible formula ----
     @staticmethod
     def _score(r: dict[str, Any]) -> float:
-        pw = _PRIORITY_W.get(r.get("priority", "medium"), 0.6)
-        conf = _num(r.get("confidence")) or 0.5
-        ev = len(r.get("evidence") or [])
-        effort = _EFFORT_PEN.get(r.get("estimated_effort", "medium"), 0.1)
-        ts = 0.15 if (r.get("readiness_impact") or {}).get("time_sensitive") else 0.0
-        return round(pw * 0.45 + conf * 0.30 + min(ev, 3) / 3 * 0.10 + ts - effort + 0.0, 4)
+        # Priority = Impact × Confidence × Urgency × Evidence ÷ Effort (computed at write, stored).
+        f = r.get("formula") or {}
+        if "priority_score" in f:
+            return float(f["priority_score"])
+        return float(r.get("rank_score") or 0.0)
+
+    @staticmethod
+    def _dedup_by_finding(recs: list[dict]) -> tuple[list[dict], list[dict]]:
+        """Collapse recommendations that address the SAME finding into one (highest score wins),
+        merging impacted domains. Returns (deduped, collapsed-away)."""
+        by_finding: dict[str, list[dict]] = {}
+        for r in recs:
+            by_finding.setdefault(r.get("finding_key") or r["id"], []).append(r)
+        kept, collapsed = [], []
+        for group in by_finding.values():
+            group.sort(key=RecommendationOS._score, reverse=True)
+            primary = group[0]
+            if len(group) > 1:
+                domains = list({d for g in group for d in (g.get("impacted_domains") or [])})
+                primary = {**primary, "impacted_domains": domains,
+                           "merged_from": [g["source_module"] for g in group[1:]]}
+                collapsed.extend(group[1:])
+            kept.append(primary)
+        return kept, collapsed
 
     async def _rank(self, ctx: UserContext) -> None:
         recs = await self.active(ctx)
         for r in recs:
             await self._sb.update("recommendations", {"rank_score": self._score(r)}, filters={"id": f"eq.{r['id']}"}, schema=RECOS)
 
-    async def prioritize(self, ctx: UserContext, top: int = 3) -> dict[str, Any]:
-        recs = await self.active(ctx)
-        # Confidence floor (Sprint 27): a < 0.25-confidence rec can never rank — it renders as
-        # "needs more information", not a top action. DEPENDENCY/INFORMATION never rank as actions.
+    def _rankable(self, recs: list[dict]) -> tuple[list[dict], list[dict]]:
         rankable = [r for r in recs if _num(r.get("confidence")) is not None and (_num(r.get("confidence")) or 0) >= _CONF_FLOOR
                     and r.get("rec_type") not in ("DEPENDENCY", "INFORMATION")]
         needs_info = [r for r in recs if r not in rankable]
-        ranked = sorted(rankable, key=self._score, reverse=True)
+        deduped, _ = self._dedup_by_finding(rankable)
+        return sorted(deduped, key=self._score, reverse=True), needs_info
 
-        def shape(r: dict) -> dict:
-            return {
-                "id": r["id"], "title": r["title"], "rec_type": r.get("rec_type", "ACTION"), "category": r["category"],
-                "source_module": r["source_module"], "priority": r["priority"], "confidence": r.get("confidence"),
-                "rank_score": self._score(r), "current_state": r.get("current_state"), "target_state": r.get("target_state"),
-                "delta": r.get("delta_text"), "quantified_impact": r.get("quantified_impact") or {},
-                "why": r.get("description") or (r.get("evidence") or [{}])[0].get("statement", ""),
-                "recommended_action": r.get("recommended_action"),
-                "expected_benefit": r.get("estimated_benefit") or (r.get("quantified_impact") or {}).get("description"),
-                "narrative": r.get("narrative") or {}, "evidence": r.get("evidence"), "impacted_domains": r.get("impacted_domains"),
-            }
-        return {"total": len(recs), "top_actions": [shape(r) for r in ranked[:top]],
+    def _shape(self, r: dict) -> dict:
+        return {
+            "id": r["id"], "title": r["title"], "rec_type": r.get("rec_type", "ACTION"), "category": r["category"],
+            "source_module": r["source_module"], "priority": r["priority"], "confidence": r.get("confidence"),
+            "rank_score": self._score(r), "formula": r.get("formula") or {}, "finding": r.get("finding_label"),
+            "current_state": r.get("current_state"), "target_state": r.get("target_state"), "delta": r.get("delta_text"),
+            "quantified_impact": r.get("quantified_impact") or {},
+            "why": r.get("description") or (r.get("evidence") or [{}])[0].get("statement", ""),
+            "recommended_action": r.get("recommended_action"),
+            "expected_benefit": r.get("estimated_benefit") or (r.get("quantified_impact") or {}).get("description"),
+            "narrative": r.get("narrative") or {}, "evidence": r.get("evidence"),
+            "impacted_domains": r.get("impacted_domains"), "merged_from": r.get("merged_from"),
+        }
+
+    @staticmethod
+    def _why_first(ranked: list[dict]) -> dict[str, Any]:
+        """Explain why #1 beat #2 / #3, naming the formula factor that decided it."""
+        if not ranked:
+            return {}
+        first = ranked[0]
+        ff = first.get("formula") or {}
+        out: dict[str, Any] = {"why_number_one": f"Highest priority score ({ff.get('priority_score')}) — "
+                               f"impact {ff.get('impact')} × confidence {ff.get('confidence')} × urgency {ff.get('urgency')} "
+                               f"× evidence {ff.get('evidence_strength')} ÷ effort {ff.get('effort')}."}
+        comparisons = []
+        for other in ranked[1:3]:
+            of = other.get("formula") or {}
+            factor = max(("impact", "confidence", "urgency", "evidence_strength"),
+                         key=lambda k: (ff.get(k, 0) or 0) - (of.get(k, 0) or 0))
+            comparisons.append({"over": other["title"], "reason": f"higher {factor.replace('_', ' ')} "
+                                f"({ff.get(factor)} vs {of.get(factor)})"})
+        out["ranked_above"] = comparisons
+        return out
+
+    async def prioritize(self, ctx: UserContext, top: int = 3) -> dict[str, Any]:
+        recs = await self.active(ctx)
+        ranked, needs_info = self._rankable(recs)
+        return {"total": len(recs), "deduped_total": len(ranked),
+                "top_actions": [self._shape(r) for r in ranked[:top]],
+                "why_ranking": self._why_first(ranked),
                 "needs_more_information": [{"id": r["id"], "title": r["title"], "rec_type": r.get("rec_type"),
                                             "why": r.get("description") or r.get("recommended_action")} for r in needs_info[:5]],
-                "conflicts": await self.conflicts(ctx, rankable),
+                "conflicts": self._conflicts(ranked),
                 "note": "One prioritized answer for the whole platform — the dashboard, chat, reports, and graph read this same list."}
 
-    # ---- conflict engine: competing actions on the same resource ----
+    # ---- roadmap: Now / Next / Later (an execution sequence, not a list) ----
+    async def roadmap(self, ctx: UserContext) -> dict[str, Any]:
+        recs = await self.active(ctx)
+        ranked, needs_info = self._rankable(recs)
+        # Now = the single highest-leverage action with no blocking dependency; Next = the rest of
+        # the top tier; Later = lower-priority. DEPENDENCIES that block actions surface as blockers.
+        blockers = [r for r in needs_info if r.get("rec_type") == "DEPENDENCY"]
+        now = ranked[:1]
+        nxt = ranked[1:3]
+        later = ranked[3:]
+        return {
+            "now": [self._shape(r) for r in now],
+            "next": [self._shape(r) for r in nxt],
+            "later": [self._shape(r) for r in later],
+            "blocked_by": [{"id": b["id"], "title": b["title"], "why": "Upload to unlock more precise recommendations."} for b in blockers[:3]],
+            "conflicts": self._conflicts(ranked),
+            "why_now": self._why_first(ranked).get("why_number_one"),
+            "note": "Your execution roadmap — do Now first, then Next, then Later.",
+        }
+
+    # ---- conflict engine: money / time / dependency / goal conflicts + a sequence ----
     async def conflicts(self, ctx: UserContext, recs: Optional[list] = None) -> list[dict[str, Any]]:
         recs = recs if recs is not None else await self.active(ctx)
+        return self._conflicts(recs)
+
+    def _conflicts(self, recs: list[dict]) -> list[dict[str, Any]]:
+        out: list[dict[str, Any]] = []
+        # MONEY: multiple recs claiming the same finite resource (e.g. savings_dollars).
         by_resource: dict[str, list[dict]] = {}
         for r in recs:
             res = (r.get("readiness_impact") or {}).get("resource") or ""
             if res:
                 by_resource.setdefault(res, []).append(r)
-        out = []
         for res, group in by_resource.items():
             competing = [g for g in group if g.get("priority") in ("high", "medium")]
             if len(competing) >= 2:
                 seq = sorted(competing, key=self._score, reverse=True)
+                kind = "money" if res in ("savings_dollars", "insurance") else "time"
                 out.append({
-                    "resource": res, "reason": f"{len(competing)} recommendations compete for the same {res.replace('_', ' ')}.",
-                    "competing": [{"title": g["title"], "source": g["source_module"], "priority": g["priority"]} for g in competing],
-                    "tradeoff": "These can't all be funded/done at once.",
+                    "type": kind, "resource": res,
+                    "reason": f"{len(competing)} recommendations compete for the same {res.replace('_', ' ')}.",
+                    "competing": [{"title": g["title"], "priority": g["priority"], "score": self._score(g)} for g in competing],
+                    "tradeoff": "They can't all be funded/done at once — sequence them.",
                     "suggested_sequence": [g["title"] for g in seq],
                 })
         return out

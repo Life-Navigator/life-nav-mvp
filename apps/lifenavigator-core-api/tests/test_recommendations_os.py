@@ -168,3 +168,60 @@ async def test_quantified_fields_persisted_and_surfaced():
     assert a["current_state"] == "6%" and a["target_state"] == "10%" and a["delta"] == "+4%"
     assert a["quantified_impact"]["financial_impact_annual"] == 4800
     assert a["rec_type"] == "ACTION" and a["narrative"]["current"] == "6%"
+
+
+# ---- Sprint 28: dedup + formula + roadmap ----
+@pytest.mark.asyncio
+async def test_dedup_collapses_same_finding():
+    os = _os()
+    ev = [{"statement": "$1M protection gap", "source_table": "documents:life_insurance_policy"}]
+    # three modules surface the SAME underlying finding -> must collapse to one
+    await os.write(CTX, title="Family gap", source_module="readiness:family", category="family", finding_key="protection_gap", confidence=0.6, evidence=ev, impacted_domains=["family"])
+    await os.write(CTX, title="Survivor gap", source_module="family_office", category="family", finding_key="protection_gap", confidence=0.7, evidence=ev, impacted_domains=["family", "survivor"])
+    await os.write(CTX, title="Legacy gap", source_module="family_office", rec_type="RISK", category="family", finding_key="protection_gap", confidence=0.65, evidence=ev, impacted_domains=["legacy"])
+    p = await os.prioritize(CTX, top=10)
+    protection = [a for a in p["top_actions"] if a.get("finding") or a["title"] in ("Family gap", "Survivor gap", "Legacy gap")]
+    assert len(protection) == 1  # collapsed to ONE
+    assert set(protection[0]["impacted_domains"]) >= {"family", "survivor", "legacy"}  # impacts merged
+    assert p["deduped_total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_formula_inputs_are_visible():
+    os = _os()
+    await os.write(CTX, title="Increase 401k", source_module="comp", category="finance", confidence=0.9, estimated_effort="low",
+                   quantified_impact={"readiness_delta": 6, "financial_impact_annual": 5000},
+                   evidence=[{"statement": "match", "source_table": "documents:401k_statement"}])
+    a = (await os.prioritize(CTX, top=1))["top_actions"][0]
+    f = a["formula"]
+    for k in ("impact", "confidence", "urgency", "evidence_strength", "effort", "priority_score"):
+        assert k in f
+    assert f["formula"] == "Impact × Confidence × Urgency × Evidence ÷ Effort"
+
+
+@pytest.mark.asyncio
+async def test_roadmap_now_next_later_and_why():
+    os = _os()
+    ev = [{"statement": "e", "source_table": "documents:d"}]
+    await os.write(CTX, title="A big win", source_module="m1", category="finance", confidence=0.9, estimated_effort="low",
+                   quantified_impact={"readiness_delta": 8, "financial_impact_annual": 6000}, evidence=ev)
+    await os.write(CTX, title="B medium", source_module="m2", category="finance", confidence=0.7, estimated_effort="medium", evidence=ev)
+    await os.write(CTX, title="C smaller", source_module="m3", category="health", confidence=0.5, estimated_effort="high", evidence=ev)
+    await os.write(CTX, title="D later", source_module="m4", category="career", confidence=0.4, estimated_effort="high", evidence=ev)
+    rm = await os.roadmap(CTX)
+    assert len(rm["now"]) == 1 and rm["now"][0]["title"] == "A big win"  # single highest-leverage
+    assert len(rm["next"]) <= 2 and rm["later"]  # Next then Later
+    assert rm["why_now"]  # explains the #1
+
+
+@pytest.mark.asyncio
+async def test_why_ranking_explains_number_one():
+    os = _os()
+    ev = [{"statement": "e", "source_table": "documents:d"}]
+    await os.write(CTX, title="Top", source_module="m1", category="finance", confidence=0.95, estimated_effort="low",
+                   quantified_impact={"readiness_delta": 9, "financial_impact_annual": 8000}, evidence=ev)
+    await os.write(CTX, title="Second", source_module="m2", category="finance", confidence=0.6, estimated_effort="high", evidence=ev)
+    p = await os.prioritize(CTX, top=3)
+    wr = p["why_ranking"]
+    assert "why_number_one" in wr and wr["ranked_above"]
+    assert wr["ranked_above"][0]["over"] == "Second"
