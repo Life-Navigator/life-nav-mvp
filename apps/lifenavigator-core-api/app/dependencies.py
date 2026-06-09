@@ -38,6 +38,7 @@ from .services.decision_engine import DecisionEngine
 from .services.decision_graph import DecisionGraphService
 from .services.decision_workspace import DecisionWorkspaceService
 from .services.documents import DocumentIntelligenceService
+from .services.life_discovery import LifeDiscoveryService
 from .services.readiness import LifeReadinessEngine
 from .services.recommendations_os import RecommendationOS
 from .services.sharing import ShareService
@@ -239,6 +240,10 @@ def get_platform_access(
     settings: Settings = Depends(get_settings),
 ) -> PlatformAccess:
     return PlatformAccess(supabase=supabase, admin_emails=settings.admin_email_set())
+
+
+def get_life_discovery(supabase: SupabaseClient = Depends(get_supabase)) -> LifeDiscoveryService:
+    return LifeDiscoveryService(supabase)
 
 
 def get_recommendation_os(

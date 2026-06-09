@@ -137,7 +137,11 @@ class RecommendationOS:
             except Exception:  # noqa: BLE001
                 idx = ""
         evs = await self._sb.select("recommendation_events", columns="event", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1000, schema=RECOS)
-        return _hash(f"{sig_docs}#idx={idx}#events={len(evs)}")
+        try:  # life objectives change recommendations too (onboarding -> recs, no upload needed)
+            objs = await self._sb.select("life_objectives", columns="id", filters={"user_id": f"eq.{ctx.user_id}"}, limit=100, schema="life")
+        except Exception:  # noqa: BLE001
+            objs = []
+        return _hash(f"{sig_docs}#idx={idx}#events={len(evs)}#objs={len(objs)}")
 
     async def ensure_fresh(self, ctx: UserContext) -> bool:
         """If the input signature changed since last sync, re-sync. Returns True if it re-synced.
@@ -373,6 +377,41 @@ class RecommendationOS:
                                resource="benefits_time",
                                evidence=gi.get("evidence") or [{"statement": "GI Bill eligible (honorable discharge); entitlement not on file", "source_table": "documents:dd214"}],
                                impacted_domains=["finance", "career", "education"])
+        # === 6) Life objectives (Sprint 33) — recommendations from onboarding, BEFORE any document ===
+        try:
+            objs = await self._sb.select("life_objectives", filters={"user_id": f"eq.{ctx.user_id}"}, limit=50, schema="life")
+        except Exception:  # noqa: BLE001
+            objs = []
+        if objs:
+            obj_by_id = {o["id"]: o for o in objs}
+            try:
+                ldeps = await self._sb.select("dependencies", filters={"user_id": f"eq.{ctx.user_id}"}, limit=200, schema="life")
+                lrisks = await self._sb.select("risks", filters={"user_id": f"eq.{ctx.user_id}"}, limit=100, schema="life")
+            except Exception:  # noqa: BLE001
+                ldeps, lrisks = [], []
+            for d in [x for x in ldeps if not x.get("satisfied")][:8]:
+                o = obj_by_id.get(d.get("objective_id"), {})
+                await emit(rec_type="DEPENDENCY", source_module="life:objective", category=d.get("domain") or "decision",
+                           priority="medium", confidence=0.5,
+                           title=f"To {str(o.get('title', 'reach your objective')).lower()}: {d['label']}",
+                           description=f"Your stated objective '{o.get('title')}' depends on this.",
+                           recommended_action=d.get("prompt") or f"Address: {d['label']}",
+                           finding_key=f"lifedep:{d['id']}", finding_label=d["label"],
+                           quantified_impact={"unlocked_capabilities": [f"progress toward {o.get('title')}"],
+                                              "expected_accuracy_gain": "confirming this turns a stated objective into a tracked, evidence-backed plan",
+                                              "priority_reason": "a life objective you told us about depends on it"},
+                           evidence=[{"statement": f"You told us your objective is '{o.get('title')}', which requires: {d['label']}", "source_table": "life:life_objectives"}],
+                           impacted_domains=[d["domain"]] if d.get("domain") else [])
+            for rk in lrisks[:4]:
+                o = obj_by_id.get(rk.get("objective_id"), {})
+                await emit(rec_type="RISK", source_module="life:objective", category=rk.get("domain") or "decision",
+                           priority="medium", confidence=0.5,
+                           title=rk["label"], description=f"This threatens your objective '{o.get('title')}'.",
+                           recommended_action="Review this risk against your plan.",
+                           finding_key=f"liferisk:{rk['id']}", finding_label=rk["label"],
+                           quantified_impact={"risk_reduction": f"protects '{o.get('title')}'"},
+                           evidence=[{"statement": f"Your objective '{o.get('title')}' is exposed to: {rk['label']}", "source_table": "life:risks"}],
+                           impacted_domains=[rk["domain"]] if rk.get("domain") else [])
         # NOTE: decision-confidence / counts are METRICS — deliberately NOT emitted as recommendations.
 
         # Invalidation (Sprint 29): a system 'new' rec NOT re-emitted this round is no longer
