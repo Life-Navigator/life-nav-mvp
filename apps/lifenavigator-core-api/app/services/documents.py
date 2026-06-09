@@ -70,8 +70,14 @@ TAXONOMY: dict[str, T] = {
     "va_award_letter": T("military", "VA Award Letter", {"disability_rating": "percent", "monthly_benefit": "money", "effective_date": "date"}, ["finance", "health"], True),
     "military_retirement_statement": T("military", "Military Retirement Statement", {"monthly_pension": "money", "retirement_date": "date"}, ["finance"]),
     "les": T("military", "Leave & Earnings Statement (LES)", {"base_pay": "money", "bah": "money", "bas": "money", "net_pay": "money"}, ["finance", "career"]),
+    # Health (Sprint 19) — clinical documents. Values are recorded/displayed only; never diagnosed.
+    "lab_report": T("health", "Lab Report", {"total_cholesterol": "number", "hdl": "number", "ldl": "number", "triglycerides": "number", "glucose": "number", "a1c": "number", "vitamin_d": "number", "tsh": "number"}, ["health"], True),
+    "supplement_list": T("health", "Supplement List", {"supplements": "text"}, ["health"]),
+    "medication_list": T("health", "Medication List", {"medications": "text"}, ["health"]),
+    "fitness_plan": T("health", "Fitness Plan", {"weekly_workouts": "number", "goal": "text", "target_weight": "number"}, ["health"]),
+    "nutrition_log": T("health", "Nutrition Log", {"daily_calories": "number", "protein_g": "number", "carbs_g": "number", "fat_g": "number"}, ["health"]),
 }
-CATEGORIES = ("employment", "benefits", "insurance", "financial", "education", "family_office", "military")
+CATEGORIES = ("employment", "benefits", "insurance", "financial", "education", "family_office", "military", "health")
 # Synonyms so labels in real documents resolve to canonical field keys.
 _SYNONYMS = {
     "base_salary": ["base salary", "annual salary", "base pay", "salary"], "signing_bonus": ["signing bonus", "sign-on bonus"],
@@ -81,6 +87,11 @@ _SYNONYMS = {
     "total_value": ["total value", "account value", "portfolio value"], "monthly_benefit": ["monthly benefit", "monthly payment"],
     "premium": ["premium", "monthly premium"], "deductible": ["deductible"], "disability_rating": ["disability rating", "combined rating"],
     "net_cost": ["net cost", "net price"], "grants": ["grants", "gift aid"], "loans": ["loans", "loan"],
+    # health lab markers
+    "total_cholesterol": ["total cholesterol", "cholesterol total", "cholesterol"], "hdl": ["hdl", "hdl cholesterol"],
+    "ldl": ["ldl", "ldl cholesterol"], "triglycerides": ["triglycerides", "trig"], "glucose": ["glucose", "fasting glucose"],
+    "a1c": ["a1c", "hba1c", "hemoglobin a1c"], "vitamin_d": ["vitamin d", "25-hydroxyvitamin d", "25-oh vitamin d"],
+    "tsh": ["tsh", "thyroid stimulating hormone"], "supplements": ["supplements", "supplement"], "medications": ["medications", "medication", "meds"],
 }
 _MONEY = re.compile(r"\$?\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)")
 _PCT = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s?%")
@@ -131,7 +142,7 @@ class DocumentExtractor:
                 if m:
                     return m.group(0), 0.85
             elif ftype == "number":
-                m = re.search(r"([0-9][0-9,]*)", window[len(label):])
+                m = re.search(r"([0-9][0-9,]*(?:\.[0-9]+)?)", window[len(label):])  # allow decimals (e.g. A1C 5.4)
                 if m:
                     return m.group(1).replace(",", ""), 0.8
             else:  # text — take the rest of the line after a colon

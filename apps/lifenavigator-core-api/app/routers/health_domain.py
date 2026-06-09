@@ -13,7 +13,7 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_health_service
+from ..dependencies import authenticated, get_health_intelligence, get_health_service
 from ..domains.health import HealthService
 from ..models.common import DomainViewModel, UserContext, WriteResult
 from ..services.medical_safety import MedicalSafetyGate
@@ -111,3 +111,10 @@ async def safety_check(payload: dict[str, Any] = Body(default_factory=dict), use
         "message": decision.message,
         "boundary": decision.boundary,
     }
+
+
+@router.get("/intelligence")
+async def health_intelligence(user: AuthenticatedUser = Depends(authenticated), svc=Depends(get_health_intelligence)):
+    """Health Intelligence: labs vs reference ranges + supplements + medications + fitness +
+    nutrition, from uploaded health documents. Not medical advice."""
+    return await svc.assess(_ctx(user))

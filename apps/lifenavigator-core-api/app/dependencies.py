@@ -32,6 +32,7 @@ from .services.comp_benefits import CompensationBenefitsEngine
 from .services.compensation import CompensationIntelligenceEngine
 from .services.family_office import FamilyOfficeService
 from .services.financial_planning import FinancialPlanningEngine
+from .services.health_intelligence import HealthIntelligenceService
 from .services.decision_engine import DecisionEngine
 from .services.decision_graph import DecisionGraphService
 from .services.decision_workspace import DecisionWorkspaceService
@@ -218,6 +219,10 @@ def get_family_office(
     family: FamilyService = Depends(get_family_service),
 ) -> FamilyOfficeService:
     return FamilyOfficeService(supabase=supabase, family_service=family, comp_benefits=CompensationBenefitsEngine(supabase))
+
+
+def get_health_intelligence(supabase: SupabaseClient = Depends(get_supabase)) -> HealthIntelligenceService:
+    return HealthIntelligenceService(supabase=supabase)
 
 
 def get_retriever(
