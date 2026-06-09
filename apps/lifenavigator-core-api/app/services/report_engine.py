@@ -80,15 +80,25 @@ def _rec_refs(recs: list[Any]) -> list[RecommendationReference]:
 
 
 class UniversalReportEngine:
-    def __init__(self, domains: dict[str, DomainService], education: EducationService, supabase: SupabaseClient, trends: Any = None, comp_benefits: Any = None) -> None:
+    def __init__(self, domains: dict[str, DomainService], education: EducationService, supabase: SupabaseClient, trends: Any = None, comp_benefits: Any = None, reco_os: Any = None) -> None:
         self._domains = domains
         self._edu = education
         self._sb = supabase
         self._trends = trends  # optional TrendAnalyzer — adds a finance progress-over-time section
         self._comp = comp_benefits  # optional CompensationBenefitsEngine — the compensation report
+        self._os = reco_os  # the Recommendation OS — reports show the SAME recommendations as the dashboard
 
     # ---- build (generate_report) ----
     async def build(self, ctx: UserContext, report_type: str) -> ReportDefinition:
+        definition = await self._build(ctx, report_type)
+        # Sprint 26: every report's recommendations come from the ONE Recommendation OS.
+        if self._os is not None:
+            sec = await self._os_recommendations_section(ctx, len(definition.sections) + 1)
+            if sec:
+                definition.sections.append(sec)
+        return definition
+
+    async def _build(self, ctx: UserContext, report_type: str) -> ReportDefinition:
         if report_type == "financial":
             return await self._domain_report(ctx, "finance", "Financial Report")
         if report_type == "family":
@@ -102,6 +112,23 @@ class UniversalReportEngine:
         if report_type == "compensation":
             return await self._compensation_report(ctx)
         raise ValueError(f"unknown report_type {report_type}")
+
+    async def _os_recommendations_section(self, ctx: UserContext, ord_n: int) -> Optional[ReportSection]:
+        try:
+            pri = await self._os.prioritize(ctx, top=5)
+        except Exception:  # noqa: BLE001
+            return None
+        actions = pri.get("top_actions") or []
+        if not actions:
+            return None
+        return ReportSection(
+            key="prioritized_recommendations", title="Your Prioritized Next Steps", ord=ord_n,
+            body={"recommendations": [{"title": a["title"], "why": a.get("why"), "action": a.get("recommended_action"),
+                                       "priority": a.get("priority"), "confidence": a.get("confidence"),
+                                       "expected_benefit": a.get("expected_benefit"), "source": a.get("source_module")}
+                                      for a in actions]},
+            recommendations=[RecommendationReference(id=a["id"], title=a["title"], priority=a.get("priority")) for a in actions],
+            evidence=[EvidenceReference(metric_name=a["title"], metric_value="", source_table=a.get("source_module", "recommendation_os")) for a in actions])
 
     async def _compensation_report(self, ctx: UserContext) -> ReportDefinition:
         if self._comp is None:

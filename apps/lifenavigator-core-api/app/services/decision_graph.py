@@ -34,10 +34,11 @@ def _money(v: Any) -> Optional[str]:
 
 
 class DecisionGraphService:
-    def __init__(self, workspace: Any, comp_benefits: Any, supabase: Any) -> None:
+    def __init__(self, workspace: Any, comp_benefits: Any, supabase: Any, reco_os: Any = None) -> None:
         self._ws = workspace
         self._comp = comp_benefits
         self._sb = supabase
+        self._os = reco_os  # the Recommendation OS — its recommendations are first-class graph nodes
 
     async def build(self, ctx: UserContext, decision_type: str) -> dict[str, Any]:
         ws = await self._ws.create(ctx, decision_type, persist=False)
@@ -160,6 +161,23 @@ class DecisionGraphService:
                   detail={"Current index": ri["current_index"], "Projected index": ri["projected_index"],
                           "Change": ri["index_delta"], "Per-domain": ri["domain_deltas"], "note": ri["note"]})
         edge(rec, rd)
+
+        # Sprint 26: the platform's prioritized recommendations are first-class graph nodes.
+        if self._os is not None:
+            try:
+                pri = await self._os.prioritize(ctx, top=5)
+            except Exception:  # noqa: BLE001
+                pri = {"top_actions": []}
+            for i, a in enumerate(pri.get("top_actions", [])):
+                pr = node(f"os_rec:{i}", "recommendation", a["title"][:48], PURPLE, 4,
+                          subtitle=f"{a.get('source_module', '')} · conf {round((a.get('confidence') or 0) * 100)}%",
+                          detail={"Why it was recommended": a.get("why"), "Recommended action": a.get("recommended_action"),
+                                  "Priority": a.get("priority"), "Confidence": a.get("confidence"),
+                                  "Expected benefit": a.get("expected_benefit"), "Source": a.get("source_module")})
+                # Document → Evidence → Finding → Recommendation → Priority → Readiness chain
+                for aid in analysis_ids:
+                    edge(aid, pr)
+                edge(pr, rd)
 
         return {
             "decision_type": decision_type, "label": ws["label"], "question": ws["question"],

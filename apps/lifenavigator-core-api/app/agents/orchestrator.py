@@ -81,17 +81,36 @@ class LifeOrchestratorAgent:
         gemini: GeminiClient,
         trust_safety: TrustSafetyAgent,
         memory: MemoryAgent,
+        recommendation_os: object | None = None,
     ) -> None:
         self._ctx_builder = context_builder
         self._gemini = gemini
         self._trust_safety = trust_safety
         self._memory = memory
         self._medical = MedicalSafetyGate()
+        self._os = recommendation_os  # the Recommendation OS — chat reads the SAME spine as the dashboard
+
+    @staticmethod
+    def _is_next_action_query(q: str) -> bool:
+        ql = q.lower()
+        return any(p in ql for p in (
+            "what should i do next", "what do i do next", "next best", "what's my next", "what is my next",
+            "biggest risk", "what should i focus", "what to focus", "what should i prioriti", "top priority",
+            "what should i do first", "what now",
+        ))
 
     async def handle(
         self, ctx: UserContext, query: str, conversation_id: str | None = None
     ) -> ChatTurnResponse:
         intent, domains = _classify(query)
+
+        # Recommendation OS consumer (Sprint 26): "what should I do next / biggest risk / focus" is
+        # answered DIRECTLY from the spine — the same prioritized answer the dashboard shows. No
+        # separate reasoning, no model call; this guarantees chat == dashboard == inbox.
+        if self._os is not None and self._is_next_action_query(query):
+            os_resp = await self._answer_from_os(ctx, query, conversation_id)
+            if os_resp is not None:
+                return os_resp
 
         # Medical safety: for health queries, BLOCK diagnosis/dosing/treatment and
         # ESCALATE emergencies before any model call (HEALTH_GOVERNANCE_STANDARD).
@@ -180,6 +199,33 @@ class LifeOrchestratorAgent:
         for f in packet.authoritative_facts:
             lines.append(f"- {f.get('fact')}: {f.get('value')}")
         return "\n".join(lines) or "(none)"
+
+    async def _answer_from_os(self, ctx: UserContext, query: str, conversation_id: str | None) -> ChatTurnResponse | None:
+        """Answer next-action / risk / focus questions straight from the Recommendation OS."""
+        try:
+            pri = await self._os.prioritize(ctx, top=3)  # type: ignore[union-attr]
+        except Exception:  # noqa: BLE001
+            return None
+        actions = pri.get("top_actions") or []
+        if not actions:
+            return None
+        ql = query.lower()
+        if "focus" in ql or "month" in ql:
+            top = actions[: min(3, len(actions))]
+            body = "Here's what to focus on, in priority order:\n\n" + "\n".join(
+                f"{i + 1}. **{a['title']}** — {a.get('why', '')} (confidence {round((a.get('confidence') or 0) * 100)}%)"
+                for i, a in enumerate(top))
+        else:
+            a = actions[0]
+            label = "biggest risk to address" if "risk" in ql else "single most important next step"
+            body = (f"Your {label} right now: **{a['title']}**.\n\n"
+                    f"Why: {a.get('why', '')}\n\n"
+                    f"Recommended action: {a.get('recommended_action') or '—'}\n\n"
+                    f"_Confidence {round((a.get('confidence') or 0) * 100)}% · from {a['source_module']}. "
+                    f"This is the same prioritized answer you'll see on your dashboard._")
+        evidence = [{"fact": a["title"], "value": a.get("why", ""), "source": a.get("source_module")} for a in actions[:3]]
+        return ChatTurnResponse(message=body, grounded=True, used_gemini=False, evidence=evidence,
+                                conversation_id=conversation_id)
 
     def _insufficient_message(self, packet: EvidencePacket) -> str:
         missing = ", ".join(packet.missing_facts) or "your account data"

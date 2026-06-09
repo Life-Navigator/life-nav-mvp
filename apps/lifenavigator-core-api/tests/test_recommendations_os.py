@@ -87,3 +87,46 @@ async def test_invalid_status_rejected():
     rid = await os.write(CTX, title="R", source_module="m", category="finance", evidence=[{"statement": "e", "source_table": "d"}])
     with pytest.raises(ValueError):
         await os.set_status(CTX, rid, "banana")
+
+
+# ---- Sprint 26: consumer consistency (same OS top everywhere) ----
+@pytest.mark.asyncio
+async def test_chat_next_action_reads_the_same_os():
+    from app.agents.orchestrator import LifeOrchestratorAgent
+    sb = FakeSupabase({})
+    os_engine = RecommendationOS(sb)
+    await os_engine.write(CTX, title="Maximize your 401(k) match", source_module="comp_benefits", category="finance",
+                          priority="high", confidence=0.9, evidence=[{"statement": "Employer match $4,000/yr", "source_table": "documents:401k"}],
+                          recommended_action="Contribute to the full match", estimated_effort="low")
+    orch = LifeOrchestratorAgent(context_builder=None, gemini=None, trust_safety=None, memory=None, recommendation_os=os_engine)
+    assert orch._is_next_action_query("what should I do next?") is True
+    resp = await orch._answer_from_os(CTX, "what should I do next?", None)
+    pri = await os_engine.prioritize(CTX, top=1)
+    # chat's answer is the SAME top recommendation the OS prioritizes (== dashboard)
+    assert pri["top_actions"][0]["title"] in resp.message
+    assert resp.used_gemini is False and resp.grounded is True
+
+
+@pytest.mark.asyncio
+async def test_report_recommendations_come_from_os():
+    from app.domains.career import CareerService
+    from app.domains.education import EducationService
+    from app.domains.family import FamilyService
+    from app.domains.finance import FinanceService
+    from app.domains.health import HealthService
+    from app.services.compensation import CompensationIntelligenceEngine
+    from app.services.market_intelligence import MarketPositionAnalyzer
+    from app.services.report_engine import UniversalReportEngine
+    sb = FakeSupabase({"financial_accounts": [{"id": "a1", "account_type": "depository", "current_balance": 5000}]})
+    os_engine = RecommendationOS(sb)
+    await os_engine.write(CTX, title="Build your emergency fund", source_module="readiness:finance", category="finance",
+                          priority="high", confidence=0.7, evidence=[{"statement": "Low cash buffer", "source_table": "finance"}])
+    comp = CompensationIntelligenceEngine(sb)
+    domains = {"finance": FinanceService(supabase=sb), "health": HealthService(supabase=sb),
+               "career": CareerService(sb, comp, MarketPositionAnalyzer(sb)), "family": FamilyService(sb, comp)}
+    engine = UniversalReportEngine(domains=domains, education=EducationService(sb, comp), supabase=sb, reco_os=os_engine)
+    rpt = await engine.build(CTX, "financial")
+    sec = next((s for s in rpt.sections if s.key == "prioritized_recommendations"), None)
+    pri = await os_engine.prioritize(CTX, top=5)
+    assert sec is not None
+    assert sec.recommendations[0].id == pri["top_actions"][0]["id"]  # report == OS, no report-only recs
