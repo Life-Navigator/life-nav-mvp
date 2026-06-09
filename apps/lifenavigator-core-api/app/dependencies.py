@@ -319,7 +319,8 @@ def get_scenario_compare(
     readiness: LifeReadinessEngine = Depends(get_readiness_engine),
     life: LifeDiscoveryService = Depends(get_life_discovery),
 ) -> ScenarioComparisonEngine:
-    return ScenarioComparisonEngine(readiness=readiness, life=life, supabase=supabase)
+    return ScenarioComparisonEngine(readiness=readiness, life=life, supabase=supabase,
+                                    tools=ToolRunner(supabase), comp=CompensationBenefitsEngine(supabase))
 
 
 def get_decision_brain(

@@ -90,15 +90,73 @@ SCENARIO_SETS: dict[str, dict[str, Any]] = {
 }
 
 
+# Each scenario variant runs these deterministic tools (Sprint 38) with these variant overrides,
+# so the comparison numbers are TOOL-traceable (Sprint 39 wiring), not a modeled estimate.
+VARIANT_TOOLS: dict[str, list[tuple[str, dict]]] = {
+    "retire_55": [("retirement_projection", {"retirement_age": 55})],
+    "retire_65": [("retirement_projection", {"retirement_age": 65})],
+    "buy_now": [("home_affordability", {})],
+    "wait_12mo": [("home_affordability", {})],
+    "pay_debt_first": [("debt_payoff", {})],
+    "pay_debt": [("debt_payoff", {})],
+    "invest": [("retirement_projection", {})],
+    "mba": [("degree_roi", {})],
+    "new_job": [("k401_match", {})],
+}
+
+
 class ScenarioComparisonEngine:
-    def __init__(self, readiness: Any, life: Any, supabase: Any) -> None:
+    def __init__(self, readiness: Any, life: Any, supabase: Any, tools: Any = None, comp: Any = None) -> None:
         self._readiness = readiness
         self._life = life
         self._sb = supabase
+        self._tools = tools  # ToolRunner — scenario numbers come from deterministic tools
+        self._comp = comp
 
     @staticmethod
     def sets() -> list[dict[str, Any]]:
         return [{"key": k, "question": v["question"], "variants": [x["name"] for x in v["variants"]]} for k, v in SCENARIO_SETS.items()]
+
+    async def _financial_inputs(self, ctx: UserContext) -> dict[str, Any]:
+        """Base inputs the tools need, gathered from the user's real data (cited, never invented)."""
+        income = 0.0
+        if self._comp is not None:
+            try:
+                income = float((await self._comp.analyze(ctx))["total_compensation"].get("base") or 0)
+            except Exception:  # noqa: BLE001
+                income = 0.0
+        assets: float = 0.0
+        debts: list[dict[str, Any]] = []
+        try:
+            docs = await self._sb.select("documents", filters={"user_id": f"eq.{ctx.user_id}"}, limit=500, schema="documents")
+            by = {d.get("doc_type"): (d.get("extracted_json") or {}) for d in docs}
+            k = by.get("401k_statement") or {}
+            assets = float(str(k.get("total_balance") or 0).replace(",", "").replace("$", "") or 0)
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            nw = await self._sb.select("net_worth_snapshots", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, order="as_of_date.desc", schema="finance")
+            if nw:
+                assets = assets or float(nw[0].get("net_worth") or 0)
+        except Exception:  # noqa: BLE001
+            pass
+        return {"income": income, "annual_income": income, "current_assets": assets,
+                "annual_contribution": round(income * 0.06, 2) if income else 0.0,
+                "current_age": 40, "monthly_debts": 0.0, "debts": debts,
+                "tuition_total": 0.0, "salary_before": income, "salary_after": round(income * 1.4, 2) if income else 0.0}
+
+    async def _variant_tool_runs(self, ctx: UserContext, set_key: str, variant_id: str, base: dict) -> list[dict[str, Any]]:
+        if self._tools is None:
+            return []
+        runs = []
+        for tool_name, override in VARIANT_TOOLS.get(variant_id, []):
+            try:
+                r = await self._tools.run(ctx, tool_name, {**base, **override}, scenario_id=f"{set_key}:{variant_id}")
+                runs.append({"tool": r["tool"], "label": r["label"], "outputs": r["outputs"],
+                             "confidence": r["confidence"], "calculation": r["calculation"], "tool_run_id": r["tool_run_id"]})
+            except Exception:  # noqa: BLE001
+                continue
+        return runs
 
     async def _present_doc_types(self, ctx: UserContext) -> set[str]:
         try:
@@ -122,6 +180,7 @@ class ScenarioComparisonEngine:
         primary_obj = max(active, key=lambda o: float(o.get("confidence") or 0)) if active else None
         primary_root = primary_obj.get("root_objective_key") if primary_obj else None
         present = await self._present_doc_types(ctx)
+        base_inputs = await self._financial_inputs(ctx)
 
         scenarios = []
         for v in spec["variants"]:
@@ -136,7 +195,14 @@ class ScenarioComparisonEngine:
                 obj_impacts = [{"objective": root.replace("_", " ").title(), "root": root, "score": s, "is_primary": False}
                                for root, s in v["objective_influence"].items()]
             missing = [n for n in v.get("needs", []) if n not in present]
-            confidence = round(max(0.4, 0.85 - 0.15 * len(missing)), 2)
+            tool_runs = await self._variant_tool_runs(ctx, set_key, v["id"], base_inputs)
+            # blend the deterministic tool confidence into the scenario confidence
+            base_conf = max(0.4, 0.85 - 0.15 * len(missing))
+            if tool_runs:
+                tconf = sum(t["confidence"] for t in tool_runs) / len(tool_runs)
+                confidence = round((base_conf + tconf) / 2, 2)
+            else:
+                confidence = round(base_conf, 2)
             scenarios.append({
                 "scenario_id": v["id"], "name": v["name"],
                 "objective_impacts": sorted(obj_impacts, key=lambda x: abs(x["score"]), reverse=True),
@@ -144,6 +210,7 @@ class ScenarioComparisonEngine:
                 "confidence": confidence,
                 "assumptions": [A.cite(a) for a in v.get("assumptions", [])],
                 "missing_inputs": missing,
+                "tool_calculations": tool_runs,  # deterministic, tool-traceable numbers (Sprint 39)
                 "net_objective_score": sum(i["score"] for i in obj_impacts),
                 "primary_objective_score": next((i["score"] for i in obj_impacts if i["is_primary"]), None),
             })

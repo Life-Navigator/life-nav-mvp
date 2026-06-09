@@ -102,7 +102,32 @@ class UniversalReportEngine:
             sec = await self._os_recommendations_section(ctx, len(definition.sections) + 1)
             if sec:
                 definition.sections.append(sec)
+        # Sprint 39: surface the deterministic tool calculations behind the numbers.
+        tool_sec = await self._tool_calculations_section(ctx, len(definition.sections) + 1)
+        if tool_sec:
+            definition.sections.append(tool_sec)
         return definition
+
+    async def _tool_calculations_section(self, ctx: UserContext, ord_n: int) -> Optional[ReportSection]:
+        """Every number in this report that came from a deterministic tool, with its calculation."""
+        try:
+            runs = await self._sb.select("tool_runs", filters={"user_id": f"eq.{ctx.user_id}"}, limit=20, order="created_at.desc", schema="tools")
+        except Exception:  # noqa: BLE001
+            return None
+        if not runs:
+            return None
+        seen, items = set(), []
+        for r in runs:  # most-recent run per tool
+            t = r.get("tool")
+            if t in seen:
+                continue
+            seen.add(t)
+            items.append({"tool": t, "confidence": r.get("confidence"),
+                          "outputs": r.get("outputs"), "assumptions": r.get("assumptions"),
+                          "limitations": r.get("limitations"), "tool_run_id": r.get("tool_run_id")})
+        return ReportSection(key="tool_calculations", title="Deterministic Calculations", ord=ord_n,
+                             body={"note": "Every figure below is computed by a deterministic tool (same input → same output), not estimated.",
+                                   "calculations": items[:10]})
 
     async def _life_model_section(self, ctx: UserContext, ord_n: int) -> Optional[ReportSection]:
         """Advisor-grade life-model section: vision, primary objective, themes, constraints, tradeoffs."""
