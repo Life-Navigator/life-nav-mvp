@@ -11,8 +11,9 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, Query
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_finance_service, get_snapshot_engine, get_trend_analyzer
+from ..dependencies import authenticated, get_finance_service, get_financial_planning, get_snapshot_engine, get_trend_analyzer
 from ..domains.finance import FinanceService
+from ..services.financial_planning import FinancialPlanningEngine
 from ..services.snapshots import SnapshotEngine, TrendAnalyzer
 from ..models.common import DomainViewModel, UserContext, WriteResult
 
@@ -132,3 +133,15 @@ async def take_snapshot(user: AuthenticatedUser = Depends(authenticated), engine
 async def trends(user: AuthenticatedUser = Depends(authenticated), analyzer: TrendAnalyzer = Depends(get_trend_analyzer)):
     """Trend direction + change detection ('what changed this month') from snapshot history."""
     return await analyzer.trends(_ctx(user))
+
+
+@router.get("/plan")
+async def financial_plan(
+    user: AuthenticatedUser = Depends(authenticated),
+    engine: FinancialPlanningEngine = Depends(get_financial_planning),
+    current_age: int = Query(default=40),
+    retirement_age: int = Query(default=67),
+):
+    """Advanced financial plan: retirement readiness + Monte Carlo + goal funding + Social
+    Security + insurance optimization + withdrawal planning."""
+    return await engine.plan(_ctx(user), current_age=current_age, retirement_age=retirement_age)

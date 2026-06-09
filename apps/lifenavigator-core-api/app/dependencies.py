@@ -30,6 +30,7 @@ from .grounding.retriever import Retriever
 from .services.analytics import AnalyticsService
 from .services.comp_benefits import CompensationBenefitsEngine
 from .services.compensation import CompensationIntelligenceEngine
+from .services.financial_planning import FinancialPlanningEngine
 from .services.decision_engine import DecisionEngine
 from .services.decision_graph import DecisionGraphService
 from .services.decision_workspace import DecisionWorkspaceService
@@ -153,7 +154,7 @@ def get_readiness_engine(
     education: EducationService = Depends(get_education_service),
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> LifeReadinessEngine:
-    return LifeReadinessEngine(domains=domains, education=education, supabase=supabase)
+    return LifeReadinessEngine(domains=domains, education=education, supabase=supabase, planning=FinancialPlanningEngine(supabase, CompensationBenefitsEngine(supabase)))
 
 
 def get_share_service(
@@ -196,6 +197,10 @@ def get_decision_graph(
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> DecisionGraphService:
     return DecisionGraphService(workspace=workspace, comp_benefits=comp, supabase=supabase)
+
+
+def get_financial_planning(supabase: SupabaseClient = Depends(get_supabase)) -> FinancialPlanningEngine:
+    return FinancialPlanningEngine(supabase=supabase, comp_benefits=CompensationBenefitsEngine(supabase))
 
 
 def get_retriever(

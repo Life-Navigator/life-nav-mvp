@@ -48,10 +48,11 @@ def _index_status(score: int) -> str:
 
 
 class LifeReadinessEngine:
-    def __init__(self, domains: dict[str, DomainService], education: EducationService, supabase: SupabaseClient) -> None:
+    def __init__(self, domains: dict[str, DomainService], education: EducationService, supabase: SupabaseClient, planning: Any = None) -> None:
         self._domains = domains
         self._edu = education
         self._sb = supabase
+        self._planning = planning  # optional FinancialPlanningEngine — enriches Finance readiness
 
     async def assess(self, ctx: UserContext) -> dict[str, Any]:
         readinesses: list[dict[str, Any]] = []
@@ -73,6 +74,9 @@ class LifeReadinessEngine:
             readinesses.append(self._unavailable("education"))
         # Decision confidence
         readinesses.append(await self._decision_readiness(ctx))
+        # New readiness inputs (Sprint 16): enrich Finance with retirement-readiness from the plan.
+        if self._planning is not None:
+            await self._enrich_finance(ctx, readinesses)
 
         index_score = round(sum(_WEIGHTS.get(r["domain"], 0.0) * r["progress"] for r in readinesses))
         goals = await self._goals(ctx)
@@ -88,6 +92,32 @@ class LifeReadinessEngine:
             "domains": readinesses,
             "goals": goals,
         }
+
+    async def _enrich_finance(self, ctx: UserContext, readinesses: list[dict[str, Any]]) -> None:
+        """Blend retirement readiness (Monte Carlo / target ratio) into the Finance domain score."""
+        fin = next((r for r in readinesses if r["domain"] == "finance"), None)
+        if fin is None:
+            return
+        try:
+            plan = await self._planning.plan(ctx)
+        except Exception:  # noqa: BLE001 — planning failure never breaks the board
+            return
+        if not plan.get("available"):
+            return
+        rr = plan.get("retirement_readiness", {})
+        ratio = rr.get("readiness_ratio")
+        if ratio is None:
+            return
+        retire_progress = max(0, min(100, round(ratio * 100)))
+        # 60% data-completeness signal + 40% retirement-readiness signal
+        blended = round(0.6 * fin["progress"] + 0.4 * retire_progress)
+        fin["progress"] = blended
+        fin["status"] = _status_from(blended)
+        fin["retirement_readiness"] = {"ratio": ratio, "status": rr.get("status"),
+                                       "success_probability": plan.get("readiness_inputs", {}).get("retirement_success_probability")}
+        if not rr.get("on_track"):
+            fin["gap"] = f"Retirement underfunded — projected {ratio:.0%} of target nest egg"
+            fin["timeline"] = "Increase contributions / review plan"
 
     def _assess_vm(self, domain: str, vm: DomainViewModel) -> dict[str, Any]:
         recs = vm.recommendations
