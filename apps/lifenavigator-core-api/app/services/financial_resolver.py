@@ -115,6 +115,48 @@ class FinancialInputResolver:
                 "total": len(inputs), "missing": missing, "last_updated": last_updated,
                 "note": "Every value resolves from Supabase with its source; missing inputs are named, never defaulted."}
 
+    async def retirement_projection_card(self, ctx: UserContext, runner: Any, current_age: Optional[int] = None) -> dict[str, Any]:
+        """Run the deterministic retirement_projection tool from CANONICAL inputs only. Runs solely
+        when the real required inputs exist (balance + age); otherwise returns a missing state — never
+        defaults a fabricated age/horizon. The tool run is persisted; we return its run id + lineage."""
+        r = await self.resolve(ctx)
+        i = r["inputs"]
+        plans = await self._rows("retirement_plans", "finance", uid=ctx.user_id)
+        vis = await self._rows("life_vision", "life", uid=ctx.user_id)
+        prompts = (vis[0].get("prompts") or {}) if vis else {}
+        # current_age is user-entered; persist it canonically when supplied so we remember it.
+        if current_age:
+            try:
+                merged = {**prompts, "current_age": int(current_age)}
+                await self._sb.upsert("life_vision", {"user_id": ctx.user_id, "tenant_id": ctx.user_id,
+                                                      "vision_text": (vis[0].get("vision_text") if vis else None), "prompts": merged}, schema="life")
+                prompts = merged
+            except Exception:  # noqa: BLE001
+                pass
+        age = current_age or prompts.get("current_age")
+        retire_age = _num(plans[0].get("target_retirement_age")) if plans else None
+
+        missing = []
+        if not i["retirement_balance"]["present"]:
+            missing.append({"input": "retirement_balance", "prompt": i["retirement_balance"]["prompt"]})
+        if not age:
+            missing.append({"input": "current_age", "prompt": "Enter your current age so we can project your retirement assets (we won't guess it)."})
+        if missing:
+            return {"available": False, "source": MISSING, "missing": missing,
+                    "unlocks": ["projected retirement assets", "funding gap", "on-track readiness"],
+                    "message": "Add the missing input(s) to run a real, deterministic retirement projection."}
+
+        income = i["income"]["value"] if i["income"]["present"] else None
+        rate = i["retirement_contribution_rate"]["value"] if i["retirement_contribution_rate"]["present"] else 6.0
+        contribution = round((income or 0) * (float(rate) / 100), 2) if income else 0.0
+        tool_inputs = {"current_age": int(age), "retirement_age": int(retire_age) if retire_age else 65,  # type: ignore[arg-type]
+                       "current_assets": i["retirement_balance"]["value"], "income": income, "annual_contribution": contribution}
+        run = await runner.run(ctx, "retirement_projection", tool_inputs)
+        return {"available": True, "source": "Deterministic tool run", "tool_run_id": run["tool_run_id"],
+                "outputs": run["outputs"], "inputs_used": tool_inputs, "assumptions": run["assumptions"],
+                "limitations": run["limitations"], "confidence": run["confidence"], "confidence_band": _band(run["confidence"]),
+                "calculation": run.get("calculation"), "last_updated": r.get("last_updated")}
+
     async def tool_inputs(self, ctx: UserContext) -> dict[str, Any]:
         """Flat canonical inputs for the deterministic tools (values only; missing -> absent, not 0)."""
         r = await self.resolve(ctx)

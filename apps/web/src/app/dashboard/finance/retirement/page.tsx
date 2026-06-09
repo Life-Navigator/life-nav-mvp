@@ -483,6 +483,7 @@ export default function RetirementPlanningPage() {
           'income',
           'time_horizon',
         ]}
+        withProjection
       />
       <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-6 text-white">
         <div className="flex items-center justify-between">

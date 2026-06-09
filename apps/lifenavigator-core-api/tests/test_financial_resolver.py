@@ -49,3 +49,28 @@ async def test_tool_inputs_are_flat_canonical_no_zeros_for_missing():
     ti = await FinancialInputResolver(sb).tool_inputs(CTX)
     assert ti.get("current_assets") == 92500
     assert "annual_income" not in ti  # missing income -> absent, NOT 0
+
+
+# ---- Sprint 45D: retirement projection card (tool-run-backed, missing-aware) ----
+@pytest.mark.asyncio
+async def test_projection_missing_age_does_not_run():
+    from app.services.tools import ToolRunner
+    sb = FakeSupabase({"retirement_plans": [{"id": "r", "user_id": CTX.user_id, "current_savings": 92500, "target_retirement_age": 65}]})
+    card = await FinancialInputResolver(sb).retirement_projection_card(CTX, ToolRunner(sb), current_age=None)
+    assert card["available"] is False and any(m["input"] == "current_age" for m in card["missing"])
+    # nothing was projected / persisted
+    assert not await sb.select("tool_runs", filters={"user_id": f"eq.{CTX.user_id}"}, schema="tools")
+
+
+@pytest.mark.asyncio
+async def test_projection_runs_and_persists_with_age():
+    from app.services.tools import ToolRunner
+    sb = FakeSupabase({"retirement_plans": [{"id": "r", "user_id": CTX.user_id, "current_savings": 92500, "target_retirement_age": 65}]})
+    card = await FinancialInputResolver(sb).retirement_projection_card(CTX, ToolRunner(sb), current_age=40)
+    assert card["available"] is True and card["source"] == "Deterministic tool run"
+    assert card["tool_run_id"] and card["outputs"]["projected_assets"] > 92500  # grew
+    assert card["inputs_used"]["current_age"] == 40 and card["limitations"]
+    # the run was persisted + the age remembered canonically
+    assert await sb.select("tool_runs", filters={"user_id": f"eq.{CTX.user_id}"}, schema="tools")
+    vis = await sb.select("life_vision", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
+    assert vis and (vis[0].get("prompts") or {}).get("current_age") == 40

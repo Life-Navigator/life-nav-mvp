@@ -147,7 +147,8 @@ async def financial_plan(
     return await engine.plan(_ctx(user), current_age=current_age, retirement_age=retirement_age)
 
 
-from ..dependencies import get_financial_resolver  # noqa: E402
+from ..dependencies import get_financial_resolver, get_tool_runner  # noqa: E402
+from ..services.tools import ToolRunner  # noqa: E402
 from ..services.financial_resolver import FinancialInputResolver  # noqa: E402
 
 
@@ -155,3 +156,13 @@ from ..services.financial_resolver import FinancialInputResolver  # noqa: E402
 async def resolved_inputs(user: AuthenticatedUser = Depends(authenticated), svc: FinancialInputResolver = Depends(get_financial_resolver)):
     """Canonical financial inputs resolved from Supabase — each with its source + present/missing."""
     return await svc.resolve(UserContext(user_id=user.user_id))
+
+
+@router.get("/retirement-projection")
+async def retirement_projection_card(current_age: int | None = Query(default=None),
+                                     user: AuthenticatedUser = Depends(authenticated),
+                                     svc: FinancialInputResolver = Depends(get_financial_resolver),
+                                     runner: ToolRunner = Depends(get_tool_runner)):
+    """Projected retirement assets from the deterministic tool, run on canonical inputs only.
+    Missing required inputs -> a named missing state (never a fabricated projection)."""
+    return await svc.retirement_projection_card(UserContext(user_id=user.user_id), runner, current_age)

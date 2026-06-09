@@ -64,10 +64,50 @@ const LABELS: Record<string, string> = {
   housing_target: 'Home price target',
 };
 
-export default function FinancialResolverPanel({ title, keys }: { title: string; keys: string[] }) {
+interface Projection {
+  available: boolean;
+  source: string;
+  tool_run_id?: string;
+  outputs?: {
+    projected_assets: number;
+    target_nest_egg: number;
+    funding_gap: number;
+    readiness_ratio: number | null;
+    on_track: boolean;
+    years_to_retirement: number;
+  };
+  inputs_used?: Record<string, number | null>;
+  assumptions?: string[];
+  limitations?: string[];
+  confidence?: number;
+  confidence_band?: string;
+  missing?: { input: string; prompt: string }[];
+  message?: string;
+}
+
+export default function FinancialResolverPanel({
+  title,
+  keys,
+  withProjection = false,
+}: {
+  title: string;
+  keys: string[];
+  withProjection?: boolean;
+}) {
   const [r, setR] = useState<Resolved | null>(null);
   const [loading, setLoading] = useState(true);
   const [drawer, setDrawer] = useState<{ key: string; field: Field } | null>(null);
+  const [proj, setProj] = useState<Projection | null>(null);
+  const [age, setAge] = useState('');
+
+  const loadProjection = (currentAge?: string) => {
+    if (!withProjection) return;
+    const qs = currentAge ? `?current_age=${encodeURIComponent(currentAge)}` : '';
+    fetch(`/api/finance/retirement-projection${qs}`)
+      .then((x) => (x.ok ? x.json() : null))
+      .then(setProj)
+      .catch(() => {});
+  };
 
   useEffect(() => {
     fetch('/api/finance/resolved-inputs')
@@ -77,7 +117,8 @@ export default function FinancialResolverPanel({ title, keys }: { title: string;
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+    loadProjection();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading)
     return (
@@ -148,6 +189,69 @@ export default function FinancialResolverPanel({ title, keys }: { title: string;
           );
         })}
       </div>
+
+      {withProjection && proj && (
+        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-gray-800">Projected retirement assets</h3>
+            <span className="text-[10px] px-2 py-0.5 rounded-full border bg-amber-100 text-amber-700 border-amber-200">
+              {proj.available ? 'Source: Deterministic tool run' : 'Source: Missing'}
+            </span>
+          </div>
+          {proj.available && proj.outputs ? (
+            <>
+              <div className="text-3xl font-extrabold text-gray-900 mt-1">
+                {money(proj.outputs.projected_assets)}
+              </div>
+              <div className="text-sm text-gray-600 mt-0.5">
+                {proj.outputs.on_track
+                  ? 'On track'
+                  : `Funding gap ${money(proj.outputs.funding_gap)}`}{' '}
+                · {proj.outputs.years_to_retirement} years to retirement · {proj.confidence_band}{' '}
+                confidence
+              </div>
+              {proj.assumptions && proj.assumptions.length > 0 && (
+                <div className="text-[11px] text-gray-500 mt-2">
+                  Assumptions: {proj.assumptions.join(' · ')}
+                </div>
+              )}
+              {proj.limitations && proj.limitations.length > 0 && (
+                <div className="text-[11px] text-gray-400 mt-1">{proj.limitations.join(' ')}</div>
+              )}
+              <div className="text-[10px] text-gray-400 mt-1 font-mono">
+                Tool run: {proj.tool_run_id?.slice(0, 8)}
+              </div>
+            </>
+          ) : (
+            <div className="mt-1">
+              <div className="text-sm text-gray-700">
+                {proj.message || 'A required input is missing.'}
+              </div>
+              <div className="text-[11px] text-gray-500 mt-1">
+                Missing: {(proj.missing || []).map((m) => m.input).join(', ')}
+              </div>
+              {(proj.missing || []).some((m) => m.input === 'current_age') && (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    placeholder="Your age"
+                    inputMode="numeric"
+                    className="w-24 rounded-md border border-gray-200 px-2 py-1 text-sm"
+                  />
+                  <button
+                    onClick={() => loadProjection(age)}
+                    disabled={!age}
+                    className="px-3 py-1 rounded-md bg-indigo-600 text-white text-sm font-medium disabled:opacity-40"
+                  >
+                    Run projection
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {drawer && (
         <div
