@@ -8,11 +8,16 @@ engine ranks them; a conflict engine flags competing actions. No recommendation 
 """
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
 from ..models.common import UserContext
+
+
+def _hash(s: str) -> str:
+    return hashlib.sha256(s.encode()).hexdigest()[:32]
 
 RECOS = "recommendations"
 _NS = uuid.UUID("6f3b1e22-0000-4000-8000-00000000000c")
@@ -103,7 +108,7 @@ class RecommendationOS:
             r.setdefault("rec_type", "ACTION")
             r.setdefault("formula", {})
             r.setdefault("finding_key", r["id"])
-        rows = [r for r in rows if r.get("status") not in ("dismissed", "completed")]
+        rows = [r for r in rows if r.get("status") not in ("dismissed", "completed", "invalidated")]
         if only_visible_to == "chat":
             rows = [r for r in rows if r.get("chat_visibility", True)]
         elif only_visible_to == "report":
@@ -118,6 +123,49 @@ class RecommendationOS:
             dt = r.get("doc_type")
             if dt and dt not in out:
                 out[dt] = r.get("extracted_json") or {}
+        return out
+
+    # ---- freshness: reads auto-recalc when the inputs change (no manual sync) ----
+    async def _signature(self, ctx: UserContext) -> str:
+        """A cheap fingerprint of everything that should change recommendations."""
+        docs = await self._sb.select("documents", columns="doc_type,uploaded_at", filters={"user_id": f"eq.{ctx.user_id}"}, limit=500, schema="documents")
+        sig_docs = "|".join(sorted(f"{d.get('doc_type')}:{d.get('uploaded_at')}" for d in docs))
+        idx = ""
+        if self._readiness:
+            try:
+                idx = str((await self._readiness.assess(ctx))["index"]["score"])
+            except Exception:  # noqa: BLE001
+                idx = ""
+        evs = await self._sb.select("recommendation_events", columns="event", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1000, schema=RECOS)
+        return _hash(f"{sig_docs}#idx={idx}#events={len(evs)}")
+
+    async def ensure_fresh(self, ctx: UserContext) -> bool:
+        """If the input signature changed since last sync, re-sync. Returns True if it re-synced.
+        Only meaningful on a full OS (with collector engines); read-only consumers no-op."""
+        if self._readiness is None:
+            return False
+        sig = await self._signature(ctx)
+        state = await self._sb.select("sync_state", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema=RECOS)
+        if state and state[0].get("signature") == sig:
+            return False
+        await self.sync(ctx)
+        return True
+
+    async def _learning_factors(self, ctx: UserContext) -> dict[str, float]:
+        """Behaviour-only ranking nudges: a finding the user dismissed/deferred before is
+        deprioritized when it re-emerges. Never fabricates — only down-weights."""
+        evs = await self._sb.select("recommendation_events", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1000, schema=RECOS)
+        recs = await self._sb.select("recommendations", columns="id,finding_key", filters={"user_id": f"eq.{ctx.user_id}"}, limit=500, schema=RECOS)
+        by_id = {r["id"]: (r.get("finding_key") or r["id"]) for r in recs}
+        out: dict[str, float] = {}
+        for e in evs:
+            fk = by_id.get(e.get("recommendation_id"))
+            if not fk:
+                continue
+            if e.get("event") == "dismissed":
+                out[fk] = min(out.get(fk, 1.0), 0.4)
+            elif e.get("event") == "deferred":
+                out[fk] = min(out.get(fk, 1.0), 0.7)
         return out
 
     async def sync(self, ctx: UserContext) -> dict[str, Any]:
@@ -247,17 +295,41 @@ class RecommendationOS:
                                impacted_domains=["finance", "career"])
         # NOTE: decision-confidence / counts are METRICS — deliberately NOT emitted as recommendations.
 
+        # Invalidation (Sprint 29): a system 'new' rec NOT re-emitted this round is no longer
+        # supported by evidence (e.g. the 401k was uploaded -> "upload your 401k" vanishes). Prune
+        # it. User-touched recs (accepted/in_progress/deferred) are preserved — only their rank decays.
+        existing = await self._sb.select("recommendations", columns="id,status", filters={"user_id": f"eq.{ctx.user_id}"}, limit=500, schema=RECOS)
+        ws = set(written)
+        pruned = 0
+        for r in existing:
+            if r.get("status", "new") == "new" and r["id"] not in ws:
+                await self._sb.update("recommendations", {"status": "invalidated", "updated_at": _now()},
+                                      filters={"id": f"eq.{r['id']}", "user_id": f"eq.{ctx.user_id}"}, schema=RECOS)
+                pruned += 1
+
         await self._rank(ctx)
-        return {"written": len(written), "by_source": sources}
+        sig = await self._signature(ctx)
+        await self._sb.upsert("sync_state", {"user_id": ctx.user_id, "tenant_id": ctx.user_id, "signature": sig, "synced_at": _now()}, schema=RECOS)
+        return {"written": len(written), "by_source": sources, "pruned": pruned}
 
     # ---- prioritization: ONE answer, via the visible formula ----
     @staticmethod
+    def _decay(updated_at: Any) -> float:
+        """Aging: a recommendation loses priority as it goes stale (half-ish over ~180 days)."""
+        try:
+            ts = datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+            age_days = (datetime.now(timezone.utc) - ts).days
+            return max(0.5, 1.0 - max(0, age_days) / 180.0)
+        except (TypeError, ValueError):
+            return 1.0
+
+    @staticmethod
     def _score(r: dict[str, Any]) -> float:
-        # Priority = Impact × Confidence × Urgency × Evidence ÷ Effort (computed at write, stored).
+        # Priority = Impact × Confidence × Urgency × Evidence ÷ Effort (stored at write), then aged
+        # (decay) and nudged by learned behaviour (down-weight only — never fabricates).
         f = r.get("formula") or {}
-        if "priority_score" in f:
-            return float(f["priority_score"])
-        return float(r.get("rank_score") or 0.0)
+        base = float(f["priority_score"]) if "priority_score" in f else float(r.get("rank_score") or 0.0)
+        return round(base * RecommendationOS._decay(r.get("updated_at")) * float(r.get("_learn_factor", 1.0)), 4)
 
     @staticmethod
     def _dedup_by_finding(recs: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -283,7 +355,10 @@ class RecommendationOS:
         for r in recs:
             await self._sb.update("recommendations", {"rank_score": self._score(r)}, filters={"id": f"eq.{r['id']}"}, schema=RECOS)
 
-    def _rankable(self, recs: list[dict]) -> tuple[list[dict], list[dict]]:
+    def _rankable(self, recs: list[dict], learn: Optional[dict] = None) -> tuple[list[dict], list[dict]]:
+        learn = learn or {}
+        for r in recs:  # stamp the learned (behaviour-only) multiplier before scoring
+            r["_learn_factor"] = learn.get(r.get("finding_key") or r["id"], 1.0)
         rankable = [r for r in recs if _num(r.get("confidence")) is not None and (_num(r.get("confidence")) or 0) >= _CONF_FLOOR
                     and r.get("rec_type") not in ("DEPENDENCY", "INFORMATION")]
         needs_info = [r for r in recs if r not in rankable]
@@ -325,8 +400,9 @@ class RecommendationOS:
         return out
 
     async def prioritize(self, ctx: UserContext, top: int = 3) -> dict[str, Any]:
+        await self.ensure_fresh(ctx)  # no manual sync — recompute if inputs changed
         recs = await self.active(ctx)
-        ranked, needs_info = self._rankable(recs)
+        ranked, needs_info = self._rankable(recs, await self._learning_factors(ctx))
         return {"total": len(recs), "deduped_total": len(ranked),
                 "top_actions": [self._shape(r) for r in ranked[:top]],
                 "why_ranking": self._why_first(ranked),
@@ -337,8 +413,9 @@ class RecommendationOS:
 
     # ---- roadmap: Now / Next / Later (an execution sequence, not a list) ----
     async def roadmap(self, ctx: UserContext) -> dict[str, Any]:
+        await self.ensure_fresh(ctx)  # no manual sync — recompute if inputs changed
         recs = await self.active(ctx)
-        ranked, needs_info = self._rankable(recs)
+        ranked, needs_info = self._rankable(recs, await self._learning_factors(ctx))
         # Now = the single highest-leverage action with no blocking dependency; Next = the rest of
         # the top tier; Later = lower-priority. DEPENDENCIES that block actions surface as blockers.
         blockers = [r for r in needs_info if r.get("rec_type") == "DEPENDENCY"]

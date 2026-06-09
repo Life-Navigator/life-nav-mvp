@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from app.models.common import UserContext
-from app.services.recommendations_os import RecommendationOS
+from app.services.recommendations_os import RecommendationOS, _now as _now_iso
 
 from .conftest import FakeSupabase
 
@@ -225,3 +225,51 @@ async def test_why_ranking_explains_number_one():
     wr = p["why_ranking"]
     assert "why_number_one" in wr and wr["ranked_above"]
     assert wr["ranked_above"][0]["over"] == "Second"
+
+
+# ---- Sprint 29: freshness, aging, learning ----
+class _FreshOS(RecommendationOS):
+    """A tiny full-OS stub: a fixed signature flips after 'change()' so ensure_fresh re-syncs."""
+    def __init__(self, sb):
+        super().__init__(sb, readiness=object())  # non-None -> ensure_fresh is active
+        self._sig = "A"
+        self._synced = 0
+    async def _signature(self, ctx):  # type: ignore[override]
+        return self._sig
+    async def sync(self, ctx):  # type: ignore[override]
+        self._synced += 1
+        await self._sb.upsert("sync_state", {"user_id": ctx.user_id, "tenant_id": ctx.user_id, "signature": self._sig}, schema="recommendations")
+        return {"written": 0}
+
+
+@pytest.mark.asyncio
+async def test_reads_auto_resync_when_inputs_change_no_button():
+    os = _FreshOS(FakeSupabase({}))
+    assert await os.ensure_fresh(CTX) is True   # first time: no state -> sync
+    assert await os.ensure_fresh(CTX) is False  # unchanged signature -> no re-sync
+    os._sig = "B"                               # an input changed (e.g. a document uploaded)
+    assert await os.ensure_fresh(CTX) is True   # auto re-sync, no manual trigger
+    assert os._synced == 2
+
+
+@pytest.mark.asyncio
+async def test_aging_decays_priority():
+    fresh = {"formula": {"priority_score": 1.0}, "updated_at": _now_iso()}
+    old = {"formula": {"priority_score": 1.0}, "updated_at": "2025-01-01T00:00:00+00:00"}
+    assert RecommendationOS._score(fresh) > RecommendationOS._score(old)  # stale loses priority
+    assert RecommendationOS._score(old) >= 0.5  # but never below the floor
+
+
+@pytest.mark.asyncio
+async def test_learning_downweights_dismissed_findings_only():
+    os = _os()
+    ev = [{"statement": "e", "source_table": "documents:d"}]
+    await os.write(CTX, title="Often dismissed", source_module="m", category="finance", finding_key="F_DIS", confidence=0.9, evidence=ev)
+    await os.write(CTX, title="Never touched", source_module="m2", category="finance", finding_key="F_OK", confidence=0.9, evidence=ev)
+    recs = await os.active(CTX)
+    base_dis = RecommendationOS._score(next(r for r in recs if r["finding_key"] == "F_DIS"))
+    learned, _ = os._rankable(recs, {"F_DIS": 0.4})  # behaviour: this finding was dismissed
+    dis = next(r for r in learned if r["finding_key"] == "F_DIS")
+    ok = next(r for r in learned if r["finding_key"] == "F_OK")
+    assert RecommendationOS._score(dis) < base_dis      # down-weighted by learning
+    assert RecommendationOS._score(ok) >= RecommendationOS._score(dis)  # untouched ranks above
