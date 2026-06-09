@@ -3,6 +3,7 @@ import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supab
 import { exchangePublicToken, getAccounts } from '@/lib/integrations/plaid/client';
 import { persistPlaidItem } from '@/lib/integrations/plaid/persist';
 import { safeApiError } from '@/lib/security/safe-error';
+import { blockRealLinkIfBeta } from '@/lib/integrations/plaid/beta';
 import { recordUserEvent } from '@/lib/analytics/events';
 
 export const dynamic = 'force-dynamic';
@@ -15,6 +16,8 @@ export async function POST(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const betaBlock = blockRealLinkIfBeta();
+  if (betaBlock) return betaBlock;
 
   try {
     const { publicToken, institutionId, institutionName } = await request.json();

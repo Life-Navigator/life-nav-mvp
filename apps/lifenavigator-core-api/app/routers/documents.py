@@ -37,10 +37,12 @@ async def register(
     text: str = Body("", embed=True),
     title: str = Body("", embed=True),
     file_ref: str = Body("", embed=True),
+    acknowledge_sensitive: bool = Body(False, embed=True),
 ):
     if doc_type not in TAXONOMY:
         raise HTTPException(status_code=400, detail="unknown doc_type (see /v1/documents/catalog)")
-    return await svc.register(_ctx(user), doc_type=doc_type, text=text, title=title or None, file_ref=file_ref or None)
+    return await svc.register(_ctx(user), doc_type=doc_type, text=text, title=title or None,
+                              file_ref=file_ref or None, acknowledge_sensitive=acknowledge_sensitive)
 
 
 @router.post("/upload")
@@ -49,8 +51,9 @@ async def upload(
     svc: DocumentIntelligenceService = Depends(get_document_service),
     doc_type: str = Form(...),
     file: UploadFile = File(...),
+    acknowledge_sensitive: bool = Form(False),
 ):
-    """Upload a real file (PDF/text/image) → store → parse → extract → generate evidence."""
+    """Upload a real file (PDF/text/image) → PII scan → store → parse → extract → evidence."""
     if doc_type not in TAXONOMY:
         raise HTTPException(status_code=400, detail="unknown doc_type (see /v1/documents/catalog)")
     data = await file.read()
@@ -59,7 +62,8 @@ async def upload(
     if len(data) > _MAX_BYTES:
         raise HTTPException(status_code=413, detail="file too large (max 25MB)")
     return await svc.upload(_ctx(user), doc_type=doc_type, filename=file.filename or "document",
-                            content_type=file.content_type or "application/octet-stream", data=data)
+                            content_type=file.content_type or "application/octet-stream", data=data,
+                            acknowledge_sensitive=acknowledge_sensitive)
 
 
 @router.get("")

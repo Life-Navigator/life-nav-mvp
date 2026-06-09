@@ -21,6 +21,52 @@ from ..models.common import UserContext
 
 DOCS = "documents"
 _REC_NS = uuid.UUID("6f3b1e22-0000-4000-8000-00000000000b")
+
+# ── PII safeguard (Sprint 42B): detect sensitive identifiers in uploads. High-precision so normal
+# financial numbers (balances, rates) don't false-positive. We return categories + COUNTS only —
+# never the matched values — and never store them. ──
+_SSN_RE = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
+_SSN_LABELED_RE = re.compile(r"(?i)\b(?:ssn|social\s*security)\b[^0-9]{0,15}(\d{9}|\d{3}-\d{2}-\d{4})")
+_CARD_RE = re.compile(r"\b(?:\d[ -]?){13,19}\b")
+_ROUTING_RE = re.compile(r"(?i)\b(?:routing|aba|rtn)\b[^0-9]{0,15}\d{9}\b")
+_ACCOUNT_RE = re.compile(r"(?i)\b(?:account|acct)\s*(?:number|no\.?|#)\b[^0-9]{0,10}\d{6,17}")
+
+
+def _luhn_ok(digits: str) -> bool:
+    s, alt = 0, False
+    for ch in reversed(digits):
+        d = ord(ch) - 48
+        if alt:
+            d *= 2
+            if d > 9:
+                d -= 9
+        s += d
+        alt = not alt
+    return s % 10 == 0 and len(digits) >= 13
+
+
+def scan_pii(text: str) -> dict[str, int]:
+    """Return {category: count} of detected sensitive identifiers (counts only, no values)."""
+    if not text:
+        return {}
+    out: dict[str, int] = {}
+    ssn_vals = set(_SSN_RE.findall(text)) | set(_SSN_LABELED_RE.findall(text))  # dedupe overlap (count distinct)
+    if ssn_vals:
+        out["ssn"] = len(ssn_vals)
+    cards = sum(1 for m in _CARD_RE.findall(text) if _luhn_ok(re.sub(r"[ -]", "", m)))
+    if cards:
+        out["credit_or_debit_card"] = cards
+    routing = len(_ROUTING_RE.findall(text))
+    if routing:
+        out["routing_number"] = routing
+    acct = len(_ACCOUNT_RE.findall(text))
+    if acct:
+        out["account_number"] = acct
+    return out
+
+
+_PII_LABELS = {"ssn": "Social Security Number", "credit_or_debit_card": "Credit/debit card number",
+               "routing_number": "Routing number", "account_number": "Account number"}
 GREEN, YELLOW, ORANGE, RED = "green", "yellow", "orange", "red"
 
 
@@ -208,16 +254,26 @@ class DocumentIntelligenceService:
         self._ex = extractor or DocumentExtractor()
         self._parser = parser or DocumentParser()
 
-    async def upload(self, ctx: UserContext, *, doc_type: str, filename: str, content_type: str, data: bytes, title: Optional[str] = None) -> dict[str, Any]:
-        """Upload → store binary → parse text → extract → register → generate evidence."""
+    async def upload(self, ctx: UserContext, *, doc_type: str, filename: str, content_type: str, data: bytes,
+                     title: Optional[str] = None, acknowledge_sensitive: bool = False) -> dict[str, Any]:
+        """Upload → parse → PII scan → (store binary) → extract → register → evidence.
+        The PII scan happens BEFORE storing the binary, so a blocked upload persists nothing."""
         if doc_type not in TAXONOMY:
             raise ValueError(f"unknown doc_type {doc_type}")
+        parsed = self._parser.parse(filename, content_type, data)
+        pii = scan_pii(parsed["text"])
+        if pii and not acknowledge_sensitive:
+            await self._log_pii(ctx, doc_type, pii, acknowledged=False)
+            return {"stored": False, "pii_warning": True, "requires_confirmation": True,
+                    "detected": [{"category": k, "label": _PII_LABELS.get(k, k), "count": v} for k, v in pii.items()],
+                    "message": ("Potential sensitive information detected. We recommend removing or redacting "
+                                + ", ".join(_PII_LABELS.get(k, k) for k in pii) + " before uploading. Continue anyway?"),
+                    "status": "blocked_pending_confirmation"}
         doc_id = str(uuid.uuid4())
         path = f"{ctx.user_id}/{doc_id}/{(filename or 'document')[:80]}"
         await self._sb.storage_upload("documents", path, data, content_type or "application/octet-stream")
-        parsed = self._parser.parse(filename, content_type, data)
         res = await self.register(ctx, doc_type=doc_type, text=parsed["text"], title=title or filename,
-                                  file_ref=path, _doc_id=doc_id, source_kind=parsed["kind"])
+                                  file_ref=path, _doc_id=doc_id, source_kind=parsed["kind"], acknowledge_sensitive=True)
         res["parsed_kind"] = parsed["kind"]
         res["parsed_chars"] = len(parsed["text"])
         return res
@@ -238,11 +294,33 @@ class DocumentIntelligenceService:
         ]
         return [{"step": s, "done": bool(d), "detail": detail} for s, d, detail in steps]
 
+    async def _log_pii(self, ctx: UserContext, doc_type: str, categories: dict[str, int], *, acknowledged: bool) -> None:
+        try:  # categories + counts ONLY — never the matched values
+            await self._sb.insert("pii_scan_events", {"id": str(uuid.uuid4()), "user_id": ctx.user_id,
+                                                      "tenant_id": ctx.user_id, "doc_type": doc_type,
+                                                      "categories": categories, "acknowledged": acknowledged}, schema=DOCS)
+        except Exception:  # noqa: BLE001 — telemetry must never block the upload
+            pass
+
     async def register(self, ctx: UserContext, *, doc_type: str, text: str = "", title: Optional[str] = None,
-                       file_ref: Optional[str] = None, _doc_id: Optional[str] = None, source_kind: str = "text") -> dict[str, Any]:
+                       file_ref: Optional[str] = None, _doc_id: Optional[str] = None, source_kind: str = "text",
+                       acknowledge_sensitive: bool = False) -> dict[str, Any]:
         spec = TAXONOMY.get(doc_type)
         if not spec:
             raise ValueError(f"unknown doc_type {doc_type}")
+        # PII safeguard (Sprint 42B): if sensitive identifiers are present and the user hasn't
+        # acknowledged, DO NOT store the document — return a warning. We never persist the matched
+        # values; we log only the categories + counts (for beta safety telemetry).
+        pii = scan_pii(text)
+        if pii and not acknowledge_sensitive:
+            await self._log_pii(ctx, doc_type, pii, acknowledged=False)
+            return {"stored": False, "pii_warning": True, "requires_confirmation": True,
+                    "detected": [{"category": k, "label": _PII_LABELS.get(k, k), "count": v} for k, v in pii.items()],
+                    "message": ("Potential sensitive information detected. We recommend removing or redacting "
+                                + ", ".join(_PII_LABELS.get(k, k) for k in pii) + " before uploading. Continue anyway?"),
+                    "status": "blocked_pending_confirmation"}
+        if pii and acknowledge_sensitive:
+            await self._log_pii(ctx, doc_type, pii, acknowledged=True)
         ext = self._ex.extract(doc_type, text)
         doc_id = _doc_id or str(uuid.uuid4())
         extracted_json = {f["field_key"]: f["field_value"] for f in ext["fields"]}
