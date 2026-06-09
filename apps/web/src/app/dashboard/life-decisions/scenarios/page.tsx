@@ -10,9 +10,23 @@ type Status = 'green' | 'yellow' | 'orange' | 'red';
 interface Outcome {
   readiness_index: number;
   readiness_status: Status;
-  net_worth: number;
+  net_worth: number | null;
+  net_worth_known: boolean;
   retirement_ratio: number;
   confidence: number;
+  missing?: string[];
+}
+interface Lineage {
+  evidence: { statement: string; source: string }[];
+  assumptions: { label?: string; key?: string; value?: unknown; basis?: string }[];
+  calculation: string;
+  missing: string | null;
+}
+interface ConfComponent {
+  label: string;
+  value: number;
+  kind: string;
+  why: string;
 }
 interface TNode {
   id: string;
@@ -23,6 +37,12 @@ interface TNode {
   label: string;
   is_leaf: boolean;
   outcome: Outcome;
+  lineage?: Lineage;
+  confidence_breakdown?: {
+    overall: number;
+    components: ConfComponent[];
+    what_would_improve: string;
+  };
 }
 interface Tree {
   decisions: string[];
@@ -44,13 +64,15 @@ const SDOT: Record<Status, string> = {
   orange: 'bg-orange-500',
   red: 'bg-rose-500',
 };
-const money = (v: number) => `$${Math.round(v).toLocaleString()}`;
+const money = (v: number | null, known = true) =>
+  !known || v === null ? 'needs data' : `$${Math.round(v).toLocaleString()}`;
 
 export default function ScenariosPage() {
   const [available, setAvailable] = useState<Pick[]>([]);
   const [chosen, setChosen] = useState<string[]>(['mba', 'new_job']);
   const [tree, setTree] = useState<Tree | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState<TNode | null>(null);
   const [paths, setPaths] = useState<{ d: string; best: boolean }[]>([]);
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -183,7 +205,8 @@ export default function ScenariosPage() {
                         ref={(el) => {
                           nodeRefs.current[n.id] = el;
                         }}
-                        className={`rounded-xl bg-white shadow-sm p-3 ring-1 ${best ? 'ring-2 ring-indigo-400' : 'ring-gray-100'}`}
+                        onClick={() => n.lineage && setSelected(n)}
+                        className={`rounded-xl bg-white shadow-sm p-3 ring-1 ${n.lineage ? 'cursor-pointer hover:shadow-md' : ''} ${selected?.id === n.id ? 'ring-2 ring-indigo-500' : best ? 'ring-2 ring-indigo-400' : 'ring-gray-100'}`}
                       >
                         <div className="flex items-center gap-2">
                           <span
@@ -202,8 +225,10 @@ export default function ScenariosPage() {
                             {o.readiness_index}
                           </span>
                           <span>Net worth</span>
-                          <span className="text-right font-semibold text-gray-800">
-                            {money(o.net_worth)}
+                          <span
+                            className={`text-right font-semibold ${o.net_worth_known ? 'text-gray-800' : 'text-amber-600'}`}
+                          >
+                            {money(o.net_worth, o.net_worth_known)}
                           </span>
                           <span>Retirement</span>
                           <span className="text-right font-semibold text-gray-800">
@@ -214,6 +239,9 @@ export default function ScenariosPage() {
                             {Math.round(o.confidence * 100)}%
                           </span>
                         </div>
+                        {n.lineage && (
+                          <div className="mt-1 text-[10px] text-indigo-500">Why? →</div>
+                        )}
                       </div>
                     );
                   })}
@@ -222,6 +250,117 @@ export default function ScenariosPage() {
             </div>
           </div>
           <p className="text-xs text-gray-400 mt-3">{tree.note}</p>
+        </div>
+      )}
+
+      {/* Why This Projection? — full lineage for the clicked node */}
+      {selected && selected.lineage && (
+        <div
+          className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/30 p-4"
+          onClick={() => setSelected(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">{selected.label} — Why this projection?</h3>
+              <button
+                onClick={() => setSelected(null)}
+                className="text-gray-400 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-3 text-sm">
+              <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+                Net worth impact
+              </div>
+              <div
+                className={`text-lg font-bold ${selected.outcome.net_worth_known ? 'text-gray-900' : 'text-amber-600'}`}
+              >
+                {money(selected.outcome.net_worth, selected.outcome.net_worth_known)}
+              </div>
+            </div>
+
+            {selected.lineage.missing ? (
+              <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                {selected.lineage.missing}
+              </div>
+            ) : (
+              <>
+                <div className="mt-4">
+                  <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+                    Evidence
+                  </div>
+                  <ul className="mt-1 text-sm text-gray-700 list-disc list-inside">
+                    {selected.lineage.evidence.map((e, i) => (
+                      <li key={i}>
+                        {e.statement} <span className="text-gray-400 text-xs">({e.source})</span>
+                      </li>
+                    ))}
+                    {selected.lineage.evidence.length === 0 && (
+                      <li className="text-gray-400">No documents used.</li>
+                    )}
+                  </ul>
+                </div>
+                <div className="mt-3">
+                  <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+                    Calculation
+                  </div>
+                  <p className="mt-1 text-sm text-gray-700">{selected.lineage.calculation}</p>
+                </div>
+              </>
+            )}
+
+            <div className="mt-3">
+              <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+                Assumptions
+              </div>
+              <ul className="mt-1 text-sm text-gray-700 space-y-1">
+                {selected.lineage.assumptions.map((a, i) => (
+                  <li key={i}>
+                    <span className="font-medium">{a.label}</span>
+                    {a.value !== undefined && a.value !== null ? `: ${String(a.value)}` : ''}
+                    {a.basis && <span className="block text-xs text-gray-400">{a.basis}</span>}
+                  </li>
+                ))}
+                {selected.lineage.assumptions.length === 0 && (
+                  <li className="text-gray-400">None.</li>
+                )}
+              </ul>
+            </div>
+
+            {selected.confidence_breakdown && (
+              <div className="mt-4 border-t border-gray-100 pt-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+                    Confidence
+                  </div>
+                  <div className="text-lg font-bold text-gray-900">
+                    {selected.confidence_breakdown.overall}%
+                  </div>
+                </div>
+                <div className="mt-1 space-y-1">
+                  {selected.confidence_breakdown.components.map((c, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600" title={c.why}>
+                        {c.label}
+                      </span>
+                      <span className={c.value >= 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                        {c.value >= 0 ? '+' : ''}
+                        {c.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  {selected.confidence_breakdown.what_would_improve}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
