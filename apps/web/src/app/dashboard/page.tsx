@@ -1,5 +1,6 @@
 import DashboardClient from '@/components/dashboard/DashboardClient';
 import FirstInsightCard from '@/components/dashboard/FirstInsightCard';
+import LifeIntelligence from '@/components/dashboard/LifeIntelligence';
 import MissionControl from '@/components/dashboard/MissionControl';
 import RecommendationsCard from '@/components/dashboard/RecommendationsCard';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
@@ -63,7 +64,8 @@ export default async function DashboardPage() {
   return (
     <>
       <div className="px-6 pt-6 max-w-[1400px] mx-auto w-full">
-        {/* Mission control: status → next best action → why → journey (Sprint 23) */}
+        {/* Life model first (Sprint 35), then mission control (status → next action → why) */}
+        <LifeIntelligence />
         <MissionControl />
         {firstInsight?.has_data && (
           <>
