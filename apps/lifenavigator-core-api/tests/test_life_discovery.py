@@ -19,9 +19,10 @@ def test_need_behind_the_need_house_for_family_is_family_stability():
     assert root == "family_stability"
 
 
-def test_house_with_no_family_signal_is_homeownership():
+def test_house_for_equity_is_wealth_not_homeownership():
     svc = LifeDiscoveryService(FakeSupabase({}))
-    assert svc.infer_root("buy a house", [{"q": "why", "a": "tired of renting and want to build equity"}]) == "homeownership"
+    # "buy a house to build equity/rental income" -> the objective is wealth, not the house itself
+    assert svc.infer_root("buy a house", [{"q": "why", "a": "rental income and build equity"}]) == "financial_independence"
 
 
 @pytest.mark.asyncio

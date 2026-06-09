@@ -83,16 +83,37 @@ ROOT_OBJECTIVES: dict[str, dict[str, Any]] = {
     },
 }
 
-# Surface-goal signals -> root objective. Family signals OUTRANK house signals (the need behind the need).
-_ROOT_SIGNALS: list[tuple[tuple[str, ...], str]] = [
-    (("child", "kids", "baby", "family", "raise a family", "start a family", "parent"), "family_stability"),
-    (("retire", "retirement", "financial independence", "freedom", "fire"), "financial_independence"),
-    (("legacy", "estate", "inherit", "leave behind", "wealth transfer"), "legacy"),
-    (("mba", "school", "degree", "law school", "medical school", "certification", "education"), "education_advancement"),
-    (("promotion", "job", "career", "raise", "leadership", "entrepreneur", "business"), "career_growth"),
-    (("health", "fitness", "weight", "longevity", "energy", "sleep"), "health_longevity"),
-    (("house", "home", "buy", "mortgage", "property"), "homeownership"),
+# ── Life Theme layer (Sprint 34): statements -> weighted themes -> objectives (not keyword routing) ──
+THEMES: dict[str, list[str]] = {
+    "freedom": ["freedom", "free", "depend on anyone", "don't want to depend", "not depend", "independent", "independence", "on my own", "not rely", "autonomy", "self-sufficient", "self sufficient"],
+    "security": ["security", "secure", "stable", "stability", "safe", "peace of mind", "certainty", "protected", "fallback"],
+    "family": ["family", "children", "child", "kids", "kid", "baby", "pregnant", "wife", "husband", "spouse", "raise", "dependents", "newborn", "expecting"],
+    "wealth_creation": ["wealth", "rich", "rental income", "passive income", "net worth", "build equity", "investment", "returns", "appreciate"],
+    "health": ["health", "healthy", "weight", "fitness", "fit", "energy", "longevity", "strlength", "stronger", "sleep", "wellness", "lose weight"],
+    "career_fulfillment": ["career", "promotion", "leadership", "fulfillment", "challenged", "valued", "burnout", "burning me out", "burned out", "change careers", "career change", "new job", "boss", "compensation", "paid more", "salary", "business", "entrepreneur", "start a business", "founder"],
+    "achievement": ["achieve", "succeed", "success", "ambition", "advance", "prove", "accomplish"],
+    "legacy": ["legacy", "estate", "inherit", "leave behind", "generational", "wealth transfer", "pass on", "heirs"],
+    "belonging": ["closer to family", "near family", "community", "belong", "connection", "support network", "support system"],
+    "purpose": ["purpose", "meaning", "impact", "service", "give back", "mission", "fulfilling"],
+    "adventure": ["adventure", "travel", "explore", "new city", "feel stuck", "stuck", "change of scenery"],
+}
+THEME_OBJECTIVE: dict[str, str] = {
+    "freedom": "financial_independence", "wealth_creation": "financial_independence",
+    "security": "family_stability", "family": "family_stability", "belonging": "family_stability",
+    "health": "health_longevity", "career_fulfillment": "career_growth", "achievement": "career_growth",
+    "legacy": "legacy", "purpose": "legacy", "adventure": "career_growth",
+}
+# TERMINAL goals: the goal's own domain IS the objective (the why is motivation, not the objective).
+# (surface signal -> objective, base confidence). Checked before instrumental routing.
+_TERMINAL: list[tuple[tuple[str, ...], str, float]] = [
+    (("lose weight", "weight", "fitness", "get fit", "get healthy", "health", "sleep better", "more energy"), "health_longevity", 0.86),
+    (("life insurance", "insurance", "protect my family", "coverage"), "family_stability", 0.82),
+    (("retire", "retirement"), "financial_independence", 0.85),
+    (("new job", "change jobs", "quit my job", "promotion", "leave my job", "hate my boss", "burned out", "burning me out"), "career_growth", 0.84),
 ]
+# INSTRUMENTAL signals: a means to a deeper end — the why-chain decides the objective.
+_INSTRUMENTAL = ("house", "home", "buy", "mortgage", "property", "move", "relocat", "save", "money", "invest", "mba", "degree", "school", "certification")
+_CONF_THRESHOLD = 0.6  # below this, probe instead of concluding
 
 
 class LifeDiscoveryService:
@@ -100,100 +121,238 @@ class LifeDiscoveryService:
         self._sb = supabase
 
     @staticmethod
-    def infer_root(surface_goal: str, why_chain: Optional[list] = None) -> str:
-        """Resolve the root objective from the surface goal + the why-chain. The why-chain wins —
-        'buy a house' because 'we want children' resolves to family_stability, not homeownership."""
+    def _score_themes(text: str) -> dict[str, float]:
+        scores = {t: sum(1 for sig in sigs if sig in text) for t, sigs in THEMES.items()}
+        scores = {t: c for t, c in scores.items() if c > 0}
+        total = sum(scores.values()) or 1
+        return {t: round(c / total, 2) for t, c in scores.items()}
+
+    @staticmethod
+    def _detect_constraints(text: str) -> list[dict[str, Any]]:
+        """Recognize conflicting / unrealistic goals — trust over optimism."""
+        out: list[dict[str, Any]] = []
+        broke = any(p in text for p in ("no savings", "haven't saved", "no retirement", "nothing saved", "broke", "in debt", "lot of debt", "no money"))
+        early_retire = ("retire" in text and any(a in text for a in ("45", "40", "early", "50", "by 4", "by 5")))
+        if early_retire and broke:
+            out.append({"label": "Retirement timeline appears inconsistent with current savings", "kind": "savings",
+                        "detail": "An early-retirement goal with little/no savings needs a higher savings rate or a later timeline — not impossible, but it requires explicit action.", "severity": "high"})
+        if any(p in text for p in ("$2m", "$2 m", "2 million", "expensive house", "dream house")) and broke:
+            out.append({"label": "Home budget may exceed current capacity", "kind": "affordability",
+                        "detail": "The target home value looks high relative to stated savings/income — review affordability before committing.", "severity": "medium"})
+        return out
+
+    def analyze(self, *, surface_goal: str, why_chain: Optional[list] = None, vision: str = "") -> dict[str, Any]:
+        """Reason from statement → themes → objective with confidence, alternatives, and (if
+        uncertain) a follow-up question. Terminal goals (lose weight, new job) take their own domain;
+        instrumental goals (house, save, move) are resolved by the why-chain."""
         why_text = " ".join(str(w.get("a", "")) if isinstance(w, dict) else str(w) for w in (why_chain or [])).lower()
         surface = (surface_goal or "").lower()
-        # why-chain signals first (the real motivation), then the surface goal
-        for text in (why_text, surface):
-            for signals, root in _ROOT_SIGNALS:
-                if any(sig in text for sig in signals):
-                    return root
-        return "career_growth"
+        # The immediate discovery signal is the goal + why-chain. The broad life vision is captured
+        # separately and used only as a weak tie-breaker — it must not dilute goal-specific signal.
+        text = f"{surface} {why_text}".strip()
+        themes = self._score_themes(text)
+        if not themes and vision:
+            themes = self._score_themes(vision.lower())
+        ranked = sorted(themes.items(), key=lambda kv: kv[1], reverse=True)
+        constraints = self._detect_constraints(text)
+
+        # 1) Terminal goal? Its domain is the objective; the why is motivation.
+        for sigs, obj, conf in _TERMINAL:
+            if any(s in surface for s in sigs):
+                alts = [{"objective": THEME_OBJECTIVE[t], "weight": w} for t, w in ranked[:3]
+                        if THEME_OBJECTIVE.get(t) and THEME_OBJECTIVE[t] != obj][:2]
+                return {"primary_objective": obj, "confidence": conf, "themes": themes, "alternatives": alts,
+                        "reasoning": f"'{surface_goal}' is a goal whose own domain defines the objective ({ROOT_OBJECTIVES[obj]['label']}); your stated reasons are treated as motivation, not the objective.",
+                        "needs_followup": False, "constraints": constraints}
+
+        # 2) Instrumental goal with no why-chain → PROBE, never invent.
+        instrumental = any(s in surface for s in _INSTRUMENTAL)
+        if instrumental and not why_text.strip():
+            return {"primary_objective": None, "confidence": 0.3, "themes": {}, "alternatives": [],
+                    "reasoning": f"'{surface_goal}' can serve very different life objectives — we shouldn't guess.",
+                    "needs_followup": True,
+                    "followup_question": f"Why is '{surface_goal}' important to you right now?",
+                    "followup_options": ["Family", "Investment / wealth", "Stability / security", "Freedom / independence", "Relocation / change", "Something else"],
+                    "constraints": constraints}
+
+        # 3) Resolve from themes (instrumental-with-why, or unmapped).
+        if not ranked:
+            return {"primary_objective": None, "confidence": 0.3, "themes": {}, "alternatives": [],
+                    "reasoning": "Not enough signal to infer your underlying objective.", "needs_followup": True,
+                    "followup_question": f"What would achieving '{surface_goal}' really give you?",
+                    "followup_options": ["Security", "Freedom", "Family", "Growth", "Health", "Legacy"], "constraints": constraints}
+        top_theme, top_w = ranked[0]
+        second_w = ranked[1][1] if len(ranked) > 1 else 0.0
+        primary = THEME_OBJECTIVE.get(top_theme, "career_growth")
+        margin = top_w - second_w
+        confidence = round(min(0.92, 0.55 + margin + (0.1 if len(ranked) == 1 else 0)), 2)
+        alts = [{"objective": THEME_OBJECTIVE[t], "weight": w} for t, w in ranked[1:4]
+                if THEME_OBJECTIVE.get(t) and THEME_OBJECTIVE[t] != primary][:2]
+        result = {"primary_objective": primary, "confidence": confidence, "themes": themes, "alternatives": alts,
+                  "reasoning": f"Your reasons point most to '{top_theme}' (weight {top_w}), which maps to {ROOT_OBJECTIVES[primary]['label']}.",
+                  "needs_followup": confidence < _CONF_THRESHOLD, "constraints": constraints}
+        if result["needs_followup"]:
+            result["followup_question"] = f"Is '{surface_goal}' more about {top_theme}, or something else?"
+            result["followup_options"] = [t for t, _ in ranked[:3]] + ["Something else"]
+        return result
+
+    @staticmethod
+    def infer_root(surface_goal: str, why_chain: Optional[list] = None) -> str:
+        """Back-compat thin wrapper — returns the primary objective (or career_growth if probing)."""
+        r = LifeDiscoveryService(None).analyze(surface_goal=surface_goal, why_chain=why_chain)
+        return r.get("primary_objective") or "career_growth"
 
     async def save_vision(self, ctx: UserContext, *, vision_text: str, prompts: Optional[dict] = None) -> dict[str, Any]:
         await self._sb.upsert("life_vision", {"user_id": ctx.user_id, "tenant_id": ctx.user_id,
                                               "vision_text": vision_text, "prompts": prompts or {}, "updated_at": _now()}, schema=LIFE)
         return {"saved": True, "vision_text": vision_text}
 
+    async def _edge(self, ctx: UserContext, src: str, tgt: str, etype: str, domain: str = "", conf: float = 0.7) -> None:
+        eid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{ctx.user_id}:{src}->{tgt}:{etype}"))
+        await self._sb.upsert("life_graph_edges", {"edge_id": eid, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+                                                   "source_node": src, "target_node": tgt, "edge_type": etype,
+                                                   "domain": domain or None, "confidence": conf, "status": "active", "updated_at": _now()}, schema=LIFE)
+
     async def discover_goal(self, ctx: UserContext, *, surface_goal: str, why_chain: Optional[list] = None,
                             root_override: Optional[str] = None) -> dict[str, Any]:
-        """Capture a surface goal + why-chain → a ROOT objective decomposed into the Life Graph."""
-        root = root_override if root_override in ROOT_OBJECTIVES else self.infer_root(surface_goal, why_chain)
+        """Discover the objective: reason about it; PROBE if uncertain; else decompose + persist the
+        graph with confidence/themes/alternatives/constraints + supersede stale objectives."""
+        vis = await self._rows("life_vision", ctx)
+        vision_text = vis[0].get("vision_text", "") if vis else ""
+        a = self.analyze(surface_goal=surface_goal, why_chain=why_chain, vision=vision_text)
+        root = root_override if root_override in ROOT_OBJECTIVES else a.get("primary_objective")
+
+        # Adaptive: if uncertain (and not overridden), ask a follow-up — never invent an objective.
+        if not root_override and (a.get("needs_followup") or not root):
+            return {"needs_followup": True, "surface_goal": surface_goal,
+                    "followup_question": a.get("followup_question"), "followup_options": a.get("followup_options", []),
+                    "confidence": a.get("confidence"), "reasoning": a.get("reasoning"),
+                    "themes": a.get("themes", {}), "constraints": a.get("constraints", [])}
+
+        assert root is not None  # guaranteed by the probe guard above
         spec = ROOT_OBJECTIVES[root]
         obj_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{ctx.user_id}:{root}"))
+        # Lifecycle: supersede any active objective for this SAME surface goal with a different root.
+        for o in await self._rows("life_objectives", ctx):
+            if (o.get("surface_goal", "").strip().lower() == surface_goal.strip().lower()
+                    and o.get("root_objective_key") != root and o.get("status", "active") == "active"):
+                await self._sb.update("life_objectives", {"status": "superseded", "updated_at": _now()},
+                                      filters={"id": f"eq.{o['id']}"}, schema=LIFE)
+
         await self._sb.upsert("life_objectives", {
             "id": obj_id, "user_id": ctx.user_id, "tenant_id": ctx.user_id, "title": spec["label"],
             "root_objective_key": root, "surface_goal": surface_goal, "why_chain": why_chain or [],
-            "domain": "cross_domain", "importance": "high",
+            "domain": "cross_domain", "importance": "high", "status": "active",
+            "confidence": a.get("confidence"), "themes": list(a.get("themes", {}).keys()),
+            "alternatives": a.get("alternatives", []), "reasoning": a.get("reasoning"), "updated_at": _now(),
         }, schema=LIFE)
-        # the surface goal becomes a goal under the objective; dependencies/risks/opps become nodes
-        await self._sb.upsert("goals", {"id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:surface")),
-                                        "user_id": ctx.user_id, "tenant_id": ctx.user_id, "objective_id": obj_id,
-                                        "title": surface_goal, "domain": "cross_domain", "status": "open"}, schema=LIFE)
+        goal_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:surface"))
+        await self._sb.upsert("goals", {"id": goal_id, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+                                        "objective_id": obj_id, "title": surface_goal, "domain": "cross_domain", "status": "open"}, schema=LIFE)
+        await self._edge(ctx, goal_id, obj_id, "advances", "cross_domain", a.get("confidence", 0.7))
         deps = []
         for label, domain in spec["dependencies"]:
-            d = {"id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:dep:{label}")), "user_id": ctx.user_id,
-                 "tenant_id": ctx.user_id, "objective_id": obj_id, "label": label, "domain": domain,
-                 "satisfied": None, "prompt": f"Confirm or upload evidence for: {label}"}
-            await self._sb.upsert("dependencies", d, schema=LIFE)
-            deps.append(d)
+            did = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:dep:{label}"))
+            await self._sb.upsert("dependencies", {"id": did, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+                                                   "objective_id": obj_id, "label": label, "domain": domain,
+                                                   "satisfied": None, "prompt": f"Confirm or upload evidence for: {label}"}, schema=LIFE)
+            await self._edge(ctx, obj_id, did, "requires", domain)
+            deps.append({"label": label, "domain": domain})
         for label, domain in spec.get("risks", []):
-            await self._sb.upsert("risks", {"id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:risk:{label}")),
-                                            "user_id": ctx.user_id, "tenant_id": ctx.user_id, "objective_id": obj_id,
-                                            "label": label, "domain": domain, "severity": "medium"}, schema=LIFE)
+            rid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:risk:{label}"))
+            await self._sb.upsert("risks", {"id": rid, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+                                            "objective_id": obj_id, "label": label, "domain": domain, "severity": "medium"}, schema=LIFE)
+            await self._edge(ctx, obj_id, rid, "threatened_by", domain)
         for label, domain in spec.get("opportunities", []):
-            await self._sb.upsert("opportunities", {"id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:opp:{label}")),
-                                                    "user_id": ctx.user_id, "tenant_id": ctx.user_id, "objective_id": obj_id,
-                                                    "label": label, "domain": domain}, schema=LIFE)
+            oid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:opp:{label}"))
+            await self._sb.upsert("opportunities", {"id": oid, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+                                                    "objective_id": obj_id, "label": label, "domain": domain}, schema=LIFE)
+            await self._edge(ctx, obj_id, oid, "accelerated_by", domain)
+        # Constraint intelligence — conflicts become first-class nodes, not optimistic recommendations.
+        constraints = a.get("constraints", [])
+        for c in constraints:
+            cid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:con:{c['label']}"))
+            await self._sb.upsert("constraints", {"id": cid, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+                                                  "objective_id": obj_id, "label": c["label"], "kind": c.get("kind"),
+                                                  "detail": c.get("detail"), "severity": c.get("severity", "medium")}, schema=LIFE)
+            await self._edge(ctx, obj_id, cid, "conflicts_with", c.get("kind", ""), 0.8)
         return {"objective_id": obj_id, "root_objective": root, "root_label": spec["label"],
                 "surface_goal": surface_goal, "the_need_behind_the_need": spec["label"],
-                "dependencies": [{"label": d["label"], "domain": d["domain"]} for d in deps],
-                "risks": [r[0] for r in spec.get("risks", [])], "opportunities": [o[0] for o in spec.get("opportunities", [])]}
+                "confidence": a.get("confidence"), "themes": a.get("themes", {}), "reasoning": a.get("reasoning"),
+                "alternatives": a.get("alternatives", []), "needs_followup": False,
+                "dependencies": deps, "risks": [r[0] for r in spec.get("risks", [])],
+                "opportunities": [o[0] for o in spec.get("opportunities", [])],
+                "constraints": [{"label": c["label"], "detail": c.get("detail")} for c in constraints]}
 
     async def _rows(self, table: str, ctx: UserContext) -> list[dict]:
         return await self._sb.select(table, filters={"user_id": f"eq.{ctx.user_id}"}, limit=500, schema=LIFE)
 
+    @staticmethod
+    def _active(objectives: list[dict]) -> list[dict]:
+        return [o for o in objectives if o.get("status", "active") == "active"]
+
     async def snapshot(self, ctx: UserContext) -> dict[str, Any]:
         vision = await self._rows("life_vision", ctx)
-        objectives = await self._rows("life_objectives", ctx)
-        deps = await self._rows("dependencies", ctx)
-        risks = await self._rows("risks", ctx)
-        opps = await self._rows("opportunities", ctx)
+        objectives = self._active(await self._rows("life_objectives", ctx))
+        active_ids = {o["id"] for o in objectives}
+        deps = [d for d in await self._rows("dependencies", ctx) if d.get("objective_id") in active_ids]
+        risks = [r for r in await self._rows("risks", ctx) if r.get("objective_id") in active_ids]
+        opps = [o for o in await self._rows("opportunities", ctx) if o.get("objective_id") in active_ids]
+        cons = [c for c in await self._rows("constraints", ctx) if c.get("objective_id") in active_ids]
+        primary = max(objectives, key=lambda o: float(o.get("confidence") or 0), default=None)
         return {
             "life_vision": vision[0].get("vision_text") if vision else None,
+            "primary_objective": ({"title": primary["title"], "confidence": primary.get("confidence"),
+                                   "reasoning": primary.get("reasoning"), "alternatives": primary.get("alternatives"),
+                                   "themes": primary.get("themes")} if primary else None),
             "objectives": [{"id": o["id"], "title": o["title"], "root": o.get("root_objective_key"),
-                            "surface_goal": o.get("surface_goal"), "why_chain": o.get("why_chain")} for o in objectives],
+                            "surface_goal": o.get("surface_goal"), "confidence": o.get("confidence"),
+                            "themes": o.get("themes"), "why_chain": o.get("why_chain")} for o in objectives],
+            "top_themes": list(primary.get("themes") or [])[:5] if primary else [],
             "top_risks": [r["label"] for r in risks[:5]],
             "top_opportunities": [o["label"] for o in opps[:5]],
+            "active_constraints": [{"label": c["label"], "detail": c.get("detail")} for c in cons[:5]],
             "open_dependencies": [{"label": d["label"], "domain": d["domain"]} for d in deps if not d.get("satisfied")][:8],
+            "discovery_status": "in_progress" if not objectives else "active",
             "note": "Your objectives drive recommendations + roadmap before you upload anything.",
         }
 
+    async def life_context(self, ctx: UserContext) -> dict[str, Any]:
+        """Compact retrieval context for GraphRAG / advisor memory — what we know about the user."""
+        snap = await self.snapshot(ctx)
+        return {
+            "has_discovery": bool(snap["objectives"]),
+            "life_vision": snap["life_vision"],
+            "primary_objective": snap["primary_objective"],
+            "objectives": [o["title"] for o in snap["objectives"]],
+            "themes": snap["top_themes"], "risks": snap["top_risks"], "opportunities": snap["top_opportunities"],
+            "constraints": [c["label"] for c in snap["active_constraints"]],
+            "open_dependencies": [d["label"] for d in snap["open_dependencies"]],
+        }
+
     async def personal_graph(self, ctx: UserContext) -> dict[str, Any]:
-        """The Personal Life Graph: vision → objectives → goals/dependencies/risks/opportunities."""
+        """The Personal Life Graph from PERSISTED nodes + edges (active objectives only)."""
         vision = await self._rows("life_vision", ctx)
-        objectives = await self._rows("life_objectives", ctx)
-        deps = await self._rows("dependencies", ctx)
-        goals = await self._rows("goals", ctx)
-        risks = await self._rows("risks", ctx)
-        opps = await self._rows("opportunities", ctx)
+        objectives = self._active(await self._rows("life_objectives", ctx))
+        active_ids = {o["id"] for o in objectives}
+        deps = [d for d in await self._rows("dependencies", ctx) if d.get("objective_id") in active_ids]
+        goals = [g for g in await self._rows("goals", ctx) if g.get("objective_id") in active_ids]
+        risks = [r for r in await self._rows("risks", ctx) if r.get("objective_id") in active_ids]
+        opps = [o for o in await self._rows("opportunities", ctx) if o.get("objective_id") in active_ids]
+        cons = [c for c in await self._rows("constraints", ctx) if c.get("objective_id") in active_ids]
+        stored_edges = [e for e in await self._rows("life_graph_edges", ctx) if e.get("status", "active") == "active"]
         nodes: list[dict[str, Any]] = []
-        edges: list[dict[str, Any]] = []
         if vision and vision[0].get("vision_text"):
             nodes.append({"id": "vision", "type": "Life Vision", "label": vision[0]["vision_text"][:60], "color": "purple"})
         for o in objectives:
-            nodes.append({"id": o["id"], "type": "Life Objective", "label": o["title"], "color": "indigo"})
-            if vision:
-                edges.append({"from": "vision", "to": o["id"], "rel": "realizes"})
-        for coll, typ, color, rel in ((goals, "Goal", "blue", "advances"), (deps, "Dependency", "amber", "requires"),
-                                      (risks, "Risk", "red", "threatened_by"), (opps, "Opportunity", "green", "accelerated_by")):
+            nodes.append({"id": o["id"], "type": "Life Objective", "label": o["title"], "color": "indigo", "confidence": o.get("confidence")})
+        for coll, typ, color in ((goals, "Goal", "blue"), (deps, "Dependency", "amber"),
+                                 (risks, "Risk", "red"), (opps, "Opportunity", "green"), (cons, "Constraint", "rose")):
             for r in coll:
-                nid = r["id"]
-                nodes.append({"id": nid, "type": typ, "label": r.get("label") or r.get("title"), "color": color, "domain": r.get("domain")})
-                if r.get("objective_id"):
-                    edges.append({"from": r["objective_id"], "to": nid, "rel": rel})
-        return {"nodes": nodes, "edges": edges, "objective_count": len(objectives),
-                "legend": {"purple": "Life Vision", "indigo": "Life Objective", "blue": "Goal",
-                           "amber": "Dependency", "red": "Risk", "green": "Opportunity"}}
+                nodes.append({"id": r["id"], "type": typ, "label": r.get("label") or r.get("title"), "color": color, "domain": r.get("domain")})
+        node_ids = {n["id"] for n in nodes}
+        edges = [{"from": e["source_node"], "to": e["target_node"], "rel": e["edge_type"], "confidence": e.get("confidence")}
+                 for e in stored_edges if e["source_node"] in node_ids and e["target_node"] in node_ids]
+        return {"nodes": nodes, "edges": edges, "objective_count": len(objectives), "edge_count": len(edges),
+                "legend": {"purple": "Life Vision", "indigo": "Life Objective", "blue": "Goal", "amber": "Dependency",
+                           "red": "Risk", "green": "Opportunity", "rose": "Constraint"}}

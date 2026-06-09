@@ -82,6 +82,7 @@ class LifeOrchestratorAgent:
         trust_safety: TrustSafetyAgent,
         memory: MemoryAgent,
         recommendation_os: object | None = None,
+        life: object | None = None,
     ) -> None:
         self._ctx_builder = context_builder
         self._gemini = gemini
@@ -89,6 +90,13 @@ class LifeOrchestratorAgent:
         self._memory = memory
         self._medical = MedicalSafetyGate()
         self._os = recommendation_os  # the Recommendation OS — chat reads the SAME spine as the dashboard
+        self._life = life  # Life Discovery — chat knows the user's objectives before speaking (GraphRAG)
+
+    @staticmethod
+    def _is_about_me_query(q: str) -> bool:
+        ql = q.lower()
+        return any(p in ql for p in ("what do you know about", "my goals", "my objectives", "do you know me",
+                                     "what have i told you", "remember about me", "my life vision", "what's my objective"))
 
     @staticmethod
     def _is_next_action_query(q: str) -> bool:
@@ -111,6 +119,12 @@ class LifeOrchestratorAgent:
             os_resp = await self._answer_from_os(ctx, query, conversation_id)
             if os_resp is not None:
                 return os_resp
+
+        # Advisor memory (Sprint 34): "what do you know about my goals?" answered from the Life Graph.
+        if self._life is not None and self._is_about_me_query(query):
+            me = await self._answer_about_me(ctx, query, conversation_id)
+            if me is not None:
+                return me
 
         # Medical safety: for health queries, BLOCK diagnosis/dosing/treatment and
         # ESCALATE emergencies before any model call (HEALTH_GOVERNANCE_STANDARD).
@@ -226,6 +240,37 @@ class LifeOrchestratorAgent:
         evidence = [{"fact": a["title"], "value": a.get("why", ""), "source": a.get("source_module")} for a in actions[:3]]
         return ChatTurnResponse(message=body, grounded=True, used_gemini=False, evidence=evidence,
                                 conversation_id=conversation_id)
+
+    async def _answer_about_me(self, ctx: UserContext, query: str, conversation_id: str | None) -> ChatTurnResponse | None:
+        """Answer 'what do you know about my goals?' from the persisted Life Graph (advisor memory)."""
+        try:
+            c = await self._life.life_context(ctx)  # type: ignore[union-attr]
+        except Exception:  # noqa: BLE001
+            return None
+        if not c.get("has_discovery"):
+            return ChatTurnResponse(
+                message=("I don't have your goals yet. Tell me one thing you're trying to do (and why it matters) "
+                         "on the Discover page, and I'll build your life model from there."),
+                grounded=True, used_gemini=False, conversation_id=conversation_id)
+        po = c.get("primary_objective") or {}
+        parts = []
+        if c.get("life_vision"):
+            parts.append(f'You described success as: "{c["life_vision"]}".')
+        if po:
+            parts.append(f"Your primary objective appears to be **{po.get('title')}** "
+                         f"(confidence {round((po.get('confidence') or 0) * 100)}%).")
+        if c.get("open_dependencies"):
+            parts.append("Important dependencies you'll need: " + ", ".join(c["open_dependencies"][:5]) + ".")
+        if c.get("risks"):
+            parts.append("I flagged these risks: " + ", ".join(c["risks"][:3]) + ".")
+        if c.get("constraints"):
+            parts.append("And these constraints to resolve: " + ", ".join(c["constraints"][:3]) + ".")
+        if c.get("opportunities"):
+            parts.append("Potential opportunities: " + ", ".join(c["opportunities"][:3]) + ".")
+        parts.append("Based on what you've shared — tell me if I've got this wrong and I'll adjust.")
+        evidence = [{"fact": "primary objective", "value": po.get("title", ""), "source": "life:objectives"}]
+        return ChatTurnResponse(message="\n\n".join(parts), grounded=True, used_gemini=False,
+                                evidence=evidence, conversation_id=conversation_id)
 
     def _insufficient_message(self, packet: EvidencePacket) -> str:
         missing = ", ".join(packet.missing_facts) or "your account data"

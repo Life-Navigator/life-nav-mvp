@@ -317,6 +317,7 @@ def get_orchestrator(
     trust_safety: TrustSafetyAgent = Depends(get_trust_safety_agent),
     memory: MemoryAgent = Depends(get_memory_agent),
     recommendation_os: RecommendationOS = Depends(get_recommendation_os),
+    life: LifeDiscoveryService = Depends(get_life_discovery),
 ) -> LifeOrchestratorAgent:
     return LifeOrchestratorAgent(
         context_builder=context_builder,
@@ -324,6 +325,7 @@ def get_orchestrator(
         trust_safety=trust_safety,
         memory=memory,
         recommendation_os=recommendation_os,
+        life=life,
     )
 
 

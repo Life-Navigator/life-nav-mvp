@@ -380,6 +380,7 @@ class RecommendationOS:
         # === 6) Life objectives (Sprint 33) — recommendations from onboarding, BEFORE any document ===
         try:
             objs = await self._sb.select("life_objectives", filters={"user_id": f"eq.{ctx.user_id}"}, limit=50, schema="life")
+            objs = [o for o in objs if o.get("status", "active") == "active"]  # superseded objectives don't generate recs
         except Exception:  # noqa: BLE001
             objs = []
         if objs:
