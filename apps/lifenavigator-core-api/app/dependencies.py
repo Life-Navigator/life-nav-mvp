@@ -31,6 +31,7 @@ from .services.analytics import AnalyticsService
 from .services.comp_benefits import CompensationBenefitsEngine
 from .services.compensation import CompensationIntelligenceEngine
 from .services.family_office import FamilyOfficeService
+from .services.guidance import GuidanceEngine
 from .services.financial_planning import FinancialPlanningEngine
 from .services.health_intelligence import HealthIntelligenceService
 from .services.decision_engine import DecisionEngine
@@ -236,6 +237,14 @@ def get_platform_access(
     settings: Settings = Depends(get_settings),
 ) -> PlatformAccess:
     return PlatformAccess(supabase=supabase, admin_emails=settings.admin_email_set())
+
+
+def get_guidance(
+    readiness: LifeReadinessEngine = Depends(get_readiness_engine),
+    documents: DocumentIntelligenceService = Depends(get_document_service),
+    supabase: SupabaseClient = Depends(get_supabase),
+) -> GuidanceEngine:
+    return GuidanceEngine(readiness=readiness, documents=documents, supabase=supabase)
 
 
 def get_retriever(

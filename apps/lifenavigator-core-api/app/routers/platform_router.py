@@ -8,8 +8,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends, HTTPException
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_platform_access
+from ..dependencies import authenticated, get_guidance, get_platform_access
 from ..models.common import UserContext
+from ..services.guidance import GuidanceEngine
 from ..services.platform_access import VALID_STATUSES, PlatformAccess
 
 router = APIRouter(prefix="/v1/platform", tags=["platform"])
@@ -46,3 +47,21 @@ async def skip_military(user: AuthenticatedUser = Depends(authenticated), svc: P
     """User dismissed the one-time military onboarding question without answering."""
     await svc.mark_onboarding_asked(_ctx(user))
     return {"ok": True}
+
+
+@router.get("/dashboard")
+async def dashboard(user: AuthenticatedUser = Depends(authenticated), svc: GuidanceEngine = Depends(get_guidance)):
+    """Mission control: status + next-best-action + top gaps + missing documents + journey."""
+    return await svc.dashboard(_ctx(user))
+
+
+@router.put("/onboarding")
+async def set_onboarding(
+    user: AuthenticatedUser = Depends(authenticated),
+    svc: PlatformAccess = Depends(get_platform_access),
+    focus_decision: str = Body("", embed=True),
+    completed: bool = Body(False, embed=True),
+    step: int = Body(0, embed=True),
+):
+    return await svc.set_onboarding(_ctx(user), focus_decision=focus_decision or None,
+                                    completed=completed if completed else None, step=step or None)

@@ -45,6 +45,21 @@ class PlatformAccess:
         await self._sb.upsert("user_settings", row, schema=PLATFORM)
         return {"military_status": status, "source": source}
 
+    async def set_onboarding(self, ctx: UserContext, *, focus_decision: Optional[str] = None,
+                             completed: Optional[bool] = None, step: Optional[int] = None) -> dict[str, Any]:
+        existing = await self.get_settings(ctx)
+        row = {"user_id": ctx.user_id, "tenant_id": ctx.user_id,
+               "military_status": existing.get("military_status", "unknown"),
+               "onboarding_military_asked": existing.get("onboarding_military_asked", False), "updated_at": _now()}
+        if focus_decision is not None:
+            row["focus_decision"] = focus_decision
+        if completed is not None:
+            row["onboarding_completed"] = completed
+        if step is not None:
+            row["onboarding_step"] = step
+        await self._sb.upsert("user_settings", row, schema=PLATFORM)
+        return {"ok": True}
+
     async def mark_onboarding_asked(self, ctx: UserContext) -> None:
         existing = await self.get_settings(ctx)
         await self._sb.upsert("user_settings", {"user_id": ctx.user_id, "tenant_id": ctx.user_id,
@@ -63,6 +78,8 @@ class PlatformAccess:
         auto_enabled = has_doc and status in ("unknown", "civilian")
         return {"military_status": status, "has_military_doc": has_doc, "auto_enabled": auto_enabled,
                 "onboarding_military_asked": settings.get("onboarding_military_asked", False),
+                "onboarding_completed": settings.get("onboarding_completed", False),
+                "focus_decision": settings.get("focus_decision"),
                 "is_admin": self.is_admin(email),
                 "ask_military_question": status == "unknown" and not settings.get("onboarding_military_asked", False) and not has_doc}
 
