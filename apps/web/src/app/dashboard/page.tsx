@@ -1,5 +1,6 @@
 import DashboardClient from '@/components/dashboard/DashboardClient';
 import FirstInsightCard from '@/components/dashboard/FirstInsightCard';
+import MissionControl from '@/components/dashboard/MissionControl';
 import RecommendationsCard from '@/components/dashboard/RecommendationsCard';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import type { FirstInsight } from '@/lib/finance/first-insight';
@@ -61,12 +62,16 @@ export default async function DashboardPage() {
 
   return (
     <>
-      {firstInsight?.has_data && (
-        <div className="px-6 pt-6 max-w-[1400px] mx-auto w-full">
-          <FirstInsightCard insight={firstInsight} />
-          <RecommendationsCard recommendations={recommendations} />
-        </div>
-      )}
+      <div className="px-6 pt-6 max-w-[1400px] mx-auto w-full">
+        {/* Mission control: status → next best action → why → journey (Sprint 23) */}
+        <MissionControl />
+        {firstInsight?.has_data && (
+          <>
+            <FirstInsightCard insight={firstInsight} />
+            <RecommendationsCard recommendations={recommendations} />
+          </>
+        )}
+      </div>
       <DashboardClient firstInsight={firstInsight} />
     </>
   );

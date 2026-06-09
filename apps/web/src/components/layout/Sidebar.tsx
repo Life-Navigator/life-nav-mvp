@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, Fragment } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { classNames } from '@/lib/utils/classNames';
@@ -383,62 +383,27 @@ const emailAccounts: Array<{
 // Navigation items with sections and child items
 // Items marked comingSoon: true are hidden in beta to keep users on the working path.
 const navigation = [
-  {
-    name: 'Dashboard',
-    href: '/dashboard',
-    icon: HomeIcon,
-    current: false,
-  },
-  {
-    name: 'Life Readiness',
-    href: '/dashboard/readiness',
-    icon: TargetIcon,
-    current: false,
-  },
-  {
-    name: 'Chat',
-    href: '/dashboard/chat',
-    icon: ChatIcon,
-    current: false,
-  },
-  {
-    name: 'Goals & Assessment',
-    href: '/dashboard/goals',
-    icon: TargetIcon,
-    current: false,
-  },
-  {
-    name: 'Scenario Lab',
-    href: '/dashboard/scenario-lab',
-    icon: ChartBarIcon,
-    current: false,
-  },
+  // ── Core: the outcome journey ──
+  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, current: false, section: 'Core' },
+  { name: 'Life Readiness', href: '/dashboard/readiness', icon: TargetIcon, current: false },
+  { name: 'Documents', href: '/dashboard/documents', icon: DocumentIcon, current: false },
   {
     name: 'Life Decisions',
     href: '/dashboard/life-decisions/workspace',
     icon: TargetIcon,
     current: false,
   },
+  { name: 'Reports', href: '/dashboard/reports', icon: DocumentIcon, current: false },
+  // ── Financial ──
   {
-    name: 'Decision Graph',
-    href: '/dashboard/life-decisions/graph',
-    moduleId: 'decision_graph',
-    icon: PuzzlePieceIcon,
+    name: 'Finance',
+    href: '/dashboard/finance',
+    icon: CurrencyDollarIcon,
     current: false,
+    section: 'Financial',
+    children: [{ name: 'Overview', href: '/dashboard/finance/overview' }],
   },
-  {
-    name: 'Scenarios',
-    href: '/dashboard/life-decisions/scenarios',
-    moduleId: 'scenarios',
-    icon: MapIcon,
-    current: false,
-  },
-  {
-    name: 'Documents',
-    href: '/dashboard/documents',
-    icon: DocumentIcon,
-    current: false,
-  },
+  { name: 'Career', href: '/dashboard/career', icon: BriefcaseIcon, current: false },
   {
     name: 'Comp & Benefits',
     href: '/dashboard/benefits',
@@ -453,29 +418,27 @@ const navigation = [
     icon: ChartBarIcon,
     current: false,
   },
-  {
-    name: 'Finance',
-    href: '/dashboard/finance',
-    icon: CurrencyDollarIcon,
-    current: false,
-    children: [{ name: 'Overview', href: '/dashboard/finance/overview' }],
-  },
-  {
-    name: 'Career',
-    href: '/dashboard/career',
-    icon: BriefcaseIcon,
-    current: false,
-  },
-  {
-    name: 'Family',
-    href: '/dashboard/family',
-    icon: HeartIcon,
-    current: false,
-  },
+  // ── Family ──
+  { name: 'Family', href: '/dashboard/family', icon: HeartIcon, current: false, section: 'Family' },
   {
     name: 'Family Office',
     href: '/dashboard/family-office',
     moduleId: 'family_office',
+    icon: HeartIcon,
+    current: false,
+  },
+  // ── Health ──
+  {
+    name: 'Health & Wellness',
+    href: '/dashboard/wellness',
+    icon: HeartIcon,
+    current: false,
+    section: 'Health',
+  },
+  {
+    name: 'Health Intelligence',
+    href: '/dashboard/health-intelligence',
+    moduleId: 'health_intelligence',
     icon: HeartIcon,
     current: false,
   },
@@ -486,24 +449,31 @@ const navigation = [
     current: false,
     comingSoon: true,
   },
+  // ── Military (gated; section hides with the item for civilians) ──
   {
-    name: 'Health & Wellness',
-    href: '/dashboard/wellness',
-    icon: HeartIcon,
-    current: false,
-  },
-  {
-    name: 'Health Intelligence',
-    href: '/dashboard/health-intelligence',
-    moduleId: 'health_intelligence',
-    icon: HeartIcon,
-    current: false,
-  },
-  {
-    name: 'Military / VA',
+    name: 'SquaredAway',
     href: '/dashboard/military',
     moduleId: 'military',
     icon: AcademicCapIcon,
+    current: false,
+    section: 'Military',
+  },
+  // ── More ──
+  { name: 'Chat', href: '/dashboard/chat', icon: ChatIcon, current: false, section: 'More' },
+  { name: 'Goals & Assessment', href: '/dashboard/goals', icon: TargetIcon, current: false },
+  { name: 'Scenario Lab', href: '/dashboard/scenario-lab', icon: ChartBarIcon, current: false },
+  {
+    name: 'Decision Graph',
+    href: '/dashboard/life-decisions/graph',
+    moduleId: 'decision_graph',
+    icon: PuzzlePieceIcon,
+    current: false,
+  },
+  {
+    name: 'Compare Futures',
+    href: '/dashboard/life-decisions/scenarios',
+    moduleId: 'scenarios',
+    icon: MapIcon,
     current: false,
   },
   {
@@ -513,13 +483,7 @@ const navigation = [
     current: false,
     comingSoon: true,
   },
-  {
-    name: 'Roadmap',
-    href: '/dashboard/roadmap',
-    icon: MapIcon,
-    current: false,
-    comingSoon: true,
-  },
+  { name: 'Roadmap', href: '/dashboard/roadmap', icon: MapIcon, current: false, comingSoon: true },
   {
     name: 'Executive Dashboard',
     href: '/dashboard/metrics',
@@ -787,234 +751,170 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
             const mid = (item as any).moduleId as string | undefined;
             if (mid && moduleVis[mid] && moduleVis[mid].visible === false) return null;
             const maturityBadge = mid ? moduleVis[mid]?.badge : null;
+            const section = (item as any).section as string | undefined;
 
             return (
-              <div
-                key={item.name}
-                className="mb-1 relative"
-                onMouseEnter={() => (item as any).hasDropdown && handleMouseEnter(item.name)}
-                onMouseLeave={(item as any).hasDropdown ? handleMouseLeave : undefined}
-              >
-                {/* Main navigation item (section header) */}
-                <div className="flex items-center">
-                  {isComingSoon ? (
-                    <div
-                      className={classNames(
-                        'flex items-center flex-grow rounded-md cursor-not-allowed opacity-50',
-                        isCollapsed && !isMobile ? 'justify-center p-2' : 'px-3 py-2'
-                      )}
-                      title={isCollapsed && !isMobile ? `${item.name} (Coming Soon)` : undefined}
-                    >
-                      <item.icon
-                        className={classNames(
-                          'text-gray-400 dark:text-gray-500',
-                          isCollapsed && !isMobile ? 'w-6 h-6' : 'w-5 h-5 mr-3 flex-shrink-0'
-                        )}
-                        aria-hidden="true"
-                      />
-                      {(!effectiveCollapsed || isMobile) && (
-                        <>
-                          <span className="flex-grow text-gray-400 dark:text-gray-500">
-                            {item.name}
-                          </span>
-                          <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
-                            Soon
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <Link
-                      href={item.href}
-                      className={classNames(
-                        isActive
-                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200'
-                          : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50',
-                        'flex items-center flex-grow rounded-md group',
-                        isCollapsed && !isMobile ? 'justify-center p-2' : 'px-3 py-2'
-                      )}
-                      onClick={() => isMobile && !item.children && setIsOpen(false)}
-                      title={isCollapsed && !isMobile ? item.name : undefined}
-                    >
-                      <item.icon
-                        className={classNames(
-                          isActive
-                            ? 'text-blue-600 dark:text-blue-300'
-                            : 'text-gray-500 group-hover:text-gray-600 dark:text-gray-400 dark:group-hover:text-gray-300',
-                          isCollapsed && !isMobile ? 'w-6 h-6' : 'w-5 h-5 mr-3 flex-shrink-0'
-                        )}
-                        aria-hidden="true"
-                      />
-                      {(!effectiveCollapsed || isMobile) && (
-                        <span className="flex-grow flex items-center gap-1.5">
-                          {item.name}
-                          {maturityBadge && (
-                            <span
-                              className={classNames(
-                                'text-[9px] font-bold px-1 py-0.5 rounded leading-none',
-                                maturityBadge === 'BETA'
-                                  ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
-                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-                              )}
-                              title={
-                                maturityBadge === 'BETA'
-                                  ? 'Beta — still maturing; results may be limited'
-                                  : 'Experimental — illustrative only'
-                              }
-                            >
-                              {maturityBadge}
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </Link>
-                  )}
-
-                  {/* Dropdown toggle button - only show when not collapsed or on mobile */}
-                  {item.children && !isComingSoon && (!effectiveCollapsed || isMobile) && (
-                    <button
-                      onClick={() => toggleSection(item.name)}
-                      className="p-1 rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 focus:outline-none"
-                    >
-                      <ChevronIcon
-                        className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                      />
-                    </button>
-                  )}
-                </div>
-
-                {/* Child items - only show when section is expanded and not collapsed or on mobile */}
-                {item.children &&
-                  !isComingSoon &&
-                  isExpanded &&
-                  (!effectiveCollapsed || isMobile) && (
-                    <div className="ml-8 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
-                      {item.children.map((child) => {
-                        const isChildActive = pathname === child.href;
-                        return (
-                          <Link
-                            key={child.name}
-                            href={child.href}
-                            className={classNames(
-                              isChildActive
-                                ? 'text-blue-700 dark:text-blue-300 font-medium'
-                                : 'text-gray-600 hover:text-gray-800 dark:text-white dark:hover:text-gray-200',
-                              'block py-1.5 px-3 text-sm rounded-md'
-                            )}
-                            onClick={() => isMobile && setIsOpen(false)}
-                          >
-                            {child.name}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                {/* Email accounts dropdown */}
-                {(item as any).hasDropdown && isHovered && (!effectiveCollapsed || isMobile) && (
-                  <div
-                    className="absolute left-full top-0 ml-2 bg-white dark:bg-gray-800 shadow-lg rounded-md p-2 min-w-48 z-50 border border-gray-200 dark:border-gray-700"
-                    onMouseEnter={() => handleMouseEnter(item.name)}
-                    onMouseLeave={handleMouseLeave}
-                  >
-                    <div className="py-1 text-sm">
-                      <div className="px-3 py-2 font-medium text-gray-700 dark:text-white">
-                        Email Accounts
-                      </div>
-                      <div className="mt-1 space-y-1">
-                        {emailAccounts.length > 0 ? (
-                          emailAccounts.map((account) => (
-                            <div
-                              key={account.id}
-                              className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer flex items-center justify-between"
-                            >
-                              <div className="flex items-center">
-                                <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                                <span>{account.email.split('@')[0]}</span>
-                              </div>
-                              {account.unread > 0 && (
-                                <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                  {account.unread}
-                                </span>
-                              )}
-                            </div>
-                          ))
-                        ) : (
-                          <div className="px-3 py-3 text-center text-gray-500 dark:text-gray-300 text-xs">
-                            <p>No email accounts connected</p>
-                            <Link
-                              href="/dashboard/integrations"
-                              className="mt-2 inline-block px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                              onClick={() => setIsOpen(false)}
-                            >
-                              Connect Account
-                            </Link>
-                          </div>
-                        )}
-                      </div>
-                      {emailAccounts.length > 0 && (
-                        <>
-                          <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
-                          <Link
-                            href="/email"
-                            className="block px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-                            onClick={() => setIsOpen(false)}
-                          >
-                            Open Email App
-                          </Link>
-                        </>
-                      )}
-                    </div>
+              <Fragment key={item.name}>
+                {section && (!effectiveCollapsed || isMobile) && (
+                  <div className="px-3 pt-4 pb-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    {section}
                   </div>
                 )}
-
-                {/* Collapsed mode dropdown tooltip */}
-                {(item as any).hasDropdown && isHovered && isCollapsed && !isMobile && (
-                  <div
-                    className="absolute left-full top-0 ml-2 bg-white dark:bg-gray-800 shadow-lg rounded-md p-2 min-w-48 z-50 border border-gray-200 dark:border-gray-700"
-                    onMouseEnter={() => handleMouseEnter(item.name)}
-                    onMouseLeave={handleMouseLeave}
-                  >
-                    <div className="py-1">
-                      <div className="px-3 py-2 font-medium text-gray-700 dark:text-white">
-                        {item.name}
+                <div
+                  className="mb-1 relative"
+                  onMouseEnter={() => (item as any).hasDropdown && handleMouseEnter(item.name)}
+                  onMouseLeave={(item as any).hasDropdown ? handleMouseLeave : undefined}
+                >
+                  {/* Main navigation item (section header) */}
+                  <div className="flex items-center">
+                    {isComingSoon ? (
+                      <div
+                        className={classNames(
+                          'flex items-center flex-grow rounded-md cursor-not-allowed opacity-50',
+                          isCollapsed && !isMobile ? 'justify-center p-2' : 'px-3 py-2'
+                        )}
+                        title={isCollapsed && !isMobile ? `${item.name} (Coming Soon)` : undefined}
+                      >
+                        <item.icon
+                          className={classNames(
+                            'text-gray-400 dark:text-gray-500',
+                            isCollapsed && !isMobile ? 'w-6 h-6' : 'w-5 h-5 mr-3 flex-shrink-0'
+                          )}
+                          aria-hidden="true"
+                        />
+                        {(!effectiveCollapsed || isMobile) && (
+                          <>
+                            <span className="flex-grow text-gray-400 dark:text-gray-500">
+                              {item.name}
+                            </span>
+                            <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                              Soon
+                            </span>
+                          </>
+                        )}
                       </div>
-                      <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-                      {(item as any).hasDropdown && (item as any).dropdownContent && (
+                    ) : (
+                      <Link
+                        href={item.href}
+                        className={classNames(
+                          isActive
+                            ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200'
+                            : 'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-700/50',
+                          'flex items-center flex-grow rounded-md group',
+                          isCollapsed && !isMobile ? 'justify-center p-2' : 'px-3 py-2'
+                        )}
+                        onClick={() => isMobile && !item.children && setIsOpen(false)}
+                        title={isCollapsed && !isMobile ? item.name : undefined}
+                      >
+                        <item.icon
+                          className={classNames(
+                            isActive
+                              ? 'text-blue-600 dark:text-blue-300'
+                              : 'text-gray-500 group-hover:text-gray-600 dark:text-gray-400 dark:group-hover:text-gray-300',
+                            isCollapsed && !isMobile ? 'w-6 h-6' : 'w-5 h-5 mr-3 flex-shrink-0'
+                          )}
+                          aria-hidden="true"
+                        />
+                        {(!effectiveCollapsed || isMobile) && (
+                          <span className="flex-grow flex items-center gap-1.5">
+                            {item.name}
+                            {maturityBadge && (
+                              <span
+                                className={classNames(
+                                  'text-[9px] font-bold px-1 py-0.5 rounded leading-none',
+                                  maturityBadge === 'BETA'
+                                    ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'
+                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                                )}
+                                title={
+                                  maturityBadge === 'BETA'
+                                    ? 'Beta — still maturing; results may be limited'
+                                    : 'Experimental — illustrative only'
+                                }
+                              >
+                                {maturityBadge}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </Link>
+                    )}
+
+                    {/* Dropdown toggle button - only show when not collapsed or on mobile */}
+                    {item.children && !isComingSoon && (!effectiveCollapsed || isMobile) && (
+                      <button
+                        onClick={() => toggleSection(item.name)}
+                        className="p-1 rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 focus:outline-none"
+                      >
+                        <ChevronIcon
+                          className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                        />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Child items - only show when section is expanded and not collapsed or on mobile */}
+                  {item.children &&
+                    !isComingSoon &&
+                    isExpanded &&
+                    (!effectiveCollapsed || isMobile) && (
+                      <div className="ml-8 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
+                        {item.children.map((child) => {
+                          const isChildActive = pathname === child.href;
+                          return (
+                            <Link
+                              key={child.name}
+                              href={child.href}
+                              className={classNames(
+                                isChildActive
+                                  ? 'text-blue-700 dark:text-blue-300 font-medium'
+                                  : 'text-gray-600 hover:text-gray-800 dark:text-white dark:hover:text-gray-200',
+                                'block py-1.5 px-3 text-sm rounded-md'
+                              )}
+                              onClick={() => isMobile && setIsOpen(false)}
+                            >
+                              {child.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                  {/* Email accounts dropdown */}
+                  {(item as any).hasDropdown && isHovered && (!effectiveCollapsed || isMobile) && (
+                    <div
+                      className="absolute left-full top-0 ml-2 bg-white dark:bg-gray-800 shadow-lg rounded-md p-2 min-w-48 z-50 border border-gray-200 dark:border-gray-700"
+                      onMouseEnter={() => handleMouseEnter(item.name)}
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      <div className="py-1 text-sm">
+                        <div className="px-3 py-2 font-medium text-gray-700 dark:text-white">
+                          Email Accounts
+                        </div>
                         <div className="mt-1 space-y-1">
                           {emailAccounts.length > 0 ? (
-                            <>
-                              {emailAccounts.map((account) => (
-                                <div
-                                  key={account.id}
-                                  className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer flex items-center justify-between"
-                                >
-                                  <div className="flex items-center">
-                                    <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
-                                    <span className="text-sm">{account.email.split('@')[0]}</span>
-                                  </div>
-                                  {account.unread > 0 && (
-                                    <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                                      {account.unread}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                              <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
-                              <Link
-                                href="/email"
-                                className="block px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-sm"
-                                onClick={() => setIsOpen(false)}
+                            emailAccounts.map((account) => (
+                              <div
+                                key={account.id}
+                                className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer flex items-center justify-between"
                               >
-                                Open Email App
-                              </Link>
-                            </>
+                                <div className="flex items-center">
+                                  <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                                  <span>{account.email.split('@')[0]}</span>
+                                </div>
+                                {account.unread > 0 && (
+                                  <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                    {account.unread}
+                                  </span>
+                                )}
+                              </div>
+                            ))
                           ) : (
                             <div className="px-3 py-3 text-center text-gray-500 dark:text-gray-300 text-xs">
                               <p>No email accounts connected</p>
                               <Link
                                 href="/dashboard/integrations"
-                                className="mt-2 inline-block px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
+                                className="mt-2 inline-block px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                                 onClick={() => setIsOpen(false)}
                               >
                                 Connect Account
@@ -1022,11 +922,82 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
                             </div>
                           )}
                         </div>
-                      )}
+                        {emailAccounts.length > 0 && (
+                          <>
+                            <div className="border-t border-gray-200 dark:border-gray-700 my-2"></div>
+                            <Link
+                              href="/email"
+                              className="block px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+                              onClick={() => setIsOpen(false)}
+                            >
+                              Open Email App
+                            </Link>
+                          </>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+
+                  {/* Collapsed mode dropdown tooltip */}
+                  {(item as any).hasDropdown && isHovered && isCollapsed && !isMobile && (
+                    <div
+                      className="absolute left-full top-0 ml-2 bg-white dark:bg-gray-800 shadow-lg rounded-md p-2 min-w-48 z-50 border border-gray-200 dark:border-gray-700"
+                      onMouseEnter={() => handleMouseEnter(item.name)}
+                      onMouseLeave={handleMouseLeave}
+                    >
+                      <div className="py-1">
+                        <div className="px-3 py-2 font-medium text-gray-700 dark:text-white">
+                          {item.name}
+                        </div>
+                        <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                        {(item as any).hasDropdown && (item as any).dropdownContent && (
+                          <div className="mt-1 space-y-1">
+                            {emailAccounts.length > 0 ? (
+                              <>
+                                {emailAccounts.map((account) => (
+                                  <div
+                                    key={account.id}
+                                    className="px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md cursor-pointer flex items-center justify-between"
+                                  >
+                                    <div className="flex items-center">
+                                      <div className="w-2 h-2 rounded-full bg-green-500 mr-2"></div>
+                                      <span className="text-sm">{account.email.split('@')[0]}</span>
+                                    </div>
+                                    {account.unread > 0 && (
+                                      <span className="bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                                        {account.unread}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                                <div className="border-t border-gray-200 dark:border-gray-700 my-1"></div>
+                                <Link
+                                  href="/email"
+                                  className="block px-3 py-2 text-blue-600 dark:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md text-sm"
+                                  onClick={() => setIsOpen(false)}
+                                >
+                                  Open Email App
+                                </Link>
+                              </>
+                            ) : (
+                              <div className="px-3 py-3 text-center text-gray-500 dark:text-gray-300 text-xs">
+                                <p>No email accounts connected</p>
+                                <Link
+                                  href="/dashboard/integrations"
+                                  className="mt-2 inline-block px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-xs"
+                                  onClick={() => setIsOpen(false)}
+                                >
+                                  Connect Account
+                                </Link>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Fragment>
             );
           })}
         </nav>
