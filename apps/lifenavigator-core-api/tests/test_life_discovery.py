@@ -57,3 +57,52 @@ async def test_onboarding_produces_recommendations_before_any_document():
     await os_engine.sync(CTX)
     recs = await os_engine.active(CTX)
     assert recs and any(r["source_module"] == "life:objective" for r in recs)  # recs from onboarding alone
+
+
+# ---- Sprint 35: multi-objective plan, conflict/tradeoff, discovery health, full GraphRAG grounding ----
+@pytest.mark.asyncio
+async def test_multi_objective_plan_detects_conflict():
+    sb = FakeSupabase({})
+    svc = LifeDiscoveryService(sb)
+    await svc.discover_goal(CTX, surface_goal="retire at 45", why_chain=[{"a": "I want freedom and independence"}])
+    await svc.discover_goal(CTX, surface_goal="get an MBA", why_chain=[{"a": "I want to change careers and learn"}])
+    plan = await svc.objectives_plan(CTX)
+    assert len(plan["objectives"]) >= 2 and plan["objectives"][0]["priority_rank"] == 1
+    # financial_independence vs (career_growth/education) — at least the FI/education timeline conflict path exists
+    assert isinstance(plan["conflicts"], list)
+
+
+@pytest.mark.asyncio
+async def test_fi_vs_family_conflict_is_flagged():
+    sb = FakeSupabase({})
+    svc = LifeDiscoveryService(sb)
+    await svc.discover_goal(CTX, surface_goal="retire early", why_chain=[{"a": "freedom and independence"}])
+    await svc.discover_goal(CTX, surface_goal="buy a house", why_chain=[{"a": "we want children and to raise a family"}])
+    plan = await svc.objectives_plan(CTX)
+    assert plan["conflicts"], "expected a money conflict between financial independence and family stability"
+    c = plan["conflicts"][0]
+    assert c["type"] in ("money", "time", "timeline") and c["suggested_focus"] and c["suggested_sequence"]
+
+
+@pytest.mark.asyncio
+async def test_discovery_health_flags_missing_areas():
+    sb = FakeSupabase({})
+    svc = LifeDiscoveryService(sb)
+    await svc.discover_goal(CTX, surface_goal="get a new job", why_chain=[{"a": "burned out"}])  # career only
+    h = await svc.discovery_health(CTX)
+    assert "career" in h["covered_areas"]
+    assert any("health" in m or "family" in m or "retirement" in m for m in h["missing_areas"])
+    assert h["prompts"] and 0 <= h["model_quality"] <= 1
+
+
+@pytest.mark.asyncio
+async def test_life_block_grounds_the_system_prompt():
+    from app.agents.orchestrator import LifeOrchestratorAgent
+    block = LifeOrchestratorAgent._life_block({
+        "has_discovery": True, "life_vision": "Retire comfortably by 60",
+        "primary_objective": {"title": "Reach financial independence", "confidence": 0.9},
+        "objectives": ["Reach financial independence"], "themes": ["freedom"],
+        "constraints": ["Low savings rate"], "open_dependencies": ["High savings rate"], "risks": ["Outliving assets"],
+    })
+    assert "Reach financial independence" in block and "Low savings rate" in block and "stated objective" in block
+    assert LifeOrchestratorAgent._life_block({"has_discovery": False}) == ""

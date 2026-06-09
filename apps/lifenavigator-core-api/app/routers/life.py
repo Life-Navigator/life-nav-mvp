@@ -37,3 +37,15 @@ async def snapshot(user: AuthenticatedUser = Depends(authenticated), svc: LifeDi
 @router.get("/graph")
 async def graph(user: AuthenticatedUser = Depends(authenticated), svc: LifeDiscoveryService = Depends(get_life_discovery)):
     return await svc.personal_graph(_ctx(user))
+
+
+@router.get("/plan")
+async def plan(user: AuthenticatedUser = Depends(authenticated), svc: LifeDiscoveryService = Depends(get_life_discovery)):
+    """Multi-objective plan: ranked objectives + conflict/tradeoff analysis."""
+    return await svc.objectives_plan(_ctx(user))
+
+
+@router.get("/health")
+async def health(user: AuthenticatedUser = Depends(authenticated), svc: LifeDiscoveryService = Depends(get_life_discovery)):
+    """Discovery health: coverage, confidence, gaps + prompts to improve the life model."""
+    return await svc.discovery_health(_ctx(user))

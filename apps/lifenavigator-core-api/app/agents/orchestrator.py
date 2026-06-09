@@ -141,8 +141,17 @@ class LifeOrchestratorAgent:
 
         packet = await self._ctx_builder.build_evidence_packet(ctx, query, domains, intent=intent)
 
-        # (3) ANTI-HALLUCINATION GATE — no facts → no model call.
-        if not packet.has_sufficient_grounding:
+        # Full GraphRAG grounding (Sprint 35): load the user's life model into EVERY advisor turn.
+        life_ctx = None
+        if self._life is not None:
+            try:
+                life_ctx = await self._life.life_context(ctx)  # type: ignore[attr-defined]
+            except Exception:  # noqa: BLE001
+                life_ctx = None
+
+        # (3) ANTI-HALLUCINATION GATE — no facts AND no life model → no model call. A completed
+        # discovery is itself valid grounding, so discovery-only users still get real advice.
+        if not packet.has_sufficient_grounding and not (life_ctx and life_ctx.get("has_discovery")):
             return ChatTurnResponse(
                 message=self._insufficient_message(packet),
                 grounded=True,
@@ -152,8 +161,8 @@ class LifeOrchestratorAgent:
                 conversation_id=conversation_id,
             )
 
-        # (5) Gemini — server-side, prompted ONLY with the gated packet.
-        system_prompt = self._system_prompt(packet)
+        # (5) Gemini — server-side, prompted ONLY with the gated packet + life model.
+        system_prompt = self._system_prompt(packet, life_ctx)
         user_prompt = self._user_prompt(query, packet)
         raw = await self._gemini.generate(system_prompt, user_prompt)
 
@@ -186,14 +195,42 @@ class LifeOrchestratorAgent:
             ),
         )
 
+    @staticmethod
+    def _life_block(life_ctx: dict | None) -> str:
+        """The user's life model — loaded into EVERY advisor turn so the AI reasons from who the
+        user is trying to become, not just isolated facts (Sprint 35 full GraphRAG grounding)."""
+        if not life_ctx or not life_ctx.get("has_discovery"):
+            return ""
+        po = life_ctx.get("primary_objective") or {}
+        lines = ["\nWHAT YOU KNOW ABOUT THIS USER (their life model — ground every answer in this):"]
+        if life_ctx.get("life_vision"):
+            lines.append(f"- Life vision: {life_ctx['life_vision']}")
+        if po:
+            lines.append(f"- Primary objective: {po.get('title')} (confidence {round((po.get('confidence') or 0) * 100)}%)")
+        if life_ctx.get("objectives"):
+            lines.append(f"- Active objectives: {', '.join(life_ctx['objectives'])}")
+        if life_ctx.get("themes"):
+            lines.append(f"- Themes that matter to them: {', '.join(life_ctx['themes'])}")
+        if life_ctx.get("constraints"):
+            lines.append(f"- Constraints to respect: {', '.join(life_ctx['constraints'])}")
+        if life_ctx.get("open_dependencies"):
+            lines.append(f"- Open dependencies: {', '.join(life_ctx['open_dependencies'][:6])}")
+        if life_ctx.get("risks"):
+            lines.append(f"- Risks: {', '.join(life_ctx['risks'][:4])}")
+        lines.append("When advising, connect your answer to their objective and constraints. Say 'Based on your stated objective of …'.")
+        return "\n".join(lines)
+
     # --- prompt assembly: authoritative facts override; missing facts are asked ---
-    def _system_prompt(self, packet: EvidencePacket) -> str:
+    def _system_prompt(self, packet: EvidencePacket, life_ctx: dict | None = None) -> str:
         parts = [
             "You are LifeNavigator, a careful financial and life advisor.",
-            "Answer ONLY from the AUTHORITATIVE FACTS and GRAPH EVIDENCE below.",
+            "Answer ONLY from the AUTHORITATIVE FACTS, GRAPH EVIDENCE, and the user's LIFE MODEL below.",
             "Never invent numbers or facts. If something is in MISSING FACTS, ask "
             "the user for it instead of guessing.",
         ]
+        life_block = self._life_block(life_ctx)
+        if life_block:
+            parts.append(life_block)
         if packet.central_context:
             parts.append(f"\nCENTRAL_CONTEXT (methodology):\n{packet.central_context}")
         parts.append("\nAUTHORITATIVE FACTS:\n" + self._facts_block(packet))

@@ -330,6 +330,61 @@ class LifeDiscoveryService:
             "open_dependencies": [d["label"] for d in snap["open_dependencies"]],
         }
 
+    # Cross-objective conflicts (symmetric) — competing objectives + the tradeoff to make explicit.
+    _CONFLICTS: dict[frozenset, tuple[str, str]] = {
+        frozenset({"financial_independence", "education_advancement"}): ("timeline", "An education investment delays earning + saving — it competes with an early-financial-independence timeline."),
+        frozenset({"financial_independence", "family_stability"}): ("money", "Both draw on the same savings; pursuing them at full speed simultaneously slows each."),
+        frozenset({"financial_independence", "homeownership"}): ("money", "A down payment + mortgage reduces the savings rate financial independence needs."),
+        frozenset({"career_growth", "family_stability"}): ("time", "Career advancement often means more hours or relocation, which can compete with family stability."),
+        frozenset({"education_advancement", "family_stability"}): ("time", "School time + cost competes with family time + stability."),
+        frozenset({"career_growth", "health_longevity"}): ("time", "Career intensity can crowd out the consistency health requires."),
+    }
+
+    async def objectives_plan(self, ctx: UserContext) -> dict[str, Any]:
+        """Multi-objective planning (D8/D9): rank active objectives + detect conflicts/tradeoffs."""
+        objs = self._active(await self._rows("life_objectives", ctx))
+        ranked = sorted(objs, key=lambda o: float(o.get("confidence") or 0), reverse=True)
+        plan = [{"objective_id": o["id"], "title": o["title"], "root": o.get("root_objective_key"),
+                 "confidence": o.get("confidence"), "priority_rank": i + 1} for i, o in enumerate(ranked)]
+        roots = {o.get("root_objective_key"): o for o in ranked}
+        conflicts = []
+        keys = [o.get("root_objective_key") for o in ranked]
+        for i in range(len(keys)):
+            for j in range(i + 1, len(keys)):
+                pair = frozenset({keys[i], keys[j]})
+                if pair in self._CONFLICTS:
+                    kind, reason = self._CONFLICTS[pair]
+                    a, b = roots[keys[i]], roots[keys[j]]
+                    focus = a if float(a.get("confidence") or 0) >= float(b.get("confidence") or 0) else b
+                    conflicts.append({"between": [a["title"], b["title"]], "type": kind, "reason": reason,
+                                      "tradeoff": "You likely can't fully fund/pursue both at once.",
+                                      "suggested_focus": focus["title"],
+                                      "suggested_sequence": [focus["title"], (b if focus is a else a)["title"]]})
+        return {"objectives": plan, "primary": plan[0] if plan else None, "conflicts": conflicts,
+                "note": "Multiple objectives are ranked by confidence; conflicts show where they compete."}
+
+    async def discovery_health(self, ctx: UserContext) -> dict[str, Any]:
+        """Discovery health monitoring (D10): coverage, confidence, gaps + prompts to improve."""
+        objs = self._active(await self._rows("life_objectives", ctx))
+        roots_present = {o.get("root_objective_key") for o in objs}
+        confidences = [float(o.get("confidence") or 0) for o in objs]
+        avg_conf = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
+        # key life areas we'd like a defined objective for
+        key_areas = {"financial_independence": "retirement / financial independence", "family_stability": "family",
+                     "career_growth": "career", "health_longevity": "health"}
+        missing = {label for root, label in key_areas.items() if root not in roots_present}
+        weak = [o["title"] for o in objs if float(o.get("confidence") or 0) < 0.6]
+        coverage = round(len(roots_present & set(key_areas)) / len(key_areas), 2)
+        prompts = []
+        for label in sorted(missing):
+            prompts.append(f"Your {label} goals are not defined yet — completing {label} discovery would improve recommendation quality.")
+        for t in weak:
+            prompts.append(f"'{t}' is low-confidence — a quick follow-up would sharpen it.")
+        return {"objective_count": len(objs), "average_confidence": avg_conf, "coverage": coverage,
+                "covered_areas": sorted(key_areas[r] for r in roots_present if r in key_areas), "missing_areas": sorted(missing),
+                "weak_objectives": weak, "model_quality": round(coverage * 0.5 + avg_conf * 0.5, 2),
+                "prompts": prompts[:4]}
+
     async def personal_graph(self, ctx: UserContext) -> dict[str, Any]:
         """The Personal Life Graph from PERSISTED nodes + edges (active objectives only)."""
         vision = await self._rows("life_vision", ctx)
