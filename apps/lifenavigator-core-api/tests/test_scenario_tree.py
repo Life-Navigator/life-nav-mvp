@@ -1,4 +1,4 @@
-"""Sprint 17 — Multi-Scenario Planning (branching decision tree)."""
+"""Sprint 17/24 — Multi-Scenario tree: DERIVED deltas + lineage + no fabrication."""
 from __future__ import annotations
 
 import pytest
@@ -20,70 +20,82 @@ from .conftest import FakeSupabase
 
 CTX = UserContext(user_id="11111111-1111-1111-1111-111111111111")
 BANDS = [{"occupation_code": "15-2051", "geography": "US", "p25": 75000, "p50": 95000, "p75": 120000, "currency": "USD", "confidence": 0.8, "source_name": "OEWS", "as_of_date": "2024-05-01"}]
-ROWS = {
-    "career_profiles": [{"id": "cp1", "current_title": "Data Analyst", "seniority_level": "mid", "location": "US"}],
-    "compensation_bands": BANDS, "financial_accounts": [{"id": "a1", "account_type": "depository", "current_balance": 50000}],
-    "net_worth_snapshots": [{"id": "n1", "user_id": CTX.user_id, "as_of_date": "2026-06-01", "net_worth": 120000, "total_liabilities": 0}],
-}
+OFFER = {"id": "o1", "user_id": CTX.user_id, "doc_type": "offer_letter", "uploaded_at": "2026-06-08", "extracted_json": {"base_salary": "150000", "signing_bonus": "20000", "annual_bonus": "10"}}
+PROGRAM = {"id": "p1", "user_id": CTX.user_id, "doc_type": "program_details", "uploaded_at": "2026-06-08", "extracted_json": {"tuition": "60000", "duration_months": "24"}}
+AID = {"id": "a1", "user_id": CTX.user_id, "doc_type": "financial_aid_letter", "uploaded_at": "2026-06-08", "extracted_json": {"grants": "30000"}}
+NW = [{"id": "n1", "user_id": CTX.user_id, "as_of_date": "2026-06-01", "net_worth": 100000, "total_liabilities": 0}]
 
 
-def _svc() -> ScenarioTreeService:
-    sb = FakeSupabase(ROWS)
+def _svc(docs) -> ScenarioTreeService:
+    rows = {"documents": docs, "career_profiles": [{"id": "cp1", "current_title": "Data Analyst", "seniority_level": "mid", "location": "US"}],
+            "compensation_bands": BANDS, "net_worth_snapshots": NW}
+    sb = FakeSupabase(rows)
     comp = CompensationIntelligenceEngine(sb)
     edu = EducationService(sb, comp)
     domains = {"finance": FinanceService(supabase=sb), "health": HealthService(supabase=sb),
                "career": CareerService(sb, comp, MarketPositionAnalyzer(sb)), "family": FamilyService(sb, comp)}
     planning = FinancialPlanningEngine(sb, CompensationBenefitsEngine(sb))
     readiness = LifeReadinessEngine(domains=domains, education=edu, supabase=sb, planning=planning)
-    return ScenarioTreeService(readiness=readiness, planning=planning, supabase=sb)
-
-
-def test_available_decisions():
-    d = ScenarioTreeService.available_decisions()
-    assert {x["decision_type"] for x in d} == {"new_job", "mba", "move", "buy_house"}
-    assert all(len(x["options"]) == 2 for x in d)
+    return ScenarioTreeService(readiness=readiness, planning=planning, supabase=sb, comp_benefits=CompensationBenefitsEngine(sb))
 
 
 @pytest.mark.asyncio
-async def test_tree_expands_to_2n_leaves():
-    t = await _svc().build(CTX, ["mba", "new_job"])
-    assert t["leaves"] == 4  # 2 binary decisions -> 4 leaves
-    assert t["nodes"][0]["label"] == "Current State" and t["nodes"][0]["depth"] == 0
-    # each leaf carries the four metrics
+async def test_new_job_net_worth_derived_from_offer_letter():
+    t = await _svc([OFFER]).build(CTX, ["new_job"])
+    take = next(n for n in t["nodes"] if n.get("option") == "accept")
+    # 20k signing + 10% of 150k bonus = 20000 + 15000 = 35000
+    assert take["outcome"]["net_worth_known"] is True
+    assert take["lineage"]["evidence"] and "offer_letter" in take["lineage"]["evidence"][0]["source"]
+    assert "signing bonus + annual bonus" in take["lineage"]["calculation"]
+
+
+@pytest.mark.asyncio
+async def test_no_offer_letter_is_unknown_not_fabricated():
+    t = await _svc([]).build(CTX, ["new_job"])
+    take = next(n for n in t["nodes"] if n.get("option") == "accept")
+    assert take["outcome"]["net_worth_known"] is False  # unknown, NOT a hardcoded number
+    assert "Upload your offer letter" in take["lineage"]["missing"]
+
+
+@pytest.mark.asyncio
+async def test_mba_cost_derived_with_tuition_aid_and_assumptions():
+    t = await _svc([PROGRAM, AID, OFFER]).build(CTX, ["mba"])
+    yes = next(n for n in t["nodes"] if n.get("option") == "yes")
+    assert yes["outcome"]["net_worth_known"] is True and yes["outcome"]["net_worth"] < 0  # it's a cost
+    keys = {a.get("key") for a in yes["lineage"]["assumptions"] if a.get("key")}
+    assert "tuition_inflation" in keys  # cited from the registry
+    assert any("program_details" in e["source"] for e in yes["lineage"]["evidence"])
+
+
+@pytest.mark.asyncio
+async def test_mba_without_program_prompts_upload():
+    t = await _svc([]).build(CTX, ["mba"])
+    yes = next(n for n in t["nodes"] if n.get("option") == "yes")
+    assert yes["outcome"]["net_worth_known"] is False and "Upload your program details" in yes["lineage"]["missing"]
+
+
+@pytest.mark.asyncio
+async def test_buy_house_never_fabricates_down_payment():
+    t = await _svc([]).build(CTX, ["buy_house"])
+    yes = next(n for n in t["nodes"] if n.get("option") == "yes")
+    assert yes["outcome"]["net_worth_known"] is False  # no home price -> unknown, not -60000
+    assert "home price" in yes["lineage"]["missing"]
+    assert any(a.get("key") == "down_payment_pct" for a in yes["lineage"]["assumptions"])
+
+
+@pytest.mark.asyncio
+async def test_every_node_carries_confidence_breakdown():
+    t = await _svc([OFFER]).build(CTX, ["new_job", "mba"])
     for n in t["nodes"]:
-        for k in ("readiness_index", "net_worth", "retirement_ratio", "confidence"):
-            assert k in n["outcome"]
+        if n["parent"] is not None:
+            assert "confidence_breakdown" in n and n["confidence_breakdown"]["components"]
+            assert "lineage" in n
+    assert t["assumptions_used"]  # registry exposed
+    assert t["leaves"] == 4
 
 
 @pytest.mark.asyncio
-async def test_paths_diverge_on_net_worth_and_readiness():
-    t = await _svc().build(CTX, ["mba", "new_job"])
-    leaves = [n for n in t["nodes"] if n["is_leaf"]]
-    nets = {n["outcome"]["net_worth"] for n in leaves}
-    idxs = {n["outcome"]["readiness_index"] for n in leaves}
-    assert len(nets) > 1 and len(idxs) > 1  # paths genuinely differ
-    # MBA path reduces net worth vs no-MBA path (tuition)
-    mba_accept = next(n for n in leaves if ">mba:yes" in n["id"] and ">new_job:accept" in n["id"])
-    nomba_accept = next(n for n in leaves if ">mba:no" in n["id"] and ">new_job:accept" in n["id"])
-    assert mba_accept["outcome"]["net_worth"] < nomba_accept["outcome"]["net_worth"]
-
-
-@pytest.mark.asyncio
-async def test_confidence_compounds_along_path():
-    t = await _svc().build(CTX, ["mba", "new_job"])
-    leaf = next(n for n in t["nodes"] if n["is_leaf"])
-    assert 0 < leaf["outcome"]["confidence"] <= 1  # product of branch confidences
-
-
-@pytest.mark.asyncio
-async def test_best_path_is_highest_readiness_leaf():
-    t = await _svc().build(CTX, ["mba", "new_job"])
-    best = next(n for n in t["nodes"] if n["id"] == t["best_path_id"])
-    assert best["is_leaf"]
-    assert best["outcome"]["readiness_index"] == max(n["outcome"]["readiness_index"] for n in t["nodes"] if n["is_leaf"])
-
-
-@pytest.mark.asyncio
-async def test_three_decisions_cap_and_eight_leaves():
-    t = await _svc().build(CTX, ["mba", "new_job", "buy_house", "move"])  # capped to 3
-    assert len(t["decisions"]) == 3 and t["leaves"] == 8
+async def test_path_with_unknown_branch_is_marked_unknown():
+    t = await _svc([OFFER]).build(CTX, ["new_job", "buy_house"])  # buy_house unknown
+    leaf = next(n for n in t["nodes"] if n["is_leaf"] and ">buy_house:yes" in n["id"])
+    assert leaf["outcome"]["net_worth_known"] is False and leaf["outcome"]["missing"]

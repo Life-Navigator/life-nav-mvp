@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from ..auth import AuthenticatedUser
 from ..dependencies import authenticated, get_guidance, get_platform_access
 from ..models.common import UserContext
+from ..services import assumptions as A
 from ..services.guidance import GuidanceEngine
 from ..services.platform_access import VALID_STATUSES, PlatformAccess
 
@@ -65,3 +66,11 @@ async def set_onboarding(
 ):
     return await svc.set_onboarding(_ctx(user), focus_decision=focus_decision or None,
                                     completed=completed if completed else None, step=step or None)
+
+
+@router.get("/assumptions")
+async def assumptions(user: AuthenticatedUser = Depends(authenticated), mode: str = "consumer"):
+    """Every planning assumption + its cited basis. mode=advisor shows all; consumer groups them."""
+    if mode == "advisor":
+        return {"mode": "advisor", "assumptions": A.all_assumptions()}
+    return {"mode": "consumer", "by_category": A.by_category()}

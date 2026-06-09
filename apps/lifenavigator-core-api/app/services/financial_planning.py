@@ -16,6 +16,8 @@ from typing import Any, Optional
 
 from ..clients.supabase import SupabaseClient
 from ..models.common import UserContext
+from . import assumptions as _assume
+from . import confidence as _conf
 
 DOCS = "documents"
 FINANCE = "finance"
@@ -119,7 +121,18 @@ class FinancialPlanningEngine:
                                  "insurance_adequate": insurance.get("life", {}).get("status") == "adequate"},
             "evidence": analysis.get("evidence", []),
             "assumptions": assumptions,
-            "confidence": {"score": 0.7 if income and assets else 0.4, "basis": "from your documents + finance data"},
+            "assumptions_used": [_assume.cite("investment_return"), _assume.cite("return_volatility"), _assume.cite("inflation"),
+                                 _assume.cite("withdrawal_rate"), _assume.cite("retirement_replacement"), _assume.cite("life_expectancy")],
+            "confidence": _conf.build(
+                document_coverage=(sum(1 for d in ("401k_statement", "retirement_statement", "social_security_estimate") if d in f) / 3),
+                reference_quality=0.85 if income else 0.5,
+                missing_inputs=len([d for d in ("401k_statement", "retirement_statement", "social_security_estimate") if d not in f]),
+                projection_years=years, volatility=volatility),
+            "why_this_projection": {
+                "evidence": ["Your current retirement assets (401k/retirement statements)", "Your income (offer letter / comp)", "Your contribution rate + employer match"],
+                "assumptions": ["Investment return + volatility", "Inflation", "Retirement age + income replacement", "4% safe withdrawal"],
+                "calculation": "We run 1,000 Monte-Carlo paths growing (assets + annual contribution) at a random return each year to retirement, then test what fraction reach the nest egg your income needs (need ÷ 4%).",
+            },
             "boundary": self._boundary(),
         }
 

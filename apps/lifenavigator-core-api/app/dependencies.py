@@ -214,7 +214,8 @@ def get_scenario_tree(
     planning: FinancialPlanningEngine = Depends(get_financial_planning),
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> ScenarioTreeService:
-    return ScenarioTreeService(readiness=readiness, planning=planning, supabase=supabase)
+    return ScenarioTreeService(readiness=readiness, planning=planning, supabase=supabase,
+                               comp_benefits=CompensationBenefitsEngine(supabase))
 
 
 def get_family_office(
