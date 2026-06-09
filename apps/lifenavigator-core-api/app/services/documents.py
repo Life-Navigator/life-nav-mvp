@@ -216,28 +216,58 @@ class DocumentIntelligenceService:
         path = f"{ctx.user_id}/{doc_id}/{(filename or 'document')[:80]}"
         await self._sb.storage_upload("documents", path, data, content_type or "application/octet-stream")
         parsed = self._parser.parse(filename, content_type, data)
-        res = await self.register(ctx, doc_type=doc_type, text=parsed["text"], title=title or filename, file_ref=path, _doc_id=doc_id)
+        res = await self.register(ctx, doc_type=doc_type, text=parsed["text"], title=title or filename,
+                                  file_ref=path, _doc_id=doc_id, source_kind=parsed["kind"])
         res["parsed_kind"] = parsed["kind"]
         res["parsed_chars"] = len(parsed["text"])
-        if not parsed["text"]:
-            res["note"] = "No text layer found (likely a scan) — OCR pass needed before extraction."
         return res
 
-    async def register(self, ctx: UserContext, *, doc_type: str, text: str = "", title: Optional[str] = None, file_ref: Optional[str] = None, _doc_id: Optional[str] = None) -> dict[str, Any]:
+    # Sprint 32 P0/P1.5: a scanned/image document NEVER fails silently — it explains + offers a path.
+    SCANNED_MESSAGE = ("This appears to be a scanned document. We saved it successfully but cannot "
+                       "extract values yet. Upload a digital PDF or paste the document text to unlock "
+                       "readiness scoring, recommendations, and reports.")
+
+    @staticmethod
+    def _processing_status(*, classified: bool, has_text: bool, extracted: bool) -> list[dict[str, Any]]:
+        steps = [
+            ("Uploaded", True, "Your document is stored securely."),
+            ("Classified", classified, "We identified the document type."),
+            ("Text read (OCR)", has_text, "We read the document's text." if has_text else "No machine-readable text — this looks scanned/photographed."),
+            ("Evidence extracted", extracted, "We pulled the key values." if extracted else "No values extracted yet."),
+            ("Recommendation ready", extracted, "Your recommendations are updated." if extracted else "Recommendations unlock once values are extracted."),
+        ]
+        return [{"step": s, "done": bool(d), "detail": detail} for s, d, detail in steps]
+
+    async def register(self, ctx: UserContext, *, doc_type: str, text: str = "", title: Optional[str] = None,
+                       file_ref: Optional[str] = None, _doc_id: Optional[str] = None, source_kind: str = "text") -> dict[str, Any]:
         spec = TAXONOMY.get(doc_type)
         if not spec:
             raise ValueError(f"unknown doc_type {doc_type}")
         ext = self._ex.extract(doc_type, text)
         doc_id = _doc_id or str(uuid.uuid4())
         extracted_json = {f["field_key"]: f["field_value"] for f in ext["fields"]}
+        has_text = bool((text or "").strip())
+        extracted = bool(ext["fields"])
+        is_scanned = source_kind == "image" or (source_kind in ("pdf", "unknown") and not has_text)
+        status = "extracted" if extracted else "needs_review"
+        if extracted:
+            reason, message, next_steps = "extracted", None, []
+        elif is_scanned:
+            reason = "scanned_or_image"
+            message = self.SCANNED_MESSAGE
+            next_steps = ["Upload a digital (text) PDF of this document", f"Or paste the {spec.label} text directly", "We'll then extract values + generate recommendations"]
+        else:
+            reason = "no_fields_matched"
+            message = (f"We read this document but couldn't find the expected values for a {spec.label}. "
+                       "Check the document type, or paste the text so we can extract it.")
+            next_steps = [f"Confirm this is a {spec.label}", "Paste the document text", "Try a clearer copy"]
         await self._sb.insert("documents", {
             "id": doc_id, "user_id": ctx.user_id, "tenant_id": ctx.user_id, "doc_type": doc_type,
             "category": spec.category, "title": title or spec.label, "file_ref": file_ref,
-            "status": "extracted" if ext["fields"] else "needs_review", "confidence": ext["confidence"],
+            "status": status, "status_reason": reason, "confidence": ext["confidence"],
             "document_date": ext["dates"].get("document_date"), "extracted_json": extracted_json,
             "affects_domains": spec.domains,
         }, schema=DOCS)
-        # each extracted field is a first-class row -> :DocumentField graph node (HAS_EXTRACTED_FIELD)
         for f in ext["fields"]:
             await self._sb.insert("document_fields", {
                 "id": str(uuid.uuid5(_REC_NS, f"{doc_id}:{f['field_key']}")), "document_id": doc_id,
@@ -246,7 +276,9 @@ class DocumentIntelligenceService:
             }, schema=DOCS)
         return {"document_id": doc_id, "doc_type": doc_type, "category": spec.category,
                 "fields_extracted": len(ext["fields"]), "confidence": ext["confidence"],
-                "affects_domains": spec.domains, "status": "extracted" if ext["fields"] else "needs_review",
+                "affects_domains": spec.domains, "status": status, "status_reason": reason,
+                "message": message, "next_steps": next_steps,
+                "processing_status": self._processing_status(classified=True, has_text=has_text, extracted=extracted),
                 "fields": ext["fields"], "evidence": evidence_from_fields(doc_type, ext["fields"])}
 
     async def _docs(self, ctx: UserContext) -> list[dict]:
