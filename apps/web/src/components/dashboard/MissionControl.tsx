@@ -57,9 +57,19 @@ const JOURNEY: [keyof Dash['journey'], string][] = [
   ['report_generated', 'Generate a report'],
 ];
 
+const CLARITY =
+  'LifeNavigator turns your documents, goals, and life data into evidence-backed decisions, prioritized actions, and advisor-ready reports.';
+
+interface Sample {
+  label: string;
+  readiness: { index: number; status: Status; headline: string };
+  top_recommendation: { title: string; why: string; quantified_impact?: Record<string, unknown> };
+}
+
 export default function MissionControl() {
   const [d, setD] = useState<Dash | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sample, setSample] = useState<Sample | null>(null);
 
   useEffect(() => {
     let on = true;
@@ -79,7 +89,82 @@ export default function MissionControl() {
     };
   }, []);
 
-  if (loading || !d || !d.status) return null;
+  if (loading) return null;
+
+  // Activation empty state (Sprint 32) — never a thin blank dashboard. Explain the product, guide
+  // the first upload, and offer a sample preview so the value loop is visible before any upload.
+  const noDocs = !d || !d.status || !d.journey?.documents;
+  if (noDocs) {
+    const qi = (sample?.top_recommendation.quantified_impact || {}) as Record<string, number>;
+    return (
+      <div className="mb-6 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">
+          Welcome to LifeNavigator
+        </div>
+        <p className="text-base text-gray-800 mt-1 max-w-2xl">{CLARITY}</p>
+        <div className="mt-4 rounded-lg border-2 border-indigo-200 bg-indigo-50 p-4">
+          <div className="font-semibold text-gray-900">
+            Get your first recommendation in under 5 minutes
+          </div>
+          <div className="text-sm text-gray-600 mt-0.5">
+            Upload one document (an offer letter, 401(k) statement, or insurance policy) and
+            we&apos;ll extract the facts, score your readiness, and show your single
+            highest-leverage move — with the evidence behind it.
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/dashboard/documents"
+              className="inline-flex items-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
+            >
+              Upload your first document →
+            </Link>
+            <button
+              onClick={() =>
+                fetch('/api/platform/sample')
+                  .then((r) => (r.ok ? r.json() : null))
+                  .then(setSample)
+                  .catch(() => {})
+              }
+              className="inline-flex items-center px-4 py-2 rounded-md border border-indigo-200 text-indigo-700 text-sm font-medium hover:bg-white"
+            >
+              Preview with sample data
+            </button>
+          </div>
+        </div>
+        {sample && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <div className="text-[11px] uppercase tracking-wide text-amber-600 font-semibold">
+              {sample.label}
+            </div>
+            <div className="mt-2 flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full border-4 border-amber-400 text-amber-700 flex items-center justify-center bg-white font-extrabold">
+                {sample.readiness.index}
+              </div>
+              <div>
+                <div className="text-sm font-semibold text-gray-900">
+                  {sample.readiness.headline}
+                </div>
+                <div className="text-sm text-gray-700 mt-1">
+                  <b>Top move:</b> {sample.top_recommendation.title}
+                  {qi.financial_impact_annual
+                    ? ` — +$${Number(qi.financial_impact_annual).toLocaleString()}/yr`
+                    : ''}
+                  {qi.retirement_success_before_pct
+                    ? `, retirement success ${qi.retirement_success_before_pct}% → ${qi.retirement_success_after_pct}%`
+                    : ''}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">{sample.top_recommendation.why}</div>
+              </div>
+            </div>
+            <div className="text-xs text-amber-700 mt-2">
+              This is illustrative — upload your own document to generate your real roadmap.
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (!d || !d.status) return null;
   const s = d.status;
   const ring = RING[s.status] ?? RING.yellow;
 
