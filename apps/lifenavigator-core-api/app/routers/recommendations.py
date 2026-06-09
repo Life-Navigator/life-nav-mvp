@@ -43,6 +43,12 @@ async def roadmap(user: AuthenticatedUser = Depends(authenticated), os: Recommen
     return await os.roadmap(_ctx(user))
 
 
+@router.get("/audit")
+async def audit(user: AuthenticatedUser = Depends(authenticated), os: RecommendationOS = Depends(get_recommendation_os)):
+    """Recommendation quality audit — metrics, reviewer gates, and threshold pass/fail."""
+    return await os.audit(_ctx(user))
+
+
 @router.post("/{rid}/status")
 async def set_status(rid: str, user: AuthenticatedUser = Depends(authenticated), os: RecommendationOS = Depends(get_recommendation_os), status: str = Body(..., embed=True)):
     if status not in LIFECYCLE:

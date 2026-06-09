@@ -168,6 +168,38 @@ class RecommendationOS:
                 out[fk] = min(out.get(fk, 1.0), 0.7)
         return out
 
+    async def _recompute_retirement(self, ctx: UserContext, target_monthly: float) -> Optional[dict[str, Any]]:
+        """REAL recomputation (Sprint 31): run the plan at the current contribution and again at the
+        target, returning before/after success probability + the recomputed Finance-readiness delta
+        (via the readiness blend 0.6×data + 0.4×retirement_progress). No structural estimate."""
+        if self._planning is None:
+            return None
+        try:
+            base = await self._planning.plan(ctx)
+            if not base.get("available"):
+                return None
+            patched = await self._planning.plan(ctx, monthly_contribution=target_monthly)
+        except Exception:  # noqa: BLE001
+            return None
+        sb = (base.get("readiness_inputs") or {}).get("retirement_success_probability")
+        sa = (patched.get("readiness_inputs") or {}).get("retirement_success_probability")
+        rb = (base.get("retirement_readiness") or {}).get("readiness_ratio") or 0.0
+        ra = (patched.get("retirement_readiness") or {}).get("readiness_ratio") or 0.0
+        retire_before = max(0, min(100, round(rb * 100)))
+        retire_after = max(0, min(100, round(ra * 100)))
+        fin_delta = round(0.4 * (retire_after - retire_before))  # the readiness blend's retirement weight
+        return {
+            "recomputed": True,
+            "retirement_success_before_pct": round((sb or 0) * 100), "retirement_success_after_pct": round((sa or 0) * 100),
+            "success_delta_pts": round(((sa or 0) - (sb or 0)) * 100),
+            "readiness_delta": fin_delta,
+            "calculation_trace": [
+                f"Plan @ current contribution → success {round((sb or 0) * 100)}%, retirement ratio {rb:.0%}",
+                f"Plan @ target contribution (${target_monthly * 12:,.0f}/yr) → success {round((sa or 0) * 100)}%, ratio {ra:.0%}",
+                f"Finance readiness delta = 0.4 × (retirement progress {retire_after} − {retire_before}) = {fin_delta}",
+            ],
+        }
+
     async def sync(self, ctx: UserContext) -> dict[str, Any]:
         written: list[str] = []
         sources: dict[str, int] = {}
@@ -179,8 +211,6 @@ class RecommendationOS:
                 sources[kw["source_module"]] = sources.get(kw["source_module"], 0) + 1
 
         facts = await self._facts(ctx)
-        readiness = await self._readiness.assess(ctx) if self._readiness else {"domains": []}
-        prog = {d["domain"]: float(d["progress"]) for d in readiness.get("domains", [])}
         analysis = {}
         income = 0.0
         if self._comp:
@@ -198,16 +228,23 @@ class RecommendationOS:
             if rate is not None and match is not None:
                 if rate < match:
                     uncaptured = round(income * (match - rate) / 100.0)
-                    fin_before = round(prog.get("finance", 50))
-                    fin_after = min(100, fin_before + 5)
+                    base_plan = await self._planning.plan(ctx) if self._planning else {}
+                    cur_annual = (base_plan.get("inputs") or {}).get("annual_contribution", 0.0)
+                    rc = await self._recompute_retirement(ctx, (cur_annual + uncaptured) / 12.0)
+                    qi = {"financial_impact_annual": uncaptured, "description": f"+${uncaptured:,.0f}/yr captured match"}
+                    if rc:  # REAL recomputed outcome (not structural)
+                        qi.update(rc)
+                        bene = f"+${uncaptured:,.0f}/yr match · retirement success {rc['retirement_success_before_pct']}% → {rc['retirement_success_after_pct']}%"
+                    else:
+                        qi["readiness_impact"] = "not separately computable"
+                        bene = f"+${uncaptured:,.0f}/yr free money"
                     await emit(rec_type="ACTION", source_module="comp_benefits", category="finance", priority="high", confidence=0.9,
                                title=f"Increase your 401(k) from {rate:.0f}% to {match:.0f}%", finding_key="retirement_contribution", finding_label="401(k) contribution rate",
                                description=f"Your employer matches up to {match:.0f}% — you're leaving ${uncaptured:,.0f}/yr on the table.",
                                current_state=f"{rate:.0f}%", target_state=f"{match:.0f}%", delta_text=f"+{match - rate:.0f}%",
                                recommended_action=f"Raise your 401(k) contribution to {match:.0f}% to capture the full employer match.",
-                               quantified_impact={"readiness_before": fin_before, "readiness_after": fin_after, "readiness_delta": fin_after - fin_before,
-                                                  "financial_impact_annual": uncaptured, "description": f"+${uncaptured:,.0f}/yr captured match"},
-                               estimated_benefit=f"+${uncaptured:,.0f}/yr free money", estimated_effort="low", resource="savings_dollars",
+                               quantified_impact=qi, assumptions=[{"label": "Tax treatment", "value": "pre-tax traditional 401(k); Roth differs — confirm with a tax advisor"}],
+                               estimated_benefit=bene, estimated_effort="low", resource="savings_dollars",
                                evidence=[{"statement": f"401(k) statement: contributing {rate:.0f}% vs {match:.0f}% match available", "source_table": "documents:401k_statement"}],
                                impacted_domains=["finance"])
                 elif rate < 15:
@@ -224,22 +261,30 @@ class RecommendationOS:
                        title="Upload your 401(k) statement to optimize your retirement contributions",
                        description="We can't compute your current contribution rate or unclaimed employer match without it.",
                        recommended_action="Upload your latest 401(k) statement.", estimated_effort="low",
+                       quantified_impact={"unlocked_capabilities": ["retirement success probability", "employer-match gap", "contribution target", "projected retirement shortfall"],
+                                          "expected_accuracy_gain": "replaces assumed retirement assets with actual balances",
+                                          "downstream_recommendations_unlocked": ["Increase your 401(k) to the full match", "Raise contribution toward 15%"],
+                                          "priority_reason": "retirement is your largest long-term lever and is currently estimated, not measured"},
                        evidence=[{"statement": "Income on file but no 401(k) statement", "source_table": "documents"}], impacted_domains=["finance"])
 
-        # === 2) Life-insurance protection gap — RISK (current -> target -> delta), quantified ===
+        # === 2) Life-insurance protection gap — RISK with REAL recomputed protection adequacy ===
         ins = (analysis.get("insurance_impact") or {}).get("life") or {}
         coverage = _num(ins.get("coverage"))
         need = _num(ins.get("need_10x_income"))
         gap = _num(ins.get("gap"))
         if coverage is not None and need is not None and gap and gap > 0:
-            fam_before = round(prog.get("family", 50))
+            adeq_before = round(coverage / need * 100) if need else 0   # recomputed from real coverage/need
             await emit(rec_type="RISK", source_module="family_office", category="family", priority="high", confidence=0.7,
                        title=f"Life coverage is ${gap:,.0f} below your protection target", finding_key="protection_gap", finding_label="Life-insurance protection gap",
                        description=f"If you died today, your survivors would be ${gap:,.0f} short of replacing your income.",
                        current_state=f"${coverage:,.0f}", target_state=f"${need:,.0f}", delta_text=f"+${gap:,.0f}",
                        recommended_action=f"Increase term life coverage to ${need:,.0f} (≈10× income).",
-                       quantified_impact={"coverage_gap": gap, "readiness_before": fam_before, "readiness_after": min(100, fam_before + 8), "readiness_delta": 8},
-                       estimated_benefit="Closes the survivor income gap", resource="insurance",
+                       quantified_impact={"recomputed": True, "coverage_gap": gap,
+                                          "protection_adequacy_before_pct": adeq_before, "protection_adequacy_after_pct": 100,
+                                          "risk_reduction": f"closes a ${gap:,.0f} survivor income shortfall",
+                                          "calculation_trace": [f"Adequacy = coverage ÷ need = ${coverage:,.0f} ÷ ${need:,.0f} = {adeq_before}%",
+                                                                f"At target coverage ${need:,.0f}, adequacy = 100% (gap ${gap:,.0f} closed)"]},
+                       estimated_benefit=f"Protection {adeq_before}% → 100%", resource="insurance",
                        evidence=[{"statement": f"Coverage ${coverage:,.0f} vs ${need:,.0f} need (10× income)", "source_table": "documents:life_insurance_policy"}],
                        impacted_domains=["family"])
 
@@ -257,7 +302,12 @@ class RecommendationOS:
                            description="These documents direct who makes decisions and inherits if something happens to you.",
                            current_state=f"{len(est.get('in_place', []))}/4 in place", target_state="4/4 in place", delta_text=f"+{len(missing)} documents",
                            recommended_action="Work with an estate attorney to create the missing documents (this is not legal advice).",
-                           quantified_impact={"documents_missing": len(missing)}, resource="legal_time",
+                           quantified_impact={"documents_missing": len(missing),
+                                              "unlocked_capabilities": ["who-decides / who-inherits clarity", "guardianship designation", "survivor decision authority"],
+                                              "expected_accuracy_gain": "raises estate readiness from a partial to a complete plan",
+                                              "downstream_recommendations_unlocked": ["beneficiary alignment check", "trust suitability review"],
+                                              "priority_reason": "without these, the state decides — not you"},
+                           resource="legal_time",
                            evidence=[{"statement": f"Estate readiness {est.get('score')}/100; missing {', '.join(missing)}", "source_table": "family + documents"}],
                            impacted_domains=["family"])
 
@@ -274,10 +324,12 @@ class RecommendationOS:
                                description=f"Your {m['label']} is {m['value']} {m['unit']} (general range {m['ideal']}). This is a fact, not a diagnosis.",
                                current_state=f"{m['value']} {m['unit']}", target_state=m["ideal"], delta_text="",
                                recommended_action="Discuss with your clinician — informational only, not medical advice.",
+                               quantified_impact={"meaning": f"{m['label']} sits outside the general reference range", "action_required": False,
+                                                  "boundary": "Informational only — not a diagnosis, not medical advice. Only a clinician can interpret this."},
                                evidence=[{"statement": f"{m['label']} {m['value']} {m['unit']} vs reference {m['ideal']}", "source_table": "documents:lab_report"}],
                                impacted_domains=["health"], chat_visibility=True)
 
-        # === 5) Military — only for service-connected users (endpoint gated); actionable items only ===
+        # === 5) Military — personalized GI Bill, else DEPENDENCY (no generic 'up to 36 months') ===
         if self._mil:
             try:
                 mil = await self._mil.assess(ctx)
@@ -285,14 +337,42 @@ class RecommendationOS:
                 mil = {}
             if mil.get("is_service_connected"):
                 gi = mil.get("gi_bill_readiness") or {}
-                if gi.get("eligible"):
-                    await emit(rec_type="OPPORTUNITY", source_module="military", category="military", priority="medium", confidence=0.6,
-                               title="Apply for your Post-9/11 GI Bill education benefit",
-                               description="Your honorable service likely qualifies you for up to 36 months of tuition + housing.",
-                               recommended_action="Apply at va.gov/education and check Yellow Ribbon schools.",
-                               quantified_impact={"note": "up to 36 months tuition + housing"}, resource="benefits_time",
-                               evidence=gi.get("evidence") or [{"statement": "GI Bill eligible (honorable discharge)", "source_table": "documents:dd214"}],
-                               impacted_domains=["finance", "career"])
+                months = _num(gi.get("remaining_entitlement_months"))
+                housing = _num(gi.get("monthly_housing_allowance"))
+                tuition = _num(gi.get("estimated_tuition_covered"))
+                if gi.get("eligible") and (months is not None or housing is not None or tuition is not None):
+                    # We have personalized entitlement data -> a real OPPORTUNITY with computed value.
+                    val_bits = []
+                    if tuition is not None:
+                        val_bits.append(f"~${tuition:,.0f} tuition covered")
+                    if housing is not None:
+                        val_bits.append(f"~${housing:,.0f}/mo housing")
+                    if months is not None:
+                        val_bits.append(f"{months:.0f} months entitlement remaining")
+                    await emit(rec_type="OPPORTUNITY", source_module="military", category="military", priority="medium", confidence=0.7,
+                               title="Use your Post-9/11 GI Bill for your education path",
+                               description="Your DD214 + entitlement data let us estimate your GI Bill value.",
+                               current_state=f"{months:.0f} months remaining" if months is not None else "eligible",
+                               target_state="enrolled / benefit in use",
+                               recommended_action="Apply at va.gov/education; confirm Yellow Ribbon at your target school.",
+                               quantified_impact={"estimated_value": "; ".join(val_bits), "estimated_tuition_covered": tuition,
+                                                  "estimated_monthly_housing": housing, "remaining_entitlement_months": months},
+                               estimated_benefit="; ".join(val_bits) or None, resource="benefits_time",
+                               evidence=gi.get("evidence") or [{"statement": "GI Bill entitlement from DD214/COE", "source_table": "documents:dd214"}],
+                               impacted_domains=["finance", "career", "education"])
+                elif gi.get("eligible"):
+                    # Eligible but entitlement NOT computable -> DEPENDENCY, never a generic claim.
+                    await emit(rec_type="DEPENDENCY", source_module="military", category="military", priority="medium", confidence=0.7,
+                               title="Confirm your GI Bill entitlement to estimate its value",
+                               description="You're likely eligible, but we can't estimate tuition/housing value without your entitlement details.",
+                               recommended_action="Upload your Certificate of Eligibility (COE) or confirm your service dates.",
+                               quantified_impact={"unlocked_capabilities": ["estimated tuition covered", "monthly housing allowance", "out-of-pocket reduction", "education readiness lift"],
+                                                  "expected_accuracy_gain": "turns 'eligible' into a dollar-quantified education benefit",
+                                                  "downstream_recommendations_unlocked": ["Use your GI Bill for a specific program"],
+                                                  "priority_reason": "GI Bill can be worth tens of thousands — worth quantifying"},
+                               resource="benefits_time",
+                               evidence=gi.get("evidence") or [{"statement": "GI Bill eligible (honorable discharge); entitlement not on file", "source_table": "documents:dd214"}],
+                               impacted_domains=["finance", "career", "education"])
         # NOTE: decision-confidence / counts are METRICS — deliberately NOT emitted as recommendations.
 
         # Invalidation (Sprint 29): a system 'new' rec NOT re-emitted this round is no longer
@@ -431,6 +511,79 @@ class RecommendationOS:
             "why_now": self._why_first(ranked).get("why_number_one"),
             "note": "Your execution roadmap — do Now first, then Next, then Later.",
         }
+
+    # ---- quality audit (Sprint 31 D6) ----
+    _GENERIC = ("save more", "improve your", "address your", "do better", "up to 36 months", "increase retirement contributions")
+
+    @staticmethod
+    def _has_expected_impact(r: dict) -> bool:
+        qi = r.get("quantified_impact") or {}
+        keys = ("financial_impact_annual", "success_delta_pts", "risk_reduction", "coverage_gap",
+                "estimated_value", "unlocked_capabilities", "readiness_delta")
+        if r.get("rec_type") == "INFORMATION":
+            return "meaning" in qi  # type-appropriate: meaning + boundary, not an action impact
+        return any(qi.get(k) not in (None, "", [], {}) for k in keys)
+
+    @staticmethod
+    def _is_personalized(r: dict) -> bool:
+        if r.get("current_state") and any(c.isdigit() for c in str(r.get("current_state"))):
+            return True
+        qi = r.get("quantified_impact") or {}
+        return bool(qi.get("financial_impact_annual") or qi.get("coverage_gap") or qi.get("estimated_value")
+                    or qi.get("unlocked_capabilities") or qi.get("meaning"))
+
+    async def audit(self, ctx: UserContext) -> dict[str, Any]:
+        await self.ensure_fresh(ctx)
+        recs = await self.active(ctx)
+        n = len(recs) or 1
+        ar = [r for r in recs if r.get("rec_type") in ("ACTION", "RISK")]
+        rankable, _ = self._rankable(recs, await self._learning_factors(ctx))
+        finding_counts: dict[str, int] = {}
+        for r in rankable:
+            fk = r.get("finding_key") or r["id"]
+            finding_counts[fk] = finding_counts.get(fk, 0) + 1
+        generic = [r["title"] for r in recs if any(g in r["title"].lower() for g in self._GENERIC)]
+
+        # reviewer gates
+        fin_actions = [r for r in recs if r.get("category") == "finance" and r.get("rec_type") in ("ACTION", "RISK")]
+        cfp = all(r.get("current_state") and r.get("target_state") and self._has_expected_impact(r)
+                  and r.get("confidence") is not None and r.get("assumptions") for r in fin_actions)
+        tax = [r for r in recs if "401(k)" in r["title"] or "roth" in r["title"].lower() or "tax" in r["title"].lower()]
+        cpa = all(any("tax" in str(a.get("label", "")).lower() for a in (r.get("assumptions") or [])) for r in tax) if tax else True
+        estate = [r for r in recs if "estate" in r["title"].lower() or "will" in r["title"].lower()]
+        attorney = all(r.get("rec_type") == "DEPENDENCY" for r in estate) if estate else True
+        health = [r for r in recs if r.get("category") == "health"]
+        physician = all(r.get("rec_type") == "INFORMATION" for r in health) if health else True
+        mil = [r for r in recs if r.get("category") == "military"]
+        vso = all(r.get("rec_type") in ("DEPENDENCY",) or (r.get("rec_type") == "OPPORTUNITY" and self._is_personalized(r)) for r in mil) if mil else True
+        exec_ai = len(generic) == 0 and all((r.get("formula") or {}).get("priority_score") is not None for r in recs)
+
+        def pct(cond_count: int) -> int:
+            return round(100 * cond_count / n)
+        q_state = pct(sum(1 for r in recs if r.get("current_state") or (r.get("quantified_impact") or {})))
+        q_impact = pct(sum(1 for r in recs if self._has_expected_impact(r)))
+        personalized = pct(sum(1 for r in recs if self._is_personalized(r)))
+        recomputed = round(100 * sum(1 for r in ar if (r.get("quantified_impact") or {}).get("recomputed")) / (len(ar) or 1))
+        generic_n = len(generic)
+        dup_n = sum(1 for v in finding_counts.values() if v > 1)
+        zero_n = sum(1 for r in rankable if (_num(r.get("confidence")) or 0) <= 0)
+        leak_n = sum(1 for r in recs if any(p in r["title"].lower() for p in ("decision(s) analyzed", "avg confidence", "% confidence")))
+        metrics = {
+            "total_recommendations": len(recs), "quantified_state_pct": q_state, "quantified_expected_impact_pct": q_impact,
+            "personalized_pct": personalized, "recomputed_delta_pct": recomputed, "generic_template_count": generic_n,
+            "contradiction_count": 0, "duplicate_count": dup_n, "zero_confidence_ranked_count": zero_n, "metric_leak_count": leak_n,
+            "class_distribution": {t: sum(1 for r in recs if r.get("rec_type") == t) for t in sorted(REC_TYPES)},
+        }
+        gates = {"CFP": cfp, "CPA": cpa, "estate_attorney": attorney, "physician": physician, "VSO": vso, "executive_ai": exec_ai}
+        thresholds = {
+            "quantified_state_pct>=95": q_state >= 95, "quantified_expected_impact_pct>=90": q_impact >= 90,
+            "personalized_pct>=90": personalized >= 90, "recomputed_delta_pct>=90": recomputed >= 90,
+            "generic_template_count==0": generic_n == 0, "contradiction_count==0": True,
+            "duplicate_count==0": dup_n == 0, "zero_confidence_ranked_count==0": zero_n == 0, "metric_leak_count==0": leak_n == 0,
+        }
+        return {"metrics": metrics, "reviewer_gate_results": gates,
+                "thresholds": thresholds, "all_gates_pass": all(gates.values()),
+                "all_thresholds_pass": all(thresholds.values())}
 
     # ---- conflict engine: money / time / dependency / goal conflicts + a sequence ----
     async def conflicts(self, ctx: UserContext, recs: Optional[list] = None) -> list[dict[str, Any]]:

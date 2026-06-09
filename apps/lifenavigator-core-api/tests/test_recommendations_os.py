@@ -273,3 +273,57 @@ async def test_learning_downweights_dismissed_findings_only():
     ok = next(r for r in learned if r["finding_key"] == "F_OK")
     assert RecommendationOS._score(dis) < base_dis      # down-weighted by learning
     assert RecommendationOS._score(ok) >= RecommendationOS._score(dis)  # untouched ranks above
+
+
+# ---- Sprint 31: recomputed impact, personalized classes, audit + gates ----
+class _PlanStub:
+    """A planning engine whose success probability rises with contribution (real before/after)."""
+    async def plan(self, ctx, *, monthly_contribution=None, **_):
+        if monthly_contribution is None:
+            return {"available": True, "inputs": {"annual_contribution": 6000.0},
+                    "retirement_readiness": {"readiness_ratio": 0.60},
+                    "readiness_inputs": {"retirement_success_probability": 0.63}}
+        return {"available": True, "inputs": {"annual_contribution": monthly_contribution * 12},
+                "retirement_readiness": {"readiness_ratio": 0.75},
+                "readiness_inputs": {"retirement_success_probability": 0.78}}
+
+
+@pytest.mark.asyncio
+async def test_recompute_is_real_not_structural():
+    os = RecommendationOS(FakeSupabase({}), planning=_PlanStub())
+    rc = await os._recompute_retirement(CTX, 11000 / 12.0)
+    assert rc["retirement_success_before_pct"] == 63 and rc["retirement_success_after_pct"] == 78  # real MC, not +5
+    assert rc["success_delta_pts"] == 15 and rc["recomputed"] is True
+    assert rc["readiness_delta"] == round(0.4 * (75 - 60))  # blend-recomputed, not hardcoded
+    assert len(rc["calculation_trace"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_audit_thresholds_and_gates_on_a_clean_set():
+    os = _os()
+    # an advisor-grade ACTION (recomputed) + a RISK + a personalized DEPENDENCY + an INFORMATION
+    await os.write(CTX, title="Increase your 401(k) from 3% to 6%", source_module="comp_benefits", category="finance",
+                   rec_type="ACTION", confidence=0.9, current_state="3%", target_state="6%",
+                   quantified_impact={"recomputed": True, "financial_impact_annual": 5760, "success_delta_pts": 15},
+                   assumptions=[{"label": "Tax treatment", "value": "traditional vs Roth"}],
+                   evidence=[{"statement": "401k 3% vs 6%", "source_table": "documents:401k_statement"}])
+    await os.write(CTX, title="Life coverage is $420,000 below your protection target", source_module="family_office", category="family",
+                   rec_type="RISK", confidence=0.7, current_state="$1,500,000", target_state="$1,920,000",
+                   quantified_impact={"recomputed": True, "coverage_gap": 420000, "risk_reduction": "closes the gap"},
+                   evidence=[{"statement": "coverage vs need", "source_table": "documents:life_insurance_policy"}])
+    a = await os.audit(CTX)
+    m = a["metrics"]
+    assert m["recomputed_delta_pct"] == 100   # both ACTION/RISK recomputed
+    assert m["generic_template_count"] == 0 and m["metric_leak_count"] == 0
+    assert m["duplicate_count"] == 0 and m["zero_confidence_ranked_count"] == 0
+    assert a["reviewer_gate_results"]["CFP"] is True and a["reviewer_gate_results"]["executive_ai"] is True
+
+
+@pytest.mark.asyncio
+async def test_generic_recommendation_fails_exec_gate():
+    os = _os()
+    await os.write(CTX, title="Increase retirement contributions", source_module="m", category="finance",
+                   rec_type="ACTION", confidence=0.9, evidence=[{"statement": "e", "source_table": "d"}])
+    a = await os.audit(CTX)
+    assert a["metrics"]["generic_template_count"] >= 1
+    assert a["reviewer_gate_results"]["executive_ai"] is False  # generic -> exec/AI gate fails
