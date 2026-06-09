@@ -469,6 +469,12 @@ const navigation = [
     current: false,
   },
   {
+    name: 'Family Office',
+    href: '/dashboard/family-office',
+    icon: HeartIcon,
+    current: false,
+  },
+  {
     name: 'Education',
     href: '/dashboard/education',
     icon: AcademicCapIcon,
