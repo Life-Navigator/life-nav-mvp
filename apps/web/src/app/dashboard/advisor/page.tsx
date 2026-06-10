@@ -71,6 +71,8 @@ export default function AdvisorPage() {
     'financial' | 'health' | 'career' | 'education' | null
   >(null);
   const [reviewing, setReviewing] = useState(false);
+  // Set when the user returns from a document upload (?uploaded=1&uploaded_domain=…).
+  const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const loadCoverage = () => {
     fetch('/api/life/discovery-coverage', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
@@ -97,8 +99,19 @@ export default function AdvisorPage() {
 
   // Detect onboarding mode (?onboarding=1) so we can offer an explicit skip.
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setOnboardingMode(new URLSearchParams(window.location.search).get('onboarding') === '1');
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    setOnboardingMode(q.get('onboarding') === '1');
+    // Returning from a successful document upload: acknowledge it and refresh coverage/context.
+    if (q.get('uploaded') === '1') {
+      setUploadNotice(q.get('uploaded_domain') || '');
+      loadCoverage();
+      // Clean the URL so the banner doesn't re-appear on refresh (keep onboarding mode).
+      window.history.replaceState(
+        {},
+        '',
+        window.location.pathname + (q.get('onboarding') === '1' ? '?onboarding=1' : '')
+      );
     }
   }, []);
 
@@ -164,6 +177,20 @@ export default function AdvisorPage() {
         {progress && !complete && (
           <div className="mt-1 text-xs text-gray-500">
             Getting to know you — {progress.answered}/{progress.total} answered
+          </div>
+        )}
+        {uploadNotice !== null && (
+          <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 flex items-center justify-between gap-2">
+            <span>
+              Got it — your{uploadNotice ? ` ${uploadNotice}` : ''} document was added. I&apos;ve
+              refreshed what I know.
+            </span>
+            <button
+              onClick={() => setUploadNotice(null)}
+              className="text-xs underline text-emerald-700 shrink-0"
+            >
+              Dismiss
+            </button>
           </div>
         )}
         <div className="mt-3 flex-1 space-y-3 overflow-y-auto" style={{ minHeight: 360 }}>
