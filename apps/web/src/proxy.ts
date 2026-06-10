@@ -110,7 +110,10 @@ export async function proxy(request: NextRequest) {
   //   - !setup_completed            → pick a sample financial profile
   //   - setup_completed, !onboarding_completed → run the advisor onboarding
   //   - both true (or skipped)      → dashboard unlocked
-  // The advisor route itself is exempt from the advisor redirect so it can render.
+  // The advisor route itself is exempt from the advisor redirect so it can render. The documents
+  // route is ALSO exempt during onboarding: the advisor's action cards send the user there to upload
+  // a requested document, then return to the advisor — blocking it would dead-end the upload loop.
+  const ONBOARDING_ALLOWED = ['/dashboard/advisor', '/dashboard/documents'];
   if (isAuthenticated && (path.startsWith('/dashboard') || path.startsWith('/admin'))) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -124,8 +127,9 @@ export async function proxy(request: NextRequest) {
     }
 
     // Persona is set but the advisor onboarding hasn't run (or been skipped):
-    // force the user into the advisor before the rest of the dashboard unlocks.
-    if (!profile.onboarding_completed && !path.startsWith('/dashboard/advisor')) {
+    // force the user into the advisor before the rest of the dashboard unlocks — except the
+    // onboarding-support routes (advisor itself + the document upload page it links to).
+    if (!profile.onboarding_completed && !ONBOARDING_ALLOWED.some((p) => path.startsWith(p))) {
       return NextResponse.redirect(new URL('/dashboard/advisor?onboarding=1', request.url));
     }
   }
