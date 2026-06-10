@@ -21,7 +21,10 @@ export async function GET() {
       .limit(20);
 
     if (error) return safeApiError({ code: 'validation_failed', internal: error });
-    return NextResponse.json({ notifications: notifications || [] });
+    const list = notifications || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const unreadCount = list.filter((n: any) => !n.read).length;
+    return NextResponse.json({ notifications: list, unreadCount });
   } catch (err) {
     console.error('Notifications GET error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

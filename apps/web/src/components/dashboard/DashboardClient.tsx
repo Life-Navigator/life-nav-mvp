@@ -448,29 +448,8 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
           </p>
         </div>
 
-        {/* Today's brief (First Insight) is server-rendered in dashboard/page.tsx
-            above this client tree so it shows on first paint, before data load. */}
-
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
-            Quick Actions
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-            {quickActions.map((action) => (
-              <Link
-                key={action.name}
-                href={action.href}
-                className="flex flex-col items-center p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 shadow-md hover:shadow-xl hover:border-blue-400 dark:hover:border-blue-500 transition-all transform hover:scale-105"
-              >
-                <div className="text-3xl mb-2">{action.icon}</div>
-                <p className="text-xs font-medium text-center text-gray-900 dark:text-white">
-                  {action.name}
-                </p>
-              </Link>
-            ))}
-          </div>
-        </div>
+        {/* Mission Control order: domain status → alerts → tasks → intelligence → shortcuts.
+            Quick Actions are shortcuts, not the headline — moved to the bottom of the tree. */}
 
         {/* Pinned Scenario Widget */}
         <div className="mb-8">
@@ -935,6 +914,27 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                 ))
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Quick Actions — shortcuts, at the bottom of Mission Control (not the headline) */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            {quickActions.map((action) => (
+              <Link
+                key={action.name}
+                href={action.href}
+                className="flex flex-col items-center p-4 bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700 shadow-md hover:shadow-xl hover:border-blue-400 dark:hover:border-blue-500 transition-all transform hover:scale-105"
+              >
+                <div className="text-3xl mb-2">{action.icon}</div>
+                <p className="text-xs font-medium text-center text-gray-900 dark:text-white">
+                  {action.name}
+                </p>
+              </Link>
+            ))}
           </div>
         </div>
 

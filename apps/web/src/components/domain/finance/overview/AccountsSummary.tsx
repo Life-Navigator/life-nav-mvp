@@ -42,6 +42,18 @@ export function AccountsSummary() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Canonical totals are READ, never computed here (Rule 1: no frontend business math).
+  const [canonical, setCanonical] = useState<{ total_assets?: number; total_debt?: number } | null>(
+    null
+  );
+  useEffect(() => {
+    fetch('/api/finance/canonical-summary', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.net_worth === 'number') setCanonical(d);
+      })
+      .catch(() => {});
+  }, []);
 
   // Fetch accounts from Plaid API
   useEffect(() => {
@@ -76,30 +88,10 @@ export function AccountsSummary() {
   const filteredAccounts =
     filter === 'all' ? accounts : accounts.filter((account) => account.type === filter);
 
-  // Calculate totals by ACCOUNT TYPE — liability accounts (mortgage/loan/credit) carry
-  // POSITIVE balances in Plaid, so classifying by sign counted the mortgage as an asset
-  // ($2.7M "assets" / $0 liabilities). Classify by type to match the canonical summary.
-  const LIABILITY_TYPES = [
-    'mortgage',
-    'loan',
-    'credit_card',
-    'credit',
-    'auto',
-    'auto_loan',
-    'student',
-    'student_loan',
-    'line_of_credit',
-    'heloc',
-  ];
-  const isLiability = (t?: string) => LIABILITY_TYPES.includes((t || '').toLowerCase());
-
-  const totalAssets = accounts
-    .filter((account) => !isLiability(account.type))
-    .reduce((sum, account) => sum + Math.max(0, account.currentBalance || 0), 0);
-
-  const totalLiabilities = accounts
-    .filter((account) => isLiability(account.type))
-    .reduce((sum, account) => sum + Math.abs(account.currentBalance || 0), 0);
+  // Totals come from the ONE canonical summary — never summed here. The account list below
+  // is display-only grouping/filtering (Rule 1: frontend must not calculate asset/debt totals).
+  const totalAssets = canonical?.total_assets ?? null;
+  const totalLiabilities = canonical?.total_debt ?? null;
 
   // Loading state
   if (loading) {
@@ -191,21 +183,25 @@ export function AccountsSummary() {
         <div>
           <p className="text-sm text-slate-500 dark:text-slate-400">Total Assets</p>
           <p className="text-lg font-medium text-green-600 dark:text-green-400">
-            $
-            {totalAssets.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {totalAssets == null
+              ? '—'
+              : '$' +
+                totalAssets.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
           </p>
         </div>
         <div>
           <p className="text-sm text-slate-500 dark:text-slate-400">Total Liabilities</p>
           <p className="text-lg font-medium text-red-500">
-            $
-            {totalLiabilities.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {totalLiabilities == null
+              ? '—'
+              : '$' +
+                totalLiabilities.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
           </p>
         </div>
       </div>
