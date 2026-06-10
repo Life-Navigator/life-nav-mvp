@@ -1,9 +1,9 @@
 // FILE: src/components/finance/FinanceSidebar.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useFinanceData } from '@/components/domain/finance/FinanceDataContext';
 import {
   ChartBarIcon,
   BanknotesIcon,
@@ -61,37 +61,14 @@ const financeNavItems = [
 
 export function FinanceSidebar() {
   const pathname = usePathname();
-  const [accountSummary, setAccountSummary] = useState<{
-    count: number;
-    total: number;
-    loading: boolean;
-  }>({ count: 0, total: 0, loading: true });
-
-  // Fetch account summary data
-  useEffect(() => {
-    const fetchAccountSummary = async () => {
-      try {
-        // Use the canonical summary so the sidebar shows NET WORTH (not a naive sum of all
-        // balances, which counted the positive-balance mortgage as an asset → inflated total).
-        const response = await fetch('/api/finance/canonical-summary');
-        if (response.ok) {
-          const data = await response.json();
-          setAccountSummary({
-            count: data.accounts_count || 0,
-            total: typeof data.net_worth === 'number' ? data.net_worth : 0,
-            loading: false,
-          });
-        } else {
-          setAccountSummary({ count: 0, total: 0, loading: false });
-        }
-      } catch (error) {
-        console.error('Error fetching account summary:', error);
-        setAccountSummary({ count: 0, total: 0, loading: false });
-      }
-    };
-
-    fetchAccountSummary();
-  }, []);
+  // Net worth comes from the shared finance context (one canonical fetch for the whole section).
+  const fin = useFinanceData();
+  const summary = fin?.summary;
+  const accountSummary = {
+    count: summary?.accounts_count || 0,
+    total: typeof summary?.net_worth === 'number' ? summary.net_worth : 0,
+    loading: fin?.summaryStatus === 'loading',
+  };
 
   // Determine if a nav link is active
   const isActive = (href: string) => {

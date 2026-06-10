@@ -11,6 +11,7 @@ import {
   PlusIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
+import { useFinanceData } from '@/components/domain/finance/FinanceDataContext';
 
 interface Account {
   id: string;
@@ -42,18 +43,10 @@ export function AccountsSummary() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Canonical totals are READ, never computed here (Rule 1: no frontend business math).
-  const [canonical, setCanonical] = useState<{ total_assets?: number; total_debt?: number } | null>(
-    null
-  );
-  useEffect(() => {
-    fetch('/api/finance/canonical-summary', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d && typeof d.net_worth === 'number') setCanonical(d);
-      })
-      .catch(() => {});
-  }, []);
+  // Canonical totals come from the shared finance context (one fetch for the section, not per-widget).
+  const canonical = useFinanceData()?.summary as
+    | { total_assets?: number; total_debt?: number }
+    | undefined;
 
   // Fetch accounts from Plaid API
   useEffect(() => {

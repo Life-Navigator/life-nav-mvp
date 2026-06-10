@@ -1,16 +1,13 @@
 // FILE: src/components/finance/overview/SpendingTrends.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+// Renders backend-owned spending analytics (/api/finance/analytics → spending_trends). The category
+// totals + percentages are computed server-side (Rule 1). This component only formats + draws.
+
+import React from 'react';
 import Link from 'next/link';
 import { ChartBarIcon } from '@heroicons/react/24/outline';
-
-interface SpendingCategory {
-  id: string;
-  name: string;
-  amount: number;
-  color: string;
-}
+import { useFinanceData } from '@/components/domain/finance/FinanceDataContext';
 
 const categoryColors: Record<string, string> = {
   FOOD_AND_DRINK: 'bg-green-500',
@@ -24,105 +21,26 @@ const categoryColors: Record<string, string> = {
   TRAVEL: 'bg-orange-500',
   OTHER: 'bg-gray-500',
 };
-
-const timeRanges = ['This Month', 'Last Month', '3 Months', '6 Months', 'Year'];
+const colorFor = (c: string) => categoryColors[c.toUpperCase().replace(/ /g, '_')] || 'bg-gray-500';
+const pretty = (c: string) =>
+  c
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (m) => m.toUpperCase());
 
 export function SpendingTrends() {
-  const [timeRange, setTimeRange] = useState('This Month');
-  const [categories, setCategories] = useState<SpendingCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch transactions and aggregate by category
-  useEffect(() => {
-    const fetchSpendingData = async () => {
-      try {
-        setLoading(true);
-
-        // Calculate date range based on selection
-        const now = new Date();
-        let startDate: Date;
-
-        switch (timeRange) {
-          case 'Last Month':
-            startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            break;
-          case '3 Months':
-            startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
-            break;
-          case '6 Months':
-            startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-            break;
-          case 'Year':
-            startDate = new Date(now.getFullYear() - 1, now.getMonth(), 1);
-            break;
-          default: // This Month
-            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        }
-
-        const response = await fetch(
-          `/api/plaid/transactions?startDate=${startDate.toISOString()}&endDate=${now.toISOString()}&limit=500`
-        );
-
-        if (!response.ok) {
-          // 401 means user not authenticated - show empty state silently
-          if (response.status === 401) {
-            setCategories([]);
-            setError(null);
-            setLoading(false);
-            return;
-          }
-          throw new Error('Failed to fetch transactions');
-        }
-
-        const data = await response.json();
-        const transactions = data.transactions || [];
-
-        // Aggregate spending by category (only negative amounts = spending)
-        const categoryTotals: Record<string, number> = {};
-
-        transactions.forEach((tx: { amount: number; category: string | null }) => {
-          // Plaid uses positive amounts for debits (spending)
-          if (tx.amount > 0) {
-            const category = tx.category || 'OTHER';
-            const mainCategory =
-              category.split(',')[0]?.trim().toUpperCase().replace(/ /g, '_') || 'OTHER';
-            categoryTotals[mainCategory] = (categoryTotals[mainCategory] || 0) + tx.amount;
-          }
-        });
-
-        // Convert to array and sort by amount
-        const sortedCategories = Object.entries(categoryTotals)
-          .map(([name, amount], index) => ({
-            id: `cat${index}`,
-            name: name
-              .replace(/_/g, ' ')
-              .toLowerCase()
-              .replace(/\b\w/g, (c) => c.toUpperCase()),
-            amount,
-            color: categoryColors[name] || 'bg-gray-500',
-          }))
-          .sort((a, b) => b.amount - a.amount)
-          .slice(0, 7); // Top 7 categories
-
-        setCategories(sortedCategories);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching spending data:', err);
-        setError('Unable to load spending data');
-        setCategories([]);
-      } finally {
-        setLoading(false);
+  const fin = useFinanceData();
+  const st = fin?.analytics?.spending_trends as
+    | {
+        total_spending: number | null;
+        categories: { category: string; amount: number; percentage: number }[];
+        missing_state?: { reason: string };
       }
-    };
+    | undefined;
+  const loading = fin?.analyticsStatus === 'loading';
+  const categories = st?.categories || [];
+  const totalSpending = st?.total_spending ?? 0;
 
-    fetchSpendingData();
-  }, [timeRange]);
-
-  // Calculate total spending
-  const totalSpending = categories.reduce((sum, cat) => sum + cat.amount, 0);
-
-  // Loading state
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow dark:bg-slate-800 p-6">
@@ -131,13 +49,11 @@ export function SpendingTrends() {
           <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full"></div>
           <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded"></div>
           <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded"></div>
-          <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded"></div>
         </div>
       </div>
     );
   }
 
-  // Empty state
   if (categories.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow dark:bg-slate-800 p-6">
@@ -145,7 +61,7 @@ export function SpendingTrends() {
         <div className="text-center py-8">
           <ChartBarIcon className="w-12 h-12 mx-auto text-slate-400 mb-4" />
           <p className="text-slate-500 dark:text-slate-400 mb-4">
-            {error || 'No spending data available yet'}
+            {st?.missing_state?.reason || 'No spending in the last 30 days.'}
           </p>
           <Link
             href="/dashboard/finance/accounts"
@@ -162,59 +78,41 @@ export function SpendingTrends() {
     <div className="bg-white rounded-lg shadow dark:bg-slate-800 p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">Spending Trends</h2>
-        <select
-          aria-label="Select time range"
-          value={timeRange}
-          onChange={(e) => setTimeRange(e.target.value)}
-          className="px-3 py-1 text-sm rounded border border-slate-300 bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-        >
-          {timeRanges.map((range) => (
-            <option key={range} value={range}>
-              {range}
-            </option>
-          ))}
-        </select>
+        <span className="text-xs text-slate-400">Last 30 days</span>
       </div>
 
       <div className="mb-6">
         <div className="h-4 w-full flex rounded-full overflow-hidden">
-          {categories.map((category) => {
-            const percentage = totalSpending > 0 ? (category.amount / totalSpending) * 100 : 0;
-            return (
-              <div
-                key={category.id}
-                className={`${category.color} h-full`}
-                style={{ width: `${percentage}%` }}
-                title={`${category.name}: $${category.amount.toFixed(2)}`}
-              />
-            );
-          })}
+          {categories.map((c) => (
+            <div
+              key={c.category}
+              className={`${colorFor(c.category)} h-full`}
+              style={{ width: `${c.percentage}%` }}
+              title={`${pretty(c.category)}: $${c.amount.toFixed(2)}`}
+            />
+          ))}
         </div>
       </div>
 
       <div className="space-y-4">
-        {categories.map((category) => {
-          const percentage =
-            totalSpending > 0 ? ((category.amount / totalSpending) * 100).toFixed(1) : '0';
-          return (
-            <div key={category.id} className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className={`w-3 h-3 rounded-full ${category.color} mr-2`} />
-                <span className="text-sm font-medium dark:text-white">{category.name}</span>
-              </div>
-              <div className="flex items-center">
-                <span className="text-sm font-medium mr-2 dark:text-white">
-                  $
-                  {category.amount.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-                <span className="text-xs text-slate-500 dark:text-slate-400">{percentage}%</span>
-              </div>
+        {categories.map((c) => (
+          <div key={c.category} className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className={`w-3 h-3 rounded-full ${colorFor(c.category)} mr-2`} />
+              <span className="text-sm font-medium dark:text-white">{pretty(c.category)}</span>
             </div>
-          );
-        })}
+            <div className="flex items-center">
+              <span className="text-sm font-medium mr-2 dark:text-white">
+                $
+                {c.amount.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+              <span className="text-xs text-slate-500 dark:text-slate-400">{c.percentage}%</span>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">

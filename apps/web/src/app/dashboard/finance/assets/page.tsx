@@ -75,12 +75,9 @@ function formatDate(date: Date | string): string {
 // Asset Card Component
 function AssetCard({ asset, onClick }: { asset: Asset; onClick: () => void }) {
   const config = assetTypeConfig[asset.type] || assetTypeConfig.other;
-  const equity =
-    asset.currentValue -
-    (asset.loans?.reduce((sum, l) => sum + (l.isActive ? l.currentBalance : 0), 0) || 0);
-  const appreciation = asset.purchasePrice
-    ? ((asset.currentValue - asset.purchasePrice) / asset.purchasePrice) * 100
-    : null;
+  // equity + appreciation are computed by /api/assets (backend) — Rule 1: never derived here.
+  const equity = (asset as { equity?: number }).equity ?? asset.currentValue;
+  const appreciation = (asset as { appreciation?: number | null }).appreciation ?? null;
 
   return (
     <div

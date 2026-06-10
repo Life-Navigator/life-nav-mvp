@@ -57,22 +57,35 @@ export async function GET(req: NextRequest) {
 
   const typeFilter = new URL(req.url).searchParams.get('type');
   const assets = rows
-    .map((r) => ({
-      id: r.id,
-      userId: r.user_id,
-      name: r.asset_name || 'Asset',
-      type: classify(r.asset_type),
-      subtype: r.asset_type || undefined,
-      value: Number(r.current_value ?? 0),
-      currentValue: Number(r.current_value ?? 0),
-      currency: 'USD',
-      purchasePrice: r.purchase_price ?? undefined,
-      purchaseDate: r.purchase_date ?? undefined,
-      location: r.location ?? undefined,
-      description: r.description ?? undefined,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-    }))
+    .map((r) => {
+      const currentValue = Number(r.current_value ?? 0);
+      const purchasePrice = r.purchase_price != null ? Number(r.purchase_price) : undefined;
+      // equity/appreciation are computed HERE (server), never in the frontend (Rule 1).
+      // Per-asset loans aren't wired yet (finance.asset_loans) → equity = current value.
+      const equity = currentValue;
+      const appreciation =
+        purchasePrice && purchasePrice > 0
+          ? Math.round(((currentValue - purchasePrice) / purchasePrice) * 1000) / 10
+          : null;
+      return {
+        id: r.id,
+        userId: r.user_id,
+        name: r.asset_name || 'Asset',
+        type: classify(r.asset_type),
+        subtype: r.asset_type || undefined,
+        value: currentValue,
+        currentValue,
+        currency: 'USD',
+        purchasePrice,
+        purchaseDate: r.purchase_date ?? undefined,
+        location: r.location ?? undefined,
+        description: r.description ?? undefined,
+        equity,
+        appreciation,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      };
+    })
     .filter((a) => !typeFilter || typeFilter === 'all' || a.type === typeFilter);
 
   const byType: Record<string, { type: AssetType; count: number; value: number; equity: number }> =
