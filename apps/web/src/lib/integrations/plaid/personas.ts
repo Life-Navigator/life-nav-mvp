@@ -50,6 +50,10 @@ export interface PublicPersona {
   life_stage: string;
   profession: string;
   risk_profile: string;
+  income_type: string;
+  asset_profile: string;
+  liability_profile: string;
+  investment_profile: string;
 }
 
 const INST = 'ins_109508'; // First Platypus Bank (sandbox)
@@ -294,6 +298,10 @@ export function toPublicPersona(p: PlaidPersona): PublicPersona {
     life_stage: p.life_stage,
     profession: p.profession,
     risk_profile: p.risk_profile,
+    income_type: p.income_type,
+    asset_profile: p.asset_profile,
+    liability_profile: p.liability_profile,
+    investment_profile: p.investment_profile,
   };
 }
 

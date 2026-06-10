@@ -73,6 +73,10 @@ export default function AdvisorPage() {
   const [reviewing, setReviewing] = useState(false);
   // Set when the user returns from a document upload (?uploaded=1&uploaded_domain=…).
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
+  // P0.6 final open-ended question (frontend-orchestrated) before the confirmation screen.
+  const [finalAsked, setFinalAsked] = useState(false);
+  // P0.7 intentional dashboard transition.
+  const [transitioning, setTransitioning] = useState(false);
   const loadCoverage = () => {
     fetch('/api/life/discovery-coverage', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
@@ -128,7 +132,23 @@ export default function AdvisorPage() {
     } catch {
       /* best-effort; still navigate so the user is never trapped */
     }
-    router.push('/dashboard');
+    // P0.7: a short, intentional transition before the dashboard (not an abrupt jump).
+    setTransitioning(true);
+    setTimeout(() => router.push('/dashboard'), 1600);
+  };
+
+  const FINAL_Q =
+    "Before I show you what I understand — what haven't I asked that I should have? Is there anything else important to you that we haven't discussed?";
+  // P0.6: ask the final open-ended question once, capture the answer into discovery, then review.
+  const submitFinal = async (text: string) => {
+    const t = text.trim();
+    setMsgs((m) => [
+      ...m,
+      { role: 'advisor', text: FINAL_Q },
+      ...(t ? [{ role: 'user' as const, text: t }] : []),
+    ]);
+    setFinalAsked(true);
+    if (t) await send(t, pending);
   };
 
   const apply = (t: Turn | null) => {
@@ -168,6 +188,26 @@ export default function AdvisorPage() {
     setInput('');
     await send(text, pending);
   };
+
+  // P0.4: action cards appear only after a few meaningful answers (not during early discovery).
+  const userAnswers = msgs.filter((m) => m.role === 'user').length;
+  const showActions = userAnswers >= 3 && advisorActions.length > 0;
+  // P0.5/0.6: the life-model review is shown after the final open-ended question is asked.
+  const showConfirmation = (complete && finalAsked) || reviewing;
+  const showFinalQuestion = complete && !finalAsked && !reviewing;
+
+  // P0.7: intentional transition into the dashboard.
+  if (transitioning) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600 mb-4" />
+        <h2 className="text-xl font-bold text-gray-900">
+          I&apos;ve built your initial Life Model.
+        </h2>
+        <p className="text-gray-500 mt-1">Your dashboard is ready…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -252,9 +292,9 @@ export default function AdvisorPage() {
           ))}
           <div ref={endRef} />
         </div>
-        {complete || reviewing ? (
-          // Step 5/6: the life-model review must be seen before the dashboard unlocks. The dashboard
-          // is reached ONLY via an explicit Confirm (onboarding_completed, confirmed) or explicit Skip.
+        {showConfirmation ? (
+          // The life-model review is shown before the dashboard unlocks. The dashboard is reached
+          // ONLY via an explicit Confirm (onboarding_completed, confirmed) or explicit Skip.
           <div className="mt-3">
             <LifeModelConfirmation
               panel={panel}
@@ -263,9 +303,49 @@ export default function AdvisorPage() {
               finishing={finishing}
               onConfirm={() => finishOnboarding(false)}
               onSkip={() => finishOnboarding(true)}
-              onEdit={() => setReviewing(false)}
+              onEdit={() => {
+                setReviewing(false);
+                setFinalAsked(false);
+              }}
               onManualEntry={(d) => setActiveDomain(d)}
             />
+          </div>
+        ) : showFinalQuestion ? (
+          // P0.6: the final open-ended question, asked once before the review.
+          <div className="mt-3">
+            <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50 p-4">
+              <p className="text-sm text-gray-800">{FINAL_Q}</p>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const v = input;
+                  setInput('');
+                  submitFinal(v);
+                }}
+                className="mt-3 flex gap-2"
+              >
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  disabled={busy}
+                  placeholder="Anything else that matters to you…"
+                  className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || !input.trim()}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium disabled:opacity-40"
+                >
+                  Send
+                </button>
+              </form>
+              <button
+                onClick={() => submitFinal('')}
+                className="mt-2 text-xs text-gray-400 underline hover:text-gray-600"
+              >
+                Nothing else — show me what you understand →
+              </button>
+            </div>
           </div>
         ) : (
           <div className="mt-3">
@@ -306,9 +386,9 @@ export default function AdvisorPage() {
               </button>
             </form>
 
-            {/* Step 1/2: context-aware action cards — upload a document or enter data for the
-                domains still missing information. Upload → /dashboard/documents; entry → AddDataModal. */}
-            {advisorActions.length > 0 && (
+            {/* Action cards — phase-gated (P0.4): shown only after a few meaningful answers, never
+                during the first discovery exchanges. Upload → /dashboard/documents; entry → AddDataModal. */}
+            {showActions && (
               <div className="mt-4">
                 <div className="text-[11px] uppercase text-gray-400 font-semibold mb-2">
                   Strengthen your plan

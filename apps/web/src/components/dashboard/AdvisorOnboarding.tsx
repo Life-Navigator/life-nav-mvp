@@ -27,6 +27,8 @@ export interface AdvisorAction {
   // Either a route (upload/quick_form pages) OR a manual-entry modal domain.
   href?: string;
   modalDomain?: 'financial' | 'health' | 'career' | 'education';
+  // Beta: account-data uploads/entries are not supported (Plaid sandbox persona is the source).
+  coming_soon?: boolean;
 }
 
 // Step 2 — domain prompt rules. Static catalog of the actions the advisor can surface per domain.
@@ -43,6 +45,7 @@ export const DOMAIN_ACTIONS: Record<string, AdvisorAction[]> = {
       estimated_time: '2 min',
       primary_cta_label: 'Upload statement',
       href: `/dashboard/documents?domain=finance&doc_type=retirement_statement&return_to=${RET}`,
+      coming_soon: true, // account-data upload not supported in beta (Plaid persona is the source)
     },
     {
       domain: 'finance',
@@ -184,7 +187,16 @@ export function ActionCard({
       <p className="mt-1 text-xs text-gray-600">{action.why_it_matters}</p>
       <p className="mt-1 text-[11px] text-emerald-700">Unlocks: {action.what_it_unlocks}</p>
       <div className="mt-2">
-        {action.type === 'manual_entry' && action.modalDomain ? (
+        {action.coming_soon ? (
+          <div>
+            <span className="inline-block text-xs font-medium px-3 py-1.5 rounded-md bg-gray-100 text-gray-500 cursor-not-allowed">
+              Coming Soon
+            </span>
+            <p className="mt-1.5 text-[11px] text-gray-400">
+              During beta, financial account data comes from the Plaid sandbox persona you selected.
+            </p>
+          </div>
+        ) : action.type === 'manual_entry' && action.modalDomain ? (
           <button
             onClick={() => onManualEntry(action.modalDomain!)}
             className="text-xs font-medium px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
@@ -216,6 +228,7 @@ export interface CoverageDomain {
 export interface PanelLike {
   life_vision?: string | null;
   primary_objective?: string | null;
+  top_themes?: string[];
   top_constraints?: string[];
   top_risks?: string[];
   missing_areas?: string[];
@@ -246,16 +259,37 @@ export function LifeModelConfirmation({
 
   return (
     <div className="rounded-2xl border-2 border-indigo-200 bg-white p-5">
-      <h2 className="text-lg font-bold text-gray-900">Here&apos;s what I understand about you</h2>
-      <p className="text-sm text-gray-500">Review this before we open your dashboard.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">
+            Here&apos;s what I understand about you
+          </h2>
+          <p className="text-sm text-gray-500">Review this before we open your dashboard.</p>
+        </div>
+        {typeof panel.discovery_completion_pct === 'number' && (
+          <span className="shrink-0 rounded-full bg-indigo-50 text-indigo-700 text-xs font-semibold px-3 py-1">
+            {panel.discovery_completion_pct}% coverage
+          </span>
+        )}
+      </div>
 
       {panel.life_vision && (
         <Section label="Life vision">
           <span className="italic">“{panel.life_vision}”</span>
         </Section>
       )}
-      {panel.primary_objective && (
-        <Section label="Primary objective">{panel.primary_objective}</Section>
+      {(panel.primary_objective || (panel.top_themes && panel.top_themes.length > 0)) && (
+        <div className="mt-3">
+          <div className="text-[11px] uppercase text-gray-400 font-semibold">Your priorities</div>
+          <ol className="mt-1 list-decimal list-inside text-sm text-gray-900 space-y-0.5">
+            {panel.primary_objective && (
+              <li className="font-semibold">{panel.primary_objective}</li>
+            )}
+            {(panel.top_themes || []).slice(0, 4).map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ol>
+        </div>
       )}
       {panel.top_constraints && panel.top_constraints.length > 0 && (
         <Section label="Constraints">{panel.top_constraints.join(', ')}</Section>
@@ -310,14 +344,21 @@ export function LifeModelConfirmation({
           disabled={finishing}
           className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50"
         >
-          {finishing ? 'Opening your dashboard…' : 'Confirm & enter dashboard'}
+          {finishing ? 'Opening your dashboard…' : 'Looks right — enter dashboard'}
         </button>
         <button
           onClick={onEdit}
           disabled={finishing}
           className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
         >
-          Edit answers
+          Edit priorities
+        </button>
+        <button
+          onClick={onEdit}
+          disabled={finishing}
+          className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+        >
+          Add something important
         </button>
         <button
           onClick={onSkip}
