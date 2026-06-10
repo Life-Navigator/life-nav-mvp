@@ -64,6 +64,16 @@ class RelationshipManager:
         rows = await self._sb.select("life_vision", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema=LIFE)
         return rows[0] if rows else {}
 
+    async def _has_financial_data(self, ctx: UserContext) -> bool:
+        """True when the user has connected/persona financial accounts (so we don't re-ask the numbers)."""
+        try:
+            rows = await self._sb.select(
+                "financial_accounts", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema="finance"
+            )
+            return bool(rows)
+        except Exception:  # noqa: BLE001
+            return False
+
     async def _update_vision(self, ctx: UserContext, *, vision_text: Optional[str] = None, prompt_updates: Optional[dict] = None) -> None:
         """Read-modify-write life_vision, preserving vision_text + all prompt keys (incl. discovery state)."""
         cur = await self._vision_row(ctx)
@@ -137,6 +147,9 @@ class RelationshipManager:
             written["surface_goal"] = ans
             written["dependencies"] = [d["label"] for d in (res.get("dependencies") or [])]
             written["confidence"] = res.get("confidence")
+            # V3 Sprint 2/8: a single answer may hold several goals — capture ALL candidates (each with
+            # confidence + conversation-derived dependencies), never collapsed to one.
+            written["candidate_goals"] = self._life.analyze_statement(ans)
         elif step["kind"] == "risk":
             label, tol = next(((lbl, t) for k, (lbl, t) in _RISK_MAP.items() if k in ans.lower()), ("moderate", 60))
             await self._sb.upsert("risk_profiles", {"user_id": ctx.user_id, "tenant_id": ctx.user_id,
@@ -188,9 +201,11 @@ class RelationshipManager:
         updates: list[str] = []
         reflection = ""
         reveal = None
+        candidate_goals: list[dict[str, Any]] = []
         if pending_key and message.strip():
             res = await self.answer(ctx, pending_key, message)
             rec = res.get("recorded", {})
+            candidate_goals = rec.get("candidate_goals") or []
             updates = list(self._WROTE_UPDATES.get(rec.get("wrote", ""), []))
             if updates:
                 updates += ["✓ Recommendations refreshed", "✓ Roadmap updated"]  # OS re-syncs on next read
@@ -203,9 +218,15 @@ class RelationshipManager:
                     "recommendations_unlocked": len(rec["dependencies"]),
                     "confidence_pct": round((rec.get("confidence") or 0) * 100),
                 }
-            # Rule 1: HYPOTHESIZE, never declare. Offer the interpretation as a question the user
-            # confirms — the advisor must never decide what the user means before they agree.
-            if rec.get("objective"):
+            # V3 Sprint 2: a multi-goal answer is reflected as SEVERAL candidate goals (never collapsed).
+            # Rule 1: HYPOTHESIZE, never declare — offer the interpretation as a question to confirm.
+            if len(candidate_goals) >= 2:
+                listed = "; ".join(f"{i + 1}) {g['objective']}" for i, g in enumerate(candidate_goals[:4]))
+                reflection = (
+                    f"I'm hearing a few distinct things here — {listed}. "
+                    "Did I capture those, or did I miss something? "
+                )
+            elif rec.get("objective"):
                 reflection = (
                     f"What I'm hearing is that **{rec['objective']}** may be part of what's driving this — "
                     "did I understand that right, or is something else behind it? "
@@ -220,12 +241,25 @@ class RelationshipManager:
         else:
             st = await self.state(ctx)
 
+        # V3 Sprint 4: if the user already has connected financial data, acknowledge it on the opening
+        # turn and signal we won't re-ask the numbers (we'll ask what they MEAN instead).
+        plaid_ack = ""
+        if not pending_key:
+            try:
+                if await self._has_financial_data(ctx):
+                    plaid_ack = (
+                        "I can already see your financial picture from your connected persona, so I won't "
+                        "re-ask about balances or income — I'd rather understand what those numbers mean to you. "
+                    )
+            except Exception:  # noqa: BLE001
+                plaid_ack = ""
+
         nq = st.get("next_question")
         if st.get("complete") or not nq:
             assistant = (reflection + "That's everything I need to start — let's build your life plan. "
                          "Open **My Life** to see your vision, what matters most, your readiness, and your next best action.")
         else:
-            opener = "" if pending_key else "Let's build your plan together — I'll ask a few quick questions. "
+            opener = "" if pending_key else (plaid_ack + "Let's build your plan together — I'll ask a few quick questions. ")
             # Rule 7: a brief (non-verbose) reason the question matters.
             why = nq.get("why_it_matters")
             why_line = f"\n\n_Why I ask: {why}_" if why else ""
@@ -237,6 +271,7 @@ class RelationshipManager:
             "options": (nq or {}).get("options"),
             "updates": updates,
             "reveal": reveal,  # the "magic moment" — render it prominently (D2)
+            "candidate_goals": candidate_goals,  # V3: all goals heard in this turn (never collapsed)
             "progress": st.get("progress"),
             "complete": st.get("complete", False),
             "context_panel": panel,

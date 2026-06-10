@@ -10,6 +10,7 @@ decomposition of the objective, and we mark them unknown until evidence confirms
 """
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -195,6 +196,61 @@ class LifeDiscoveryService:
             result["followup_question"] = f"Is '{surface_goal}' more about {top_theme}, or something else?"
             result["followup_options"] = [t for t, _ in ranked[:3]] + ["Something else"]
         return result
+
+    # Conversation-derived dependencies (V3 Sprint 8): keyed off the user's OWN words, not a generic
+    # per-objective template. Each tuple = (signal words in the statement) → (dependencies they imply).
+    _DEP_SIGNALS: list[tuple[tuple[str, ...], list[str]]] = [
+        (("italy", "travel", "trip", "vacation", "honeymoon", "europe"), ["Vacation fund"]),
+        (("business", "company", "startup", "llc", "my own"), ["Business cash flow", "Owner replacement plan"]),
+        (("security", "secure", "protect", "stability", "stable"), ["Emergency reserve", "Life insurance"]),
+        (("family", "wife", "husband", "kids", "children", "spouse", "partner"), ["Survivor income plan"]),
+        (("income", "earn", "raise", "salary", "make more"), ["Income growth plan"]),
+        (("house", "home", "mortgage", "property", "bigger place"), ["Down payment", "Mortgage capacity"]),
+        (("retire", "retirement", "independence", "passive", "step back"), ["Passive income", "Investment assets"]),
+        (("health", "fitness", "weight", "get fit", "energy"), ["Sustainable health routine"]),
+        (("debt", "loan", "payoff", "pay off"), ["Debt reduction plan"]),
+        (("college", "school", "education", "degree", "tuition"), ["Education funding"]),
+    ]
+
+    def _derive_deps(self, text: str) -> list[str]:
+        out: list[str] = []
+        for sigs, deps in self._DEP_SIGNALS:
+            if any(s in text for s in sigs):
+                out += deps
+        return list(dict.fromkeys(out))[:4]
+
+    def analyze_statement(self, statement: str) -> list[dict[str, Any]]:
+        """V3 Sprint 2: a single answer can contain SEVERAL goals. Split it into clauses, reason about
+        each, and return candidate_goals[] — never collapsed to one. Dependencies are derived from the
+        user's own words (Sprint 8)."""
+        text = (statement or "").strip()
+        if not text:
+            return []
+        parts = re.split(r"\band\b|,|;|&|\bplus\b|\bas well as\b", text, flags=re.IGNORECASE)
+        clauses = [p.strip() for p in parts if len(p.strip()) >= 3] or [text]
+        candidates: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for clause in clauses:
+            a = self.analyze(surface_goal=clause)
+            obj_key = a.get("primary_objective")
+            label = ROOT_OBJECTIVES.get(obj_key, {}).get("label") if obj_key else None
+            deps = self._derive_deps(clause.lower())
+            if not label and not deps:
+                continue  # pure connector clause with no signal
+            key = (label or clause).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            candidates.append({
+                "goal": clause,
+                "objective": label or clause,
+                "objective_key": obj_key,
+                "confidence": round(a.get("confidence") or 0.5, 2),
+                "supporting_statements": [clause],
+                "dependencies": deps,
+                "domain": ROOT_OBJECTIVES.get(obj_key, {}).get("domain", "core") if obj_key else "core",
+            })
+        return candidates
 
     @staticmethod
     def infer_root(surface_goal: str, why_chain: Optional[list] = None) -> str:
