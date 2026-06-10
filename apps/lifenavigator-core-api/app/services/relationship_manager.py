@@ -203,13 +203,19 @@ class RelationshipManager:
                     "recommendations_unlocked": len(rec["dependencies"]),
                     "confidence_pct": round((rec.get("confidence") or 0) * 100),
                 }
-            # reflect the discovered need-behind-the-need when a goal produced a root objective
+            # Rule 1: HYPOTHESIZE, never declare. Offer the interpretation as a question the user
+            # confirms — the advisor must never decide what the user means before they agree.
             if rec.get("objective"):
-                reflection = f"Got it. The real objective behind that looks like **{rec['objective']}** — I've mapped what it depends on. "
+                reflection = (
+                    f"What I'm hearing is that **{rec['objective']}** may be part of what's driving this — "
+                    "did I understand that right, or is something else behind it? "
+                )
             elif rec.get("risk_behavior"):
-                reflection = f"Noted — your instinct is to **{rec['risk_behavior']}**, so I'll plan with that risk posture. "
+                reflection = (
+                    f"It sounds like you'd **{rec['risk_behavior']}** — tell me if that's not quite right. "
+                )
             else:
-                reflection = "Thanks — saved. "
+                reflection = "Thanks — got it. "
             st = res  # answer() already returns the advanced state
         else:
             st = await self.state(ctx)
@@ -220,7 +226,10 @@ class RelationshipManager:
                          "Open **My Life** to see your vision, what matters most, your readiness, and your next best action.")
         else:
             opener = "" if pending_key else "Let's build your plan together — I'll ask a few quick questions. "
-            assistant = f"{reflection}{opener}{nq['prompt']}"
+            # Rule 7: a brief (non-verbose) reason the question matters.
+            why = nq.get("why_it_matters")
+            why_line = f"\n\n_Why I ask: {why}_" if why else ""
+            assistant = f"{reflection}{opener}{nq['prompt']}{why_line}"
         panel = await self._context_panel(ctx)
         return {
             "assistant_message": assistant,

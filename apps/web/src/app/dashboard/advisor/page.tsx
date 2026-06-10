@@ -262,7 +262,7 @@ export default function AdvisorPage() {
                     You said: <span className="text-gray-900">“{m.reveal.you_said}”</span>
                   </div>
                   <div className="text-sm text-gray-600">
-                    The real objective:{' '}
+                    What I&apos;m hearing (does this sound right?):{' '}
                     <span className="text-lg font-bold text-gray-900">
                       {m.reveal.we_discovered}
                     </span>
