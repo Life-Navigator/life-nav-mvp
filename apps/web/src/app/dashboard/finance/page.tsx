@@ -118,6 +118,17 @@ const FinancialDashboard = () => {
   // missing-data flags). Null until the first successful fetch. Source-agnostic:
   // populated from either the Core API shape or the legacy payload via the mapper.
   const [core, setCore] = useState<FinanceCore | null>(null);
+  // P0: the authoritative net worth comes from the ONE canonical finance summary so this page can
+  // never disagree with the dashboard / overview / resolver. (Falls back to legacy sums if absent.)
+  const [canonicalNetWorth, setCanonicalNetWorth] = useState<number | null>(null);
+  useEffect(() => {
+    fetch('/api/finance/canonical-summary')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.net_worth === 'number') setCanonicalNetWorth(d.net_worth);
+      })
+      .catch(() => {});
+  }, []);
 
   // Colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
@@ -286,7 +297,7 @@ const FinancialDashboard = () => {
   // data is absent — show an em dash + a premium "connect" prompt instead.
   const hasFinanceData =
     (core?.hasData ?? false) || (Array.isArray(accounts) && accounts.length > 0);
-  const displayNetWorth = core?.netWorth ?? totals.netWorth;
+  const displayNetWorth = canonicalNetWorth ?? core?.netWorth ?? totals.netWorth;
   const moneyTile = (value: number | null): string =>
     hasFinanceData && value != null ? formatCurrency(value) : '—';
 

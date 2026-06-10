@@ -53,16 +53,16 @@ export async function GET() {
         const savings = sum((t) => t === 'savings');
         const investments = sum((t) => t === 'investment' || t === 'retirement');
         const totalAssets = sum((t) => ASSET.has(t));
-        // Plaid returns mortgage/loan liabilities but not the backing assets
-        // (home, car), so counting them yields a misleadingly negative net
-        // worth. Mirror the First Insight engine: net worth = assets minus
-        // credit-card debt; expose full liabilities (incl. mortgage) separately.
-        const consumerDebt = sum((t) => t === 'credit_card');
+        // P0: net worth = total assets − ALL liabilities, to match the canonical finance summary
+        // (/v1/finance/canonical-summary) exactly. Previously this subtracted only consumer debt,
+        // producing a net worth that contradicted the resolver/canonical summary by ~$1M. One
+        // definition everywhere; a tracked mortgage with no recorded home asset honestly lowers net
+        // worth (the fix is to add the home as an asset, not to hide the mortgage).
         const totalLiabilities = sum(
           (t) => t === 'credit_card' || t === 'loan' || t === 'mortgage'
         );
         financial = {
-          netWorth: totalAssets - consumerDebt,
+          netWorth: totalAssets - totalLiabilities,
           totalAssets,
           totalLiabilities,
           checking,
