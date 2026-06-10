@@ -113,7 +113,7 @@ export default function AccountsPage() {
               clipRule="evenodd"
             />
           </svg>
-          Connect Account
+          Add Account
         </button>
       </div>
 
