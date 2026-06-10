@@ -498,7 +498,7 @@ const FinancialDashboard = () => {
                 ))}
               </div>
               <button className="mt-4 w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                Connect New Account
+                Manage Accounts
               </button>
             </>
           ) : (
