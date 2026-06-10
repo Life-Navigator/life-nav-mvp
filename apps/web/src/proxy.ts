@@ -103,24 +103,30 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // ---- Onboarding check ----
+  // ---- Onboarding gate (advisor-first) ----
+  // Required sequence: pick persona (setup_completed) → advisor onboarding
+  // (onboarding_completed) → dashboard. Two distinct flags so persona activation
+  // can NEVER unlock the dashboard on its own (that was the trust bug).
+  //   - !setup_completed            → pick a sample financial profile
+  //   - setup_completed, !onboarding_completed → run the advisor onboarding
+  //   - both true (or skipped)      → dashboard unlocked
+  // The advisor route itself is exempt from the advisor redirect so it can render.
   if (isAuthenticated && (path.startsWith('/dashboard') || path.startsWith('/admin'))) {
-    // Check if user has completed onboarding.
-    // Handle three cases:
-    //   1. profile exists, setup_completed = true  → allow through
-    //   2. profile exists, setup_completed = false → redirect to onboarding
-    //   3. profile doesn't exist (trigger lag/failure) → redirect to onboarding
-    //      The onboarding page will wait for the profile row to appear.
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('setup_completed')
+      .select('setup_completed, onboarding_completed')
       .eq('id', user!.id)
       .single();
 
     if (profileError || !profile || !profile.setup_completed) {
-      // Beta fast-path: send new users to pick a sample financial profile
-      // (activation marks setup_completed=true), not the long questionnaire.
+      // No persona/setup yet → pick a sample financial profile first.
       return NextResponse.redirect(new URL('/onboarding/financial-profile', request.url));
+    }
+
+    // Persona is set but the advisor onboarding hasn't run (or been skipped):
+    // force the user into the advisor before the rest of the dashboard unlocks.
+    if (!profile.onboarding_completed && !path.startsWith('/dashboard/advisor')) {
+      return NextResponse.redirect(new URL('/dashboard/advisor?onboarding=1', request.url));
     }
   }
 

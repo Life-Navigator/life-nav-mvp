@@ -121,6 +121,18 @@ class FinanceService(DomainService):
                     return 0.0
         return 0.0
 
+    # Liability-type accounts carry POSITIVE balances in Plaid, so they must be
+    # SUBTRACTED from net worth, never summed in as assets. This classification
+    # MUST stay aligned with the canonical resolver (financial_resolver.summary).
+    _LIABILITY_TYPES = {
+        "credit_card", "credit", "loan", "mortgage", "student", "student_loan",
+        "line_of_credit", "heloc", "auto", "auto_loan",
+    }
+
+    @staticmethod
+    def _is_liability(row: dict) -> bool:
+        return (row.get("account_type") or "").lower() in FinanceService._LIABILITY_TYPES
+
     async def summary(self, ctx: UserContext) -> DomainViewModel:
         accounts = await self._rows("financial_accounts", ctx)
         if not accounts:
@@ -136,8 +148,13 @@ class FinanceService(DomainService):
         txns = await self._rows("transactions", ctx, limit=500, order="transaction_date.desc")
 
         cash = sum(self._bal(a) for a in accounts if (a.get("account_type") or "").lower() in {"depository", "checking", "savings", "cash"})
-        net_worth = sum(self._bal(a) for a in accounts) - sum(self._bal(d) for d in debts)
-        debt_total = sum(self._bal(d) for d in debts)
+        # Single source of truth: classify accounts into assets vs liabilities the
+        # SAME way as the canonical resolver. Liability accounts are subtracted, not
+        # added (the old `sum(all accounts)` inflated net worth by every debt balance).
+        assets_total = sum(self._bal(a) for a in accounts if not self._is_liability(a))
+        account_debt = sum(self._bal(a) for a in accounts if self._is_liability(a))
+        debt_total = account_debt
+        net_worth = assets_total - debt_total
         income, expense = self._income_expense(txns)
         savings_rate = None
         if income and income > 0:
@@ -153,7 +170,7 @@ class FinanceService(DomainService):
             {
                 "net_worth": _money(net_worth),
                 "cash": _money(cash),
-                "debt": _money(debt_total) if debts else None,
+                "debt": _money(debt_total) if debt_total else None,
                 "monthly_income": _money(income) if income else None,
                 "monthly_expenses": _money(expense) if expense else None,
                 "savings_rate": savings_rate,
@@ -238,12 +255,17 @@ class FinanceService(DomainService):
     async def net_worth(self, ctx: UserContext) -> DomainViewModel:
         accounts = await self._rows("financial_accounts", ctx)
         assets = await self._rows("assets", ctx)
-        debts = await self._rows("asset_loans", ctx)
         if not accounts and not assets:
             return self._vm(ctx, {"net_worth": None, "assets_total": None, "liabilities_total": None, "trend": []},
                             sources=[], missing=["plaid_link"], basis="missing")
-        assets_total = sum(self._bal(a) for a in accounts) + sum(self._bal(a) for a in assets)
-        liabilities_total = sum(self._bal(d) for d in debts)
+        # Asset-type accounts + standalone assets count as assets; liability-type
+        # accounts (positive Plaid balances) are subtracted. Aligned with the
+        # canonical resolver so this can never contradict the canonical summary.
+        assets_total = (
+            sum(self._bal(a) for a in accounts if not self._is_liability(a))
+            + sum(self._bal(a) for a in assets)
+        )
+        liabilities_total = sum(self._bal(a) for a in accounts if self._is_liability(a))
         return self._vm(
             ctx,
             {
@@ -252,7 +274,7 @@ class FinanceService(DomainService):
                 "liabilities_total": _money(liabilities_total),
                 "trend": [],  # needs net_worth_snapshots (Phase 1)
             },
-            sources=[_src("financial_accounts"), _src("assets"), _src("asset_loans")],
+            sources=[_src("financial_accounts"), _src("assets")],
             missing=["net_worth_snapshots"],
             basis="partial",
         )

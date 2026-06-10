@@ -318,9 +318,9 @@ export default function RetirementPlanningPage() {
           currentAge: plan?.currentAge || 55,
           retirementAge: plan?.retirementAge || 65,
           lifeExpectancy: plan?.lifeExpectancy || 90,
-          traditionalIRABalance: accountTotals?.byTaxStatus?.taxDeferred || 400000,
-          rothIRABalance: accountTotals?.byTaxStatus?.taxFree || 100000,
-          currentTaxableIncome: 100000,
+          traditionalIRABalance: accountTotals?.byTaxStatus?.taxDeferred || 0,
+          rothIRABalance: accountTotals?.byTaxStatus?.taxFree || 0,
+          currentTaxableIncome: 0,
           filingStatus: 'married',
         }),
       });
@@ -346,7 +346,7 @@ export default function RetirementPlanningPage() {
           retirementAge: plan?.retirementAge || 65,
           lifeExpectancy: plan?.lifeExpectancy || 90,
           filingStatus: 'married',
-          annualIncome: 100000,
+          annualIncome: 0,
           healthStatus: 'good',
           includeLTC: true,
         }),
@@ -485,38 +485,56 @@ export default function RetirementPlanningPage() {
         ]}
         withProjection
       />
-      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-6 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-medium opacity-90">Retirement Readiness</h2>
-            <p className="text-sm opacity-75">Based on Monte Carlo simulation</p>
-          </div>
-          <div className="text-right">
-            <div className="text-5xl font-bold">{plan?.readinessScore || 0}</div>
-            <div className="text-sm opacity-75">out of 100</div>
-          </div>
-        </div>
-        <div className="mt-4 bg-white/20 rounded-full h-3">
-          <div
-            className="bg-white rounded-full h-3 transition-all"
-            style={{ width: `${plan?.readinessScore || 0}%` }}
-          />
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="opacity-75">Success Probability</span>
-            <div className="font-semibold text-lg">
-              {formatPercent(plan?.successProbability || 0, 0)}
+      {/* Only show the readiness score / Monte Carlo banner when a real plan exists.
+          No fabricated "0 / 10 years" when there's nothing to score yet. */}
+      {plan ? (
+        <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-medium opacity-90">Retirement Readiness</h2>
+              <p className="text-sm opacity-75">Based on Monte Carlo simulation</p>
+            </div>
+            <div className="text-right">
+              <div className="text-5xl font-bold">{plan.readinessScore ?? 0}</div>
+              <div className="text-sm opacity-75">out of 100</div>
             </div>
           </div>
-          <div>
-            <span className="opacity-75">Years to Retirement</span>
-            <div className="font-semibold text-lg">
-              {(plan?.retirementAge || 65) - (plan?.currentAge || 55)} years
+          <div className="mt-4 bg-white/20 rounded-full h-3">
+            <div
+              className="bg-white rounded-full h-3 transition-all"
+              style={{ width: `${plan.readinessScore ?? 0}%` }}
+            />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="opacity-75">Success Probability</span>
+              <div className="font-semibold text-lg">
+                {formatPercent(plan.successProbability ?? 0, 0)}
+              </div>
+            </div>
+            <div>
+              <span className="opacity-75">Years to Retirement</span>
+              <div className="font-semibold text-lg">
+                {plan.retirementAge && plan.currentAge
+                  ? `${plan.retirementAge - plan.currentAge} years`
+                  : '—'}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+          <p className="text-gray-600 mb-3">
+            Add your retirement plan details to see your readiness score and projection.
+          </p>
+          <a
+            href="/dashboard/finance/add"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+          >
+            Add retirement details
+          </a>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg border border-gray-200 p-4">

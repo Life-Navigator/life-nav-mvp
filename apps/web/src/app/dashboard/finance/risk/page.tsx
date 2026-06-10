@@ -187,8 +187,19 @@ export default function RiskManagementPage() {
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Risk Score</h3>
               <span className="text-2xl">📊</span>
             </div>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">Low</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Well protected</p>
+            {policies.length > 0 ? (
+              <>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">Low</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Well protected</p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-bold text-gray-400 dark:text-gray-500">—</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Add your insurance policies to assess your risk
+                </p>
+              </>
+            )}
           </div>
         </div>
 
@@ -581,7 +592,36 @@ export default function RiskManagementPage() {
   };
 
   const renderProtectionGap = () => {
-    const humanCapitalValue = 2000000; // Estimated future earnings potential
+    // Protection-gap analysis requires the user's real income and current coverage.
+    // Until that data is present we render an honest MISSING state — never a
+    // fabricated "Estimated Need" figure.
+    if (!hasData) {
+      return (
+        <div className="space-y-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
+            <div className="text-5xl mb-4">🛡️</div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Protection gap analysis needs your data
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 max-w-xl mx-auto mb-4">
+              We can&apos;t estimate your coverage needs without your income and your current
+              insurance policies. Add them and we&apos;ll calculate the exact gap between your
+              coverage and your financial obligations.
+            </p>
+            <a
+              href="/dashboard/finance/add"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Add income &amp; insurance
+            </a>
+          </div>
+        </div>
+      );
+    }
+
+    // NOTE: when the data path is wired, this MUST be sourced from canonical income
+    // (the FinancialResolver), not a constant.
+    const humanCapitalValue = 0;
     const lifeCoverage = policies
       .filter((p) => p.type === 'life')
       .reduce((sum, p) => sum + p.coverage, 0);

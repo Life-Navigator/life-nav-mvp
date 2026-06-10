@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Building2,
   TrendingUp,
@@ -14,7 +14,7 @@ import {
   Filter,
   ExternalLink,
   Clock,
-  AlertCircle
+  AlertCircle,
 } from 'lucide-react';
 
 interface FinancialPlatform {
@@ -40,7 +40,7 @@ const financialPlatforms: FinancialPlatform[] = [
     name: 'Plaid',
     description: 'Securely connect your bank accounts and financial institutions',
     category: 'Banking',
-    isConnected: true,
+    isConnected: false, // real state resolved at runtime from /api/integrations/plaid/accounts
     comingSoon: false,
     features: ['Bank Account Linking', 'Real-time Balance Updates', 'Transaction Sync'],
     securityFeatures: ['Bank-level Encryption', 'Read-only Access', 'SOC 2 Certified'],
@@ -48,7 +48,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Real-time',
     gradientFrom: 'from-blue-500',
     gradientTo: 'to-cyan-500',
-    icon: 'Building2'
+    icon: 'Building2',
   },
   {
     id: 'monarch',
@@ -63,7 +63,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Daily',
     gradientFrom: 'from-purple-500',
     gradientTo: 'to-pink-500',
-    icon: 'TrendingUp'
+    icon: 'TrendingUp',
   },
   {
     id: 'ynab',
@@ -78,7 +78,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Real-time',
     gradientFrom: 'from-yellow-500',
     gradientTo: 'to-orange-500',
-    icon: 'Wallet'
+    icon: 'Wallet',
   },
   {
     id: 'personal-capital',
@@ -93,7 +93,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Daily',
     gradientFrom: 'from-green-500',
     gradientTo: 'to-emerald-500',
-    icon: 'TrendingUp'
+    icon: 'TrendingUp',
   },
   {
     id: 'quicken',
@@ -108,7 +108,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Daily',
     gradientFrom: 'from-red-500',
     gradientTo: 'to-rose-500',
-    icon: 'Building2'
+    icon: 'Building2',
   },
   // Investment Platforms
   {
@@ -124,7 +124,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Real-time',
     gradientFrom: 'from-teal-500',
     gradientTo: 'to-cyan-500',
-    icon: 'TrendingUp'
+    icon: 'TrendingUp',
   },
   {
     id: 'coinbase',
@@ -139,7 +139,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Real-time',
     gradientFrom: 'from-blue-600',
     gradientTo: 'to-indigo-600',
-    icon: 'DollarSign'
+    icon: 'DollarSign',
   },
   {
     id: 'wealthfront',
@@ -154,7 +154,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Daily',
     gradientFrom: 'from-indigo-500',
     gradientTo: 'to-purple-500',
-    icon: 'TrendingUp'
+    icon: 'TrendingUp',
   },
   {
     id: 'betterment',
@@ -169,7 +169,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Daily',
     gradientFrom: 'from-cyan-500',
     gradientTo: 'to-blue-500',
-    icon: 'TrendingUp'
+    icon: 'TrendingUp',
   },
   // Banking & Payments
   {
@@ -185,7 +185,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Real-time',
     gradientFrom: 'from-violet-500',
     gradientTo: 'to-purple-500',
-    icon: 'CreditCard'
+    icon: 'CreditCard',
   },
   {
     id: 'paypal',
@@ -200,7 +200,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Real-time',
     gradientFrom: 'from-blue-500',
     gradientTo: 'to-sky-500',
-    icon: 'Wallet'
+    icon: 'Wallet',
   },
   {
     id: 'venmo',
@@ -215,7 +215,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Real-time',
     gradientFrom: 'from-sky-400',
     gradientTo: 'to-blue-400',
-    icon: 'DollarSign'
+    icon: 'DollarSign',
   },
   {
     id: 'cashapp',
@@ -230,7 +230,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Real-time',
     gradientFrom: 'from-green-400',
     gradientTo: 'to-emerald-400',
-    icon: 'DollarSign'
+    icon: 'DollarSign',
   },
   // Business Finance
   {
@@ -246,7 +246,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Real-time',
     gradientFrom: 'from-green-600',
     gradientTo: 'to-teal-600',
-    icon: 'Building2'
+    icon: 'Building2',
   },
   {
     id: 'freshbooks',
@@ -261,7 +261,7 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Daily',
     gradientFrom: 'from-blue-500',
     gradientTo: 'to-cyan-500',
-    icon: 'Building2'
+    icon: 'Building2',
   },
   {
     id: 'wave',
@@ -276,16 +276,16 @@ const financialPlatforms: FinancialPlatform[] = [
     syncFrequency: 'Daily',
     gradientFrom: 'from-teal-500',
     gradientTo: 'to-green-500',
-    icon: 'Building2'
-  }
+    icon: 'Building2',
+  },
 ];
 
 const categoryColors = {
   'Personal Finance': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
-  'Investments': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
-  'Banking': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  'Payments': 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
-  'Business': 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+  Investments: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+  Banking: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  Payments: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+  Business: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
 };
 
 const getIcon = (iconName: string) => {
@@ -294,7 +294,7 @@ const getIcon = (iconName: string) => {
     TrendingUp: <TrendingUp className="w-8 h-8" />,
     Wallet: <Wallet className="w-8 h-8" />,
     CreditCard: <CreditCard className="w-8 h-8" />,
-    DollarSign: <DollarSign className="w-8 h-8" />
+    DollarSign: <DollarSign className="w-8 h-8" />,
   };
   return icons[iconName] || <Building2 className="w-8 h-8" />;
 };
@@ -303,18 +303,47 @@ export default function FinancialIntegrations() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<FinancialPlatform | null>(null);
+  const [plaidConnected, setPlaidConnected] = useState(false);
 
-  const categories = ['All', ...Array.from(new Set(financialPlatforms.map(p => p.category)))];
+  // Resolve the REAL Plaid connection state from the user's linked accounts.
+  // Never assume connected — Rule 1/7: connection status is truth, not a constant.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/integrations/plaid/accounts', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        const accounts: any[] = Array.isArray(data)
+          ? data
+          : (data.accounts ?? data.items ?? data.data ?? []);
+        if (!cancelled) setPlaidConnected(accounts.length > 0);
+      } catch {
+        /* leave as not-connected on error — honest default */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const filteredPlatforms = financialPlatforms.filter(platform => {
-    const matchesSearch = platform.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         platform.description.toLowerCase().includes(searchTerm.toLowerCase());
+  // Overlay the resolved connection state onto the static catalog.
+  const platforms = financialPlatforms.map((p) =>
+    p.id === 'plaid' ? { ...p, isConnected: plaidConnected } : p
+  );
+
+  const categories = ['All', ...Array.from(new Set(platforms.map((p) => p.category)))];
+
+  const filteredPlatforms = platforms.filter((platform) => {
+    const matchesSearch =
+      platform.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      platform.description.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || platform.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const connectedPlatforms = financialPlatforms.filter(p => p.isConnected);
-  const comingSoonPlatforms = financialPlatforms.filter(p => p.comingSoon);
+  const connectedPlatforms = platforms.filter((p) => p.isConnected);
+  const comingSoonPlatforms = platforms.filter((p) => p.comingSoon);
 
   return (
     <div className="space-y-8">
@@ -393,9 +422,7 @@ export default function FinancialIntegrations() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-              Connected Platforms
-            </h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white">Connected Platforms</h3>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {connectedPlatforms.map((platform) => (
@@ -413,13 +440,11 @@ export default function FinancialIntegrations() {
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-            Coming Soon
-          </h3>
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Coming Soon</h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredPlatforms
-            .filter(p => p.comingSoon)
+            .filter((p) => p.comingSoon)
             .map((platform) => (
               <PlatformCard
                 key={platform.id}
@@ -444,8 +469,9 @@ export default function FinancialIntegrations() {
               Bank-Level Security
             </h4>
             <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
-              All connections use industry-standard 256-bit encryption and are read-only. We never store your credentials
-              and cannot make transactions on your behalf. Your financial data is protected by the same security banks use.
+              All connections use industry-standard 256-bit encryption and are read-only. We never
+              store your credentials and cannot make transactions on your behalf. Your financial
+              data is protected by the same security banks use.
             </p>
             <div className="flex flex-wrap gap-2">
               <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
@@ -467,8 +493,8 @@ export default function FinancialIntegrations() {
         <div className="max-w-2xl">
           <h3 className="text-2xl font-bold mb-2">Want Early Access?</h3>
           <p className="text-purple-100 mb-6">
-            We're actively working on these integrations. Join the waitlist to be notified when they're available
-            and get exclusive early access to new financial platform connections.
+            We're actively working on these integrations. Join the waitlist to be notified when
+            they're available and get exclusive early access to new financial platform connections.
           </p>
           <div className="flex flex-col sm:flex-row gap-3">
             <input
@@ -516,21 +542,23 @@ function PlatformCard({ platform, onClick }: { platform: FinancialPlatform; onCl
       </div>
 
       {/* Platform Icon */}
-      <div className={`w-16 h-16 bg-gradient-to-br ${platform.gradientFrom} ${platform.gradientTo} rounded-xl flex items-center justify-center mb-4 text-white group-hover:scale-110 transition-transform`}>
+      <div
+        className={`w-16 h-16 bg-gradient-to-br ${platform.gradientFrom} ${platform.gradientTo} rounded-xl flex items-center justify-center mb-4 text-white group-hover:scale-110 transition-transform`}
+      >
         {getIcon(platform.icon)}
       </div>
 
       {/* Platform Info */}
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {platform.name}
-      </h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{platform.name}</h3>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
         {platform.description}
       </p>
 
       {/* Category */}
       <div className="mb-3">
-        <span className={`px-2 py-1 rounded text-xs font-medium ${categoryColors[platform.category]}`}>
+        <span
+          className={`px-2 py-1 rounded text-xs font-medium ${categoryColors[platform.category]}`}
+        >
           {platform.category}
         </span>
       </div>
@@ -559,20 +587,33 @@ function PlatformCard({ platform, onClick }: { platform: FinancialPlatform; onCl
           platform.isConnected
             ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
             : platform.comingSoon
-            ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-700'
+              ? 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
         }`}
       >
-        {platform.isConnected ? 'Manage Connection' : platform.comingSoon ? 'Coming Soon' : 'Connect Account'}
+        {platform.isConnected
+          ? 'Manage Connection'
+          : platform.comingSoon
+            ? 'Coming Soon'
+            : 'Connect Account'}
       </button>
     </div>
   );
 }
 
 // Platform Detail Modal Component
-function PlatformDetailModal({ platform, onClose }: { platform: FinancialPlatform; onClose: () => void }) {
+function PlatformDetailModal({
+  platform,
+  onClose,
+}: {
+  platform: FinancialPlatform;
+  onClose: () => void;
+}) {
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
+    <div
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+      onClick={onClose}
+    >
       <div
         className="bg-white dark:bg-gray-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -580,16 +621,16 @@ function PlatformDetailModal({ platform, onClose }: { platform: FinancialPlatfor
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              <div className={`w-16 h-16 bg-gradient-to-br ${platform.gradientFrom} ${platform.gradientTo} rounded-xl flex items-center justify-center text-white`}>
+              <div
+                className={`w-16 h-16 bg-gradient-to-br ${platform.gradientFrom} ${platform.gradientTo} rounded-xl flex items-center justify-center text-white`}
+              >
                 {getIcon(platform.icon)}
               </div>
               <div>
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                   {platform.name}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400 mt-1">
-                  {platform.category}
-                </p>
+                <p className="text-gray-600 dark:text-gray-400 mt-1">{platform.category}</p>
               </div>
             </div>
             <button
@@ -641,13 +682,15 @@ function PlatformDetailModal({ platform, onClose }: { platform: FinancialPlatfor
           <div className="grid grid-cols-2 gap-4">
             <div>
               <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Pricing</h4>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                platform.pricing === 'Free'
-                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                  : platform.pricing === 'Paid'
-                  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                  : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-              }`}>
+              <span
+                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  platform.pricing === 'Free'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                    : platform.pricing === 'Paid'
+                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
+                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                }`}
+              >
                 {platform.pricing}
               </span>
             </div>

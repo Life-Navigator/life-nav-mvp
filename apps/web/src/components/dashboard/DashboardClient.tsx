@@ -104,11 +104,14 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
 
   // Calendar and Notifications state
   const [calendarTasks, setCalendarTasks] = useState<CalendarTask[]>([]);
-  const [hasCalendarConnection, setHasCalendarConnection] = useState(false);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  // The Financial Overview card reads the SAME canonical endpoint as the Financial
+  // Overview page (/api/finance/canonical-summary) — one source, identical values.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [canonicalFinance, setCanonicalFinance] = useState<any | null>(null);
 
   const quickActions = [
     { name: 'Benefits Discovery', icon: '🎨', href: '/discovery/benefits' },
@@ -119,30 +122,29 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
     { name: 'Family', icon: '👨‍👩‍👧‍👦', href: '/dashboard/family' },
   ];
 
+  // Feature-interest list. No vote TOTALS are shown — there is no real aggregate
+  // vote source, so we never fabricate counts. The button reflects only the user's
+  // own (real) vote for this session.
   const futureModules = [
     {
       id: 'habit-tracker',
       name: 'Habit Tracker',
       description: 'Track daily habits and build consistent routines',
-      votes: 127,
     },
     {
       id: 'social-network',
       name: 'Social Network',
       description: 'Connect with like-minded individuals',
-      votes: 95,
     },
     {
       id: 'ai-coach',
       name: 'AI Life Coach',
       description: 'Get personalized coaching powered by AI',
-      votes: 203,
     },
     {
       id: 'milestone-celebrations',
       name: 'Milestone Celebrations',
       description: 'Celebrate achievements with friends',
-      votes: 78,
     },
   ];
 
@@ -307,8 +309,8 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
 
         if (response.ok) {
           const data = await response.json();
+          // /api/dashboard/tasks returns the user's active goals.
           setCalendarTasks(data.tasks || []);
-          setHasCalendarConnection(data.hasCalendarConnection || false);
         }
       } catch (err) {
         console.error('Error fetching calendar tasks:', err);
@@ -353,6 +355,17 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
     fetchNotifications();
   }, [currentSession]);
 
+  // Canonical finance summary for the Financial Overview card (same source as the
+  // Financial Overview page — guarantees the two never disagree).
+  useEffect(() => {
+    fetch('/api/finance/canonical-summary')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.net_worth === 'number') setCanonicalFinance(d);
+      })
+      .catch(() => {});
+  }, [currentSession]);
+
   const handleVote = (moduleId: string) => {
     setVotedModules((prev) => {
       const newSet = new Set(prev);
@@ -386,15 +399,6 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
     } catch (err) {
       console.error('Error marking notifications as read:', err);
     }
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
   };
 
   if (dataLoading) {
@@ -470,23 +474,23 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                   Financial Overview
                 </h3>
               </Link>
-              {dashboardData?.financial.hasData ? (
+              {canonicalFinance ? (
                 <>
                   <div className="grid grid-cols-3 gap-4 mb-4">
                     <div>
                       <p className="text-xs mb-1 text-gray-600 dark:text-gray-400">Net Worth</p>
                       <p className="text-lg font-bold text-gray-900 dark:text-white">
-                        ${dashboardData.financial.netWorth.toLocaleString()}
+                        ${Number(canonicalFinance.net_worth || 0).toLocaleString()}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">Current</p>
                     </div>
                     <div>
                       <p className="text-xs mb-1 text-gray-600 dark:text-gray-400">Total Assets</p>
                       <p className="text-lg font-bold text-gray-900 dark:text-white">
-                        ${dashboardData.financial.totalAssets.toLocaleString()}
+                        ${Number(canonicalFinance.total_assets || 0).toLocaleString()}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Accounts & Investments
+                        Cash, investments & retirement
                       </p>
                     </div>
                     <div>
@@ -494,7 +498,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                         Total Liabilities
                       </p>
                       <p className="text-lg font-bold text-gray-900 dark:text-white">
-                        ${dashboardData.financial.totalLiabilities.toLocaleString()}
+                        ${Number(canonicalFinance.total_debt || 0).toLocaleString()}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">Debts & Loans</p>
                     </div>
@@ -502,24 +506,46 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                   <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
                     <div className="grid grid-cols-3 gap-4 text-xs">
                       <div>
-                        <p className="text-gray-500 dark:text-gray-400">Checking</p>
+                        <p className="text-gray-500 dark:text-gray-400">Cash</p>
                         <p className="font-semibold text-gray-900 dark:text-white">
-                          ${dashboardData.financial.checking.toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 dark:text-gray-400">Savings</p>
-                        <p className="font-semibold text-gray-900 dark:text-white">
-                          ${dashboardData.financial.savings.toLocaleString()}
+                          ${Number(canonicalFinance.cash_balance || 0).toLocaleString()}
                         </p>
                       </div>
                       <div>
                         <p className="text-gray-500 dark:text-gray-400">Investments</p>
                         <p className="font-semibold text-gray-900 dark:text-white">
-                          ${dashboardData.financial.investments.toLocaleString()}
+                          ${Number(canonicalFinance.investment_balance || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 dark:text-gray-400">Retirement</p>
+                        <p className="font-semibold text-gray-900 dark:text-white">
+                          ${Number(canonicalFinance.retirement_balance || 0).toLocaleString()}
                         </p>
                       </div>
                     </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <p className="text-[10px] text-gray-400">
+                      Source:{' '}
+                      {(() => {
+                        const s = (canonicalFinance.source || '').toString().toLowerCase();
+                        if (s.includes('plaid')) return 'Plaid Sandbox Persona';
+                        if (s.includes('manual') || s.includes('user')) return 'User Entered';
+                        if (s.includes('document')) return 'Uploaded Document';
+                        if (s.includes('tool')) return 'Deterministic Tool';
+                        return canonicalFinance.source || '—';
+                      })()}
+                      {canonicalFinance.last_updated
+                        ? ` · Updated ${new Date(canonicalFinance.last_updated).toLocaleDateString()}`
+                        : ''}
+                    </p>
+                    <Link
+                      href="/dashboard/finance/overview"
+                      className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      View details →
+                    </Link>
                   </div>
                 </>
               ) : (
@@ -703,97 +729,10 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
           </div>
         </div>
 
-        {/* Daily Tasks and Alerts Section */}
+        {/* Alerts & Notifications first (recommendation PREVIEW lives here, not at the
+            top of the dashboard), then Active Goals. Full recommendations are on
+            /dashboard/recommendations. */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Daily Tasks */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-md">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Today's Tasks</h3>
-              {hasCalendarConnection && calendarTasks.length > 0 && (
-                <Link
-                  href="/dashboard/calendar"
-                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  View All
-                </Link>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              {tasksLoading ? (
-                <div className="text-center py-8">
-                  <LoadingSpinner size="medium" />
-                </div>
-              ) : !hasCalendarConnection ? (
-                <div className="text-center py-8">
-                  <span className="text-5xl mb-2 block">📅</span>
-                  <p className="text-gray-500 dark:text-gray-400 mb-3">No calendar connected</p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
-                    Connect your calendar to see today's tasks and events
-                  </p>
-                  <Link
-                    href="/dashboard/integrations"
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                  >
-                    Connect Calendar
-                  </Link>
-                </div>
-              ) : calendarTasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <span className="text-5xl mb-2 block">✅</span>
-                  <p className="text-gray-500 dark:text-gray-400">No tasks scheduled for today</p>
-                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-                    Enjoy your free time!
-                  </p>
-                </div>
-              ) : (
-                calendarTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
-                          {task.title}
-                        </h4>
-                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                          <span>
-                            {task.isAllDay
-                              ? 'All Day'
-                              : `${formatTime(task.startTime)} - ${formatTime(task.endTime)}`}
-                          </span>
-                          {task.location && (
-                            <>
-                              <span>•</span>
-                              <span>{task.location}</span>
-                            </>
-                          )}
-                        </div>
-                        {task.meetingLink && (
-                          <a
-                            href={task.meetingLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mt-1 inline-block"
-                          >
-                            Join Meeting →
-                          </a>
-                        )}
-                      </div>
-                      {task.color && (
-                        <div
-                          className="w-3 h-3 rounded-full flex-shrink-0 mt-1"
-                          style={{ backgroundColor: task.color }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
           {/* Alerts */}
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-md">
             <div className="flex items-center justify-between mb-4">
@@ -814,6 +753,30 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                 </button>
               )}
             </div>
+
+            {/* Compact recommendation preview — the dashboard shows ONLY the top
+                action here; the full experience is on /dashboard/recommendations. */}
+            {firstInsight?.has_data && (
+              <Link
+                href="/dashboard/recommendations"
+                className="block mb-3 p-3 border-l-4 border-l-indigo-500 bg-indigo-50 dark:bg-indigo-900/10 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/20 transition-colors"
+              >
+                <p className="text-[10px] uppercase tracking-wide text-indigo-500 font-semibold">
+                  Top recommendation
+                </p>
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {firstInsight.headline}
+                </h4>
+                {firstInsight.recommendation && (
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">
+                    {firstInsight.recommendation}
+                  </p>
+                )}
+                <span className="mt-1 inline-block text-xs text-indigo-600 dark:text-indigo-400">
+                  See all recommendations →
+                </span>
+              </Link>
+            )}
 
             <div className="space-y-3">
               {notificationsLoading ? (
@@ -881,6 +844,68 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
               )}
             </div>
           </div>
+
+          {/* Active Goals (the /api/dashboard/tasks endpoint returns the user's
+              active GOALS, not calendar events) */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Active Goals</h3>
+              {calendarTasks.length > 0 && (
+                <Link
+                  href="/dashboard/goals"
+                  className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  View All
+                </Link>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {tasksLoading ? (
+                <div className="text-center py-8">
+                  <LoadingSpinner size="medium" />
+                </div>
+              ) : calendarTasks.length === 0 ? (
+                <div className="text-center py-8">
+                  <span className="text-5xl mb-2 block">🎯</span>
+                  <p className="text-gray-500 dark:text-gray-400 mb-3">No active goals yet</p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
+                    Set a goal and your advisor will help you make progress on it.
+                  </p>
+                  <Link
+                    href="/goals/create"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                  >
+                    Create a Goal
+                  </Link>
+                </div>
+              ) : (
+                calendarTasks.map((goal: any) => (
+                  <div
+                    key={goal.id}
+                    className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                  >
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                      {goal.title}
+                    </h4>
+                    {goal.target_date && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        Target: {new Date(goal.target_date).toLocaleDateString()}
+                      </div>
+                    )}
+                    {typeof goal.progress_percent === 'number' && (
+                      <div className="mt-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                        <div
+                          className="bg-blue-600 dark:bg-blue-500 h-1.5 rounded-full"
+                          style={{ width: `${Math.max(0, Math.min(100, goal.progress_percent))}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Future Modules Voting Section */}
@@ -896,7 +921,6 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {futureModules.map((module) => {
               const hasVoted = votedModules.has(module.id);
-              const displayVotes = module.votes + (hasVoted ? 1 : 0);
               return (
                 <div
                   key={module.id}
@@ -923,7 +947,7 @@ export default function DashboardClient({ initialSession }: DashboardClientProps
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600'
                       } border`}
                     >
-                      {hasVoted ? '✓ Voted' : 'Vote'} ({displayVotes})
+                      {hasVoted ? '✓ Voted' : 'Vote'}
                     </button>
                   </div>
                 </div>

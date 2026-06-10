@@ -8,6 +8,7 @@ import NetWorthSummary from '@/components/financial/accounts/NetWorthSummary';
 import InstitutionGroup from '@/components/financial/accounts/InstitutionGroup';
 import AddAccountButton from '@/components/financial/accounts/AddAccountButton';
 import ConnectAccountModal from '@/components/financial/accounts/ConnectAccountModal';
+import { normalizeFinancePayload } from '@/lib/finance/domainViewModel';
 // Removed mock data import - will fetch from database
 
 export default function AccountsPage() {
@@ -15,12 +16,14 @@ export default function AccountsPage() {
   const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
   const [accounts, setAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [canonicalSummary, setCanonicalSummary] = useState<any | null>(null);
 
-  // Fetch accounts from the Finance aggregator. The legacy URL
-  // /api/plaid/accounts didn't exist; the real endpoint is at
-  // /api/financial (server-rendered from finance.financial_accounts under RLS,
-  // returned in the shape this page expects: { id, name, type, balance,
-  // institution }).
+  // Fetch accounts from the Finance aggregator (/api/financial). That endpoint is
+  // a proxy that returns the Core API DomainViewModel (accounts nested), NOT a
+  // top-level `accounts` array — reading `data.accounts` directly is why this page
+  // rendered empty for every user. Run the response through normalizeFinancePayload,
+  // which handles both the proxy shape and the legacy payload.
   React.useEffect(() => {
     const fetchAccounts = async () => {
       try {
@@ -32,7 +35,8 @@ export default function AccountsPage() {
           return;
         }
         const data = await response.json();
-        setAccounts(Array.isArray(data?.accounts) ? data.accounts : []);
+        const norm = normalizeFinancePayload(data);
+        setAccounts(Array.isArray(norm.accounts) ? norm.accounts : []);
       } catch (error) {
         console.error('[Accounts] Error fetching accounts:', error);
         setAccounts([]);
@@ -41,6 +45,17 @@ export default function AccountsPage() {
       }
     };
     fetchAccounts();
+  }, []);
+
+  // Net worth on this page comes from the ONE canonical finance summary — never a
+  // client-side sum of the account list (which would disagree with every other page).
+  React.useEffect(() => {
+    fetch('/api/finance/canonical-summary')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.net_worth === 'number') setCanonicalSummary(d);
+      })
+      .catch(() => {});
   }, []);
 
   // Filter accounts based on selected type
@@ -102,8 +117,8 @@ export default function AccountsPage() {
         </button>
       </div>
 
-      {/* Net Worth Summary */}
-      <NetWorthSummary accounts={filteredAccounts} />
+      {/* Net Worth Summary — canonical source only */}
+      <NetWorthSummary summary={canonicalSummary} />
 
       {/* Account Type Filter */}
       <AccountTypeFilter selectedType={selectedType} onChange={setSelectedType} />

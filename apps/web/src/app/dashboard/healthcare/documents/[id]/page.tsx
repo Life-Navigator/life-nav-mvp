@@ -48,29 +48,42 @@ export default function DocumentDetailPage() {
     const fetchDocument = async () => {
       try {
         setLoading(true);
-        
-        // In a real app, this would be an API call
-        await new Promise(resolve => setTimeout(resolve, 600));
-        
-        // Mock document data
-        const mockDocument: SecureDocument = {
-          id: params.id as string,
-          filename: 'Health_Insurance_Policy.pdf',
-          type: 'PDF',
-          category: 'insurance',
-          size: '1.2 MB',
-          uploadDate: '2025-04-15',
-          lastAccessed: '2025-05-08',
-          tags: ['insurance', 'healthcare', 'policy'],
-          encrypted: true,
-          favorite: true,
-          createdBy: 'Mobile App Scanner',
-          encryptionType: 'AES-256',
-          previewUrl: '/images/document-preview.png'
+
+        // Fetch the real document set and locate this id. No fabricated fallback:
+        // if it isn't found, we render the honest "Document not found" state below.
+        const res = await fetch('/api/documents', { cache: 'no-store' });
+        if (!res.ok) {
+          setDocument(null);
+          setLoading(false);
+          return;
+        }
+        const data = await res.json().catch(() => ({}));
+        const list: any[] = Array.isArray(data)
+          ? data
+          : (data.documents ?? data.items ?? data.data ?? []);
+        const found = list.find((d: any) => String(d.id) === String(params.id));
+        if (!found) {
+          setDocument(null);
+          setLoading(false);
+          return;
+        }
+        const doc: SecureDocument = {
+          id: String(found.id),
+          filename: found.filename ?? found.name ?? found.title ?? 'Document',
+          type: found.type ?? found.mime_type ?? found.file_type ?? 'FILE',
+          category: found.category ?? found.document_type ?? 'uncategorized',
+          size: found.size ?? found.file_size ?? '—',
+          uploadDate: found.uploadDate ?? found.created_at ?? found.uploaded_at ?? '',
+          lastAccessed: found.lastAccessed ?? found.last_accessed ?? found.updated_at ?? '',
+          tags: Array.isArray(found.tags) ? found.tags : [],
+          encrypted: Boolean(found.encrypted ?? true),
+          favorite: Boolean(found.favorite ?? false),
+          createdBy: found.createdBy ?? found.created_by ?? undefined,
+          encryptionType: found.encryptionType ?? found.encryption_type ?? undefined,
+          previewUrl: found.previewUrl ?? found.preview_url ?? undefined,
         };
-        
-        setDocument(mockDocument);
-        setTags(mockDocument.tags);
+        setDocument(doc);
+        setTags(doc.tags);
         setLoading(false);
       } catch (err) {
         console.error('Error fetching document:', err);
@@ -78,7 +91,7 @@ export default function DocumentDetailPage() {
         setLoading(false);
       }
     };
-    
+
     fetchDocument();
   }, [params.id]);
   
@@ -263,7 +276,7 @@ export default function DocumentDetailPage() {
                   <div className="mt-1 flex items-center">
                     <ClockIcon className="h-4 w-4 text-gray-400 mr-1.5" />
                     <p className="text-sm text-gray-900 dark:text-white">
-                      {new Date(document.uploadDate).toLocaleDateString()}
+                      {document.uploadDate ? new Date(document.uploadDate).toLocaleDateString() : '—'}
                     </p>
                   </div>
                 </div>
@@ -273,7 +286,7 @@ export default function DocumentDetailPage() {
                   <div className="mt-1 flex items-center">
                     <ClockIcon className="h-4 w-4 text-gray-400 mr-1.5" />
                     <p className="text-sm text-gray-900 dark:text-white">
-                      {new Date(document.lastAccessed).toLocaleDateString()}
+                      {document.lastAccessed ? new Date(document.lastAccessed).toLocaleDateString() : '—'}
                     </p>
                   </div>
                 </div>

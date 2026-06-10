@@ -42,6 +42,9 @@ export async function POST(_request: NextRequest) {
     .update({
       setup_completed: true,
       setup_completed_at: new Date().toISOString(),
+      // Completing the full questionnaire also satisfies the advisor-onboarding
+      // gate, so the dashboard unlocks without a second pass through the advisor.
+      onboarding_completed: true,
       updated_at: new Date().toISOString(),
     })
     .eq('id', user.id);

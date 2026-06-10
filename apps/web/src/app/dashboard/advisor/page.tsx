@@ -5,7 +5,7 @@
 // learned (✓ chips). A live context panel always reflects the current life model. This is onboarding
 // that feels like talking to an advisor, not filling a form.
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 
 interface Panel {
@@ -52,7 +52,33 @@ export default function AdvisorPage() {
   const [complete, setComplete] = useState(false);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [finishing, setFinishing] = useState(false);
+  const [onboardingMode, setOnboardingMode] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const router = useRouter();
+
+  // Detect onboarding mode (?onboarding=1) so we can offer an explicit skip.
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOnboardingMode(new URLSearchParams(window.location.search).get('onboarding') === '1');
+    }
+  }, []);
+
+  // Unlock the dashboard by persisting onboarding_completed. `skip` records an
+  // explicit, deliberate bypass. Only navigates once the write succeeds.
+  const finishOnboarding = async (skip: boolean) => {
+    setFinishing(true);
+    try {
+      await fetch('/api/onboarding/advisor-complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ skip }),
+      });
+    } catch {
+      /* best-effort; still navigate so the user is never trapped */
+    }
+    router.push('/dashboard');
+  };
 
   const apply = (t: Turn | null) => {
     if (!t) return;
@@ -164,9 +190,13 @@ export default function AdvisorPage() {
         {complete ? (
           <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
             Your life model is built.{' '}
-            <Link href="/dashboard" className="font-semibold underline">
-              See your dashboard →
-            </Link>
+            <button
+              onClick={() => finishOnboarding(false)}
+              disabled={finishing}
+              className="font-semibold underline disabled:opacity-50"
+            >
+              {finishing ? 'Opening your dashboard…' : 'See your dashboard →'}
+            </button>
           </div>
         ) : (
           <div className="mt-3">
@@ -206,6 +236,17 @@ export default function AdvisorPage() {
                 Send
               </button>
             </form>
+            {onboardingMode && (
+              <div className="mt-2 text-center">
+                <button
+                  onClick={() => finishOnboarding(true)}
+                  disabled={finishing}
+                  className="text-xs text-gray-400 underline hover:text-gray-600 disabled:opacity-50"
+                >
+                  Skip for now and go to my dashboard
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

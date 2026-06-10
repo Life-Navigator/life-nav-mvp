@@ -198,6 +198,28 @@ export default function InvestmentPage() {
   const [allocation, setAllocation] = useState<AllocationData | null>(null);
   const [taxData, setTaxData] = useState<TaxData | null>(null);
   const [dividendData, setDividendData] = useState<DividendData | null>(null);
+  // Canonical ACCOUNT-LEVEL investment balance (one source of truth). Shown even when
+  // position-level holdings are unavailable for the persona — no fake holdings.
+  const [canonicalInvestment, setCanonicalInvestment] = useState<number | null>(null);
+  const [canonicalSource, setCanonicalSource] = useState<string | null>(null);
+  useEffect(() => {
+    fetch('/api/finance/canonical-summary')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.investment_balance === 'number') {
+          setCanonicalInvestment(d.investment_balance);
+          setCanonicalSource(d.source ?? null);
+        }
+      })
+      .catch(() => {});
+  }, []);
+  const sourceLabel = (s: string | null) => {
+    const v = (s || '').toString().toLowerCase();
+    if (v.includes('plaid')) return 'Plaid Sandbox Persona';
+    if (v.includes('manual') || v.includes('user')) return 'User Entered';
+    if (v.includes('document')) return 'Uploaded Document';
+    return s || '—';
+  };
   const [rebalanceRecommendations, setRebalanceRecommendations] = useState<
     RebalanceRecommendation[]
   >([]);
@@ -414,10 +436,12 @@ export default function InvestmentPage() {
               growthRate: 0, // Sprint 45B: no fabricated 7.5% dividend-growth rate
             })
           ),
+          // No fabricated growth rate (matches growthRate: 0 above) — projection is
+          // held flat at current income rather than compounding an invented 7%.
           growthProjection: Array.from({ length: 10 }, (_, i) => ({
             year: i + 1,
-            income: (da.totalAnnualIncome || 0) * Math.pow(1.07, i + 1),
-            yieldOnCost: (da.yieldOnCost || 0) * 100 * Math.pow(1.07, i + 1),
+            income: da.totalAnnualIncome || 0,
+            yieldOnCost: (da.yieldOnCost || 0) * 100,
           })),
         });
       }
@@ -650,6 +674,12 @@ export default function InvestmentPage() {
         Start tracking your investments by adding holdings manually, importing from a CSV file, or
         connecting your brokerage accounts through Plaid.
       </p>
+      {canonicalInvestment != null && canonicalInvestment > 0 && (
+        <p className="text-sm text-indigo-700 bg-indigo-50 rounded-lg p-3 mb-6 max-w-md mx-auto">
+          Account-level investment balance (${canonicalInvestment.toLocaleString()}) is available.
+          Position-level holdings are not available for this sandbox persona.
+        </p>
+      )}
       <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
         <button
           onClick={() => setShowAddHoldingModal(true)}
@@ -2447,6 +2477,27 @@ export default function InvestmentPage() {
           </div>
         </div>
       </div>
+
+      {/* Canonical account-level investment balance — one source of truth, shown
+          even when position-level holdings aren't available for the persona. */}
+      {canonicalInvestment != null && canonicalInvestment > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500">Account-level investment balance</p>
+              <p className="text-2xl font-bold text-gray-900">
+                ${canonicalInvestment.toLocaleString()}
+              </p>
+              <p className="text-[10px] text-gray-400 mt-1">
+                Source: {sourceLabel(canonicalSource)}
+              </p>
+            </div>
+            <span className="text-xs text-gray-500 max-w-xs text-right">
+              From your connected accounts. Position-level holdings appear below when available.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">

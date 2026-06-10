@@ -93,13 +93,31 @@ export default function DocumentScanPage() {
   };
   
   const processDocument = async () => {
+    if (!capturedImage) return;
     setIsProcessing(true);
-    
-    // Simulate document processing with OCR and encryption
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    setIsProcessing(false);
-    setIsCompleted(true);
+
+    try {
+      // Convert the captured data URL to a real Blob and upload it to the
+      // documents pipeline. Completion is only shown after a successful persist —
+      // no fake "Document Secured!" without a real upload.
+      const blob = await (await fetch(capturedImage)).blob();
+      const safeName = (documentName || 'scanned-document').replace(/[^a-z0-9-_]+/gi, '_');
+      const form = new FormData();
+      form.append('file', blob, `${safeName}.jpg`);
+      if (documentName) form.append('title', documentName);
+      if (documentCategory) form.append('category', documentCategory);
+      if (documentTags) form.append('tags', documentTags);
+
+      const res = await fetch('/api/documents', { method: 'POST', body: form });
+      if (!res.ok) throw new Error(`upload failed (${res.status})`);
+
+      setIsProcessing(false);
+      setIsCompleted(true);
+    } catch (err) {
+      console.error('Error processing document:', err);
+      setIsProcessing(false);
+      alert('Could not upload the document. Please check your connection and try again.');
+    }
   };
   
   const handleCameraActivation = () => {
@@ -134,7 +152,7 @@ export default function DocumentScanPage() {
                 <div className="flex items-start">
                   <LockClosedIcon className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
                   <p className="text-sm text-blue-700 dark:text-blue-400">
-                    All scanned documents are processed locally on your device and encrypted before being stored.
+                    Scanned documents are uploaded over an encrypted connection and stored securely in your vault.
                   </p>
                 </div>
               </div>

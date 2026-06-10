@@ -56,19 +56,27 @@ export default function LegacyPlanningPage() {
     loadLegacyData();
   }, []);
 
-  const loadLegacyData = () => {
-    // Demo mode - would fetch from /api/financial/legacy
-    const demoMode = true;
-
-    if (!demoMode) {
-      setHasData(true);
-      // Load real data
-    } else {
+  const loadLegacyData = async () => {
+    // Fetch real estate-planning data. No demo/sample fallback: if the endpoint is
+    // unavailable or empty, the page renders its honest empty state.
+    try {
+      const res = await fetch('/api/financial/legacy', { cache: 'no-store' });
+      if (!res.ok) {
+        setHasData(false);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      const w = data.wills ?? [];
+      const b = data.beneficiaries ?? [];
+      const d = data.digitalAssets ?? [];
+      setWills(w);
+      setBeneficiaries(b);
+      setDigitalAssets(d);
+      setEstateValue(data.estateValue ?? 0);
+      setHasData(w.length > 0 || b.length > 0 || d.length > 0);
+    } catch (error) {
+      console.error('Error loading legacy data:', error);
       setHasData(false);
-      setWills([]);
-      setBeneficiaries([]);
-      setDigitalAssets([]);
-      setEstateValue(0);
     }
   };
 
@@ -1110,7 +1118,12 @@ export default function LegacyPlanningPage() {
   };
 
   const renderTaxPlanning = () => {
-    const estateExemption2024 = 13610000; // Federal estate tax exemption for 2024
+    // Don't show an estate-tax calculation (even a $0 one) until we actually know the
+    // user's estate value — a $0 estimate reads as "you're fine" and is misleading.
+    if (!hasData || estateValue <= 0) {
+      return renderEmptyState();
+    }
+    const estateExemption2024 = 13610000; // Federal estate tax exemption for 2024 (statutory)
     const estateTax = Math.max(0, (estateValue - estateExemption2024) * 0.4);
 
     return (

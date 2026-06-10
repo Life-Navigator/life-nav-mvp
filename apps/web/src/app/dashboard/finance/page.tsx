@@ -121,11 +121,16 @@ const FinancialDashboard = () => {
   // P0: the authoritative net worth comes from the ONE canonical finance summary so this page can
   // never disagree with the dashboard / overview / resolver. (Falls back to legacy sums if absent.)
   const [canonicalNetWorth, setCanonicalNetWorth] = useState<number | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [canonicalSummary, setCanonicalSummary] = useState<any | null>(null);
   useEffect(() => {
     fetch('/api/finance/canonical-summary')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d && typeof d.net_worth === 'number') setCanonicalNetWorth(d.net_worth);
+        if (d && typeof d.net_worth === 'number') {
+          setCanonicalNetWorth(d.net_worth);
+          setCanonicalSummary(d);
+        }
       })
       .catch(() => {});
   }, []);
@@ -297,8 +302,12 @@ const FinancialDashboard = () => {
   // data is absent — show an em dash + a premium "connect" prompt instead.
   const hasFinanceData =
     (core?.hasData ?? false) || (Array.isArray(accounts) && accounts.length > 0);
-  const displayNetWorth = canonicalNetWorth ?? core?.netWorth ?? totals.netWorth;
-  const moneyTile = (value: number | null): string =>
+  // P0 single source of truth: net worth comes ONLY from the canonical finance
+  // summary, so this page can never disagree with the dashboard / overview /
+  // resolver. If the canonical summary is unavailable we show a MISSING state
+  // ("—") — never a divergent client-side or legacy backend sum.
+  const displayNetWorth = canonicalNetWorth;
+  const moneyTile = (value: number | null | undefined): string =>
     hasFinanceData && value != null ? formatCurrency(value) : '—';
 
   const hasData =
@@ -396,7 +405,7 @@ const FinancialDashboard = () => {
             <CreditCard className="text-green-600" size={24} />
           </div>
           <div className="text-2xl font-bold text-gray-900">
-            {moneyTile(core?.cash ?? totals.bankingTotal)}
+            {moneyTile(canonicalSummary?.cash_balance ?? core?.cash)}
           </div>
           <div className="text-sm text-gray-500 mt-2">Total balance across all accounts</div>
         </div>
@@ -407,12 +416,16 @@ const FinancialDashboard = () => {
             <Briefcase className="text-purple-600" size={24} />
           </div>
           <div className="text-2xl font-bold text-gray-900">
-            {moneyTile(totals.investmentTotal)}
+            {moneyTile(canonicalSummary?.investment_balance)}
           </div>
-          <div className="flex items-center text-sm text-green-600 mt-2">
-            <ArrowUpRight size={16} className="mr-1" />
-            <span>{investments.dayChangePercent.toFixed(2)}% today</span>
-          </div>
+          {investments.dayChangePercent !== 0 ? (
+            <div className="flex items-center text-sm text-green-600 mt-2">
+              <ArrowUpRight size={16} className="mr-1" />
+              <span>{investments.dayChangePercent.toFixed(2)}% today</span>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 mt-2">Investment &amp; retirement balances</div>
+          )}
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-md">

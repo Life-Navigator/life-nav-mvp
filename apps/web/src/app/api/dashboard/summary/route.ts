@@ -3,6 +3,11 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
+const CORE_API = (process.env.CORE_API_URL || 'https://lifenavigator-core-api.fly.dev').replace(
+  /\/$/,
+  ''
+);
+
 export async function GET() {
   const supabase = await createServerSupabaseClient();
   if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
@@ -73,6 +78,38 @@ export async function GET() {
       }
     } catch (finErr) {
       console.warn('Dashboard finance read failed:', (finErr as Error)?.message);
+    }
+
+    // P0 single source of truth: override the locally-summed figures with the ONE
+    // canonical finance summary whenever it's reachable, so the dashboard Financial
+    // Overview card can never disagree with the finance page / overview / resolver.
+    // The local sum above is kept only as a graceful fallback if the canonical
+    // summary is unavailable.
+    try {
+      const {
+        data: { session },
+      } = await sb.auth.getSession();
+      if (session?.access_token) {
+        const cr = await fetch(`${CORE_API}/v1/finance/canonical-summary`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          cache: 'no-store',
+        });
+        if (cr.ok) {
+          const cs = await cr.json().catch(() => null);
+          if (cs && typeof cs.net_worth === 'number') {
+            financial = {
+              ...financial,
+              netWorth: cs.net_worth,
+              totalAssets: cs.total_assets ?? financial.totalAssets,
+              totalLiabilities: cs.total_liabilities ?? cs.debt_total ?? financial.totalLiabilities,
+              investments: cs.investment_balance ?? financial.investments,
+              hasData: true,
+            };
+          }
+        }
+      }
+    } catch (csErr) {
+      console.warn('Dashboard canonical summary override failed:', (csErr as Error)?.message);
     }
 
     // P0 fix: the legacy career/education reads are ISOLATED so a missing table (e.g.

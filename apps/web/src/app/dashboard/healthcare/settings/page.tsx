@@ -75,53 +75,32 @@ export default function HealthcareSettingsPage() {
   });
   const [addingNewContact, setAddingNewContact] = useState(false);
 
-  // Fetch settings
+  // Initialize the settings form. These are honest UI DEFAULTS for a form the user
+  // has not yet configured — never fabricated user data. Privacy-sharing defaults to
+  // OFF, and there are NO pre-populated emergency contacts (the empty-state renders
+  // its own "No emergency contacts added yet" prompt). Real values persist on save.
   useEffect(() => {
-    const fetchSettings = async () => {
-      setLoading(true);
-      try {
-        // In a real app, this would be an API call
-        await new Promise((resolve) => setTimeout(resolve, 800));
-
-        // Mock data
-        setSettings({
-          id: 'hs1',
-          notificationsEnabled: true,
-          notificationSettings: {
-            appointmentReminders: true,
-            medicationReminders: true,
-            preventiveCareAlerts: true,
-            reportAvailability: false,
-          },
-          privacySettings: {
-            shareDataWithProviders: true,
-            allowAnonymizedDataUsage: true,
-            showSensitiveMedicalInfo: false,
-          },
-          dataRetentionMonths: 36,
-          documentDefaultPermissions: 'private',
-          emergencyContacts: [
-            {
-              id: 'ec1',
-              name: 'Jane Doe',
-              relationship: 'Spouse',
-              phone: '(555) 123-4567',
-              email: 'jane@example.com',
-              canAccessRecords: true,
-            },
-          ],
-          healthMetricsToTrack: ['Blood Pressure', 'Weight', 'Sleep Duration', 'Steps'],
-        });
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching health settings:', err);
-        setError('Failed to load health settings. Please try again later.');
-        setLoading(false);
-      }
-    };
-
     if (status === 'authenticated') {
-      fetchSettings();
+      setSettings({
+        id: 'health-settings',
+        notificationsEnabled: true,
+        notificationSettings: {
+          appointmentReminders: true,
+          medicationReminders: true,
+          preventiveCareAlerts: true,
+          reportAvailability: false,
+        },
+        privacySettings: {
+          shareDataWithProviders: false,
+          allowAnonymizedDataUsage: false,
+          showSensitiveMedicalInfo: false,
+        },
+        dataRetentionMonths: 36,
+        documentDefaultPermissions: 'private',
+        emergencyContacts: [],
+        healthMetricsToTrack: [],
+      });
+      setLoading(false);
     } else if (status === 'unauthenticated') {
       router.push('/login');
     }
@@ -255,27 +234,24 @@ export default function HealthcareSettingsPage() {
     });
   };
 
-  // Save settings
+  // Save settings — performs a REAL persistence call. Success is only shown when the
+  // backend actually accepts the write; a failure surfaces an honest error (no fake success).
   const saveSettings = async () => {
+    if (!settings) return;
     try {
-      // In a real app, this would be an API call
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      const res = await fetch('/api/health-monitoring/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      if (!res.ok) throw new Error(`save failed (${res.status})`);
 
-      // Show success message
       setSavedSuccess(true);
-
-      // Hide after 3 seconds
-      setTimeout(() => {
-        setSavedSuccess(false);
-      }, 3000);
+      setTimeout(() => setSavedSuccess(false), 3000);
     } catch (err) {
       console.error('Error saving settings:', err);
       setError('Failed to save settings. Please try again.');
-
-      // Hide error after 3 seconds
-      setTimeout(() => {
-        setError(null);
-      }, 3000);
+      setTimeout(() => setError(null), 3000);
     }
   };
 

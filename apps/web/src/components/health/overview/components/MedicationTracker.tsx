@@ -33,7 +33,8 @@ interface MedicationData {
     medicationName: string;
     daysRemaining: number;
   }>;
-  adherenceRate: number;
+  // null = no dose-log source yet; never fabricate an adherence number.
+  adherenceRate: number | null;
 }
 
 export default function MedicationTracker() {
@@ -53,20 +54,25 @@ export default function MedicationTracker() {
       name: med.medication_name,
       dosage: med.dosage || 'N/A',
       frequency: med.frequency || 'As directed',
-      timeOfDay: med.reminder_times?.map(t => t.toString()) || ['Morning'],
+      timeOfDay: med.reminder_times?.map((t) => t.toString()) || ['Morning'],
       prescribedBy: med.prescribed_by || 'Unknown',
       startDate: med.start_date,
       endDate: med.end_date || undefined,
       notes: med.notes || undefined,
       refillRemaining: med.next_refill_date
-        ? Math.max(0, Math.ceil((new Date(med.next_refill_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+        ? Math.max(
+            0,
+            Math.ceil(
+              (new Date(med.next_refill_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+            )
+          )
         : 30,
     }));
 
     // Calculate upcoming refills (medications needing refill in 14 days)
     const upcomingRefills = activeMedications
-      .filter(med => med.refillRemaining <= 14)
-      .map(med => ({
+      .filter((med) => med.refillRemaining <= 14)
+      .map((med) => ({
         medicationName: med.name,
         daysRemaining: med.refillRemaining,
       }));
@@ -74,8 +80,9 @@ export default function MedicationTracker() {
     // For now, todaysDoses is empty - would need a separate dose tracking system
     const todaysDoses: DoseLog[] = [];
 
-    // Adherence rate - placeholder calculation (would need dose log data)
-    const adherenceRate = 95;
+    // No dose-log data source exists yet, so adherence is genuinely unknown.
+    // Show "Not tracked" rather than a fabricated percentage (Rule 1/3).
+    const adherenceRate: number | null = null;
 
     return {
       activeMedications,
@@ -104,7 +111,8 @@ export default function MedicationTracker() {
             No Medications Tracked
           </h3>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Add your medications to track dosages, set reminders, and manage refills all in one place.
+            Add your medications to track dosages, set reminders, and manage refills all in one
+            place.
           </p>
           <div className="flex gap-2 justify-center">
             <Link href="/dashboard/integrations">
@@ -137,9 +145,16 @@ export default function MedicationTracker() {
 
         <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4">
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Adherence Rate</p>
-          <p className={`text-3xl font-bold ${getAdherenceColor(data.adherenceRate)}`}>
-            {data.adherenceRate}%
-          </p>
+          {data.adherenceRate === null ? (
+            <>
+              <p className="text-3xl font-bold text-gray-400 dark:text-gray-500">—</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Not tracked yet</p>
+            </>
+          ) : (
+            <p className={`text-3xl font-bold ${getAdherenceColor(data.adherenceRate)}`}>
+              {data.adherenceRate}%
+            </p>
+          )}
         </div>
 
         <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-4">
@@ -154,7 +169,7 @@ export default function MedicationTracker() {
         <h3 className="text-lg font-medium mb-3">Today's Doses</h3>
         <div className="space-y-3">
           {data.todaysDoses.map((dose, index) => {
-            const medication = data.activeMedications.find(m => m.id === dose.medicationId);
+            const medication = data.activeMedications.find((m) => m.id === dose.medicationId);
             return (
               <div
                 key={index}
@@ -165,9 +180,11 @@ export default function MedicationTracker() {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    dose.taken ? 'bg-green-200 dark:bg-green-800' : 'bg-gray-200 dark:bg-gray-700'
-                  }`}>
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      dose.taken ? 'bg-green-200 dark:bg-green-800' : 'bg-gray-200 dark:bg-gray-700'
+                    }`}
+                  >
                     {dose.taken ? '✓' : '💊'}
                   </div>
                   <div>
