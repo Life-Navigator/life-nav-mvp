@@ -193,7 +193,7 @@ export function ActionCard({
           </button>
         ) : action.href ? (
           <Link
-            href={action.href}
+            href={`${action.href}&reason=${encodeURIComponent(action.why_it_matters)}&unlock=${encodeURIComponent(action.what_it_unlocks)}`}
             className="inline-block text-xs font-medium px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
           >
             {action.primary_cta_label}
