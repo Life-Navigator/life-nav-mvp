@@ -210,9 +210,15 @@ async function runUser(u) {
   }
   rec('Transactions Load', txPass, txDetail);
 
-  // 10. Investments Load — probe the page's actual API (known gap → honest FAIL)
+  // 10. Investments Load — real endpoint: 200 + honest shape (holdings is an array,
+  //     never fabricated). Reports the canonical account-level balance.
   const inv = await appGet('/api/investments/analytics', cookie);
-  rec('Investments Load', inv.status === 200, `/api/investments/analytics ${inv.status} (canonical investment_balance=${finj.investment_balance ?? '?'})`);
+  const invj = (await inv.json?.().catch(() => ({}))) || {};
+  rec(
+    'Investments Load',
+    inv.status === 200 && Array.isArray(invj.holdings),
+    `analytics ${inv.status} status=${invj.status} total=${invj.totalInvestmentBalance} accounts=${invj.accountCount} holdings=${(invj.holdings || []).length}`
+  );
 
   // 11. Retirement Load — canonical projection endpoint
   const ret = await appGet('/api/finance/retirement-projection', cookie);
