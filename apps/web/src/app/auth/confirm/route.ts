@@ -15,9 +15,14 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get('token_hash');
   const type = searchParams.get('type') as EmailOtpType | null;
+  // P0: also accept the PKCE `code` param. Supabase's DEFAULT email template runs its own
+  // /auth/v1/verify and then redirects here with ?code=… (NOT token_hash). Handling only token_hash
+  // meant those links bailed with invalid_confirmation_link — "verification broken". Support BOTH
+  // the token_hash (custom-template) and code (default-template) styles so any config works.
+  const code = searchParams.get('code');
   const next = searchParams.get('next') ?? '/dashboard';
 
-  if (!token_hash || !type) {
+  if (!token_hash && !code) {
     return NextResponse.redirect(
       new URL('/auth?mode=signin&error=invalid_confirmation_link', request.url)
     );
@@ -30,7 +35,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { error } = await supabase.auth.verifyOtp({ token_hash, type });
+  const { error } =
+    token_hash && type
+      ? await supabase.auth.verifyOtp({ token_hash, type })
+      : await supabase.auth.exchangeCodeForSession(code as string);
 
   if (error) {
     // Friendly, classified error so the login page can show the right message
@@ -47,8 +55,10 @@ export async function GET(request: NextRequest) {
   // Session is now established (cookies set on this response). Magic-link,
   // invite, and signup links all create a fresh session for a (usually new)
   // beta user, so they all flow into the onboarding gate.
+  // When we arrived via PKCE `code` (default template), `type` is null — treat it as a new session
+  // so the onboarding gate still runs (a fresh signup/magic-link is the common case).
   const isNewSessionType =
-    type === 'signup' || type === 'email' || type === 'magiclink' || type === 'invite';
+    !type || type === 'signup' || type === 'email' || type === 'magiclink' || type === 'invite';
 
   if (isNewSessionType) {
     const {

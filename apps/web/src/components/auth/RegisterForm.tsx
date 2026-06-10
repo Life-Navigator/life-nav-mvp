@@ -82,6 +82,11 @@ export default function RegisterForm() {
       password: formData.password,
       options: {
         data: { name: formData.name },
+        // P0: without this the confirmation email redirects to the Site-URL root (session lost in
+        // the URL fragment → user bounced to /auth?mode=signin → "verification failed"). Match the
+        // working flows (UnifiedAuthExperience / MagicLinkPanel): land on /auth/confirm.
+        emailRedirectTo:
+          typeof window !== 'undefined' ? `${window.location.origin}/auth/confirm` : undefined,
       },
     });
 
