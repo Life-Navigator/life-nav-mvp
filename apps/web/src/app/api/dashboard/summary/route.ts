@@ -75,33 +75,52 @@ export async function GET() {
       console.warn('Dashboard finance read failed:', (finErr as Error)?.message);
     }
 
-    // Fetch career profile
-    const { data: careerProfile } = await sb
-      .from('career_profiles')
-      .select('current_title, current_company')
-      .eq('user_id', user.id)
-      .single();
-
-    // Fetch active job applications count
-    const { count: activeApplications } = await sb
-      .from('job_applications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id)
-      .in('status', ['applied', 'interview']);
-
-    // Fetch network connections count
-    const { count: networkSize } = await sb
-      .from('connections')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
-
-    // Fetch education stats
-    const { data: courses } = await sb
-      .from('courses')
-      .select('status, progress_percent')
-      .eq('user_id', user.id);
-
-    const courseList = (courses || []) as Array<{ status: string; progress_percent: number }>;
+    // P0 fix: the legacy career/education reads are ISOLATED so a missing table (e.g.
+    // public.connections does not exist) can never throw the whole handler into emptyDashboard and
+    // hide the finance data that was already computed above. Each degrades to empty independently.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let careerProfile: any = null;
+    let activeApplications = 0;
+    let networkSize = 0;
+    let courseList: Array<{ status: string; progress_percent: number }> = [];
+    try {
+      const { data } = await sb
+        .from('career_profiles')
+        .select('current_title, current_company')
+        .eq('user_id', user.id)
+        .single();
+      careerProfile = data;
+    } catch {
+      /* legacy table optional */
+    }
+    try {
+      const { count } = await sb
+        .from('job_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .in('status', ['applied', 'interview']);
+      activeApplications = count ?? 0;
+    } catch {
+      /* legacy table optional */
+    }
+    try {
+      const { count } = await sb
+        .from('connections')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+      networkSize = count ?? 0;
+    } catch {
+      /* public.connections may not exist — degrade to 0, never collapse the summary */
+    }
+    try {
+      const { data } = await sb
+        .from('courses')
+        .select('status, progress_percent')
+        .eq('user_id', user.id);
+      courseList = (data || []) as Array<{ status: string; progress_percent: number }>;
+    } catch {
+      /* legacy table optional */
+    }
     const activeCourses = courseList.filter((c) => c.status === 'in_progress').length;
     const completedCourses = courseList.filter((c) => c.status === 'completed').length;
     const totalCourses = courseList.length;
