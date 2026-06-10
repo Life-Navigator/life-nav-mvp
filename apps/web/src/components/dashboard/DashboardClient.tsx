@@ -5,6 +5,7 @@ import Link from 'next/link';
 import LoadingSpinner from '@/components/ui/loaders/LoadingSpinner';
 import AddDataModal from '@/components/dashboard/AddDataModal';
 import PinnedScenarioWidget from '@/components/scenario-lab/PinnedScenarioWidget';
+import DomainCoverage, { type DomainCoverageData } from '@/components/dashboard/DomainCoverage';
 
 interface DashboardData {
   financial: {
@@ -115,6 +116,21 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
   // Distinguish loading / error / empty so the card NEVER shows "No financial data yet"
   // while the fetch is still in flight or after a transient failure.
   const [financeStatus, setFinanceStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  // Per-domain discovery coverage — ONE source (/api/life/discovery-coverage, same as My Discovery).
+  // Drives the domain cards' coverage %, missing inputs, unlocks, and next-action CTA.
+  const [coverage, setCoverage] = useState<Record<string, DomainCoverageData>>({});
+  useEffect(() => {
+    fetch('/api/life/discovery-coverage', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.domains) {
+          const map: Record<string, DomainCoverageData> = {};
+          for (const dm of d.domains) map[dm.domain] = dm;
+          setCoverage(map);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const quickActions = [
     { name: 'Benefits Discovery', icon: '🎨', href: '/discovery/benefits' },
@@ -616,25 +632,10 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                   </div>
                 </>
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    No healthcare data yet. Add your health information.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2 justify-center">
-                    <Link
-                      href="/dashboard/healthcare"
-                      className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600"
-                    >
-                      Go to Healthcare
-                    </Link>
-                    <button
-                      onClick={() => setActiveModal('health')}
-                      className="inline-flex items-center justify-center px-4 py-2 border border-red-600 dark:border-red-500 text-sm font-medium rounded-md text-red-600 dark:text-red-400 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20"
-                    >
-                      Enter Data
-                    </button>
-                  </div>
-                </div>
+                <DomainCoverage
+                  data={coverage['health'] || coverage['healthcare']}
+                  fallbackHref="/dashboard/healthcare"
+                />
               )}
             </div>
           </div>
@@ -676,17 +677,7 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                   </div>
                 </>
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    No career data yet. Add your career information.
-                  </p>
-                  <button
-                    onClick={() => setActiveModal('career')}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 dark:bg-purple-500 dark:hover:bg-purple-600"
-                  >
-                    Enter Data
-                  </button>
-                </div>
+                <DomainCoverage data={coverage['career']} fallbackHref="/dashboard/career" />
               )}
             </div>
           </div>
@@ -722,17 +713,7 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    No education data yet. Add your learning activities.
-                  </p>
-                  <button
-                    onClick={() => setActiveModal('education')}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
-                  >
-                    Enter Data
-                  </button>
-                </div>
+                <DomainCoverage data={coverage['education']} fallbackHref="/dashboard/education" />
               )}
             </div>
           </div>
