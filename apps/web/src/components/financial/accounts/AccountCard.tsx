@@ -17,11 +17,21 @@ export default function AccountCard({ account, onClick }: AccountCardProps) {
     maximumFractionDigits: 2,
   }).format(Math.abs(account.balance || 0));
 
-  // Format the last updated date
-  const lastUpdated = new Date(account.lastUpdated).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
+  // Institution may arrive as a rich object ({ name, logo }) or a plain string (normalized
+  // accounts) or be absent — handle all shapes without crashing.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inst: any = account.institution;
+  const institutionName =
+    (typeof inst === 'string' ? inst : inst?.name) ||
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (account as any).institution_name ||
+    '—';
+  const institutionLogo = inst && typeof inst === 'object' ? inst.logo : undefined;
+
+  // Format the last updated date (optional)
+  const lastUpdated = account.lastUpdated
+    ? new Date(account.lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : null;
 
   // Determine text color based on account type and balance
   const getBalanceColor = () => {
@@ -115,26 +125,22 @@ export default function AccountCard({ account, onClick }: AccountCardProps) {
       <div className="flex justify-between items-start mb-3">
         <div className="flex items-center">
           <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-md flex items-center justify-center mr-3">
-            {account.institution.logo ? (
-              <img
-                src={account.institution.logo}
-                alt={account.institution.name}
-                className="w-6 h-6"
-              />
+            {institutionLogo ? (
+              <img src={institutionLogo} alt={institutionName} className="w-6 h-6" />
             ) : (
               <div className="text-lg font-bold text-gray-600 dark:text-gray-400">
-                {account.institution.name.charAt(0)}
+                {institutionName.charAt(0)}
               </div>
             )}
           </div>
           <div>
             <h3 className="font-medium text-gray-900 dark:text-white">{account.name}</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{account.institution.name}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{institutionName}</p>
           </div>
         </div>
         <div className="flex flex-col items-end">
           {getAccountTypeBadge()}
-          {account.status !== 'active' && (
+          {account.status && account.status !== 'active' && (
             <span className="text-xs text-rose-600 dark:text-rose-400 mt-1">
               {account.status.charAt(0).toUpperCase() + account.status.slice(1)}
             </span>
@@ -153,7 +159,9 @@ export default function AccountCard({ account, onClick }: AccountCardProps) {
               {account.maskedAccountNumber}
             </span>
           )}
-          <span className="text-xs text-gray-400 dark:text-gray-500">Updated {lastUpdated}</span>
+          {lastUpdated && (
+            <span className="text-xs text-gray-400 dark:text-gray-500">Updated {lastUpdated}</span>
+          )}
         </div>
       </div>
     </div>
