@@ -166,3 +166,10 @@ async def retirement_projection_card(current_age: int | None = Query(default=Non
     """Projected retirement assets from the deterministic tool, run on canonical inputs only.
     Missing required inputs -> a named missing state (never a fabricated projection)."""
     return await svc.retirement_projection_card(UserContext(user_id=user.user_id), runner, current_age)
+
+
+@router.get("/canonical-summary")
+async def finance_canonical_summary(user: AuthenticatedUser = Depends(authenticated), svc: FinancialInputResolver = Depends(get_financial_resolver)):
+    """THE canonical finance summary — every finance widget reads this single source (P0):
+    cash/bank/investment/retirement/debt/net-worth, counts, source breakdown, missing fields."""
+    return await svc.summary(UserContext(user_id=user.user_id))
