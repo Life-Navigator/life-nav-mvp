@@ -56,7 +56,6 @@ export default function AdvisorPage() {
   const [pending, setPending] = useState<string | null>(null);
   const [options, setOptions] = useState<string[] | null>(null);
   const [panel, setPanel] = useState<Panel>({});
-  const [progress, setProgress] = useState<{ answered: number; total: number } | null>(null);
   const [complete, setComplete] = useState(false);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -160,7 +159,6 @@ export default function AdvisorPage() {
     setPending(t.pending_key);
     setOptions(t.options ?? null);
     setPanel(t.context_panel || {});
-    setProgress(t.progress ?? null);
     setComplete(t.complete);
   };
   const send = async (message: string, pending_key: string | null) => {
@@ -214,11 +212,30 @@ export default function AdvisorPage() {
       {/* Conversation */}
       <div className="lg:col-span-2 flex flex-col">
         <h1 className="text-xl font-bold text-gray-900">Your Advisor</h1>
-        {progress && !complete && (
-          <div className="mt-1 text-xs text-gray-500">
-            Getting to know you — {progress.answered}/{progress.total} answered
-          </div>
-        )}
+        {!complete &&
+          (coverage.length > 0 ? (
+            // Rule 5: confidence-by-domain, not a question count.
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
+              <span className="uppercase tracking-wide text-gray-400 font-semibold">
+                Understanding
+              </span>
+              {coverage.map((c) => (
+                <span key={c.domain}>
+                  {c.label}:{' '}
+                  <span className="font-medium text-gray-700">
+                    {c.confidence_pct ?? c.coverage_pct}%
+                  </span>
+                </span>
+              ))}
+              {typeof panel.discovery_completion_pct === 'number' && (
+                <span className="text-indigo-600 font-semibold">
+                  Overall {panel.discovery_completion_pct}%
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="mt-1 text-xs text-gray-500">Getting to know you…</div>
+          ))}
         {uploadNotice !== null && (
           <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 flex items-center justify-between gap-2">
             <span>

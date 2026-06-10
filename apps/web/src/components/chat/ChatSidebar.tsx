@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import { agentApi } from '@/lib/api/agent';
 
 // Auth is handled by middleware — client-side check is best-effort
@@ -21,6 +22,10 @@ interface ChatSidebarProps {
 }
 
 export default function ChatSidebar({ context }: ChatSidebarProps) {
+  // Rule 8: during advisor onboarding there is ONE conversation — the advisor itself. Hide this
+  // second assistant on the advisor route so the user never sees two AIs at once.
+  const pathname = usePathname();
+  const hiddenForOnboarding = pathname === '/dashboard/advisor';
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -201,6 +206,9 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
       handleSendMessage();
     }
   };
+
+  // Hidden during advisor onboarding (the advisor is the only conversation there).
+  if (hiddenForOnboarding) return null;
 
   return (
     <>
