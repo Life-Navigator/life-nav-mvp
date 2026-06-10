@@ -14,9 +14,10 @@ interface CanonicalSummary {
   cash_balance?: number;
   investment_balance?: number;
   retirement_balance?: number;
-  // forward-compatible flags for the mortgage-without-home prompt
-  mortgage_balance?: number;
-  home_value?: number;
+  // mortgage-without-home prompt (canonical resolver fields)
+  possible_home_equity_gap?: boolean;
+  mortgage_debt?: number;
+  real_estate_total?: number;
 }
 
 interface NetWorthSummaryProps {
@@ -56,8 +57,11 @@ export default function NetWorthSummary({ summary }: NetWorthSummaryProps) {
       (summary.retirement_balance ?? 0);
   const denom = assetsTotal + liabilitiesTotal;
 
-  // Forward-compatible integrity prompt: mortgage debt present but no home value.
-  const showMortgageGap = (summary.mortgage_balance ?? 0) > 0 && (summary.home_value ?? 0) <= 0;
+  // Integrity prompt: mortgage debt present but no home asset value (canonical flag,
+  // with a defensive fallback to the classified mortgage_debt / real_estate_total fields).
+  const showMortgageGap =
+    summary.possible_home_equity_gap ??
+    ((summary.mortgage_debt ?? 0) > 0 && (summary.real_estate_total ?? 0) <= 0);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
@@ -91,9 +95,17 @@ export default function NetWorthSummary({ summary }: NetWorthSummaryProps) {
       </div>
 
       {showMortgageGap && (
-        <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
-          We found mortgage debt but no home asset value. Add your home&apos;s value to complete
-          your net worth.
+        <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <span>
+            We found mortgage debt but no home asset value. Add your home&apos;s value to complete
+            your net worth.
+          </span>
+          <a
+            href="/dashboard/finance/assets"
+            className="inline-flex items-center whitespace-nowrap px-3 py-1.5 rounded-md bg-amber-600 text-white text-xs font-medium hover:bg-amber-700"
+          >
+            Add Home Value
+          </a>
         </div>
       )}
 
