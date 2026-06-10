@@ -114,7 +114,23 @@ export async function proxy(request: NextRequest) {
   // route is ALSO exempt during onboarding: the advisor's action cards send the user there to upload
   // a requested document, then return to the advisor — blocking it would dead-end the upload loop.
   const ONBOARDING_ALLOWED = ['/dashboard/advisor', '/dashboard/documents'];
-  if (isAuthenticated && (path.startsWith('/dashboard') || path.startsWith('/admin'))) {
+  // Legacy onboarding surfaces (superseded by /onboarding/financial-profile + the advisor). There is
+  // ONE canonical flow: persona → advisor → dashboard. These pages must never be a parallel path, so
+  // they are folded into the canonical flow by stage (no persona → persona; persona only → advisor;
+  // complete → dashboard). /onboarding/financial-profile is the canonical entry and is NOT listed.
+  const LEGACY_ONBOARDING = [
+    '/onboarding/questionnaire',
+    '/onboarding/interactive',
+    '/onboarding/hub',
+    '/onboarding/review',
+    '/onboarding/sections',
+    '/onboarding/converse',
+  ];
+  const isLegacyOnboarding = LEGACY_ONBOARDING.some((p) => path.startsWith(p));
+  if (
+    isAuthenticated &&
+    (path.startsWith('/dashboard') || path.startsWith('/admin') || isLegacyOnboarding)
+  ) {
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('setup_completed, onboarding_completed')
@@ -131,6 +147,11 @@ export async function proxy(request: NextRequest) {
     // onboarding-support routes (advisor itself + the document upload page it links to).
     if (!profile.onboarding_completed && !ONBOARDING_ALLOWED.some((p) => path.startsWith(p))) {
       return NextResponse.redirect(new URL('/dashboard/advisor?onboarding=1', request.url));
+    }
+
+    // Onboarding is complete but the user landed on a legacy onboarding page → send them to the app.
+    if (isLegacyOnboarding) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
     }
   }
 

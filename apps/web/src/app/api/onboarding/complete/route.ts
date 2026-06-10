@@ -5,7 +5,25 @@ import { recordUserEvent } from '@/lib/analytics/events';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
+  // DEPRECATED (P0 onboarding hardening): this legacy completion endpoint caused the advisor-gate
+  // bypass (it used to write onboarding_completed=true). It is now 410 Gone except for an explicit
+  // internal migration/test caller. Do NOT set onboarding_completed here — advisor completion is owned
+  // solely by /api/onboarding/advisor-complete. There is one canonical flow: persona → advisor → dashboard.
+  const internalAllowed =
+    request.headers.get('x-internal-migration') === '1' ||
+    process.env.ALLOW_LEGACY_ONBOARDING_COMPLETE === '1';
+  if (!internalAllowed) {
+    return NextResponse.json(
+      {
+        error: 'gone',
+        message:
+          'This onboarding endpoint is retired. Onboarding completion is owned by the advisor (/dashboard/advisor?onboarding=1).',
+      },
+      { status: 410 }
+    );
+  }
+
   const supabase = await createServerSupabaseClient();
   if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
 
