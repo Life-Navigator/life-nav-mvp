@@ -7,6 +7,14 @@
 
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
+import AddDataModal from '@/components/dashboard/AddDataModal';
+import {
+  ActionCard,
+  DOMAIN_ACTIONS,
+  LifeModelConfirmation,
+  type AdvisorAction,
+  type CoverageDomain,
+} from '@/components/dashboard/AdvisorOnboarding';
 
 interface Panel {
   life_vision?: string | null;
@@ -56,6 +64,33 @@ export default function AdvisorPage() {
   const [onboardingMode, setOnboardingMode] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
+  // Onboarding completion: discovery coverage (for action cards + confirmation), the manual-entry
+  // modal domain, and whether the user is on the life-model review screen.
+  const [coverage, setCoverage] = useState<CoverageDomain[]>([]);
+  const [activeDomain, setActiveDomain] = useState<
+    'financial' | 'health' | 'career' | 'education' | null
+  >(null);
+  const [reviewing, setReviewing] = useState(false);
+  const loadCoverage = () => {
+    fetch('/api/life/discovery-coverage', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.domains) setCoverage(d.domains);
+      })
+      .catch(() => {});
+  };
+  useEffect(() => {
+    loadCoverage();
+  }, []);
+
+  // Derive the action cards (Step 1/2) from whatever signal we have: prefer the coverage endpoint's
+  // incomplete domains; fall back to the advisor panel's missing_areas. One card per missing domain.
+  const missingDomainKeys: string[] = coverage.length
+    ? coverage.filter((c) => c.coverage_pct < 100).map((c) => c.domain)
+    : panel.missing_areas || [];
+  const advisorActions: AdvisorAction[] = missingDomainKeys
+    .flatMap((k) => (DOMAIN_ACTIONS[k] || []).slice(0, 1))
+    .slice(0, 3);
 
   // Detect onboarding mode (?onboarding=1) so we can offer an explicit skip.
   useEffect(() => {
@@ -72,7 +107,7 @@ export default function AdvisorPage() {
       await fetch('/api/onboarding/advisor-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skip }),
+        body: JSON.stringify({ skip, confirmed: !skip }),
       });
     } catch {
       /* best-effort; still navigate so the user is never trapped */
@@ -187,16 +222,20 @@ export default function AdvisorPage() {
           ))}
           <div ref={endRef} />
         </div>
-        {complete ? (
-          <div className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
-            Your life model is built.{' '}
-            <button
-              onClick={() => finishOnboarding(false)}
-              disabled={finishing}
-              className="font-semibold underline disabled:opacity-50"
-            >
-              {finishing ? 'Opening your dashboard…' : 'See your dashboard →'}
-            </button>
+        {complete || reviewing ? (
+          // Step 5/6: the life-model review must be seen before the dashboard unlocks. The dashboard
+          // is reached ONLY via an explicit Confirm (onboarding_completed, confirmed) or explicit Skip.
+          <div className="mt-3">
+            <LifeModelConfirmation
+              panel={panel}
+              coverage={coverage}
+              actions={advisorActions}
+              finishing={finishing}
+              onConfirm={() => finishOnboarding(false)}
+              onSkip={() => finishOnboarding(true)}
+              onEdit={() => setReviewing(false)}
+              onManualEntry={(d) => setActiveDomain(d)}
+            />
           </div>
         ) : (
           <div className="mt-3">
@@ -236,8 +275,30 @@ export default function AdvisorPage() {
                 Send
               </button>
             </form>
+
+            {/* Step 1/2: context-aware action cards — upload a document or enter data for the
+                domains still missing information. Upload → /dashboard/documents; entry → AddDataModal. */}
+            {advisorActions.length > 0 && (
+              <div className="mt-4">
+                <div className="text-[11px] uppercase text-gray-400 font-semibold mb-2">
+                  Strengthen your plan
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  {advisorActions.map((a, i) => (
+                    <ActionCard key={i} action={a} onManualEntry={(d) => setActiveDomain(d)} />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {onboardingMode && (
-              <div className="mt-2 text-center">
+              <div className="mt-3 flex flex-col items-center gap-1">
+                <button
+                  onClick={() => setReviewing(true)}
+                  className="text-xs text-indigo-600 underline hover:text-indigo-800"
+                >
+                  Review what I understand about you →
+                </button>
                 <button
                   onClick={() => finishOnboarding(true)}
                   disabled={finishing}
@@ -250,6 +311,18 @@ export default function AdvisorPage() {
           </div>
         )}
       </div>
+
+      {/* Manual-entry quick forms (Step 4) — persist to canonical tables; refresh coverage on close. */}
+      {activeDomain && (
+        <AddDataModal
+          isOpen={!!activeDomain}
+          domain={activeDomain}
+          onClose={() => {
+            setActiveDomain(null);
+            loadCoverage();
+          }}
+        />
+      )}
 
       {/* Live context panel (D8) — the advisor always knows the current life model */}
       <aside className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 h-fit">

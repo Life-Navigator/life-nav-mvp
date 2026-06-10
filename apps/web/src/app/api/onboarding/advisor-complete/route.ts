@@ -24,9 +24,11 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   let skipped = false;
+  let confirmed = false;
   try {
     const body = await request.json();
     skipped = body?.skip === true;
+    confirmed = body?.confirmed === true;
   } catch {
     /* no body → treat as a normal completion */
   }
@@ -38,11 +40,19 @@ export async function POST(request: NextRequest) {
 
   if (error) return safeApiError({ code: 'validation_failed', internal: error });
 
+  // Step 6: record the distinct end-state (reviewed-and-confirmed vs explicit skip) so the
+  // onboarding stage is not collapsed into a single boolean. `onboarding_completed` gates the
+  // dashboard; the event metadata preserves HOW it was reached.
   await recordUserEvent(supabase, {
     user_id: user.id,
     event_type: 'onboarding_completed',
-    event_metadata: { stage: 'advisor', skipped },
+    event_metadata: {
+      stage: 'advisor',
+      skipped,
+      confirmed,
+      end_state: skipped ? 'explicit_skip' : confirmed ? 'confirmation_completed' : 'completed',
+    },
   }).catch(() => {});
 
-  return NextResponse.json({ success: true, skipped });
+  return NextResponse.json({ success: true, skipped, confirmed });
 }
