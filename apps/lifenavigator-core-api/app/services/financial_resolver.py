@@ -65,8 +65,14 @@ class FinancialInputResolver:
         acct_source = PLAID if any((a.get("plaid_account_id") or (a.get("metadata") or {}).get("source") == "connected_account") for a in accounts) else (MANUAL if accounts else MISSING)
 
         cash = sum(_num(a.get("current_balance")) or 0 for a in accounts if a.get("account_type") in ("checking", "savings"))
-        invest = sum(_num(a.get("current_value")) or 0 for a in assets)
-        retire = sum(_num(p.get("current_savings")) or 0 for p in plans)
+        # P0 fix: investment/retirement balances come from BOTH the canonical accounts (account_type)
+        # AND the assets/plans tables — the SAME source the finance widgets use. Persona activation
+        # writes investment/retirement *accounts*, not separate assets/plans rows, so reading only
+        # assets/plans made the resolver say "Missing" while widgets showed the real balance.
+        invest = (sum(_num(a.get("current_balance")) or 0 for a in accounts if a.get("account_type") == "investment")
+                  + sum(_num(a.get("current_value")) or 0 for a in assets))
+        retire = (sum(_num(a.get("current_balance")) or 0 for a in accounts if a.get("account_type") == "retirement")
+                  + sum(_num(p.get("current_savings")) or 0 for p in plans))
         debt_accts = [a for a in accounts if a.get("account_type") in ("credit_card", "loan", "mortgage")]
         debt_total = sum(_num(a.get("current_balance")) or 0 for a in debt_accts)
         apr = next((_num(a.get("interest_rate")) for a in debt_accts if _num(a.get("interest_rate"))), None)
@@ -90,9 +96,9 @@ class FinancialInputResolver:
                              prompt="What's your annual income?", unlocks=["retirement projection", "home affordability", "savings rate"]),
             "cash_balance": _field(cash, acct_source, origin="finance.financial_accounts", confidence=0.95,
                                    prompt="Connect a sample profile or enter your cash balance.", unlocks=["emergency-fund analysis"]),
-            "investment_balance": _field(invest, PLAID if assets else MISSING, origin="finance.assets", confidence=0.95,
+            "investment_balance": _field(invest, acct_source if invest > 0 else MISSING, origin="finance.financial_accounts + finance.assets", confidence=0.95,
                                          prompt="No investment balances on file — connect a profile or add them.", unlocks=["net worth", "allocation view"]),
-            "retirement_balance": _field(retire, PLAID if plans else MISSING, origin="finance.retirement_plans", confidence=0.95,
+            "retirement_balance": _field(retire, acct_source if retire > 0 else MISSING, origin="finance.financial_accounts + finance.retirement_plans", confidence=0.95,
                                          prompt="No retirement balances on file — connect a profile or add them.", unlocks=["retirement projection", "readiness"]),
             "debt_total": _field(debt_total, acct_source if debt_accts else MISSING, origin="finance.financial_accounts", confidence=0.9,
                                  prompt="Add your debts to optimize payoff.", unlocks=["debt payoff optimizer"]),
@@ -114,6 +120,38 @@ class FinancialInputResolver:
         return {"inputs": inputs, "present_count": sum(1 for v in inputs.values() if v["present"]),
                 "total": len(inputs), "missing": missing, "last_updated": last_updated,
                 "note": "Every value resolves from Supabase with its source; missing inputs are named, never defaulted."}
+
+    async def summary(self, ctx: UserContext) -> dict[str, Any]:
+        """THE canonical finance summary (P0). Every finance widget reads this — one source, one
+        truth — computed from finance.* only. cash/bank/investment/retirement/debt/net-worth, counts,
+        a source breakdown, and what's missing. No frontend math for summary truth."""
+        uid = ctx.user_id
+        accounts = await self._rows("financial_accounts", "finance", uid=uid)
+        assets = await self._rows("assets", "finance", uid=uid)
+        plans = await self._rows("retirement_plans", "finance", uid=uid)
+        txns = await self._rows("transactions", "finance", uid=uid, limit=1000)
+
+        def _sum(types: tuple[str, ...]) -> float:
+            return round(sum(_num(a.get("current_balance")) or 0 for a in accounts if a.get("account_type") in types), 2)
+
+        cash = _sum(("checking", "savings"))
+        bank_total = cash
+        investment = round(_sum(("investment",)) + sum(_num(a.get("current_value")) or 0 for a in assets), 2)
+        retirement = round(_sum(("retirement",)) + sum(_num(p.get("current_savings")) or 0 for p in plans), 2)
+        total_debt = _sum(("credit_card", "loan", "mortgage"))
+        total_assets = round(cash + investment + retirement, 2)
+        net_worth = round(total_assets - total_debt, 2)
+        missing = [k for k, v in (("investment_balance", investment), ("retirement_balance", retirement)) if v <= 0]
+        last_updated = next((a.get("last_synced_at") for a in accounts if a.get("last_synced_at")), None)
+        source = PLAID if any((a.get("plaid_account_id") or (a.get("metadata") or {}).get("source") == "connected_account") for a in accounts) else (MANUAL if accounts else MISSING)
+        return {
+            "cash_balance": cash, "bank_accounts_total": bank_total, "investment_balance": investment,
+            "retirement_balance": retirement, "total_assets": total_assets, "total_debt": total_debt,
+            "net_worth": net_worth, "accounts_count": len(accounts), "transactions_count": len(txns),
+            "source_breakdown": {"accounts": len(accounts), "assets": len(assets), "retirement_plans": len(plans)},
+            "missing_fields": missing, "confidence": 0.95 if accounts else 0.0,
+            "source": source, "last_updated": last_updated, "has_data": bool(accounts or assets or plans),
+        }
 
     async def retirement_projection_card(self, ctx: UserContext, runner: Any, current_age: Optional[int] = None) -> dict[str, Any]:
         """Run the deterministic retirement_projection tool from CANONICAL inputs only. Runs solely

@@ -74,3 +74,31 @@ async def test_projection_runs_and_persists_with_age():
     assert await sb.select("tool_runs", filters={"user_id": f"eq.{CTX.user_id}"}, schema="tools")
     vis = await sb.select("life_vision", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
     assert vis and (vis[0].get("prompts") or {}).get("current_age") == 40
+
+
+# ---- P0: investment/retirement resolve from financial_accounts (not just assets/plans) ----
+import pytest as _pytest
+
+
+@_pytest.mark.asyncio
+async def test_investment_retirement_resolve_from_accounts():
+    sb = FakeSupabase({"financial_accounts": [
+        {"id": "i", "user_id": CTX.user_id, "account_type": "investment", "current_balance": 1330000, "plaid_account_id": "p1"},
+        {"id": "r", "user_id": CTX.user_id, "account_type": "retirement", "current_balance": 250000, "plaid_account_id": "p2"},
+    ]})
+    out = await FinancialInputResolver(sb).resolve(CTX)
+    assert out["inputs"]["investment_balance"]["present"] and out["inputs"]["investment_balance"]["value"] == 1330000
+    assert out["inputs"]["retirement_balance"]["present"] and out["inputs"]["retirement_balance"]["value"] == 250000
+    assert out["inputs"]["investment_balance"]["source"] == PLAID  # not Missing
+
+
+@_pytest.mark.asyncio
+async def test_canonical_summary_matches_accounts():
+    sb = FakeSupabase({"financial_accounts": [
+        {"id": "c", "user_id": CTX.user_id, "account_type": "checking", "current_balance": 203200, "plaid_account_id": "p0"},
+        {"id": "i", "user_id": CTX.user_id, "account_type": "investment", "current_balance": 1330000, "plaid_account_id": "p1"},
+        {"id": "d", "user_id": CTX.user_id, "account_type": "credit_card", "current_balance": 12000, "plaid_account_id": "p3"},
+    ]})
+    s = await FinancialInputResolver(sb).summary(CTX)
+    assert s["cash_balance"] == 203200 and s["investment_balance"] == 1330000 and s["total_debt"] == 12000
+    assert s["net_worth"] == 203200 + 1330000 - 12000 and s["has_data"] and s["accounts_count"] == 3
