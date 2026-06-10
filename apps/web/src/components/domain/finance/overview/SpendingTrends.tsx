@@ -1,9 +1,9 @@
 // FILE: src/components/finance/overview/SpendingTrends.tsx
 'use client';
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { ChartBarIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { ChartBarIcon } from '@heroicons/react/24/outline';
 
 interface SpendingCategory {
   id: string;
@@ -13,22 +13,22 @@ interface SpendingCategory {
 }
 
 const categoryColors: Record<string, string> = {
-  'FOOD_AND_DRINK': 'bg-green-500',
-  'TRANSPORTATION': 'bg-yellow-500',
-  'ENTERTAINMENT': 'bg-purple-500',
-  'MEDICAL': 'bg-red-500',
-  'SHOPPING': 'bg-indigo-500',
-  'PERSONAL_CARE': 'bg-pink-500',
-  'GENERAL_SERVICES': 'bg-blue-500',
-  'RENT_AND_UTILITIES': 'bg-cyan-500',
-  'TRAVEL': 'bg-orange-500',
-  'OTHER': 'bg-gray-500',
+  FOOD_AND_DRINK: 'bg-green-500',
+  TRANSPORTATION: 'bg-yellow-500',
+  ENTERTAINMENT: 'bg-purple-500',
+  MEDICAL: 'bg-red-500',
+  SHOPPING: 'bg-indigo-500',
+  PERSONAL_CARE: 'bg-pink-500',
+  GENERAL_SERVICES: 'bg-blue-500',
+  RENT_AND_UTILITIES: 'bg-cyan-500',
+  TRAVEL: 'bg-orange-500',
+  OTHER: 'bg-gray-500',
 };
 
-const timeRanges = ["This Month", "Last Month", "3 Months", "6 Months", "Year"];
+const timeRanges = ['This Month', 'Last Month', '3 Months', '6 Months', 'Year'];
 
 export function SpendingTrends() {
-  const [timeRange, setTimeRange] = useState("This Month");
+  const [timeRange, setTimeRange] = useState('This Month');
   const [categories, setCategories] = useState<SpendingCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,16 +44,16 @@ export function SpendingTrends() {
         let startDate: Date;
 
         switch (timeRange) {
-          case "Last Month":
+          case 'Last Month':
             startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             break;
-          case "3 Months":
+          case '3 Months':
             startDate = new Date(now.getFullYear(), now.getMonth() - 3, 1);
             break;
-          case "6 Months":
+          case '6 Months':
             startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
             break;
-          case "Year":
+          case 'Year':
             startDate = new Date(now.getFullYear() - 1, now.getMonth(), 1);
             break;
           default: // This Month
@@ -85,7 +85,8 @@ export function SpendingTrends() {
           // Plaid uses positive amounts for debits (spending)
           if (tx.amount > 0) {
             const category = tx.category || 'OTHER';
-            const mainCategory = category.split(',')[0]?.trim().toUpperCase().replace(/ /g, '_') || 'OTHER';
+            const mainCategory =
+              category.split(',')[0]?.trim().toUpperCase().replace(/ /g, '_') || 'OTHER';
             categoryTotals[mainCategory] = (categoryTotals[mainCategory] || 0) + tx.amount;
           }
         });
@@ -94,7 +95,10 @@ export function SpendingTrends() {
         const sortedCategories = Object.entries(categoryTotals)
           .map(([name, amount], index) => ({
             id: `cat${index}`,
-            name: name.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()),
+            name: name
+              .replace(/_/g, ' ')
+              .toLowerCase()
+              .replace(/\b\w/g, (c) => c.toUpperCase()),
             amount,
             color: categoryColors[name] || 'bg-gray-500',
           }))
@@ -141,13 +145,13 @@ export function SpendingTrends() {
         <div className="text-center py-8">
           <ChartBarIcon className="w-12 h-12 mx-auto text-slate-400 mb-4" />
           <p className="text-slate-500 dark:text-slate-400 mb-4">
-            {error || "No spending data available yet"}
+            {error || 'No spending data available yet'}
           </p>
           <Link
             href="/dashboard/finance/accounts"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
-            Connect Account
+            View Accounts
           </Link>
         </div>
       </div>
@@ -165,7 +169,9 @@ export function SpendingTrends() {
           className="px-3 py-1 text-sm rounded border border-slate-300 bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white"
         >
           {timeRanges.map((range) => (
-            <option key={range} value={range}>{range}</option>
+            <option key={range} value={range}>
+              {range}
+            </option>
           ))}
         </select>
       </div>
@@ -188,7 +194,8 @@ export function SpendingTrends() {
 
       <div className="space-y-4">
         {categories.map((category) => {
-          const percentage = totalSpending > 0 ? ((category.amount / totalSpending) * 100).toFixed(1) : '0';
+          const percentage =
+            totalSpending > 0 ? ((category.amount / totalSpending) * 100).toFixed(1) : '0';
           return (
             <div key={category.id} className="flex items-center justify-between">
               <div className="flex items-center">
@@ -197,7 +204,11 @@ export function SpendingTrends() {
               </div>
               <div className="flex items-center">
                 <span className="text-sm font-medium mr-2 dark:text-white">
-                  ${category.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  $
+                  {category.amount.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
                 </span>
                 <span className="text-xs text-slate-500 dark:text-slate-400">{percentage}%</span>
               </div>
@@ -210,7 +221,11 @@ export function SpendingTrends() {
         <div className="flex justify-between items-center">
           <span className="text-sm text-slate-500 dark:text-slate-400">Total Spending</span>
           <span className="text-lg font-medium dark:text-white">
-            ${totalSpending.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            $
+            {totalSpending.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </span>
         </div>
       </div>

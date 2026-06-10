@@ -89,7 +89,7 @@ interface DashboardClientProps {
   firstInsight?: import('@/lib/finance/first-insight').FirstInsight | null;
 }
 
-export default function DashboardClient({ initialSession }: DashboardClientProps) {
+export default function DashboardClient({ initialSession, firstInsight }: DashboardClientProps) {
   const currentSession = initialSession;
   const [userName, setUserName] = useState<string>('User');
 

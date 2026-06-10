@@ -1,16 +1,16 @@
 // FILE: src/components/finance/overview/AccountsSummary.tsx
 'use client';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 import {
   BuildingLibraryIcon,
   CreditCardIcon,
   HomeIcon,
   CurrencyDollarIcon,
   BanknotesIcon,
-  PlusIcon
-} from "@heroicons/react/24/outline";
-import Link from "next/link";
+  PlusIcon,
+} from '@heroicons/react/24/outline';
+import Link from 'next/link';
 
 interface Account {
   id: string;
@@ -38,7 +38,7 @@ function getAccountIcon(type: string) {
 }
 
 export function AccountsSummary() {
-  const [filter, setFilter] = useState<string>("all");
+  const [filter, setFilter] = useState<string>('all');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,17 +73,32 @@ export function AccountsSummary() {
   }, []);
 
   // Filter accounts based on selected type
-  const filteredAccounts = filter === "all"
-    ? accounts
-    : accounts.filter(account => account.type === filter);
+  const filteredAccounts =
+    filter === 'all' ? accounts : accounts.filter((account) => account.type === filter);
 
-  // Calculate totals
+  // Calculate totals by ACCOUNT TYPE — liability accounts (mortgage/loan/credit) carry
+  // POSITIVE balances in Plaid, so classifying by sign counted the mortgage as an asset
+  // ($2.7M "assets" / $0 liabilities). Classify by type to match the canonical summary.
+  const LIABILITY_TYPES = [
+    'mortgage',
+    'loan',
+    'credit_card',
+    'credit',
+    'auto',
+    'auto_loan',
+    'student',
+    'student_loan',
+    'line_of_credit',
+    'heloc',
+  ];
+  const isLiability = (t?: string) => LIABILITY_TYPES.includes((t || '').toLowerCase());
+
   const totalAssets = accounts
-    .filter(account => (account.currentBalance || 0) > 0)
-    .reduce((sum, account) => sum + (account.currentBalance || 0), 0);
+    .filter((account) => !isLiability(account.type))
+    .reduce((sum, account) => sum + Math.max(0, account.currentBalance || 0), 0);
 
   const totalLiabilities = accounts
-    .filter(account => (account.currentBalance || 0) < 0)
+    .filter((account) => isLiability(account.type))
     .reduce((sum, account) => sum + Math.abs(account.currentBalance || 0), 0);
 
   // Loading state
@@ -108,14 +123,14 @@ export function AccountsSummary() {
         <div className="text-center py-8">
           <BuildingLibraryIcon className="w-12 h-12 mx-auto text-slate-400 mb-4" />
           <p className="text-slate-500 dark:text-slate-400 mb-4">
-            {error || "No accounts connected yet"}
+            {error || 'No accounts connected yet'}
           </p>
           <Link
             href="/dashboard/finance/accounts"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             <PlusIcon className="w-5 h-5 mr-2" />
-            Connect Account
+            View Accounts
           </Link>
         </div>
       </div>
@@ -159,8 +174,14 @@ export function AccountsSummary() {
                 </p>
               </div>
             </div>
-            <div className={`text-right font-medium ${(account.currentBalance || 0) < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
-              {(account.currentBalance || 0) < 0 ? "-" : ""}${Math.abs(account.currentBalance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <div
+              className={`text-right font-medium ${(account.currentBalance || 0) < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}
+            >
+              {(account.currentBalance || 0) < 0 ? '-' : ''}$
+              {Math.abs(account.currentBalance || 0).toLocaleString(undefined, {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </div>
           </div>
         ))}
@@ -170,13 +191,21 @@ export function AccountsSummary() {
         <div>
           <p className="text-sm text-slate-500 dark:text-slate-400">Total Assets</p>
           <p className="text-lg font-medium text-green-600 dark:text-green-400">
-            ${totalAssets.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            $
+            {totalAssets.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </p>
         </div>
         <div>
           <p className="text-sm text-slate-500 dark:text-slate-400">Total Liabilities</p>
           <p className="text-lg font-medium text-red-500">
-            ${totalLiabilities.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            $
+            {totalLiabilities.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </p>
         </div>
       </div>

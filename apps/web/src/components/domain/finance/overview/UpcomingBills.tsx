@@ -1,9 +1,9 @@
 // FILE: src/components/finance/overview/UpcomingBills.tsx
 'use client';
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { CalendarDaysIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { CalendarDaysIcon } from '@heroicons/react/24/outline';
 
 interface Bill {
   id: string;
@@ -47,22 +47,38 @@ export function UpcomingBills() {
 
         // Identify recurring bills by looking for similar merchants/names
         // that appear multiple times with similar amounts
-        const merchantCounts: Record<string, { count: number; amounts: number[]; category: string; lastDate: string }> = {};
+        const merchantCounts: Record<
+          string,
+          { count: number; amounts: number[]; category: string; lastDate: string }
+        > = {};
 
-        transactions.forEach((tx: { name: string; merchantName: string | null; amount: number; category: string | null; date: string }) => {
-          // Only consider expenses (positive amounts)
-          if (tx.amount > 0) {
-            const key = (tx.merchantName || tx.name).toLowerCase().trim();
-            if (!merchantCounts[key]) {
-              merchantCounts[key] = { count: 0, amounts: [], category: tx.category || 'Other', lastDate: tx.date };
-            }
-            merchantCounts[key].count++;
-            merchantCounts[key].amounts.push(tx.amount);
-            if (new Date(tx.date) > new Date(merchantCounts[key].lastDate)) {
-              merchantCounts[key].lastDate = tx.date;
+        transactions.forEach(
+          (tx: {
+            name: string;
+            merchantName: string | null;
+            amount: number;
+            category: string | null;
+            date: string;
+          }) => {
+            // Only consider expenses (positive amounts)
+            if (tx.amount > 0) {
+              const key = (tx.merchantName || tx.name).toLowerCase().trim();
+              if (!merchantCounts[key]) {
+                merchantCounts[key] = {
+                  count: 0,
+                  amounts: [],
+                  category: tx.category || 'Other',
+                  lastDate: tx.date,
+                };
+              }
+              merchantCounts[key].count++;
+              merchantCounts[key].amounts.push(tx.amount);
+              if (new Date(tx.date) > new Date(merchantCounts[key].lastDate)) {
+                merchantCounts[key].lastDate = tx.date;
+              }
             }
           }
-        });
+        );
 
         // Filter for likely recurring bills (appeared at least twice with consistent amounts)
         const recurringBills: Bill[] = [];
@@ -86,7 +102,10 @@ export function UpcomingBills() {
               if (estimatedNextDate > today && estimatedNextDate <= nextMonth) {
                 recurringBills.push({
                   id: merchant,
-                  name: merchant.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+                  name: merchant
+                    .split(' ')
+                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                    .join(' '),
                   amount: avgAmount,
                   dueDate: estimatedNextDate,
                   category: data.category.split(',')[0]?.trim() || 'Other',
@@ -154,7 +173,7 @@ export function UpcomingBills() {
         <div className="text-center py-8">
           <CalendarDaysIcon className="w-12 h-12 mx-auto text-slate-400 mb-4" />
           <p className="text-slate-500 dark:text-slate-400 mb-4">
-            {error || "No upcoming bills detected"}
+            {error || 'No upcoming bills detected'}
           </p>
           <p className="text-sm text-slate-400 dark:text-slate-500 mb-4">
             Bills are automatically detected from your recurring transactions
@@ -163,7 +182,7 @@ export function UpcomingBills() {
             href="/dashboard/finance/accounts"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
-            Connect Account
+            View Accounts
           </Link>
         </div>
       </div>
@@ -185,9 +204,9 @@ export function UpcomingBills() {
       <div className="space-y-4 mb-6">
         {bills.map((bill) => {
           const daysUntil = getDaysUntil(bill.dueDate);
-          let statusColor = "text-yellow-500";
-          if (daysUntil <= 3) statusColor = "text-red-500";
-          if (daysUntil > 10) statusColor = "text-green-500";
+          let statusColor = 'text-yellow-500';
+          if (daysUntil <= 3) statusColor = 'text-red-500';
+          if (daysUntil > 10) statusColor = 'text-green-500';
 
           return (
             <div

@@ -1,9 +1,14 @@
 // FILE: src/components/finance/overview/FinancialInsights.tsx
 'use client';
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { LightBulbIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon, ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import {
+  LightBulbIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  ExclamationTriangleIcon,
+} from '@heroicons/react/24/outline';
 
 interface Insight {
   id: string;
@@ -57,7 +62,9 @@ export function FinancialInsights() {
         }
 
         // Separate this month's and last month's transactions
-        const thisMonthTx = transactions.filter((tx: { date: string }) => new Date(tx.date) >= thisMonthStart);
+        const thisMonthTx = transactions.filter(
+          (tx: { date: string }) => new Date(tx.date) >= thisMonthStart
+        );
         const lastMonthTx = transactions.filter((tx: { date: string }) => {
           const txDate = new Date(tx.date);
           return txDate >= oneMonthAgo && txDate < thisMonthStart;
@@ -176,29 +183,29 @@ export function FinancialInsights() {
 
   const getTypeStyles = (type: string) => {
     switch (type) {
-      case "warning":
+      case 'warning':
         return {
-          bg: "bg-amber-50 dark:bg-amber-900/20",
-          icon: "text-amber-500",
-          border: "border-amber-200 dark:border-amber-800"
+          bg: 'bg-amber-50 dark:bg-amber-900/20',
+          icon: 'text-amber-500',
+          border: 'border-amber-200 dark:border-amber-800',
         };
-      case "success":
+      case 'success':
         return {
-          bg: "bg-green-50 dark:bg-green-900/20",
-          icon: "text-green-500",
-          border: "border-green-200 dark:border-green-800"
+          bg: 'bg-green-50 dark:bg-green-900/20',
+          icon: 'text-green-500',
+          border: 'border-green-200 dark:border-green-800',
         };
-      case "info":
+      case 'info':
         return {
-          bg: "bg-blue-50 dark:bg-blue-900/20",
-          icon: "text-blue-500",
-          border: "border-blue-200 dark:border-blue-800"
+          bg: 'bg-blue-50 dark:bg-blue-900/20',
+          icon: 'text-blue-500',
+          border: 'border-blue-200 dark:border-blue-800',
         };
       default:
         return {
-          bg: "bg-slate-50 dark:bg-slate-700",
-          icon: "text-slate-500",
-          border: "border-slate-200 dark:border-slate-600"
+          bg: 'bg-slate-50 dark:bg-slate-700',
+          icon: 'text-slate-500',
+          border: 'border-slate-200 dark:border-slate-600',
         };
     }
   };
@@ -224,7 +231,7 @@ export function FinancialInsights() {
         <div className="text-center py-8">
           <LightBulbIcon className="w-12 h-12 mx-auto text-slate-400 mb-4" />
           <p className="text-slate-500 dark:text-slate-400 mb-4">
-            {error || "No insights available yet"}
+            {error || 'No insights available yet'}
           </p>
           <p className="text-sm text-slate-400 dark:text-slate-500 mb-4">
             Insights are generated based on your transaction history
@@ -233,7 +240,7 @@ export function FinancialInsights() {
             href="/dashboard/finance/accounts"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
-            Connect Account
+            View Accounts
           </Link>
         </div>
       </div>
@@ -257,14 +264,9 @@ export function FinancialInsights() {
           const styles = getTypeStyles(insight.type);
 
           return (
-            <div
-              key={insight.id}
-              className={`p-4 rounded-lg border ${styles.border} ${styles.bg}`}
-            >
+            <div key={insight.id} className={`p-4 rounded-lg border ${styles.border} ${styles.bg}`}>
               <div className="flex items-start">
-                <div className={`mr-3 ${styles.icon}`}>
-                  {insight.icon}
-                </div>
+                <div className={`mr-3 ${styles.icon}`}>{insight.icon}</div>
                 <div className="flex-1">
                   <h3 className="font-medium mb-1">{insight.title}</h3>
                   <p className="text-sm text-slate-600 dark:text-slate-300 mb-2">

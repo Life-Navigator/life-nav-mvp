@@ -1,9 +1,9 @@
 // FILE: src/components/finance/overview/CashFlow.tsx
 'use client';
 
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import { ArrowsRightLeftIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { ArrowsRightLeftIcon } from '@heroicons/react/24/outline';
 
 interface CashFlowData {
   monthly: {
@@ -17,7 +17,7 @@ interface CashFlowData {
 }
 
 export function CashFlow() {
-  const [viewMode, setViewMode] = useState<"summary" | "income" | "expenses">("summary");
+  const [viewMode, setViewMode] = useState<'summary' | 'income' | 'expenses'>('summary');
   const [cashFlowData, setCashFlowData] = useState<CashFlowData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,13 +132,13 @@ export function CashFlow() {
         <div className="text-center py-8">
           <ArrowsRightLeftIcon className="w-12 h-12 mx-auto text-slate-400 mb-4" />
           <p className="text-slate-500 dark:text-slate-400 mb-4">
-            {error || "No cash flow data available yet"}
+            {error || 'No cash flow data available yet'}
           </p>
           <Link
             href="/dashboard/finance/accounts"
             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
-            Connect Account
+            View Accounts
           </Link>
         </div>
       </div>
@@ -152,50 +152,58 @@ export function CashFlow() {
         <div className="flex space-x-1 bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
           <button
             className={`px-3 py-1 text-sm rounded-md transition-colors ${
-              viewMode === "summary"
-                ? "bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm"
-                : "text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+              viewMode === 'summary'
+                ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
             }`}
-            onClick={() => setViewMode("summary")}
+            onClick={() => setViewMode('summary')}
           >
             Summary
           </button>
           <button
             className={`px-3 py-1 text-sm rounded-md transition-colors ${
-              viewMode === "income"
-                ? "bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm"
-                : "text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+              viewMode === 'income'
+                ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
             }`}
-            onClick={() => setViewMode("income")}
+            onClick={() => setViewMode('income')}
           >
             Income
           </button>
           <button
             className={`px-3 py-1 text-sm rounded-md transition-colors ${
-              viewMode === "expenses"
-                ? "bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm"
-                : "text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
+              viewMode === 'expenses'
+                ? 'bg-white dark:bg-slate-600 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
             }`}
-            onClick={() => setViewMode("expenses")}
+            onClick={() => setViewMode('expenses')}
           >
             Expenses
           </button>
         </div>
       </div>
 
-      {viewMode === "summary" && (
+      {viewMode === 'summary' && (
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-slate-50 dark:bg-slate-700 p-4 rounded-lg">
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Monthly Income</p>
               <p className="text-xl font-semibold text-green-600 dark:text-green-400">
-                ${cashFlowData.monthly.income.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                $
+                {cashFlowData.monthly.income.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
             </div>
             <div className="bg-slate-50 dark:bg-slate-700 p-4 rounded-lg">
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Monthly Expenses</p>
               <p className="text-xl font-semibold text-red-500">
-                ${cashFlowData.monthly.expenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                $
+                {cashFlowData.monthly.expenses.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
             </div>
           </div>
@@ -203,14 +211,22 @@ export function CashFlow() {
           <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
             <div className="flex justify-between items-center mb-4">
               <span className="font-medium">Monthly Savings</span>
-              <span className={`font-medium ${cashFlowData.monthly.savings >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}>
-                {cashFlowData.monthly.savings < 0 ? '-' : ''}${Math.abs(cashFlowData.monthly.savings).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              <span
+                className={`font-medium ${cashFlowData.monthly.savings >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-red-500'}`}
+              >
+                {cashFlowData.monthly.savings < 0 ? '-' : ''}$
+                {Math.abs(cashFlowData.monthly.savings).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </span>
             </div>
 
             <div className="flex justify-between items-center">
               <span className="text-sm text-slate-500 dark:text-slate-400">Savings Rate</span>
-              <span className={`text-sm font-medium ${cashFlowData.monthly.savingsRate >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+              <span
+                className={`text-sm font-medium ${cashFlowData.monthly.savingsRate >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}
+              >
                 {cashFlowData.monthly.savingsRate.toFixed(1)}%
               </span>
             </div>
@@ -218,7 +234,7 @@ export function CashFlow() {
         </div>
       )}
 
-      {viewMode === "income" && (
+      {viewMode === 'income' && (
         <div className="space-y-4">
           {cashFlowData.income.length > 0 ? (
             <>
@@ -229,7 +245,11 @@ export function CashFlow() {
                 >
                   <span>{item.category}</span>
                   <span className="font-medium text-green-600 dark:text-green-400">
-                    ${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    $
+                    {item.amount.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
               ))}
@@ -238,18 +258,24 @@ export function CashFlow() {
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Total Income</span>
                   <span className="font-medium text-green-600 dark:text-green-400">
-                    ${cashFlowData.monthly.income.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    $
+                    {cashFlowData.monthly.income.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
               </div>
             </>
           ) : (
-            <p className="text-center py-4 text-slate-500 dark:text-slate-400">No income recorded this month</p>
+            <p className="text-center py-4 text-slate-500 dark:text-slate-400">
+              No income recorded this month
+            </p>
           )}
         </div>
       )}
 
-      {viewMode === "expenses" && (
+      {viewMode === 'expenses' && (
         <div className="space-y-4">
           {cashFlowData.expenses.length > 0 ? (
             <>
@@ -260,7 +286,11 @@ export function CashFlow() {
                 >
                   <span>{item.category}</span>
                   <span className="font-medium text-red-500">
-                    ${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    $
+                    {item.amount.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
               ))}
@@ -269,13 +299,19 @@ export function CashFlow() {
                 <div className="flex justify-between items-center">
                   <span className="font-medium">Total Expenses</span>
                   <span className="font-medium text-red-500">
-                    ${cashFlowData.monthly.expenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    $
+                    {cashFlowData.monthly.expenses.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
               </div>
             </>
           ) : (
-            <p className="text-center py-4 text-slate-500 dark:text-slate-400">No expenses recorded this month</p>
+            <p className="text-center py-4 text-slate-500 dark:text-slate-400">
+              No expenses recorded this month
+            </p>
           )}
         </div>
       )}
