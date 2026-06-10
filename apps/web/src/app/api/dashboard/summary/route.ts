@@ -112,6 +112,71 @@ export async function GET() {
       console.warn('Dashboard canonical summary override failed:', (csErr as Error)?.message);
     }
 
+    // Health: read REAL signals from health_meta so the card reflects actual data instead of a
+    // hardcoded `hasData:false`. Each query is isolated; health_meta is RLS-gated
+    // (is_health_enabled), so a locked/empty user degrades to an honest empty card — never a crash.
+    let health = { ...emptyDashboard.health };
+    try {
+      const hm = sb.schema('health_meta');
+      let medicationsDue = 0;
+      try {
+        const { count } = await hm
+          .from('medications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id);
+        medicationsDue = count ?? 0;
+      } catch {
+        /* locked/absent */
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let appts: any[] = [];
+      try {
+        const { data } = await hm.from('appointments').select('*').eq('user_id', user.id).limit(20);
+        appts = data || [];
+      } catch {
+        /* locked/absent */
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let wb: any[] = [];
+      try {
+        const { data } = await hm
+          .from('daily_wellbeing')
+          .select('*')
+          .eq('user_id', user.id)
+          .limit(20);
+        wb = data || [];
+      } catch {
+        /* locked/absent */
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dateOf = (a: any) =>
+        a.appointment_date || a.date || a.scheduled_at || a.starts_at || a.start_time || null;
+      const now = Date.now();
+      const upcoming = appts
+        .map((a) => ({ a, t: dateOf(a) ? new Date(dateOf(a)).getTime() : NaN }))
+        .filter((x) => !Number.isNaN(x.t) && x.t >= now)
+        .sort((x, y) => x.t - y.t);
+      const nextAppt = upcoming[0]?.a;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const scoreOf = (w: any) =>
+        w?.score ?? w?.wellbeing_score ?? w?.wellness_score ?? w?.overall_score ?? null;
+
+      health = {
+        nextAppointment: nextAppt
+          ? {
+              title: nextAppt.title || nextAppt.reason || nextAppt.type || 'Appointment',
+              date: dateOf(nextAppt),
+              provider: nextAppt.provider || nextAppt.doctor || nextAppt.clinician || '',
+            }
+          : null,
+        wellnessScore: scoreOf(wb[0]),
+        medicationsDue,
+        hasData: medicationsDue > 0 || appts.length > 0 || wb.length > 0,
+      };
+    } catch (hErr) {
+      console.warn('Dashboard health read failed:', (hErr as Error)?.message);
+    }
+
     // P0 fix: the legacy career/education reads are ISOLATED so a missing table (e.g.
     // public.connections does not exist) can never throw the whole handler into emptyDashboard and
     // hide the finance data that was already computed above. Each degrades to empty independently.
@@ -197,6 +262,7 @@ export async function GET() {
 
     const hasAnyData = !!(
       financial.hasData ||
+      health.hasData ||
       careerProfile ||
       (activeApplications && activeApplications > 0) ||
       totalCourses > 0 ||
@@ -222,7 +288,7 @@ export async function GET() {
         hasData: totalCourses > 0,
       },
       health: {
-        ...emptyDashboard.health,
+        ...health,
         lifeObjective: objByDomain['health'] || null,
       },
       family: { lifeObjective: objByDomain['family'] || null, hasData: false },
