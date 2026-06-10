@@ -40,11 +40,12 @@ export async function POST(_request: NextRequest) {
   const { error } = await (supabase as any)
     .from('profiles')
     .update({
+      // INVARIANT: only the advisor (POST /api/onboarding/advisor-complete) may set
+      // onboarding_completed=true. The legacy questionnaire counts as SETUP, but the user must
+      // still pass the advisor before the dashboard unlocks — otherwise this route is a gate bypass
+      // (completing the legacy questionnaire skipped persona selection + advisor entirely).
       setup_completed: true,
       setup_completed_at: new Date().toISOString(),
-      // Completing the full questionnaire also satisfies the advisor-onboarding
-      // gate, so the dashboard unlocks without a second pass through the advisor.
-      onboarding_completed: true,
       updated_at: new Date().toISOString(),
     })
     .eq('id', user.id);
