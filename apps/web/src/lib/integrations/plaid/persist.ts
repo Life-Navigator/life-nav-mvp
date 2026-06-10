@@ -153,58 +153,29 @@ export async function clearPriorFinanceData(svc: Svc, userId: string): Promise<v
 }
 
 /**
- * Sprint 42 — hydrate the Investments + Retirement pages. After accounts are persisted, project
- * each investment/retirement-type account into finance.assets (a holding) and finance.retirement_plans
- * using the account's REAL balance (not a placeholder) plus clearly-stated default planning
- * assumptions. Closes the audit's "successful connect, empty page" finding.
+ * Investment + retirement balances come from the connected `finance.financial_accounts`
+ * rows (account_type = 'investment' | 'retirement') — those ARE the canonical source.
+ *
+ * This function previously MIRRORED each investment account into `finance.assets`
+ * (asset_type='investment') and each retirement account into `finance.retirement_plans`
+ * (current_savings = balance). The canonical resolver then SUMMED those mirrors ON TOP
+ * of the accounts, double-counting every balance (e.g. a real $920K investment account
+ * rendered as $1.84M) and mislabeling investment accounts as generic "assets". It also
+ * wrote fabricated default planning assumptions (retirement age 65, 6% return).
+ *
+ * Both are wrong: we no longer duplicate accounts into assets/plans. Real position-level
+ * holdings and real retirement plans are added only from real sources (Plaid Investments
+ * holdings, uploaded statements, or user input) — never mirrored from accounts here.
+ * `finance.assets` is reserved for genuine non-account assets (real estate, vehicles, …).
  */
 export async function persistInvestmentsAndRetirement(
-  svc: Svc,
-  userId: string,
-  accounts: PlaidAccountLike[]
+  _svc: Svc,
+  _userId: string,
+  _accounts: PlaidAccountLike[]
 ): Promise<{ holdings: number; retirementPlans: number }> {
-  const assets: Record<string, unknown>[] = [];
-  const plans: Record<string, unknown>[] = [];
-  for (const a of accounts) {
-    const kind = mapAccountType(a.type, a.subtype);
-    const balance = a.balances?.current ?? 0;
-    if (balance <= 0) continue;
-    const name = a.name || a.official_name || 'Account';
-    if (kind === 'investment') {
-      assets.push({
-        user_id: userId,
-        asset_name: name,
-        asset_type: 'investment',
-        current_value: balance,
-        description: 'Imported from a connected investment account.',
-        metadata: { source: 'connected_account', plaid_account_id: a.account_id },
-      });
-    } else if (kind === 'retirement') {
-      plans.push({
-        user_id: userId,
-        plan_name: name,
-        current_savings: balance,
-        target_retirement_age: 65, // default planning assumption (editable)
-        expected_return_rate: 0.06,
-        inflation_rate: 0.025,
-        withdrawal_strategy: '4% rule',
-        metadata: {
-          source: 'connected_account',
-          plaid_account_id: a.account_id,
-          assumptions_are_defaults: true,
-        },
-      });
-    }
-  }
-  if (assets.length) {
-    const { error } = await svc.schema('finance').from('assets').insert(assets);
-    if (error) console.warn(`persistInvestmentsAndRetirement(assets): ${error.message}`);
-  }
-  if (plans.length) {
-    const { error } = await svc.schema('finance').from('retirement_plans').insert(plans);
-    if (error) console.warn(`persistInvestmentsAndRetirement(retirement_plans): ${error.message}`);
-  }
-  return { holdings: assets.length, retirementPlans: plans.length };
+  // No-op by design: mirroring financial_accounts into assets/retirement_plans
+  // double-counted net worth and mislabeled investments. See doc comment above.
+  return { holdings: 0, retirementPlans: 0 };
 }
 
 /** Upsert accounts; returns a map of plaid_account_id → finance.financial_accounts.id. */

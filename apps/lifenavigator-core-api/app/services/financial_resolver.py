@@ -134,23 +134,99 @@ class FinancialInputResolver:
         def _sum(types: tuple[str, ...]) -> float:
             return round(sum(_num(a.get("current_balance")) or 0 for a in accounts if a.get("account_type") in types), 2)
 
-        cash = _sum(("checking", "savings"))
+        # --- Accounts: canonical source for cash / investment / retirement ---
+        cash = _sum(("checking", "savings", "cash"))
         bank_total = cash
-        investment = round(_sum(("investment",)) + sum(_num(a.get("current_value")) or 0 for a in assets), 2)
-        retirement = round(_sum(("retirement",)) + sum(_num(p.get("current_savings")) or 0 for p in plans), 2)
-        total_debt = _sum(("credit_card", "loan", "mortgage"))
-        total_assets = round(cash + investment + retirement, 2)
-        net_worth = round(total_assets - total_debt, 2)
-        missing = [k for k, v in (("investment_balance", investment), ("retirement_balance", retirement)) if v <= 0]
+        investment_accounts_total = _sum(("investment",))
+        retirement_accounts_total = round(
+            _sum(("retirement",)) + sum(_num(p.get("current_savings")) or 0 for p in plans), 2
+        )
+
+        # --- Non-account assets, classified by asset_type. Exclude rows that MIRROR a
+        #     connected account (legacy double-count guard): metadata.source/plaid_account_id,
+        #     or a plaid_account_id already represented by a financial_account. Real estate /
+        #     vehicles / business are NEVER folded into "investment" anymore. ---
+        acct_plaid_ids = {a.get("plaid_account_id") for a in accounts if a.get("plaid_account_id")}
+
+        def _is_account_mirror(asset: dict) -> bool:
+            md = asset.get("metadata") or {}
+            if md.get("source") == "connected_account":
+                return True
+            pid = md.get("plaid_account_id")
+            return bool(pid and pid in acct_plaid_ids)
+
+        real_assets = [a for a in assets if not _is_account_mirror(a)]
+
+        def _asum(types: tuple[str, ...]) -> float:
+            return round(
+                sum(_num(a.get("current_value")) or 0 for a in real_assets if (a.get("asset_type") or "").lower() in types),
+                2,
+            )
+
+        real_estate_total = _asum(("real_estate", "home", "property"))
+        vehicle_assets_total = _asum(("vehicle", "auto", "car"))
+        business_assets_total = _asum(("business",))
+        investment_assets = _asum(("investment", "brokerage", "crypto"))  # genuine non-account holdings
+        _classified = {"real_estate", "home", "property", "vehicle", "auto", "car", "business", "investment", "brokerage", "crypto"}
+        other_assets_total = round(
+            sum(_num(a.get("current_value")) or 0 for a in real_assets if (a.get("asset_type") or "").lower() not in _classified),
+            2,
+        )
+
+        # Investment total = investment ACCOUNTS + genuine non-account investment assets.
+        investment_total = round(investment_accounts_total + investment_assets, 2)
+
+        # --- Liabilities, classified (liability accounts carry positive Plaid balances) ---
+        credit_card_debt = _sum(("credit_card",))
+        loan_debt = _sum(("loan",))
+        mortgage_debt = _sum(("mortgage",))
+        student_loan_debt = _sum(("student_loan", "student"))
+        auto_loan_debt = _sum(("auto_loan",))
+        other_debt = 0.0
+        total_liabilities = round(
+            credit_card_debt + loan_debt + mortgage_debt + student_loan_debt + auto_loan_debt + other_debt, 2
+        )
+
+        total_assets = round(
+            cash + investment_total + retirement_accounts_total
+            + real_estate_total + vehicle_assets_total + business_assets_total + other_assets_total,
+            2,
+        )
+        net_worth = round(total_assets - total_liabilities, 2)
+
+        possible_home_equity_gap = mortgage_debt > 0 and real_estate_total <= 0
+        missing = [k for k, v in (("investment_balance", investment_total), ("retirement_balance", retirement_accounts_total)) if v <= 0]
         last_updated = next((a.get("last_synced_at") for a in accounts if a.get("last_synced_at")), None)
         source = PLAID if any((a.get("plaid_account_id") or (a.get("metadata") or {}).get("source") == "connected_account") for a in accounts) else (MANUAL if accounts else MISSING)
         return {
-            "cash_balance": cash, "bank_accounts_total": bank_total, "investment_balance": investment,
-            "retirement_balance": retirement, "total_assets": total_assets, "total_debt": total_debt,
-            "net_worth": net_worth, "accounts_count": len(accounts), "transactions_count": len(txns),
-            "source_breakdown": {"accounts": len(accounts), "assets": len(assets), "retirement_plans": len(plans)},
+            # cash / bank
+            "cash_balance": cash, "bank_accounts_total": bank_total,
+            # investments — accounts vs total (total incl. genuine non-account investment assets)
+            "investment_accounts_total": investment_accounts_total,
+            "investment_balance": investment_total,  # backward-compatible key
+            # retirement
+            "retirement_accounts_total": retirement_accounts_total,
+            "retirement_balance": retirement_accounts_total,  # backward-compatible key
+            # other assets, classified
+            "real_estate_total": real_estate_total,
+            "vehicle_assets_total": vehicle_assets_total,
+            "business_assets_total": business_assets_total,
+            "other_assets_total": other_assets_total,
+            # totals
+            "total_assets": total_assets,
+            # liabilities, classified
+            "credit_card_debt": credit_card_debt, "loan_debt": loan_debt, "mortgage_debt": mortgage_debt,
+            "student_loan_debt": student_loan_debt, "auto_loan_debt": auto_loan_debt, "other_debt": other_debt,
+            "total_liabilities": total_liabilities, "total_debt": total_liabilities,  # backward-compatible alias
+            # net worth
+            "net_worth": net_worth,
+            # metadata
+            "possible_home_equity_gap": possible_home_equity_gap,
+            "accounts_count": len(accounts), "transactions_count": len(txns),
+            "source_breakdown": {"accounts": len(accounts), "real_assets": len(real_assets), "retirement_plans": len(plans)},
             "missing_fields": missing, "confidence": 0.95 if accounts else 0.0,
-            "source": source, "last_updated": last_updated, "has_data": bool(accounts or assets or plans),
+            "source": source, "last_updated": last_updated,
+            "has_data": bool(accounts or real_assets or plans),
         }
 
     async def retirement_projection_card(self, ctx: UserContext, runner: Any, current_age: Optional[int] = None) -> dict[str, Any]:
