@@ -112,6 +112,9 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
   // Overview page (/api/finance/canonical-summary) — one source, identical values.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [canonicalFinance, setCanonicalFinance] = useState<any | null>(null);
+  // Distinguish loading / error / empty so the card NEVER shows "No financial data yet"
+  // while the fetch is still in flight or after a transient failure.
+  const [financeStatus, setFinanceStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   const quickActions = [
     { name: 'Benefits Discovery', icon: '🎨', href: '/discovery/benefits' },
@@ -358,12 +361,22 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
   // Canonical finance summary for the Financial Overview card (same source as the
   // Financial Overview page — guarantees the two never disagree).
   useEffect(() => {
-    fetch('/api/finance/canonical-summary')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d && typeof d.net_worth === 'number') setCanonicalFinance(d);
+    let cancelled = false;
+    setFinanceStatus('loading');
+    fetch('/api/finance/canonical-summary', { cache: 'no-store' })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`canonical-summary ${r.status}`);
+        const d = await r.json();
+        if (cancelled) return;
+        setCanonicalFinance(d && typeof d.net_worth === 'number' ? d : null);
+        setFinanceStatus('ready');
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setFinanceStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [currentSession]);
 
   const handleVote = (moduleId: string) => {
@@ -548,17 +561,34 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                     </Link>
                   </div>
                 </>
+              ) : financeStatus === 'loading' ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600 mx-auto mb-2"></div>
+                  <p className="text-sm text-gray-400 dark:text-gray-500">Loading your finances…</p>
+                </div>
+              ) : financeStatus === 'error' ? (
+                <div className="text-center py-8">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                    Couldn&apos;t load your financial summary right now.
+                  </p>
+                  <Link
+                    href="/dashboard/finance/overview"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
+                  >
+                    Open Financial Overview
+                  </Link>
+                </div>
               ) : (
                 <div className="text-center py-8">
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                    No financial data yet. Add your accounts to get started.
+                    No financial data yet. Choose a sandbox persona to get started.
                   </p>
-                  <button
-                    onClick={() => setActiveModal('financial')}
+                  <Link
+                    href="/onboarding/financial-profile"
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
                   >
-                    Enter Data
-                  </button>
+                    Choose Sandbox Persona
+                  </Link>
                 </div>
               )}
             </div>
