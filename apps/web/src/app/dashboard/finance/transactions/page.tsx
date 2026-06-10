@@ -101,16 +101,27 @@ export default function TransactionsPage() {
     setEndDate(end);
   };
 
-  // Calculate total income and expenses
-  const totalIncome = filteredTransactions
-    .filter((txn) => txn.isIncome)
-    .reduce((sum, txn) => sum + txn.amount, 0);
-
-  const totalExpenses = filteredTransactions
-    .filter((txn) => !txn.isIncome)
-    .reduce((sum, txn) => sum + txn.amount, 0);
-
-  const netAmount = totalIncome - totalExpenses;
+  // Income / expenses / net are computed by the BACKEND (Rule 1: no frontend money summation).
+  // The client only supplies the active filter (date range + selected accounts); the server sums.
+  const [summary, setSummary] = useState<{ income: number; expenses: number; net: number } | null>(
+    null
+  );
+  useEffect(() => {
+    const params = new URLSearchParams({
+      start: startDate.toISOString(),
+      end: endDate.toISOString(),
+    });
+    if (selectedAccountIds.length) params.set('accounts', selectedAccountIds.join(','));
+    fetch(`/api/finance/transaction-summary?${params.toString()}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && typeof d.net === 'number') setSummary(d);
+      })
+      .catch(() => {});
+  }, [startDate, endDate, selectedAccountIds]);
+  const totalIncome = summary?.income ?? 0;
+  const totalExpenses = summary?.expenses ?? 0;
+  const netAmount = summary?.net ?? 0;
 
   // Format currency
   const formatCurrency = (amount: number) => {

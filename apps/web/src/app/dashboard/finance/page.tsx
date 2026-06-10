@@ -24,7 +24,6 @@ import {
   DollarSign,
   Briefcase,
   CreditCard,
-  Bitcoin,
   AlertTriangle,
   TrendingUp,
   Upload,
@@ -99,16 +98,6 @@ const FinancialDashboard = () => {
     dayChange: 0,
     dayChangePercent: 0,
   });
-  const [cryptoAssets, setCryptoAssets] = useState<
-    {
-      symbol: string;
-      name: string;
-      quantity: number;
-      price: number;
-      value: number;
-      change24h: number;
-    }[]
-  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [timeframe, setTimeframe] = useState('month'); // week, month, year
@@ -175,7 +164,6 @@ const FinancialDashboard = () => {
             dayChange: 0,
             dayChangePercent: 0,
           });
-          setCryptoAssets([]);
           setCore(null);
           setError(null);
           setLoading(false);
@@ -194,7 +182,6 @@ const FinancialDashboard = () => {
       setAccounts(norm.accounts);
       setTransactions(norm.transactions);
       setInvestments(norm.investments);
-      setCryptoAssets(norm.cryptoAssets);
       setCore(norm.core);
 
       setError(null);
@@ -215,7 +202,6 @@ const FinancialDashboard = () => {
         dayChange: 0,
         dayChangePercent: 0,
       });
-      setCryptoAssets([]);
       setCore(null);
       setError(null); // Don't show error, show empty state instead
       setLoading(false);
@@ -226,51 +212,9 @@ const FinancialDashboard = () => {
     fetchFinancialData();
   }, [fetchFinancialData]);
 
-  // Calculate total assets and liabilities with elite error handling
-  const calculateTotals = () => {
-    try {
-      const bankingTotal = Array.isArray(accounts)
-        ? accounts
-            .filter((account) => account?.type === 'banking')
-            .reduce((sum, account) => sum + (Number(account?.balance) || 0), 0)
-        : 0;
-
-      const investmentTotal = Array.isArray(accounts)
-        ? accounts
-            .filter((account) => account?.type === 'investment')
-            .reduce((sum, account) => sum + (Number(account?.balance) || 0), 0)
-        : 0;
-
-      const creditTotal = Array.isArray(accounts)
-        ? accounts
-            .filter((account) => account?.type === 'credit')
-            .reduce((sum, account) => sum + (Number(account?.balance) || 0), 0)
-        : 0;
-
-      const cryptoTotal = Array.isArray(cryptoAssets)
-        ? cryptoAssets.reduce((sum, asset) => sum + (Number(asset?.value) || 0), 0)
-        : 0;
-
-      const netWorth = bankingTotal + investmentTotal + cryptoTotal + creditTotal;
-
-      return {
-        bankingTotal,
-        investmentTotal,
-        creditTotal,
-        cryptoTotal,
-        netWorth,
-      };
-    } catch (err) {
-      console.error('Error calculating totals:', err);
-      return {
-        bankingTotal: 0,
-        investmentTotal: 0,
-        creditTotal: 0,
-        cryptoTotal: 0,
-        netWorth: 0,
-      };
-    }
-  };
+  // Rule 1: this page does NOT calculate business totals. Every money tile below reads the ONE
+  // canonical finance summary (cash_balance, investment_balance, retirement_balance, net_worth).
+  // Account/transaction rows are still rendered for detail, but never summed into headline metrics.
 
   // Format currency
   const formatCurrency = (amount: number): string => {
@@ -293,9 +237,6 @@ const FinancialDashboard = () => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
-
-  // Safely calculate totals with error handling
-  const totals = calculateTotals();
 
   // Money-tile display: prefer the backend's authoritative figures (Core API),
   // fall back to the client-side sum (legacy payload). NEVER render a fake $0 when
@@ -430,11 +371,13 @@ const FinancialDashboard = () => {
 
         <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-700">Crypto</h2>
-            <Bitcoin className="text-yellow-600" size={24} />
+            <h2 className="text-lg font-semibold text-gray-700">Retirement</h2>
+            <Briefcase className="text-amber-600" size={24} />
           </div>
-          <div className="text-2xl font-bold text-gray-900">{moneyTile(totals.cryptoTotal)}</div>
-          <div className="text-sm text-gray-500 mt-2">{cryptoAssets.length} assets</div>
+          <div className="text-2xl font-bold text-gray-900">
+            {moneyTile(canonicalSummary?.retirement_balance)}
+          </div>
+          <div className="text-sm text-gray-500 mt-2">From your retirement accounts</div>
         </div>
       </div>
 
