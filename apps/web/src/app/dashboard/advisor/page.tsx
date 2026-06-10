@@ -88,9 +88,12 @@ export default function AdvisorPage() {
   const missingDomainKeys: string[] = coverage.length
     ? coverage.filter((c) => c.coverage_pct < 100).map((c) => c.domain)
     : panel.missing_areas || [];
+  // Show up to 2 actions for the top 2 missing domains so BOTH an upload and a manual-entry
+  // (quick form) path are always reachable — never an upload-only set with no way to type data in.
   const advisorActions: AdvisorAction[] = missingDomainKeys
-    .flatMap((k) => (DOMAIN_ACTIONS[k] || []).slice(0, 1))
-    .slice(0, 3);
+    .slice(0, 2)
+    .flatMap((k) => (DOMAIN_ACTIONS[k] || []).slice(0, 2))
+    .slice(0, 4);
 
   // Detect onboarding mode (?onboarding=1) so we can offer an explicit skip.
   useEffect(() => {
