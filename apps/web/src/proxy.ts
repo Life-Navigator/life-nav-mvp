@@ -97,6 +97,11 @@ export async function proxy(request: NextRequest) {
 
   // ---- Protected routes: require auth ----
   if (isProtectedRoute(path) && !isAuthenticated) {
+    // Rule 4: protected APIs return a clean 401 (don't redirect a fetch() to the HTML login page,
+    // which would otherwise look like a 200 of /auth). Pages still redirect to the sign-in form.
+    if (path.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized', code: 'unauthenticated' }, { status: 401 });
+    }
     const loginUrl = new URL('/auth', request.url);
     loginUrl.searchParams.set('mode', 'signin');
     loginUrl.searchParams.set('next', path);
