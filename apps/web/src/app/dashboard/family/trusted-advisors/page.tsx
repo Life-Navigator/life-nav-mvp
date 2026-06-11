@@ -1,6 +1,28 @@
-import FamilyTabEmpty from '@/components/domain/family/FamilyTabEmpty';
+import FamilyEntityCrud from '@/components/domain/family/FamilyEntityCrud';
 
-// Family → trusted-advisors tab. Honest missing-state via the shared framework (no 404, no fake data).
-export default function FamilyTrustedadvisorsPage() {
-  return <FamilyTabEmpty tab="trusted-advisors" />;
+// Family → Trusted advisors: REAL CRUD (add/list/delete), persisted to family.trusted_advisors.
+export default function FamilyTrustedAdvisorsPage() {
+  return (
+    <FamilyEntityCrud
+      slug="trusted-advisors"
+      title="Trusted advisors"
+      fields={[
+        { name: 'name', label: 'Name', required: true },
+        {
+          name: 'advisor_type',
+          label: 'Type',
+          type: 'select',
+          options: ['CPA', 'Attorney', 'Financial Advisor', 'Insurance Agent', 'Other'],
+        },
+        { name: 'firm', label: 'Firm' },
+        { name: 'email', label: 'Email' },
+        { name: 'phone', label: 'Phone' },
+      ]}
+      summarize={(r) =>
+        [String(r.name || ''), r.advisor_type && String(r.advisor_type), r.firm && String(r.firm)]
+          .filter(Boolean)
+          .join(' · ')
+      }
+    />
+  );
 }
