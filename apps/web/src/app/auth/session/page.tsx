@@ -13,6 +13,12 @@ export default function AuthSessionPage() {
   const [name, setName] = useState<string | null>(null);
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [setupDone, setSetupDone] = useState(false);
+  const [persona, setPersona] = useState<{
+    display_name: string;
+    profession?: string;
+    data_source: string;
+    selected_at?: string | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -48,6 +54,18 @@ export default function AuthSessionPage() {
       setName(p?.display_name ?? null);
       setSetupDone(!!p?.setup_completed);
       setOnboardingDone(!!p?.onboarding_completed);
+      // Persona transparency (Rule 1): which sandbox profile is connected + when.
+      try {
+        const pr = await (
+          await fetch('/api/onboarding/active-persona', { cache: 'no-store' })
+        ).json();
+        if (pr?.persona) {
+          setPersona(pr.persona);
+          logEvent('PERSONA_RESUMED', { persona: pr.persona.display_name });
+        }
+      } catch {
+        /* no persona */
+      }
       setLoading(false);
       logEvent('AUTH_SESSION_RESUMED', { onboarding_completed: !!p?.onboarding_completed });
     });
@@ -111,7 +129,31 @@ export default function AuthSessionPage() {
               {onboardingDone ? 'Complete' : setupDone ? 'In progress (advisor)' : 'Not started'}
             </span>
           </div>
-          {setupDone && !onboardingDone && (
+          {persona && (
+            <>
+              <div className="mt-1 flex justify-between">
+                <span className="text-gray-400">Current persona</span>
+                <span className="font-medium text-gray-900">{persona.display_name}</span>
+              </div>
+              <div className="mt-1 flex justify-between">
+                <span className="text-gray-400">Data source</span>
+                <span className="text-gray-900">{persona.data_source}</span>
+              </div>
+              {persona.selected_at && (
+                <div className="mt-1 flex justify-between">
+                  <span className="text-gray-400">Selected</span>
+                  <span className="text-gray-900">
+                    {new Date(persona.selected_at).toLocaleDateString()}
+                  </span>
+                </div>
+              )}
+              <p className="mt-2 text-xs text-gray-500">
+                The financial data shown during beta is this sandbox persona — not your real
+                financial data.
+              </p>
+            </>
+          )}
+          {setupDone && !persona && !onboardingDone && (
             <p className="mt-2 text-xs text-gray-500">
               A beta persona is connected to this account. Continuing resumes that in-progress
               setup.
@@ -127,6 +169,24 @@ export default function AuthSessionPage() {
           >
             {busy === 'continue' ? 'Continuing…' : 'Continue'}
           </button>
+          {persona && (
+            <button
+              onClick={() => {
+                if (
+                  window.confirm(
+                    'Changing personas replaces the current sandbox financial data with the new persona. Continue?'
+                  )
+                ) {
+                  logEvent('PERSONA_CHANGED', { from: persona.display_name });
+                  router.push('/onboarding/financial-profile');
+                }
+              }}
+              disabled={!!busy}
+              className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            >
+              Choose different persona
+            </button>
+          )}
           <button
             onClick={() => signOutTo('AUTH_SWITCH_ACCOUNT', '/auth?mode=signin')}
             disabled={!!busy}
