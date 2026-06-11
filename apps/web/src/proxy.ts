@@ -137,8 +137,24 @@ export async function proxy(request: NextRequest) {
       .eq('id', user!.id)
       .single();
 
+    // ONBOARDING_GATE_DECISION — structured log so any reported bypass is diagnosable from prod logs.
+    const gate = (decision: string, redirect: string | null) =>
+      console.log(
+        'ONBOARDING_GATE_DECISION ' +
+          JSON.stringify({
+            user_id: user!.id,
+            path,
+            setup_completed: profile?.setup_completed ?? null,
+            onboarding_completed: profile?.onboarding_completed ?? null,
+            profile_error: profileError?.message ?? null,
+            decision,
+            redirect,
+          })
+      );
+
     if (profileError || !profile || !profile.setup_completed) {
       // No persona/setup yet → pick a sample financial profile first.
+      gate('no_setup→financial_profile', '/onboarding/financial-profile');
       return NextResponse.redirect(new URL('/onboarding/financial-profile', request.url));
     }
 
@@ -146,13 +162,16 @@ export async function proxy(request: NextRequest) {
     // force the user into the advisor before the rest of the dashboard unlocks — except the
     // onboarding-support routes (advisor itself + the document upload page it links to).
     if (!profile.onboarding_completed && !ONBOARDING_ALLOWED.some((p) => path.startsWith(p))) {
+      gate('setup_only→advisor', '/dashboard/advisor?onboarding=1');
       return NextResponse.redirect(new URL('/dashboard/advisor?onboarding=1', request.url));
     }
 
     // Onboarding is complete but the user landed on a legacy onboarding page → send them to the app.
     if (isLegacyOnboarding) {
+      gate('complete_on_legacy→dashboard', '/dashboard');
       return NextResponse.redirect(new URL('/dashboard', request.url));
     }
+    gate('served', null);
   }
 
   return response;
