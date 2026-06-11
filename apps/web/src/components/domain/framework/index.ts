@@ -14,3 +14,5 @@ export type { DomainEmptyStateProps } from './states';
 export { DomainSidebar } from './DomainSidebar';
 export { DomainLayout, DomainHeader, DomainActionBar } from './DomainLayout';
 export { DomainOverview } from './DomainOverview';
+export { DomainReports } from './DomainReports';
+export type { DomainReportItem } from './DomainReports';
