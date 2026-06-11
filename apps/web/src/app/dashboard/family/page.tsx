@@ -1,91 +1,130 @@
 'use client';
 
-// Family — render-only view of the Core API Family DomainViewModel (via /api/family/summary).
-// Protection / readiness / college are grounded in your data; absent values render as
-// missing-data prompts, never fake. Estate & guardianship carry a legal boundary (attorney
-// escalation) — this is not legal advice. No internals exposed.
-
-import React, { useEffect, useState } from 'react';
+// Family Overview — rendered by the SHARED DomainOverview (no bespoke Family cards). /api/family/summary
+// is mapped into the universal CoverageModel; absent data → DomainEmptyState. No fake dependents,
+// coverage, beneficiaries, or readiness scores. Estate/guardianship carry a legal-boundary note.
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import {
+  DomainOverview,
+  DomainLoadingState,
+  DomainErrorState,
+  type CoverageModel,
+} from '@/components/domain/framework';
+import { familyDomain } from '@/components/domain/configs/family';
 
 interface Rec {
-  id: string;
-  title: string;
-  why_it_matters: string;
-  evidence: { statement: string }[];
-  priority: 'high' | 'medium' | 'low';
+  title?: string;
 }
 interface FamilyVM {
-  domain: string;
   data: {
-    protection: {
-      life_coverage: number | null;
-      life_insurance_need: number | null;
-      coverage_gap: number | null;
-      income_basis: number | null;
-      income_source: string | null;
-    };
+    protection: { life_coverage: number | null; coverage_gap: number | null };
     readiness: {
       dependents: number;
       guardianship_status: string | null;
-      estate: {
-        has_will?: boolean;
-        has_poa?: boolean;
-        has_beneficiaries?: boolean;
-        status?: string;
-      } | null;
+      estate: { has_will?: boolean; has_poa?: boolean; has_beneficiaries?: boolean } | null;
     };
-    college: {
-      target_year?: number;
-      projected_cost?: number | null;
-      saved_amount?: number | null;
-      funding_gap?: number | null;
-    }[];
-    safety_boundaries: { boundary_type: string; disclaimer_text: string }[];
+    college?: { target_year?: number }[];
     missing_data_prompts?: string[];
   };
-  recommendations: Rec[];
-  missing: string[];
-  freshness: { as_of?: string };
-  confidence: { score: number; basis: string };
+  recommendations?: Rec[];
+  missing?: string[];
+  freshness?: { as_of?: string };
+  confidence?: { score: number; basis: string };
 }
 
-const PROMPT_COPY: Record<string, { title: string; body: string }> = {
-  dependents: {
-    title: 'Add your household',
-    body: 'Add dependents, a spouse/partner, and coverage to see protection gaps and readiness.',
-  },
-  insurance_profiles: {
-    title: 'Add your coverage',
-    body: 'Add your life/disability coverage to compare against an income-replacement need.',
-  },
-  estate_plans: {
-    title: 'Track estate readiness',
-    body: 'Note your will / POA / beneficiaries. Not legal advice — an attorney completes these.',
-  },
-  career_profiles: {
-    title: 'Add your income basis',
-    body: 'Add your role so we can estimate an income-replacement need (cited market value).',
-  },
-};
-
-const fmt = (n: number | null | undefined, ccy = 'USD') =>
+const fmt = (n: number | null | undefined) =>
   n == null
-    ? '—'
+    ? null
     : new Intl.NumberFormat('en-US', {
         style: 'currency',
-        currency: ccy,
+        currency: 'USD',
         maximumFractionDigits: 0,
       }).format(n);
-const yn = (b: boolean | undefined) => (b ? '✓' : '✗');
 
-export default function FamilyPage() {
+const MISSING_LABEL: Record<string, string> = {
+  dependents: 'Dependents + spouse/partner',
+  insurance_profiles: 'Life / disability coverage',
+  estate_plans: 'Will / POA / beneficiaries',
+};
+
+const FAMILY_UNLOCKS = [
+  'Estate readiness',
+  'Inheritance planning',
+  'Family protection analysis',
+  'Guardian planning',
+];
+const DEFAULT_MISSING = [
+  'Life insurance review',
+  'Beneficiary review',
+  'Trust',
+  'Will',
+  'Guardian designations',
+];
+
+function toCoverageModel(vm: FamilyVM | null): CoverageModel {
+  const d = vm?.data;
+  const known: string[] = [];
+  if (d) {
+    if (d.readiness?.dependents > 0) known.push(`${d.readiness.dependents} dependent(s)`);
+    const cov = fmt(d.protection?.life_coverage);
+    if (cov) known.push(`Life coverage: ${cov}`);
+    if (d.readiness?.guardianship_status)
+      known.push(`Guardianship: ${d.readiness.guardianship_status}`);
+    if (d.readiness?.estate?.has_will) known.push('Will on file');
+    if (d.readiness?.estate?.has_beneficiaries) known.push('Beneficiaries on file');
+    if (d.college?.length) known.push(`College plan for ${d.college.length} child(ren)`);
+  }
+  const rawMissing = vm?.missing?.length ? vm.missing : (d?.missing_data_prompts ?? []);
+  const missing = rawMissing.length
+    ? rawMissing.map((m) => MISSING_LABEL[m] ?? m)
+    : DEFAULT_MISSING;
+
+  const rawScore = vm?.confidence?.score ?? 0;
+  const confidence_pct = rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
+  const total = known.length + missing.length;
+  const coverage_pct = total ? Math.round((known.length / total) * 100) : 0;
+  const asOf = vm?.freshness?.as_of ?? 'Today';
+
+  return {
+    coverage_pct,
+    confidence_pct,
+    known,
+    missing,
+    unlocks: FAMILY_UNLOCKS,
+    next_action: {
+      label: known.length ? 'Add more family details' : 'Add your family details',
+      href: '/dashboard/documents?domain=family&return_to=/dashboard/family',
+    },
+    last_updated: asOf,
+    source: {
+      source: 'Family profile',
+      updated: asOf,
+      confidence: confidence_pct >= 75 ? 'high' : confidence_pct >= 40 ? 'medium' : 'low',
+    },
+  };
+}
+
+export function LegalBoundary() {
+  return (
+    <p className="text-xs text-gray-500 dark:text-gray-400">
+      LifeNavigator is not a law firm and does not provide legal advice. Estate planning decisions
+      should be reviewed with a qualified attorney.
+    </p>
+  );
+}
+
+export default function FamilyOverviewPage() {
   const [vm, setVm] = useState<FamilyVM | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let active = true;
     fetch('/api/family/summary')
-      .then(async (r) => (r.ok ? ((await r.json()) as FamilyVM) : null))
+      .then(async (r) =>
+        r.ok ? ((await r.json()) as FamilyVM) : Promise.reject(new Error('load'))
+      )
       .then((d) => {
         if (active) {
           setVm(d);
@@ -94,7 +133,7 @@ export default function FamilyPage() {
       })
       .catch(() => {
         if (active) {
-          setVm(null);
+          setError(true);
           setLoading(false);
         }
       });
@@ -103,160 +142,69 @@ export default function FamilyPage() {
     };
   }, []);
 
-  const prot = vm?.data.protection;
-  const ready = vm?.data.readiness;
-  const college = vm?.data.college ?? [];
-  const legal = vm?.data.safety_boundaries?.find((b) => b.boundary_type === 'legal');
-  const missing = vm?.missing ?? [];
+  if (loading)
+    return (
+      <div className="p-6">
+        <DomainLoadingState />
+      </div>
+    );
+  if (error)
+    return (
+      <div className="p-6">
+        <DomainErrorState
+          message="We couldn't load your family summary just now."
+          onRetry={() => window.location.reload()}
+        />
+      </div>
+    );
+
+  const model = toCoverageModel(vm);
+  const recs = vm?.recommendations ?? [];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Family &amp; Protection</h1>
-        <a
-          href="/api/reports/family/pdf"
-          className="text-sm px-3 py-1.5 rounded-md border border-rose-600 text-rose-700 hover:bg-rose-50"
-        >
-          Download PDF
-        </a>
-      </div>
-      <p className="text-sm text-gray-500 mt-1">
-        Protection, readiness, and college — grounded in your own data.
-      </p>
-
-      <div className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
-        {legal?.disclaimer_text ??
-          'Planning guidance, not legal or financial advice. Consult an attorney for wills, guardianship, and estate documents.'}
+    <DomainOverview config={familyDomain} model={model}>
+      {/* Legal boundary (protection/estate are shown above) */}
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+        <LegalBoundary />
       </div>
 
-      {loading ? (
-        <div className="mt-8 text-gray-500">Loading your family summary…</div>
-      ) : (
-        <>
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-lg font-semibold text-gray-700">Life-insurance protection</h2>
-              {prot && prot.life_insurance_need != null ? (
-                <>
-                  <div className="text-sm text-gray-600 mt-2">
-                    Coverage {fmt(prot.life_coverage)} · Need {fmt(prot.life_insurance_need)}
-                  </div>
-                  {prot.coverage_gap != null && prot.coverage_gap > 0 ? (
-                    <div className="mt-2 text-lg font-bold text-rose-700">
-                      Gap {fmt(prot.coverage_gap)}
-                    </div>
-                  ) : (
-                    <div className="mt-2 text-lg font-bold text-emerald-700">Covered ✓</div>
-                  )}
-                  <div className="text-xs text-gray-400 mt-1">
-                    Need = 10× income ({fmt(prot.income_basis)}, {prot.income_source}) + debts
-                  </div>
-                </>
-              ) : (
-                <Prompt field="insurance_profiles" />
-              )}
-            </div>
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-lg font-semibold text-gray-700">Readiness</h2>
-              {ready && (ready.dependents > 0 || ready.estate) ? (
-                <div className="text-sm text-gray-600 mt-2 space-y-1">
-                  <div>
-                    Dependents: <b>{ready.dependents}</b>
-                  </div>
-                  <div>
-                    Guardianship: <b>{ready.guardianship_status ?? 'undesignated'}</b>
-                  </div>
-                  {ready.estate && (
-                    <div>
-                      Estate — will {yn(ready.estate.has_will)} · POA {yn(ready.estate.has_poa)} ·
-                      beneficiaries {yn(ready.estate.has_beneficiaries)}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <Prompt field="dependents" />
-              )}
-            </div>
-          </div>
+      {/* 9. Related Recommendations (family-specific) */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          Related family recommendations
+        </div>
+        {recs.length ? (
+          <ul className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+            {recs.slice(0, 4).map((r, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="text-indigo-500">•</span>
+                {r.title ?? 'Recommendation'}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-500">
+            No family recommendations yet — they appear as your protection + estate picture fills
+            in.{' '}
+            <Link href="/dashboard/family/recommendations" className="text-indigo-600">
+              View all →
+            </Link>
+          </p>
+        )}
+      </div>
 
-          {college.length > 0 && (
-            <div className="mt-6 bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-lg font-semibold text-gray-700">College funding</h2>
-              <div className="mt-2 space-y-1 text-sm text-gray-600">
-                {college.map((c, i) => (
-                  <div key={i}>
-                    {c.target_year}: projected {fmt(c.projected_cost)} · saved {fmt(c.saved_amount)}
-                    {c.funding_gap != null && c.funding_gap > 0 && (
-                      <span className="text-rose-700 font-semibold">
-                        {' '}
-                        · gap {fmt(c.funding_gap)}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {vm && vm.recommendations.length > 0 && (
-            <div className="mt-6 bg-white p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-semibold text-gray-800 mb-4">Protect &amp; plan</h2>
-              <div className="space-y-4">
-                {vm.recommendations.map((rec) => (
-                  <div key={rec.id} className="border-l-4 border-rose-600 pl-4 py-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900">{rec.title}</h3>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
-                        {rec.priority}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">{rec.why_it_matters}</p>
-                    {rec.evidence.length > 0 && (
-                      <ul className="list-disc list-inside text-sm text-gray-700 mt-2">
-                        {rec.evidence.map((e, i) => (
-                          <li key={i}>{e.statement}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {missing.length > 0 && (
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {missing.map((field) => (
-                <div key={field} className="bg-white p-5 rounded-lg shadow-md text-center">
-                  <Prompt field={field} />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {vm && (
-            <div className="mt-8 text-xs text-gray-400">
-              Confidence: {vm.confidence.basis}
-              {vm.freshness.as_of
-                ? ` · as of ${new Date(vm.freshness.as_of).toLocaleDateString()}`
-                : ''}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function Prompt({ field }: { field: string }) {
-  const copy = PROMPT_COPY[field] ?? {
-    title: `Add your ${field.replace(/_/g, ' ')}`,
-    body: 'Add your family data to unlock protection insights.',
-  };
-  return (
-    <div className="text-center py-2">
-      <p className="font-medium text-gray-700">{copy.title}</p>
-      <p className="text-sm text-gray-500 mt-1">{copy.body}</p>
-    </div>
+      {/* 8. Related Documents */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          Related documents
+        </div>
+        <p className="text-sm text-gray-500">
+          Wills, trusts, POAs, and beneficiary forms power your family protection planning.{' '}
+          <Link href="/dashboard/family/documents" className="text-indigo-600">
+            Manage documents →
+          </Link>
+        </p>
+      </div>
+    </DomainOverview>
   );
 }
