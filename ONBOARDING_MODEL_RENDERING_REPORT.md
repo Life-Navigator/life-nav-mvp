@@ -126,21 +126,57 @@ domains_touched:   finance, family, health, education
 ✅ no career invented · family/health/education > 0 · school = future · user words preserved
 ```
 
+## Production Apply + Live Validation (2026-06-11)
+
+`life.candidate_goals` **applied to production** (project `diwkyyahglnqmyledsey`) via the Management API
+(`apply_candidate_goals_migration.sh`). Table confirmed present, **RLS enabled**, grants in place.
+
+Validated end-to-end against the **deployed Core API v76** (`/tmp/validate_prod.py`): a fresh user, the
+exact transcript posted to `POST /v1/life/discovery/chat`, then rows read **straight from production
+Supabase** (service role) — not in-memory:
+
+```
+Fresh user: c316cb93-32d9-4193-8762-f791f9f3dcbb
+
+PROOF — life.candidate_goals rows in PRODUCTION Supabase:
+  • Paying down credit cards                              (finance)
+  • Get a better travel rewards card for all spending     (finance)
+  • I don't carry any revolving debt anymore              (finance)
+  • Build a down payment for a larger house               (finance)
+  • Start building a family                               (family)
+  • The wedding next sept                                 (family)
+  • Build a solid foundation for my family … security      (family)
+  • Removing the revolving credit … focus on saving        (finance)
+  • Also interested in getting in better shape            (health)
+  • Also considering going back to school                 (education) [future]
+
+Coverage (reload):  finance 100 · family 30 · health 30 · education 30 · career 0
+NEW SESSION panel.priorities_i_heard: all 10 goals still render (loaded from the DB, not turn state)
+✅ goals persist across session · Finance/Family/Health/Education > 0 · career 0 · school=future
+Cleanup: HTTP 204 → 0 rows remain (verified total=0, test_user=0)
+```
+
+Checklist (production route `lifenavigator-core-api.fly.dev/v1/life/*`): 1 fresh user ✅ · 3 transcript
+run ✅ · 4 DB rows created ✅ · 5–6 reload renders ✅ · 7–8 new session renders (cross-session) ✅ ·
+9 confirmation uses persisted candidate_goals ✅ · 10 coverage Finance/Family/Health/Education > 0 ✅ ·
+11 no career ✅. (Item 2 persona-select + 12 Plaid CTAs are the frontend layer — career produces no
+action card because its live coverage is 0, so "Upload resume" cannot appear; finance income/401k are
+fixed to "Coming Soon" with goal-target cards leading.)
+
 ## Remaining Risks
 
-- **Migration not yet applied to prod** (blocking, needs your Supabase Management token). The
-  `life.candidate_goals` table must exist for persistence to function live. Apply with:
-  `SUPABASE_ACCESS_TOKEN=sbp_… ./apply_candidate_goals_migration.sh`. The code is migration-safe — until
-  the table exists, goals simply don't persist (no crash), and live validation of persistence is pending.
 - Domain classification is keyword-based; an unusually phrased goal could land in `core` (kept only if it
-  also has a canonical objective/deps). The meta/fragment filter is heuristic.
+  also has a canonical objective/deps). The meta/fragment filter is heuristic ("The wedding next sept" is
+  kept as a real family-timing signal — acceptable, on the inclusive side).
 - Coverage floors a stated goal at 30% ("started") — intentionally conservative; it reflects intent
   captured, not data completeness.
+- Frontend (confirmation render + Plaid CTAs) is committed/pushed but validated by code + the live
+  coverage it consumes, not a browser screenshot.
 
 ## Definition of Done — status
 
-✅ Final review reflects what the user said. ✅ No stated goal disappears (8/8 persist). ✅ No unstated
+✅ Final review reflects what the user said. ✅ No stated goal disappears (all persist). ✅ No unstated
 goal appears (career stays 0). ✅ Domain coverage reflects the conversation (Finance/Family/Health/
 Education > 0). ✅ Recommended actions match the user's goals + Plaid data (goal targets, not "enter
-income"). ⏳ Live end-to-end validation pending the one migration apply (token-blocked) — proven through
-the real engine in-memory (`validate_transcript.py`), 333 tests green.
+income"). ✅ **The final review reflects persisted candidate_goals from PRODUCTION Supabase, not
+in-memory** — migration applied, validated live on Core API v76, 333 tests green.
