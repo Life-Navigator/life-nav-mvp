@@ -162,49 +162,52 @@ export default function FamilyOverviewPage() {
   const recs = vm?.recommendations ?? [];
 
   return (
-    <DomainOverview config={familyDomain} model={model}>
-      {/* Legal boundary (protection/estate are shown above) */}
-      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/50">
-        <LegalBoundary />
-      </div>
-
-      {/* 9. Related Recommendations (family-specific) */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-          Related family recommendations
+    <div>
+      {/* Legal boundary — always visible on Family (protection/estate concepts), even on the empty state */}
+      <div className="p-6 pb-0">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+          <LegalBoundary />
         </div>
-        {recs.length ? (
-          <ul className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
-            {recs.slice(0, 4).map((r, i) => (
-              <li key={i} className="flex gap-2">
-                <span className="text-indigo-500">•</span>
-                {r.title ?? 'Recommendation'}
-              </li>
-            ))}
-          </ul>
-        ) : (
+      </div>
+      <DomainOverview config={familyDomain} model={model}>
+        {/* 9. Related Recommendations (family-specific) */}
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Related family recommendations
+          </div>
+          {recs.length ? (
+            <ul className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+              {recs.slice(0, 4).map((r, i) => (
+                <li key={i} className="flex gap-2">
+                  <span className="text-indigo-500">•</span>
+                  {r.title ?? 'Recommendation'}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-gray-500">
+              No family recommendations yet — they appear as your protection + estate picture fills
+              in.{' '}
+              <Link href="/dashboard/family/recommendations" className="text-indigo-600">
+                View all →
+              </Link>
+            </p>
+          )}
+        </div>
+
+        {/* 8. Related Documents */}
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+            Related documents
+          </div>
           <p className="text-sm text-gray-500">
-            No family recommendations yet — they appear as your protection + estate picture fills
-            in.{' '}
-            <Link href="/dashboard/family/recommendations" className="text-indigo-600">
-              View all →
+            Wills, trusts, POAs, and beneficiary forms power your family protection planning.{' '}
+            <Link href="/dashboard/family/documents" className="text-indigo-600">
+              Manage documents →
             </Link>
           </p>
-        )}
-      </div>
-
-      {/* 8. Related Documents */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-          Related documents
         </div>
-        <p className="text-sm text-gray-500">
-          Wills, trusts, POAs, and beneficiary forms power your family protection planning.{' '}
-          <Link href="/dashboard/family/documents" className="text-indigo-600">
-            Manage documents →
-          </Link>
-        </p>
-      </div>
-    </DomainOverview>
+      </DomainOverview>
+    </div>
   );
 }
