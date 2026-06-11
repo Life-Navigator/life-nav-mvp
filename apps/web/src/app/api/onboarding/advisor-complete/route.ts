@@ -25,13 +25,36 @@ export async function POST(request: NextRequest) {
 
   let skipped = false;
   let confirmed = false;
+  let reason = 'completed';
+  let discoveryAnswerCount: number | null = null;
+  let graphIntegrityAtSkip: number | null = null;
+  let coverageAtSkip: number | null = null;
   try {
     const body = await request.json();
     skipped = body?.skip === true;
     confirmed = body?.confirmed === true;
+    discoveryAnswerCount =
+      typeof body?.discovery_answer_count === 'number' ? body.discovery_answer_count : null;
+    graphIntegrityAtSkip =
+      typeof body?.graph_integrity_at_skip === 'number' ? body.graph_integrity_at_skip : null;
+    coverageAtSkip = typeof body?.coverage_at_skip === 'number' ? body.coverage_at_skip : null;
+    // Distinct end-states (never one vague "completed"): the caller tells us how onboarding ended.
+    const allowed = [
+      'confirmation_completed',
+      'explicit_skip_after_minimum',
+      'early_skip_confirmed',
+    ];
+    if (typeof body?.reason === 'string' && allowed.includes(body.reason)) reason = body.reason;
+    else
+      reason = confirmed
+        ? 'confirmation_completed'
+        : skipped
+          ? 'explicit_skip_after_minimum'
+          : 'completed';
   } catch {
     /* no body → treat as a normal completion */
   }
+  const isEarlySkip = reason === 'early_skip_confirmed';
 
   const { error } = await (supabase as any)
     .from('profiles')
@@ -40,9 +63,7 @@ export async function POST(request: NextRequest) {
 
   if (error) return safeApiError({ code: 'validation_failed', internal: error });
 
-  // Step 6: record the distinct end-state (reviewed-and-confirmed vs explicit skip) so the
-  // onboarding stage is not collapsed into a single boolean. `onboarding_completed` gates the
-  // dashboard; the event metadata preserves HOW it was reached.
+  // Record the distinct end-state + skip telemetry so any skip is intentional, persisted, and traceable.
   await recordUserEvent(supabase, {
     user_id: user.id,
     event_type: 'onboarding_completed',
@@ -50,9 +71,16 @@ export async function POST(request: NextRequest) {
       stage: 'advisor',
       skipped,
       confirmed,
-      end_state: skipped ? 'explicit_skip' : confirmed ? 'confirmation_completed' : 'completed',
+      explicit_skip: skipped,
+      end_state: reason,
+      skip_reason: skipped ? reason : null,
+      skipped_at: skipped ? new Date().toISOString() : null,
+      discovery_answer_count: discoveryAnswerCount,
+      graph_integrity_at_skip: graphIntegrityAtSkip,
+      coverage_at_skip: coverageAtSkip,
+      limited_dashboard: isEarlySkip,
     },
   }).catch(() => {});
 
-  return NextResponse.json({ success: true, skipped, confirmed });
+  return NextResponse.json({ success: true, skipped, confirmed, end_state: reason });
 }

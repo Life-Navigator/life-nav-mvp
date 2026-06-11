@@ -120,13 +120,25 @@ export default function AdvisorPage() {
 
   // Unlock the dashboard by persisting onboarding_completed. `skip` records an
   // explicit, deliberate bypass. Only navigates once the write succeeds.
-  const finishOnboarding = async (skip: boolean) => {
+  const finishOnboarding = async (skip: boolean, reason?: string) => {
     setFinishing(true);
+    const answerCount = msgs.filter((m) => m.role === 'user').length;
+    const coverageAvg = coverage.length
+      ? Math.round(coverage.reduce((a, c) => a + (c.coverage_pct || 0), 0) / coverage.length)
+      : 0;
+    const finalReason = reason || (skip ? 'explicit_skip_after_minimum' : 'confirmation_completed');
     try {
       await fetch('/api/onboarding/advisor-complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ skip, confirmed: !skip }),
+        body: JSON.stringify({
+          skip,
+          confirmed: !skip,
+          reason: finalReason,
+          discovery_answer_count: answerCount,
+          coverage_at_skip: coverageAvg,
+          graph_integrity_at_skip: panel.discovery_completion_pct ?? null,
+        }),
       });
     } catch {
       /* best-effort; still navigate so the user is never trapped */
@@ -134,6 +146,17 @@ export default function AdvisorPage() {
     // P0.7: a short, intentional transition before the dashboard (not an abrupt jump).
     setTransitioning(true);
     setTimeout(() => router.push('/dashboard'), 1600);
+  };
+
+  // Skip-policy hardening: a skip is never a one-click bypass — it opens a warning, and the recorded
+  // reason distinguishes an early skip (minimum not met) from a deliberate post-minimum skip.
+  const [showSkipWarning, setShowSkipWarning] = useState(false);
+  const requestSkip = () => setShowSkipWarning(true);
+  const confirmLimitedSkip = () => {
+    const answerCount = msgs.filter((m) => m.role === 'user').length;
+    const minimumMet = answerCount >= 3;
+    setShowSkipWarning(false);
+    finishOnboarding(true, minimumMet ? 'explicit_skip_after_minimum' : 'early_skip_confirmed');
   };
 
   const FINAL_Q =
@@ -319,7 +342,7 @@ export default function AdvisorPage() {
               actions={advisorActions}
               finishing={finishing}
               onConfirm={() => finishOnboarding(false)}
-              onSkip={() => finishOnboarding(true)}
+              onSkip={() => finishOnboarding(true, 'explicit_skip_after_minimum')}
               onEdit={() => {
                 setReviewing(false);
                 setFinalAsked(false);
@@ -420,6 +443,12 @@ export default function AdvisorPage() {
 
             {onboardingMode && (
               <div className="mt-3 flex flex-col items-center gap-1">
+                <p className="text-xs text-gray-500">
+                  Your Life Model is {panel.discovery_completion_pct ?? 0}% complete
+                  {coverage.filter((c) => c.coverage_pct < 100).length > 0
+                    ? ` · ${coverage.filter((c) => c.coverage_pct < 100).length} areas still need context`
+                    : ''}
+                </p>
                 <button
                   onClick={() => setReviewing(true)}
                   className="text-xs text-indigo-600 underline hover:text-indigo-800"
@@ -427,11 +456,11 @@ export default function AdvisorPage() {
                   Review what I understand about you →
                 </button>
                 <button
-                  onClick={() => finishOnboarding(true)}
+                  onClick={requestSkip}
                   disabled={finishing}
                   className="text-xs text-gray-400 underline hover:text-gray-600 disabled:opacity-50"
                 >
-                  Skip for now and go to my dashboard
+                  Continue with limited dashboard
                 </button>
               </div>
             )}
@@ -449,6 +478,37 @@ export default function AdvisorPage() {
             loadCoverage();
           }}
         />
+      )}
+
+      {/* Skip-policy warning — a skip is intentional + warned, never a one-click bypass. */}
+      {showSkipWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+              Your dashboard will be limited
+            </h3>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+              LifeNavigator works best after advisor discovery. If you continue now, your dashboard
+              may be incomplete, recommendations may be less useful, and your Life Graph may be
+              sparse.
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                onClick={() => setShowSkipWarning(false)}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                Continue Advisor Discovery
+              </button>
+              <button
+                onClick={confirmLimitedSkip}
+                disabled={finishing}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300"
+              >
+                Continue with Limited Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Live context panel (D8) — the advisor always knows the current life model */}
