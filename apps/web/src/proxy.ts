@@ -88,9 +88,17 @@ export async function proxy(request: NextRequest) {
 
   // ---- Public routes: allow through ----
   if (isPublicRoute(path)) {
-    // If authenticated user visits any auth page, redirect to dashboard
-    if (isAuthenticated && (path === '/auth' || path.startsWith('/auth/'))) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
+    // Rule 1: an authenticated user hitting the auth pages must NEVER silently resume into the app —
+    // route to the explicit session interstitial (Continue / Switch Account / Sign Out). Don't trap the
+    // interstitial itself or the auth-processing callbacks (callback/confirm complete the login first).
+    if (
+      isAuthenticated &&
+      (path === '/auth' || path.startsWith('/auth/')) &&
+      path !== '/auth/session' &&
+      !path.startsWith('/auth/callback') &&
+      !path.startsWith('/auth/confirm')
+    ) {
+      return NextResponse.redirect(new URL('/auth/session', request.url));
     }
     return response;
   }
