@@ -1,3 +1,5 @@
+'use client';
+
 import FamilyEntityCrud from '@/components/domain/family/FamilyEntityCrud';
 
 // Family → Beneficiaries: REAL CRUD (add/list/delete), persisted to family.beneficiaries.
