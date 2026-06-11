@@ -17,6 +17,12 @@ interface RawNode {
   color?: string;
   confidence?: number | null;
   domain?: string | null;
+  source?: string | null;
+  updated_at?: string | null;
+}
+interface GraphIntegrity {
+  domains: Record<string, number>;
+  overall: number;
 }
 interface RawEdge {
   from: string;
@@ -27,6 +33,7 @@ interface RawEdge {
 interface GraphPayload {
   nodes: RawNode[];
   edges: RawEdge[];
+  graph_integrity?: GraphIntegrity;
 }
 
 type GNode = RawNode & { relationship_count: number; status: string };
@@ -66,6 +73,7 @@ export default function LifeGraphPage() {
   const [query, setQuery] = useState('');
   const [domainFilter, setDomainFilter] = useState<string>('all');
   const [selected, setSelected] = useState<GNode | null>(null);
+  const [integrity, setIntegrity] = useState<GraphIntegrity | null>(null);
   const [dims, setDims] = useState({ w: 800, h: 600 });
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -76,6 +84,7 @@ export default function LifeGraphPage() {
       )
       .then((d) => {
         setPayload({ nodes: d.nodes ?? [], edges: d.edges ?? [] });
+        setIntegrity(d.graph_integrity ?? null);
         setLoading(false);
       })
       .catch(() => {
@@ -188,10 +197,26 @@ export default function LifeGraphPage() {
             ))}
           </select>
         )}
+        {integrity && (
+          <span className="text-xs text-gray-300">
+            Graph Integrity{' '}
+            <span className="font-semibold text-indigo-300">{integrity.overall}%</span>
+          </span>
+        )}
         <span className="ml-auto text-xs text-gray-400">
           {graphData.nodes.length} nodes · {graphData.links.length} relationships
         </span>
       </div>
+      {integrity && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-gray-800 bg-gray-900/40 px-5 py-2 text-[11px] text-gray-400">
+          <span className="font-semibold uppercase tracking-wide text-gray-500">Completeness</span>
+          {Object.entries(integrity.domains).map(([d, pct]) => (
+            <span key={d}>
+              {d}: <span className="font-medium text-gray-200">{pct}%</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="relative flex-1 overflow-hidden" ref={wrapRef}>
         {loading ? (
@@ -250,6 +275,10 @@ export default function LifeGraphPage() {
             <dl className="space-y-1.5 text-sm">
               <Row k="Type" v={selected.type} />
               {selected.domain && <Row k="Domain" v={selected.domain} />}
+              {selected.source && <Row k="Source" v={selected.source} />}
+              {selected.updated_at && (
+                <Row k="Updated" v={String(selected.updated_at).slice(0, 10)} />
+              )}
               <Row
                 k="Confidence"
                 v={

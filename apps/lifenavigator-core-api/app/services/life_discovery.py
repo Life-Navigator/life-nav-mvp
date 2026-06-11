@@ -461,9 +461,53 @@ class LifeDiscoveryService:
                                  (risks, "Risk", "red"), (opps, "Opportunity", "green"), (cons, "Constraint", "rose")):
             for r in coll:
                 nodes.append({"id": r["id"], "type": typ, "label": r.get("label") or r.get("title"), "color": color, "domain": r.get("domain")})
+        # ── Domain population: real domain CRUD data becomes graph nodes (Family is live) ──
+        fam_nodes: list[dict[str, Any]] = []
+        fam_edges: list[dict[str, Any]] = []
+        fam_total = 0
+        for table, typ, labelfield in (("dependents", "Dependent", "relationship"), ("beneficiaries", "Beneficiary", "name"),
+                                       ("emergency_contacts", "Emergency Contact", "name"), ("trusted_advisors", "Trusted Advisor", "name")):
+            try:
+                rows = await self._sb.select(table, filters={"user_id": f"eq.{ctx.user_id}"}, limit=200, schema="family")
+            except Exception:  # noqa: BLE001
+                rows = []
+            for r in rows:
+                fam_total += 1
+                nid = f"family:{table}:{r['id']}"
+                fam_nodes.append({"id": nid, "type": typ, "label": str(r.get(labelfield) or r.get("name") or typ),
+                                  "color": "amber", "domain": "family", "source": "User entry", "updated_at": r.get("updated_at")})
+                fam_edges.append({"from": nid, "to": "family_hub", "rel": "part_of", "confidence": 1.0})
+        if fam_total:
+            fam_nodes.append({"id": "family_hub", "type": "Family", "label": "Family", "color": "amber", "domain": "family"})
+            for o in objectives:
+                if o.get("root_objective_key") == "family_stability":
+                    fam_edges.append({"from": "family_hub", "to": o["id"], "rel": "supports", "confidence": 0.8})
+        nodes.extend(fam_nodes)
+
         node_ids = {n["id"] for n in nodes}
         edges = [{"from": e["source_node"], "to": e["target_node"], "rel": e["edge_type"], "confidence": e.get("confidence")}
                  for e in stored_edges if e["source_node"] in node_ids and e["target_node"] in node_ids]
+        edges.extend([e for e in fam_edges if e["from"] in node_ids and e["to"] in node_ids])
+        integrity = await self._graph_integrity(ctx, objective_count=len(objectives), family_count=fam_total)
         return {"nodes": nodes, "edges": edges, "objective_count": len(objectives), "edge_count": len(edges),
-                "legend": {"purple": "Life Vision", "indigo": "Life Objective", "blue": "Goal", "amber": "Dependency",
+                "graph_integrity": integrity,
+                "legend": {"purple": "Life Vision", "indigo": "Life Objective", "blue": "Goal", "amber": "Dependency/Family",
                            "red": "Risk", "green": "Opportunity", "rose": "Constraint"}}
+
+    async def _graph_integrity(self, ctx: UserContext, *, objective_count: int, family_count: int) -> dict[str, Any]:
+        """Graph Integrity — per-domain completeness from REAL data presence (not question counts).
+        Each domain reads its primary table defensively; absent data → 0 (honest, not fabricated)."""
+        async def cnt(table: str, schema: str) -> int:
+            try:
+                return len(await self._sb.select(table, filters={"user_id": f"eq.{ctx.user_id}"}, limit=50, schema=schema))
+            except Exception:  # noqa: BLE001
+                return 0
+        finance = min(100, await cnt("financial_accounts", "finance") * 25)
+        career = min(100, await cnt("career_profiles", "career") * 60 + await cnt("certifications", "career") * 20)
+        education = min(100, await cnt("education_records", "education") * 30 + await cnt("courses", "education") * 15)
+        health = min(100, await cnt("sleep_logs", "health") * 15 + await cnt("vitals", "health") * 15)
+        family = min(100, family_count * 20)
+        life = min(100, objective_count * 25)
+        domains = {"finance": finance, "career": career, "health": health, "education": education, "family": family, "life": life}
+        overall = round(sum(domains.values()) / len(domains))
+        return {"domains": domains, "overall": overall}
