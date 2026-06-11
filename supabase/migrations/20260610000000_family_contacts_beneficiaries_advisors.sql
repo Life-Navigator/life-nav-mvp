@@ -46,3 +46,4 @@ begin
   end loop;
 end $$;
 notify pgrst, 'reload schema';
+grant select, insert, update, delete on family.emergency_contacts, family.beneficiaries, family.trusted_advisors to service_role, anon;
