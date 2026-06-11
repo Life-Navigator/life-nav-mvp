@@ -11,42 +11,49 @@ Flow:  Advisor Chat → Relationship Manager Discovery → Supabase (life.*) →
 """
 from __future__ import annotations
 
+import re
 import uuid
 from typing import Any, Optional
+
+# Rule 2: user corrections are authoritative. When the user pushes back, we apologize + ask them to
+# restate — we never re-assert a rejected interpretation.
+_CORRECTION_RE = re.compile(
+    r"\b(no|nope|wrong|incorrect|that'?s not( right| it)?|not what i meant|you made (that|it|them)? ?up|"
+    r"you made up|i didn'?t say|i never said|don'?t (say|put|add)|not (career|family|finance|health)|"
+    r"that'?s wrong|you'?re wrong|stop assuming)\b",
+    re.IGNORECASE,
+)
 
 from ..models.common import UserContext
 
 LIFE = "life"
 
 # The discovery interview. Each step writes to the canonical model the moment it's answered.
+# Goal-DRIVEN flow (Rule 4/5): we capture the user's goals in their own words, then clarify THOSE goals —
+# we do NOT march through family→career→finance→health asking domain questions the user never raised.
+# (Career/health/family surface only if the user introduces them; analyze_statement captures them.)
 FLOW: list[dict[str, Any]] = [
     {"key": "vision", "kind": "vision", "domain": "core",
      "prompt": "Let's start with the big picture — what would you most like your life to look like over the next few years?",
      "why": "Your vision anchors every recommendation we make."},
     {"key": "primary_goal", "kind": "goal", "domain": "core",
-     "prompt": "What's the one thing you'd most like to make progress on right now — and what's behind that for you?",
-     "why": "We find the real objective behind the goal, then map what it depends on."},
-    {"key": "family_goal", "kind": "goal", "domain": "family",
-     "prompt": "Tell me a little about your family — and anything you're hoping to do for them (a home, kids, caring for parents)?",
-     "why": "Family goals drive protection, housing, and survivor planning."},
-    {"key": "career_goal", "kind": "goal", "domain": "career",
-     "prompt": "Where would you like your career to go over the next few years?",
-     "why": "Career trajectory shapes income, timing, and several other goals."},
+     "prompt": "In your own words, what are you working toward right now? List as many things as matter to you.",
+     "why": "I capture your goals in your words first — I don't slot you into categories."},
+    {"key": "priority", "kind": "context", "domain": "core",
+     "prompt": "Of everything you just shared, which matters most to you right now?",
+     "why": "Knowing your top priority shapes the whole plan."},
     {"key": "financial_goal", "kind": "goal", "domain": "finance",
-     "prompt": "When it comes to money, what matters most to you right now — and what would it mean to get there?",
-     "why": "This becomes the spine of your readiness + roadmap."},
+     "prompt": "Is there anything about money — saving, debt, or a purchase — tied to those goals?",
+     "why": "Money is usually the spine of the plan, but only when it's part of YOUR goals."},
+    {"key": "time_horizon", "kind": "time_horizon", "domain": "core",
+     "prompt": "What timeline are you targeting for the thing that matters most? (a few years, ten years, by retirement…)",
+     "why": "Time horizon changes the right strategy entirely."},
     {"key": "risk", "kind": "risk", "domain": "finance",
      "prompt": "When an outcome is uncertain — say your investments dropped sharply — how do you usually react?",
      "why": "Your real instincts (not a survey) drive projections + recommendations.",
      "options": ["I'd sell to protect myself", "I'd hold steady", "I'd buy more"]},
-    {"key": "time_horizon", "kind": "time_horizon", "domain": "core",
-     "prompt": "When are you hoping to reach the thing that matters most? (a few years, ten years, by retirement…)",
-     "why": "Time horizon changes the right strategy entirely."},
-    {"key": "health_goal", "kind": "goal", "domain": "health",
-     "prompt": "Anything on the health or energy side you'd like us to keep in mind?",
-     "why": "Health goals affect longevity planning and energy for everything else.", "optional": True},
     {"key": "constraint", "kind": "constraint", "domain": "core",
-     "prompt": "Last one — what feels like the biggest thing standing in your way right now?",
+     "prompt": "What feels like the biggest thing standing in your way right now?",
      "why": "We plan around real constraints instead of pretending they don't exist."},
 ]
 _FLOW_BY_KEY = {s["key"]: s for s in FLOW}
@@ -202,13 +209,34 @@ class RelationshipManager:
         reflection = ""
         reveal = None
         candidate_goals: list[dict[str, Any]] = []
+        if pending_key and message.strip() and _CORRECTION_RE.search(message):
+            # Rule 2: the user is correcting us — apologize, do NOT classify or advance, ask them to
+            # restate in their own words. (We never re-surface the rejected interpretation.)
+            nq0 = _FLOW_BY_KEY.get(pending_key) or {}
+            st0 = await self.state(ctx)
+            panel0 = await self._context_panel(ctx)
+            return {
+                "assistant_message": (
+                    "You're right — I overreached, and I should only work from what you actually told me. "
+                    "Tell me again, in your own words, what matters most to you — I'll capture exactly what you say."
+                ),
+                "pending_key": pending_key,
+                "options": nq0.get("options"),
+                "updates": [],
+                "reveal": None,
+                "candidate_goals": [],
+                "progress": st0.get("progress"),
+                "complete": False,
+                "context_panel": panel0,
+            }
         if pending_key and message.strip():
             res = await self.answer(ctx, pending_key, message)
             rec = res.get("recorded", {})
             candidate_goals = rec.get("candidate_goals") or []
             updates = list(self._WROTE_UPDATES.get(rec.get("wrote", ""), []))
             if updates:
-                updates += ["✓ Recommendations refreshed", "✓ Roadmap updated"]  # OS re-syncs on next read
+                # Rule 7: during discovery, nothing is finalized — use draft language, not "recommendations refreshed".
+                updates += ["✓ Life model updated", "✓ Discovery notes updated"]
             # The "magic moment" (D2): surface goal → discovered objective → dependencies → confidence.
             if rec.get("objective") and rec.get("dependencies"):
                 reveal = {
@@ -218,13 +246,13 @@ class RelationshipManager:
                     "recommendations_unlocked": len(rec["dependencies"]),
                     "confidence_pct": round((rec.get("confidence") or 0) * 100),
                 }
-            # V3 Sprint 2: a multi-goal answer is reflected as SEVERAL candidate goals (never collapsed).
-            # Rule 1: HYPOTHESIZE, never declare — offer the interpretation as a question to confirm.
+            # Rule 3: EXTRACT first, classify later — reflect the user's OWN words (the goal text),
+            # never an objective label, and ask them to confirm before any classification.
             if len(candidate_goals) >= 2:
-                listed = "; ".join(f"{i + 1}) {g['objective']}" for i, g in enumerate(candidate_goals[:4]))
+                listed = "; ".join(f"{i + 1}) {g.get('goal') or g.get('objective')}" for i, g in enumerate(candidate_goals[:4]))
                 reflection = (
-                    f"I'm hearing a few distinct things here — {listed}. "
-                    "Did I capture those, or did I miss something? "
+                    f"I'm hearing a few priorities — {listed}. "
+                    "Did I capture that correctly, or did I miss something? "
                 )
             elif rec.get("objective"):
                 reflection = (

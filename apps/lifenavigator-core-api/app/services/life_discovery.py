@@ -184,7 +184,13 @@ class LifeDiscoveryService:
                     "followup_options": ["Security", "Freedom", "Family", "Growth", "Health", "Legacy"], "constraints": constraints}
         top_theme, top_w = ranked[0]
         second_w = ranked[1][1] if len(ranked) > 1 else 0.0
-        primary = THEME_OBJECTIVE.get(top_theme, "career_growth")
+        # Rule 1: NEVER default to career. If the top theme has no objective mapping, probe — don't invent.
+        primary = THEME_OBJECTIVE.get(top_theme)
+        if not primary:
+            return {"primary_objective": None, "confidence": 0.3, "themes": themes, "alternatives": [],
+                    "reasoning": f"'{surface_goal}' doesn't map confidently to one objective yet.", "needs_followup": True,
+                    "followup_question": f"What would achieving '{surface_goal}' really give you?",
+                    "followup_options": ["Security", "Freedom", "Family", "Growth", "Health", "Legacy"], "constraints": constraints}
         margin = top_w - second_w
         confidence = round(min(0.92, 0.55 + margin + (0.1 if len(ranked) == 1 else 0)), 2)
         alts = [{"objective": THEME_OBJECTIVE[t], "weight": w} for t, w in ranked[1:4]

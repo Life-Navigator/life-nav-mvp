@@ -103,7 +103,8 @@ async def test_converse_answers_writes_and_shows_updates():
     rm = _rm(sb)
     turn = await rm.converse(CTX, "buy a house because we want to start a family", pending_key="primary_goal")
     assert any("Objective added" in u for u in turn["updates"])  # visible learning (D2)
-    assert any("Recommendations refreshed" in u for u in turn["updates"])
+    # Rule 7: discovery uses draft language, not "recommendations refreshed" (nothing finalized yet).
+    assert any("Life model updated" in u for u in turn["updates"])
     assert "family stability" in turn["assistant_message"].lower()  # reflects the need behind the need (D4)
     assert turn["pending_key"] and turn["pending_key"] != "primary_goal"  # advanced
     # it actually wrote canonically
