@@ -1,120 +1,156 @@
 'use client';
 
+// Education Overview — rendered by the SHARED DomainOverview. There is no /api/education/summary, so we
+// aggregate the user's REAL education records / certifications / courses into the universal CoverageModel.
+// No fake degrees, courses, study streaks, or ROI — absent data renders DomainEmptyState.
 import Link from 'next/link';
-import { AcademicCapIcon, BookOpenIcon, ChartBarIcon, CheckBadgeIcon } from '@heroicons/react/24/outline';
-import PlatformIntegrations from '@/components/education/PlatformIntegrations';
+import { useEffect, useState } from 'react';
+import {
+  DomainOverview,
+  DomainLoadingState,
+  DomainErrorState,
+  type CoverageModel,
+} from '@/components/domain/framework';
+import { educationDomain } from '@/components/domain/configs/education';
 
-export default function EducationLandingPage() {
-  const features = [
-    {
-      id: 1,
-      name: 'Education Overview',
-      description: 'Track your courses, degrees, and learning progress all in one place.',
-      icon: BookOpenIcon,
-      color: 'bg-emerald-100 dark:bg-emerald-900/30',
-      iconColor: 'text-emerald-500 dark:text-emerald-400',
-      href: '/dashboard/education/overview'
-    },
-    {
-      id: 2,
-      name: 'Progress Tracking',
-      description: 'Monitor assignments, grades, and study habits to optimize your learning.',
-      icon: ChartBarIcon,
-      color: 'bg-emerald-100 dark:bg-emerald-900/30',
-      iconColor: 'text-emerald-500 dark:text-emerald-400',
-      href: '/dashboard/education/progress'
-    },
-    {
-      id: 3,
-      name: 'Certifications',
-      description: 'Manage professional certifications, credentials, and exam preparation.',
-      icon: CheckBadgeIcon,
-      color: 'bg-emerald-100 dark:bg-emerald-900/30',
-      iconColor: 'text-emerald-500 dark:text-emerald-400',
-      href: '/dashboard/education/certifications'
-    }
+interface Counts {
+  records: number;
+  certifications: number;
+  courses: number;
+}
+
+const EDUCATION_UNLOCKS = [
+  'Education ROI comparison',
+  'School / program fit',
+  'Financing strategy',
+  'Career-aligned learning plan',
+  'Credential gap analysis',
+];
+
+function toCoverageModel(counts: Counts | null): CoverageModel {
+  const known: string[] = [];
+  if (counts) {
+    if (counts.records) known.push(`${counts.records} education record(s)`);
+    if (counts.certifications) known.push(`${counts.certifications} certification(s)`);
+    if (counts.courses) known.push(`${counts.courses} course(s)`);
+  }
+  // Missing inputs not yet covered by what we know.
+  const missing = [
+    'Current education',
+    'Target degree or certification',
+    'Program preference',
+    'Cost tolerance',
+    'Timeline',
+    'Transcript or credential documents',
+    'Career reason',
   ];
+  const total = known.length + missing.length;
+  const coverage_pct = total ? Math.round((known.length / total) * 100) : 0;
+  return {
+    coverage_pct,
+    confidence_pct: known.length ? Math.min(60, known.length * 20) : 0,
+    known,
+    missing,
+    unlocks: EDUCATION_UNLOCKS,
+    next_action: {
+      label: known.length ? 'Add more education info' : 'Enter your education goal',
+      href: '/dashboard/education/add',
+    },
+    last_updated: 'Today',
+    source: {
+      source: 'Your education records',
+      updated: 'Today',
+      confidence: known.length >= 2 ? 'medium' : 'low',
+    },
+  };
+}
+
+async function countOf(path: string): Promise<number> {
+  try {
+    const r = await fetch(path);
+    if (!r.ok) return 0;
+    const body = await r.json();
+    const arr = Array.isArray(body) ? body : (body?.items ?? body?.data ?? body?.records ?? []);
+    return Array.isArray(arr) ? arr.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export default function EducationOverviewPage() {
+  const [counts, setCounts] = useState<Counts | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      countOf('/api/education/records'),
+      countOf('/api/education/certifications'),
+      countOf('/api/education/courses'),
+    ])
+      .then(([records, certifications, courses]) => {
+        if (active) {
+          setCounts({ records, certifications, courses });
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setError(true);
+          setLoading(false);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (loading)
+    return (
+      <div className="p-6">
+        <DomainLoadingState />
+      </div>
+    );
+  if (error)
+    return (
+      <div className="p-6">
+        <DomainErrorState
+          message="We couldn't load your education records just now."
+          onRetry={() => window.location.reload()}
+        />
+      </div>
+    );
+
+  const model = toCoverageModel(counts);
 
   return (
-    <div className="h-full w-full p-8">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center mb-8">
-          <div className="mr-4 p-3 rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-            <AcademicCapIcon className="h-10 w-10 text-emerald-500 dark:text-emerald-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Education Hub</h1>
-            <p className="text-gray-600 dark:text-gray-300">Manage and track your educational journey</p>
-          </div>
+    <DomainOverview config={educationDomain} model={model}>
+      {/* 9. Related Recommendations */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          Related education recommendations
         </div>
-
-        {/* Feature Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-10">
-          {features.map((feature) => (
-            <Link key={feature.id} href={feature.href}>
-              <div className="h-full p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow duration-200">
-                <div className={`inline-flex items-center justify-center p-3 rounded-full ${feature.color} mb-4`}>
-                  <feature.icon className={`h-8 w-8 ${feature.iconColor}`} />
-                </div>
-                <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">{feature.name}</h2>
-                <p className="text-gray-600 dark:text-gray-300">{feature.description}</p>
-                <div className="mt-4 text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                  View details &rarr;
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {/* Status Card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Education Features Coming Soon</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">
-            Our education management tools are currently in development. Click on any section above to learn more about upcoming features and sign up for notifications when they launch.
-          </p>
-          <div className="flex flex-col md:flex-row gap-4 mt-6">
-            <Link
-              href="/dashboard"
-              className="px-5 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-md font-medium transition-colors text-center"
-            >
-              Back to Dashboard
-            </Link>
-            <Link
-              href="/dashboard/download"
-              className="px-5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md font-medium transition-colors text-center"
-            >
-              Join Desktop Waitlist
-            </Link>
-          </div>
-        </div>
-
-        {/* Platform Integrations */}
-        <div className="mb-8">
-          <PlatformIntegrations />
-        </div>
-
-        {/* Educational Resources */}
-        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4 text-emerald-800 dark:text-emerald-300">
-            Recommended Resources
-          </h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-md border border-emerald-100 dark:border-emerald-800">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-2">Free Online Courses</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                Explore thousands of free courses from top universities on platforms like Coursera, edX, and Khan Academy.
-              </p>
-            </div>
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-md border border-emerald-100 dark:border-emerald-800">
-              <h3 className="font-medium text-gray-900 dark:text-white mb-2">Professional Certifications</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                Advance your career with in-demand certifications in technology, business, healthcare, and more.
-              </p>
-            </div>
-          </div>
-        </div>
+        <p className="text-sm text-gray-500">
+          Education recommendations appear once your goal and records are in place.{' '}
+          <Link href="/dashboard/education/recommendations" className="text-indigo-600">
+            View all →
+          </Link>
+        </p>
       </div>
-    </div>
+
+      {/* 8. Related Documents */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          Related documents
+        </div>
+        <p className="text-sm text-gray-500">
+          Transcripts, certifications, and degree plans power your education analysis.{' '}
+          <Link href="/dashboard/education/documents" className="text-indigo-600">
+            Manage documents →
+          </Link>
+        </p>
+      </div>
+    </DomainOverview>
   );
 }
