@@ -8,7 +8,7 @@ const CORE_API = (process.env.CORE_API_URL || 'https://lifenavigator-core-api.fl
   /\/$/,
   ''
 );
-const TYPES = ['full', 'financial', 'decision', 'family', 'compensation', 'education'];
+const TYPES = ['full', 'financial', 'decision', 'family', 'compensation', 'education', 'health'];
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ type: string }> }) {
   const { type } = await ctx.params;

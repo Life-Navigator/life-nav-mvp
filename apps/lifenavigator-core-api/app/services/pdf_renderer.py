@@ -72,6 +72,7 @@ _SUBTITLE = {
     "family": "Your family protection, readiness, and planning",
     "compensation": "Your total compensation & benefits analysis",
     "education": "Programs ranked against your life goals",
+    "health": "Your wellness, activity, and sleep guidance",
 }
 _MONEY_HINT = ("salary", "value", "cost", "balance", "amount", "comp", "savings", "benefit",
                "premium", "coverage", "contribution", "net_worth", "income", "bonus", "equity",
