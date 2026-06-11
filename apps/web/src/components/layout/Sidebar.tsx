@@ -386,6 +386,7 @@ const navigation = [
   // ── Core: the outcome journey ──
   { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, current: false, section: 'Core' },
   { name: 'Life Readiness', href: '/dashboard/readiness', icon: TargetIcon, current: false },
+  { name: 'Life Graph', href: '/dashboard/life-graph', icon: PuzzlePieceIcon, current: false },
   { name: 'Recommendations', href: '/dashboard/recommendations', icon: TargetIcon, current: false },
   {
     name: 'Decision Brain',
