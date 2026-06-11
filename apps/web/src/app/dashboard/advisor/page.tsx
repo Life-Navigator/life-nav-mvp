@@ -143,9 +143,9 @@ export default function AdvisorPage() {
     } catch {
       /* best-effort; still navigate so the user is never trapped */
     }
-    // P0.7: a short, intentional transition before the dashboard (not an abrupt jump).
+    // P0.7: an intentional handoff (Life Model summary) before the dashboard — not an abrupt jump.
     setTransitioning(true);
-    setTimeout(() => router.push('/dashboard'), 1600);
+    setTimeout(() => router.push('/dashboard'), 3200);
   };
 
   // Skip-policy hardening: a skip is never a one-click bypass — it opens a warning, and the recorded
@@ -219,13 +219,43 @@ export default function AdvisorPage() {
 
   // P0.7: intentional transition into the dashboard.
   if (transitioning) {
+    const priorities = [panel.primary_objective, ...(panel.top_themes || [])]
+      .filter(Boolean)
+      .slice(0, 3) as string[];
+    const risks = (panel.top_risks || []).slice(0, 3);
+    const opps = (panel.top_opportunities || []).slice(0, 3);
+    const Col = ({ title, items, dot }: { title: string; items: string[]; dot: string }) => (
+      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          {title}
+        </div>
+        {items.length ? (
+          <ul className="space-y-1 text-sm text-gray-700">
+            {items.map((x, i) => (
+              <li key={i} className="flex gap-2">
+                <span className={dot}>•</span>
+                {x}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-gray-400">Builds as you add more.</p>
+        )}
+      </div>
+    );
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600 mb-4" />
-        <h2 className="text-xl font-bold text-gray-900">
-          I&apos;ve built your initial Life Model.
-        </h2>
-        <p className="text-gray-500 mt-1">Your dashboard is ready…</p>
+        <h2 className="text-2xl font-bold text-gray-900">Your Life Model is ready.</h2>
+        <p className="text-gray-500 mt-1">
+          Here&apos;s what matters most — your dashboard reflects it.
+        </p>
+        <div className="mt-6 grid w-full max-w-3xl gap-4 text-left sm:grid-cols-3">
+          <Col title="Top priorities" items={priorities} dot="text-indigo-500" />
+          <Col title="Top risks" items={risks} dot="text-red-500" />
+          <Col title="Top opportunities" items={opps} dot="text-emerald-500" />
+        </div>
+        <p className="mt-5 text-sm text-gray-400">Taking you to your dashboard…</p>
       </div>
     );
   }
