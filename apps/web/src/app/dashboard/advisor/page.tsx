@@ -88,11 +88,18 @@ export default function AdvisorPage() {
     loadCoverage();
   }, []);
 
-  // Derive the action cards (Step 1/2) from whatever signal we have: prefer the coverage endpoint's
-  // incomplete domains; fall back to the advisor panel's missing_areas. One card per missing domain.
-  const missingDomainKeys: string[] = coverage.length
-    ? coverage.filter((c) => c.coverage_pct < 100).map((c) => c.domain)
-    : panel.missing_areas || [];
+  // Derive the action cards (Step 1/2). P0.4: recommend data ONLY for domains the user actually
+  // engaged with (a stated goal → coverage > 0 but < 100). A domain at 0% (e.g. career the user
+  // never mentioned) must NOT surface a "do this" card — we don't push career data at someone who
+  // didn't raise career. Fall back to all-incomplete only if nothing is engaged yet.
+  const engagedKeys = coverage
+    .filter((c) => c.coverage_pct > 0 && c.coverage_pct < 100)
+    .map((c) => c.domain);
+  const missingDomainKeys: string[] = engagedKeys.length
+    ? engagedKeys
+    : coverage.length
+      ? coverage.filter((c) => c.coverage_pct < 100).map((c) => c.domain)
+      : panel.missing_areas || [];
   // Show up to 2 actions for the top 2 missing domains so BOTH an upload and a manual-entry
   // (quick form) path are always reachable — never an upload-only set with no way to type data in.
   const advisorActions: AdvisorAction[] = missingDomainKeys

@@ -107,6 +107,52 @@ THEME_OBJECTIVE: dict[str, str] = {
     "achievement": "financial_independence",
     "legacy": "legacy", "purpose": "legacy", "adventure": "financial_independence",
 }
+# P0.3 — every candidate goal carries a real life DOMAIN (not "core"), so domain coverage reflects what the
+# user actually said. Checked in priority order; the FIRST domain whose keywords appear wins. Education/Health
+# are most specific (checked first); explicit money terms map to finance before the ambiguous "house" → family.
+_DOMAIN_KW: list[tuple[str, tuple[str, ...]]] = [
+    ("education", ("school", "college", "university", "degree", "mba", "study", "studies", "classes",
+                   "certification", "go back to school", "education", "phd", "master")),
+    ("health", ("fitness", "shape", "gym", "workout", "exercise", "lose weight", "weight", "healthy",
+                "health", "wellness", "energy", "sleep", "stronger", "in better shape", "get fit")),
+    ("finance", ("credit card", "revolving", "debt", "loan", "pay off", "pay down", "payoff", "paying down",
+                 "down payment", "mortgage", "savings", "saving", "emergency fund", "invest", "retire",
+                 "retirement", "401", "income", "wealth", "rewards", "budget", "financ", "money")),
+    ("family", ("family", "fiance", "fiancé", "fiancée", "wedding", "marriage", "marry", "married", "kids",
+                "children", "child", "baby", "spouse", "wife", "husband", "partner", "raise", "dependents",
+                "house", "home", "household")),
+    ("career", ("career", "promotion", "my job", "new job", "boss", "salary", "professional", "employer",
+                "business", "founder", "startup")),
+]
+
+
+def _goal_domain(text: str) -> str:
+    """Classify a goal clause to a life domain by evidence. Never invents career (needs explicit job terms)."""
+    t = (text or "").lower()
+    for domain, kws in _DOMAIN_KW:
+        if any(kw in t for kw in kws):
+            return domain
+    return "core"
+
+
+# P0.5 — a goal framed as later ("a few years out") is a future_goal, never dropped.
+_FUTURE_MARKERS = ("few years", "down the road", "later", "someday", "eventually", "in the future",
+                   "years away", "years from now", "one day", "not right now", "not yet", "down the line")
+
+
+def _is_future(text: str) -> bool:
+    return any(m in (text or "").lower() for m in _FUTURE_MARKERS)
+
+
+# Meta/system statements that mention a domain word but are NOT goals (the user talking about the app /
+# correcting us). Kept out of the goal list so the confirmation never shows "you already have…" as a goal.
+_META_RE = re.compile(
+    r"\b(you already have|you have my|through plaid|that confirmation|is blank|you made up|"
+    r"i didn'?t say|i never said|you'?re wrong|that'?s wrong)\b",
+    re.IGNORECASE,
+)
+
+
 # TERMINAL goals: the goal's own domain IS the objective (the why is motivation, not the objective).
 # (surface signal -> objective, base confidence). Checked before instrumental routing.
 _TERMINAL: list[tuple[tuple[str, ...], str, float]] = [
@@ -273,8 +319,19 @@ class LifeDiscoveryService:
             obj_key = a.get("primary_objective")
             label = ROOT_OBJECTIVES.get(obj_key, {}).get("label") if obj_key else None
             deps = self._derive_deps(clause.lower())
-            if not label and not deps:
-                continue  # pure connector clause with no signal
+            clause_domain = _goal_domain(clause)
+            # A domain-only clause (a clear life signal but no canonical objective/deps) is kept ONLY if it
+            # reads like a goal: ≥3 words and not a meta/system statement ("you already have…through plaid").
+            domain_only = (not label and not deps) and clause_domain != "core"
+            looks_like_goal = len(clause.split()) >= 3 and not _META_RE.search(clause)
+            if (not label and not deps and clause_domain == "core") or (domain_only and not looks_like_goal):
+                # P0.5: a dropped pure-qualifier clause ("a few years in the future") still carries timing —
+                # propagate it onto the goal it qualifies so the goal isn't silently de-scoped.
+                if _is_future(clause) and candidates:
+                    candidates[-1]["status"] = "future_goal"
+                continue  # pure connector / fragment / meta statement — no real goal
+            # P0.5: a clause with a clear life-domain signal ("getting in better shape" → health) is a real
+            # goal even when it maps to no canonical objective yet — keep it, don't silently discard.
             # P0.5: the goal text is the user's OWN words; the label is secondary.
             key = clause.lower()
             if key in seen:
@@ -285,11 +342,13 @@ class LifeDiscoveryService:
                 "objective": label or clause,
                 "objective_key": obj_key,
                 "confidence": round(a.get("confidence") or 0.5, 2),
+                "status": "future_goal" if _is_future(clause) else "active",
                 # P0.6: every goal carries its supporting quote (evidence) — no quote, no goal.
                 "supporting_quotes": [clause],
                 "supporting_statements": [clause],
                 "dependencies": deps,
-                "domain": ROOT_OBJECTIVES.get(obj_key, {}).get("domain", "core") if obj_key else "core",
+                # P0.3: domain from the user's own words (evidence) so coverage is never falsely 0%.
+                "domain": clause_domain,
             })
         return candidates
 

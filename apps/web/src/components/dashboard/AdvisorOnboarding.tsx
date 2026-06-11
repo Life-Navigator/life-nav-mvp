@@ -34,38 +34,38 @@ export interface AdvisorAction {
 // Step 2 — domain prompt rules. Static catalog of the actions the advisor can surface per domain.
 // Shown when a domain still has missing coverage. Upload → documents page; entry → AddDataModal.
 export const DOMAIN_ACTIONS: Record<string, AdvisorAction[]> = {
+  // P0.4: goal-target CTAs FIRST (things Plaid can't know — payoff/down-payment/fund targets), so the
+  // top-2 recommended actions are always actionable. Account-data entries (income/401k) are beta-blocked
+  // (Plaid persona is the source) and sink to the end as "Coming Soon".
   finance: [
     {
       domain: 'finance',
-      type: 'upload_document',
-      title: 'Upload your 401(k) statement',
-      why_it_matters:
-        'Confirms balances and employer match so projections are real, not estimates.',
-      what_it_unlocks: 'retirement projection · match-gap analysis',
-      estimated_time: '2 min',
-      primary_cta_label: 'Upload statement',
-      href: `/dashboard/documents?domain=finance&doc_type=retirement_statement&return_to=${RET}`,
-      coming_soon: true, // account-data upload not supported in beta (Plaid persona is the source)
-    },
-    {
-      domain: 'finance',
       type: 'manual_entry',
-      title: 'Enter your income',
-      why_it_matters: 'Income drives savings rate, affordability, and retirement readiness.',
-      what_it_unlocks: 'savings rate · home affordability',
+      title: 'Set your credit-card payoff target',
+      why_it_matters: 'A monthly payoff target turns "pay down debt" into a real, trackable plan.',
+      what_it_unlocks: 'debt-free date · interest saved',
       estimated_time: '1 min',
-      primary_cta_label: 'Enter income',
+      primary_cta_label: 'Set payoff target',
       modalDomain: 'financial',
     },
     {
       domain: 'finance',
       type: 'manual_entry',
-      title: 'Add your home value',
-      why_it_matters:
-        'You have mortgage debt on file but no home asset — net worth is understated.',
-      what_it_unlocks: 'accurate net worth · home equity',
+      title: 'Set your home down-payment goal',
+      why_it_matters: 'A target down payment lets us time the larger house against your savings.',
+      what_it_unlocks: 'home timeline · savings target',
       estimated_time: '1 min',
-      primary_cta_label: 'Add home value',
+      primary_cta_label: 'Set down-payment goal',
+      modalDomain: 'financial',
+    },
+    {
+      domain: 'finance',
+      type: 'manual_entry',
+      title: 'Set an emergency-fund target',
+      why_it_matters: 'A security cushion is the foundation before saving for the house.',
+      what_it_unlocks: 'security cushion · risk buffer',
+      estimated_time: '1 min',
+      primary_cta_label: 'Set fund target',
       modalDomain: 'financial',
     },
     {
@@ -77,6 +77,29 @@ export const DOMAIN_ACTIONS: Record<string, AdvisorAction[]> = {
       estimated_time: '2 min',
       primary_cta_label: 'Upload policy',
       href: `/dashboard/documents?domain=finance&doc_type=insurance_policy&return_to=${RET}`,
+    },
+    {
+      domain: 'finance',
+      type: 'manual_entry',
+      title: 'Enter your income',
+      why_it_matters: 'Income drives savings rate, affordability, and retirement readiness.',
+      what_it_unlocks: 'savings rate · home affordability',
+      estimated_time: '1 min',
+      primary_cta_label: 'Enter income',
+      modalDomain: 'financial',
+      coming_soon: true, // beta: income comes from the Plaid persona, not manual entry
+    },
+    {
+      domain: 'finance',
+      type: 'upload_document',
+      title: 'Upload your 401(k) statement',
+      why_it_matters:
+        'Confirms balances and employer match so projections are real, not estimates.',
+      what_it_unlocks: 'retirement projection · match-gap analysis',
+      estimated_time: '2 min',
+      primary_cta_label: 'Upload statement',
+      href: `/dashboard/documents?domain=finance&doc_type=retirement_statement&return_to=${RET}`,
+      coming_soon: true, // account-data upload not supported in beta (Plaid persona is the source)
     },
   ],
   career: [
@@ -225,9 +248,20 @@ export interface CoverageDomain {
   unlocks: string[];
   cta: string | null;
 }
+export interface CandidateGoal {
+  goal: string;
+  objective?: string;
+  domain?: string;
+  status?: string;
+  supporting_quote?: string | null;
+}
 export interface PanelLike {
   life_vision?: string | null;
   primary_objective?: string | null;
+  // P0.2 — the goals the advisor actually heard, in the user's own words (the source of truth for review).
+  candidate_goals?: CandidateGoal[];
+  priorities_i_heard?: string[];
+  domains_touched?: string[];
   top_themes?: string[];
   top_constraints?: string[];
   top_risks?: string[];
@@ -256,6 +290,13 @@ export function LifeModelConfirmation({
   finishing: boolean;
 }) {
   const topActions = actions.slice(0, 3);
+  // P0.2: the confirmation renders the goals the advisor HEARD (user's own words), not a stale label.
+  const heard =
+    panel.candidate_goals && panel.candidate_goals.length > 0
+      ? panel.candidate_goals.map((g) => ({ text: g.goal, future: g.status === 'future_goal' }))
+      : (panel.priorities_i_heard || []).map((t) => ({ text: t, future: false }));
+  // P0.6: nothing heard yet AND no vision → an intelligent missing state, never a blank section.
+  const nothingYet = heard.length === 0 && !panel.life_vision;
 
   return (
     <div className="rounded-2xl border-2 border-indigo-200 bg-white p-5">
@@ -273,20 +314,36 @@ export function LifeModelConfirmation({
         )}
       </div>
 
+      {nothingYet && (
+        // P0.6: intelligent missing state — never a blank confirmation.
+        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+          I haven&apos;t captured your goals yet. Tell me, in your own words, what you&apos;re
+          working toward — and I&apos;ll show it back to you here.
+        </div>
+      )}
+
       {panel.life_vision && (
         <Section label="Life vision">
           <span className="italic">“{panel.life_vision}”</span>
         </Section>
       )}
-      {(panel.primary_objective || (panel.top_themes && panel.top_themes.length > 0)) && (
+
+      {/* P0.2/P0.7: Priorities I Heard — the user's own words, in order, never collapsed to one label. */}
+      {heard.length > 0 && (
         <div className="mt-3">
-          <div className="text-[11px] uppercase text-gray-400 font-semibold">Your priorities</div>
+          <div className="text-[11px] uppercase text-gray-400 font-semibold">
+            Priorities I heard
+          </div>
           <ol className="mt-1 list-decimal list-inside text-sm text-gray-900 space-y-0.5">
-            {panel.primary_objective && (
-              <li className="font-semibold">{panel.primary_objective}</li>
-            )}
-            {(panel.top_themes || []).slice(0, 4).map((t) => (
-              <li key={t}>{t}</li>
+            {heard.slice(0, 8).map((g, i) => (
+              <li key={`${g.text}-${i}`}>
+                {g.text}
+                {g.future && (
+                  <span className="ml-1.5 text-[10px] uppercase tracking-wide text-gray-400">
+                    · later
+                  </span>
+                )}
+              </li>
             ))}
           </ol>
         </div>

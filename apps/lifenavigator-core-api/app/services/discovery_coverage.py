@@ -44,6 +44,13 @@ class DiscoveryCoverageService:
         answered = set(((vis[0].get("prompts") or {}).get("discovery_answered") or []) if vis else [])
         objs = await self._sb.select("life_objectives", filters={"user_id": f"eq.{ctx.user_id}"}, limit=50, schema="life")
         obj_text = [f"{o.get('root_objective_key', '')} {o.get('title', '')}".lower() for o in objs]
+        # P0.3: persisted candidate goals carry an explicit domain — a domain the user spoke to is never 0%.
+        try:
+            cands = await self._sb.select("candidate_goals", filters={"user_id": f"eq.{ctx.user_id}"},
+                                          limit=50, schema="life")
+        except Exception:  # noqa: BLE001
+            cands = []
+        goal_domains = {str(c.get("domain") or "").lower() for c in cands}
         fin_missing: list[dict[str, Any]] = []
         if self._resolver is not None:
             try:
@@ -54,6 +61,8 @@ class DiscoveryCoverageService:
         domains = []
         for key, spec in DOMAINS.items():
             answered_here = [k for k in spec["advisor_keys"] if k in answered]
+            # P0.3: an explicit candidate goal tagged to this domain means the user spoke to it.
+            has_goal = key in goal_domains
             has_objective = any(any(kw in t for kw in spec["objective_kw"]) for t in obj_text)
             # coverage signals: each answered advisor question + an objective + (finance) resolved inputs
             total_signals = max(1, len(spec["advisor_keys"]) + 1)  # +1 for "has an objective"
@@ -62,14 +71,17 @@ class DiscoveryCoverageService:
             if key == "finance" and fin_missing:
                 missing_inputs += [m["input"] for m in fin_missing]
             coverage_pct = round(100 * got / total_signals)
-            if not spec["advisor_keys"] and not has_objective:
-                coverage_pct = 0  # no path to cover this domain yet (e.g. education)
+            if not spec["advisor_keys"] and not has_objective and not has_goal:
+                coverage_pct = 0  # no path to cover this domain yet (e.g. education with no stated goal)
+            # P0.3: a stated goal floors coverage at "started" — a domain the user named is never 0%.
+            if has_goal:
+                coverage_pct = max(coverage_pct, 30)
             status = ("complete" if coverage_pct >= 80 else "partial" if coverage_pct >= 40
                       else "started" if coverage_pct > 0 else "not_started")
             domains.append({
                 "domain": key, "label": spec["label"], "coverage_pct": coverage_pct, "status": status,
                 "confidence_pct": min(95, coverage_pct) if coverage_pct else 0,
-                "has_objective": has_objective,
+                "has_objective": has_objective or has_goal,
                 "missing": missing_inputs[:5], "unlocks": spec["unlocks"],
                 "cta": "/dashboard/advisor" if missing_inputs or coverage_pct < 80 else None,
                 "source": "Advisor Discovery",

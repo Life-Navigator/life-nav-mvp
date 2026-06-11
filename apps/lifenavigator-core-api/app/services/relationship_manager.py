@@ -30,6 +30,7 @@ _REJECTED_PHRASE_RE = re.compile(
 )
 
 from ..models.common import UserContext
+from .life_discovery import _now
 
 LIFE = "life"
 
@@ -92,6 +93,60 @@ class RelationshipManager:
                 if len(w) >= 5 and w not in _STOP:
                     norms.add(w)
         return norms
+
+    @staticmethod
+    def _future_status(goal: str) -> str:
+        """P0.5: a goal the user framed as later ('a few years', 'someday') is a future_goal, not dropped."""
+        t = (goal or "").lower()
+        if any(s in t for s in ("few years", "down the road", "later", "someday", "eventually",
+                                "in the future", "years away", "years from now", "one day")):
+            return "future_goal"
+        return "active"
+
+    async def _persist_candidate_goals(self, ctx: UserContext, goals: list[dict[str, Any]]) -> None:
+        """P0.1: accumulate every extracted goal across turns (upsert by normalized text). No goal is lost,
+        none collapsed into a generic label — the final review reads from THIS, not a stale objective."""
+        for g in goals:
+            text = str(g.get("goal") or g.get("objective") or "").strip()
+            if not text:
+                continue
+            norm = text.lower()
+            quotes = g.get("supporting_quotes") or []
+            try:
+                await self._sb.upsert("candidate_goals", {
+                    "id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{ctx.user_id}:cand:{norm}")),
+                    "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+                    "goal_text": text, "normalized_goal": norm,
+                    "objective_key": g.get("objective_key"),
+                    "objective_label": g.get("objective") if g.get("objective") != text else None,
+                    "domain": g.get("domain") or "core",
+                    "confidence": g.get("confidence") or 0.5,
+                    "supporting_quote": (quotes[0] if quotes else text)[:500],
+                    "status": g.get("status") or self._future_status(text),
+                    "updated_at": _now(),
+                }, on_conflict="user_id,normalized_goal", schema=LIFE)
+            except Exception:  # noqa: BLE001
+                pass
+
+    async def _load_candidate_goals(self, ctx: UserContext) -> list[dict[str, Any]]:
+        """All goals heard across the whole conversation (for the final confirmation — never stale labels)."""
+        try:
+            rows = await self._sb.select("candidate_goals", filters={"user_id": f"eq.{ctx.user_id}"},
+                                         limit=50, schema=LIFE)
+        except Exception:  # noqa: BLE001
+            return []
+        rejected = await self._rejected_norms(ctx)
+        out = []
+        for r in rows:
+            blob = (str(r.get("goal_text", "")) + " " + str(r.get("objective_label") or "")).lower()
+            if rejected and any(x in blob for x in rejected):
+                continue  # P0.3: a goal the user rejected never appears in the final model
+            out.append({
+                "goal": r.get("goal_text"), "objective": r.get("objective_label") or r.get("goal_text"),
+                "domain": r.get("domain") or "core", "status": r.get("status") or "active",
+                "supporting_quote": r.get("supporting_quote"), "confidence": r.get("confidence"),
+            })
+        return out
 
     async def _has_financial_data(self, ctx: UserContext) -> bool:
         """True when the user has connected/persona financial accounts (so we don't re-ask the numbers)."""
@@ -217,7 +272,12 @@ class RelationshipManager:
         except Exception:  # noqa: BLE001
             return {}
         po = snap.get("primary_objective") or {}
+        # P0.2: the confirmation renders THESE accumulated goals (the user's own words), not a stale label.
+        cands = await self._load_candidate_goals(ctx)
         return {"life_vision": snap.get("life_vision"), "primary_objective": po.get("title"),
+                "candidate_goals": cands,
+                "priorities_i_heard": [c["goal"] for c in cands],
+                "domains_touched": sorted({c["domain"] for c in cands if c["domain"] != "core"}),
                 "top_themes": snap.get("top_themes"), "top_risks": snap.get("top_risks"),
                 "top_constraints": [c["label"] for c in snap.get("active_constraints", [])],
                 "top_opportunities": snap.get("top_opportunities"),
@@ -268,7 +328,16 @@ class RelationshipManager:
         if pending_key and message.strip():
             res = await self.answer(ctx, pending_key, message)
             rec = res.get("recorded", {})
-            candidate_goals = rec.get("candidate_goals") or []
+            candidate_goals = list(rec.get("candidate_goals") or [])
+            # P0.5: a goal can surface in ANY answer — while answering the risk/constraint question, or
+            # in a final open-ended reply ("I'm also considering going back to school"). Extract from every
+            # substantive message, not just the dedicated goal turn, so no stated goal is ever dropped.
+            seen_goal = {str(g.get("goal", "")).lower() for g in candidate_goals}
+            for g in self._life.analyze_statement(message):
+                gk = str(g.get("goal", "")).lower()
+                if gk and gk not in seen_goal:
+                    seen_goal.add(gk)
+                    candidate_goals.append(g)
             # P0.3: suppress any candidate matching a previously rejected goal (persists across sessions).
             if candidate_goals:
                 rejected = await self._rejected_norms(ctx)
@@ -280,6 +349,9 @@ class RelationshipManager:
                             for r in rejected
                         )
                     ]
+            # P0.1: persist every surviving candidate goal so it accumulates across turns (never lost).
+            if candidate_goals:
+                await self._persist_candidate_goals(ctx, candidate_goals)
             updates = list(self._WROTE_UPDATES.get(rec.get("wrote", ""), []))
             if updates:
                 # Rule 7: during discovery, nothing is finalized — use draft language, not "recommendations refreshed".
