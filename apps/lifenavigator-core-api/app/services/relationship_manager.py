@@ -23,6 +23,11 @@ _CORRECTION_RE = re.compile(
     r"that'?s wrong|you'?re wrong|stop assuming)\b",
     re.IGNORECASE,
 )
+# Pull the rejected concept out of the correction so it can be persisted + suppressed forever (P0.2).
+_REJECTED_PHRASE_RE = re.compile(
+    r"(?:made (?:that |it |them )?up|i didn'?t say|i never said|don'?t (?:say|put|add)|not)\s+([a-z][a-z '\-]{2,48})",
+    re.IGNORECASE,
+)
 
 from ..models.common import UserContext
 
@@ -70,6 +75,23 @@ class RelationshipManager:
     async def _vision_row(self, ctx: UserContext) -> dict[str, Any]:
         rows = await self._sb.select("life_vision", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema=LIFE)
         return rows[0] if rows else {}
+
+    async def _rejected_norms(self, ctx: UserContext) -> set[str]:
+        """Normalized rejected goals (full phrase + significant words like 'career') to suppress forever."""
+        _STOP = {"about", "build", "start", "being", "things", "would", "could", "really", "advance"}
+        try:
+            rows = await self._sb.select("rejected_goals", filters={"user_id": f"eq.{ctx.user_id}"}, limit=50, schema=LIFE)
+        except Exception:  # noqa: BLE001
+            return set()
+        norms: set[str] = set()
+        for r in rows:
+            ph = str(r.get("normalized_goal", "")).strip()
+            if len(ph) >= 4:
+                norms.add(ph)
+            for w in ph.split():
+                if len(w) >= 5 and w not in _STOP:
+                    norms.add(w)
+        return norms
 
     async def _has_financial_data(self, ctx: UserContext) -> bool:
         """True when the user has connected/persona financial accounts (so we don't re-ask the numbers)."""
@@ -212,6 +234,20 @@ class RelationshipManager:
         if pending_key and message.strip() and _CORRECTION_RE.search(message):
             # Rule 2: the user is correcting us — apologize, do NOT classify or advance, ask them to
             # restate in their own words. (We never re-surface the rejected interpretation.)
+            # P0.2: PERSIST the rejected concept so it never resurfaces — even in a future session.
+            m = _REJECTED_PHRASE_RE.search(message)
+            phrase = (m.group(1).strip() if m else "").rstrip(". ")
+            if phrase:
+                try:
+                    await self._sb.insert("rejected_goals", {
+                        "id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{ctx.user_id}:rej:{phrase.lower()}")),
+                        "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+                        "rejected_goal": phrase, "normalized_goal": phrase.lower(),
+                        "reason": "user said the advisor invented/misclassified it",
+                        "rejected_by_user_quote": message[:280],
+                    }, schema=LIFE)
+                except Exception:  # noqa: BLE001
+                    pass
             nq0 = _FLOW_BY_KEY.get(pending_key) or {}
             st0 = await self.state(ctx)
             panel0 = await self._context_panel(ctx)
@@ -233,6 +269,17 @@ class RelationshipManager:
             res = await self.answer(ctx, pending_key, message)
             rec = res.get("recorded", {})
             candidate_goals = rec.get("candidate_goals") or []
+            # P0.3: suppress any candidate matching a previously rejected goal (persists across sessions).
+            if candidate_goals:
+                rejected = await self._rejected_norms(ctx)
+                if rejected:
+                    candidate_goals = [
+                        g for g in candidate_goals
+                        if not any(
+                            r in (str(g.get("goal", "")) + " " + str(g.get("objective", ""))).lower()
+                            for r in rejected
+                        )
+                    ]
             updates = list(self._WROTE_UPDATES.get(rec.get("wrote", ""), []))
             if updates:
                 # Rule 7: during discovery, nothing is finalized — use draft language, not "recommendations refreshed".

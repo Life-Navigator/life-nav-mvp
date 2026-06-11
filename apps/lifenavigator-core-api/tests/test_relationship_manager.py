@@ -105,7 +105,10 @@ async def test_converse_answers_writes_and_shows_updates():
     assert any("Objective added" in u for u in turn["updates"])  # visible learning (D2)
     # Rule 7: discovery uses draft language, not "recommendations refreshed" (nothing finalized yet).
     assert any("Life model updated" in u for u in turn["updates"])
-    assert "family stability" in turn["assistant_message"].lower()  # reflects the need behind the need (D4)
+    # Rule 3: reflect the user's OWN words (house/family), not an objective label, before confirmation.
+    msg = turn["assistant_message"].lower()
+    assert "house" in msg or "family" in msg
+    assert "career" not in msg  # Rule 1: never invent career
     assert turn["pending_key"] and turn["pending_key"] != "primary_goal"  # advanced
     # it actually wrote canonically
     assert await sb.select("life_objectives", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")

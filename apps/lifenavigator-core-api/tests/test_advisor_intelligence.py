@@ -44,3 +44,31 @@ def test_correction_regex_detects_pushback():
         "not career",
     ]:
         assert _CORRECTION_RE.search(m), m  # Rule 2: corrections are detected
+
+
+def test_long_answer_splits_into_clean_goals():
+    s = LifeDiscoveryService(None)
+    stmt = ("I am currently paying down credit cards in order to get a better travel rewards card for all "
+            "spending and the current one will be for emergencies. Once I don't carry any revolving debt "
+            "anymore I want to build a down payment for a larger house. My fiancée and I want to start "
+            "building a family after the wedding next September.")
+    goals = s.analyze_statement(stmt)
+    assert len(goals) >= 4  # P0.4: a run-on answer becomes several clean goal units
+    blob = " ".join((g["goal"] + " " + g["objective"]) for g in goals).lower()
+    assert "career" not in blob  # Rule 1: never invents career
+    assert any("credit card" in g["goal"].lower() or "debt" in g["goal"].lower() for g in goals)
+    assert any("house" in g["goal"].lower() or "down payment" in g["goal"].lower() for g in goals)
+    assert any("family" in g["goal"].lower() for g in goals)
+
+
+def test_every_surfaced_goal_has_supporting_quote():
+    s = LifeDiscoveryService(None)
+    for g in s.analyze_statement("pay off debt, and build a down payment for a house"):
+        assert g.get("supporting_quotes") and g["supporting_quotes"][0]  # P0.6: no quote, no goal
+        assert g.get("goal")  # user wording preserved
+
+
+def test_travel_rewards_is_not_career():
+    s = LifeDiscoveryService(None)
+    r = s.analyze(surface_goal="get a better travel rewards card")
+    assert r.get("primary_objective") != "career_growth"  # adventure/travel != career

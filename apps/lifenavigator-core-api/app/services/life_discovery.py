@@ -101,8 +101,11 @@ THEMES: dict[str, list[str]] = {
 THEME_OBJECTIVE: dict[str, str] = {
     "freedom": "financial_independence", "wealth_creation": "financial_independence",
     "security": "family_stability", "family": "family_stability", "belonging": "family_stability",
-    "health": "health_longevity", "career_fulfillment": "career_growth", "achievement": "career_growth",
-    "legacy": "legacy", "purpose": "legacy", "adventure": "career_growth",
+    "health": "health_longevity", "career_fulfillment": "career_growth",
+    # Rule 1: "adventure"/"achievement" do NOT imply career — travel rewards / wanting to achieve are not
+    # employment goals. They map to freedom, not career (career requires explicit job/role/promotion evidence).
+    "achievement": "financial_independence",
+    "legacy": "legacy", "purpose": "legacy", "adventure": "financial_independence",
 }
 # TERMINAL goals: the goal's own domain IS the objective (the why is motivation, not the objective).
 # (surface signal -> objective, base confidence). Checked before instrumental routing.
@@ -214,7 +217,7 @@ class LifeDiscoveryService:
         (("house", "home", "mortgage", "property", "bigger place"), ["Down payment", "Mortgage capacity"]),
         (("retire", "retirement", "independence", "passive", "step back"), ["Passive income", "Investment assets"]),
         (("health", "fitness", "weight", "get fit", "energy"), ["Sustainable health routine"]),
-        (("debt", "loan", "payoff", "pay off"), ["Debt reduction plan"]),
+        (("debt", "loan", "payoff", "pay off", "pay down", "paying down", "credit card", "revolving"), ["Debt reduction plan"]),
         (("college", "school", "education", "degree", "tuition"), ["Education funding"]),
     ]
 
@@ -225,6 +228,26 @@ class LifeDiscoveryService:
                 out += deps
         return list(dict.fromkeys(out))[:4]
 
+    # Leading filler/subject phrases stripped from each clause (the VERB is kept, so "paying down cards" stays).
+    _CLAUSE_PREFIXES = (
+        "i am currently ", "i'm currently ", "currently ", "i am ", "i'm ", "i need to ", "we need to ",
+        "i'm hoping to ", "we're hoping to ", "i will ", "we will ", "my fiancée and ", "my fiancee and ",
+        "my partner and ", "my wife and ", "my husband and ", "the current one will be ",
+        "the current one is ", "to ",
+    )
+
+    @classmethod
+    def _clean_clause(cls, c: str) -> str:
+        c = (c or "").strip().strip(".").strip()
+        low = c.lower()
+        for pre in cls._CLAUSE_PREFIXES:
+            if low.startswith(pre):
+                c = c[len(pre):].strip()
+                low = c.lower()
+        if len(c.split()) < 2:  # drop pure-filler fragments ("for emergencies", "i", etc.)
+            return ""
+        return c[0].upper() + c[1:]
+
     def analyze_statement(self, statement: str) -> list[dict[str, Any]]:
         """V3 Sprint 2: a single answer can contain SEVERAL goals. Split it into clauses, reason about
         each, and return candidate_goals[] — never collapsed to one. Dependencies are derived from the
@@ -232,8 +255,17 @@ class LifeDiscoveryService:
         text = (statement or "").strip()
         if not text:
             return []
-        parts = re.split(r"\band\b|,|;|&|\bplus\b|\bas well as\b", text, flags=re.IGNORECASE)
-        clauses = [p.strip() for p in parts if len(p.strip()) >= 3] or [text]
+        # P0.4: split on sentence boundaries + connectives/subordinators so a run-on answer becomes
+        # clean goal units (periods, ; , and, then, once, after, so that, in order to, because, plus).
+        parts = re.split(
+            r"\. |;|,|\band\b|\bthen\b|\bonce\b|\bafter\b|\bso that\b|\bin order to\b|\bbecause\b|&|\bplus\b|"
+            r"\bas well as\b|\bi want to\b|\bi'd like to\b|\bi would like to\b|\bwe want to\b|\bwe'd like to\b",
+            text,
+            flags=re.IGNORECASE,
+        )
+        clauses = [c for c in (self._clean_clause(p) for p in parts) if c]
+        if not clauses:
+            clauses = [text]
         candidates: list[dict[str, Any]] = []
         seen: set[str] = set()
         for clause in clauses:
@@ -243,7 +275,8 @@ class LifeDiscoveryService:
             deps = self._derive_deps(clause.lower())
             if not label and not deps:
                 continue  # pure connector clause with no signal
-            key = (label or clause).lower()
+            # P0.5: the goal text is the user's OWN words; the label is secondary.
+            key = clause.lower()
             if key in seen:
                 continue
             seen.add(key)
@@ -252,6 +285,8 @@ class LifeDiscoveryService:
                 "objective": label or clause,
                 "objective_key": obj_key,
                 "confidence": round(a.get("confidence") or 0.5, 2),
+                # P0.6: every goal carries its supporting quote (evidence) — no quote, no goal.
+                "supporting_quotes": [clause],
                 "supporting_statements": [clause],
                 "dependencies": deps,
                 "domain": ROOT_OBJECTIVES.get(obj_key, {}).get("domain", "core") if obj_key else "core",
