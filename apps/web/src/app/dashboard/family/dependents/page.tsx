@@ -1,6 +1,6 @@
-import FamilyTabEmpty from '@/components/domain/family/FamilyTabEmpty';
+import FamilyDependents from '@/components/domain/family/FamilyDependents';
 
-// Family → dependents tab. Honest missing-state via the shared framework (no 404, no fake data).
+// Family → Dependents: REAL CRUD (add/list/delete) — no longer a shell.
 export default function FamilyDependentsPage() {
-  return <FamilyTabEmpty tab="dependents" />;
+  return <FamilyDependents />;
 }
