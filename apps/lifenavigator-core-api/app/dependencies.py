@@ -278,13 +278,15 @@ def get_advisor_orchestrator(
     from .services.advisor_llm import GeminiAdvisorLLM
     from .services.advisor_orchestrator import AdvisorOrchestrator
     enabled = os.environ.get("ADVISOR_LLM_ENABLED", "true").lower() in ("1", "true", "yes")
-    # Per-domain discovery scores feed the LLM's question prioritisation. Built inline because
-    # get_discovery_coverage is defined later in this module (avoids a forward-ref NameError).
+    # Per-domain discovery scores + the real personal graph feed the LLM's question prioritisation and
+    # relationship reasoning. Built inline because get_discovery_coverage is defined later in this module
+    # (avoids a forward-ref NameError).
+    life = LifeDiscoveryService(supabase)
     coverage = DiscoveryCoverageService(
-        LifeDiscoveryService(supabase), supabase,
+        life, supabase,
         FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)),
     )
-    builder = AdvisorContextBuilder(supabase, coverage=coverage)
+    builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life)
     return AdvisorOrchestrator(rm, builder, GeminiAdvisorLLM(gemini), enabled=enabled)
 
 

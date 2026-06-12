@@ -44,6 +44,7 @@ def build_constraints(base: dict[str, Any], context: Any) -> dict[str, Any]:
         "may_summarise": bool(base.get("complete")),
         "focus_candidates": context.domain_priorities or list(context.missing_areas or []),
         "objective": context.primary_objective,
+        "relationships_available": context.relationships_available,
         "allowed_topics": ["discovery", "clarification", "summary", context.current_stage],
         "disallowed_topics": [
             "final financial advice", "medical advice", "legal advice", "tax advice",
@@ -114,6 +115,8 @@ class AdvisorOrchestrator:
             base["prompt_version"] = self.prompt_version
             if safe.get("missing_data"):
                 base["missing_data"] = safe["missing_data"]  # advisory display only — not persisted
+            if safe.get("relationships_referenced"):
+                base["relationships_referenced"] = safe["relationships_referenced"]  # real cited edges
             return base
         except Exception:  # noqa: BLE001 — never break the user experience
             base["llm_status"] = "fallback:error"

@@ -13,7 +13,17 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .advisor_context import AdvisorContext
+from .advisor_context import AdvisorContext, _norm
+
+# Connective phrases that assert a relationship between two goals/objectives. If the LLM uses one, it must
+# cite a supporting edge — otherwise it is inventing graph reasoning and we reject it.
+_RELATION = re.compile(
+    r"\b(connected to|linked to|tied to|tied together|ties? into|tie in with|related to|relates to|"
+    r"connects? to|connection between|feeds? into|interrelated|interconnected|"
+    r"work against each other|compete[s]? with|trade ?off against|at odds with|reinforces|"
+    r"is connected|are connected|both (?:support|feed|point|connect|relate))\b",
+    re.IGNORECASE,
+)
 
 # Phrases that mean the advisor is RECOMMENDING / advising rather than discovering — not allowed here
 # (recommendations come from the recommendation engine; medical/legal/tax advice is never allowed).
@@ -33,6 +43,51 @@ def _financial_numbers(text: str) -> set[str]:
     for m in _FIN_NUM.findall(text or ""):
         out.add(m.strip().lstrip("$").rstrip("%").replace(",", ""))
     return {n for n in out if n}
+
+
+def _pair_supported(a: str, b: str, pairs: set[frozenset[str]]) -> bool:
+    """A cited {a, b} is real if it matches a connected pair — exact, or label-containment either way
+    (the LLM may shorten 'Financial Independence' to 'retirement/financial' etc.)."""
+    na, nb = _norm(a), _norm(b)
+    if not na or not nb:
+        return False
+    if frozenset({na, nb}) in pairs:
+        return True
+    for p in pairs:
+        xs = list(p)
+        if len(xs) != 2:
+            continue
+        x, y = xs[0], xs[1]
+        if ((na in x or x in na) and (nb in y or y in nb)) or ((na in y or y in na) and (nb in x or x in nb)):
+            return True
+    return False
+
+
+def _check_relationships(result: dict[str, Any], context: AdvisorContext, visible: str) -> tuple[list[str], list[dict[str, Any]]]:
+    """Gate graph reasoning. Returns (reasons, kept_citations).
+
+    Rules:
+      * every cited relationship must be a REAL connected pair in the user's graph,
+      * if the text asserts a relationship, it must be backed by at least one valid citation,
+      * if the user has no graph edges at all, no relationship may be claimed.
+    """
+    cited = result.get("relationships_referenced") or []
+    if not isinstance(cited, list):
+        cited = []
+    pairs = context.connected_pairs
+    valid = [c for c in cited if isinstance(c, dict) and _pair_supported(c.get("from"), c.get("to"), pairs)]
+    invalid = [c for c in cited if c not in valid]
+
+    reasons: list[str] = []
+    if invalid:
+        bad = ", ".join(f"{(c or {}).get('from')}–{(c or {}).get('to')}" for c in invalid)
+        reasons.append(f"unsupported relationship referenced (not in graph): {bad}")
+    if _RELATION.search(visible):
+        if not pairs:
+            reasons.append("relationship mentioned but the user's graph has no edges")
+        elif not valid:
+            reasons.append("relationship mentioned without a supporting graph edge")
+    return reasons, valid
 
 
 def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any], list[str]]:
@@ -63,6 +118,10 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     if next_q.count("?") > 1:
         reasons.append("more than one question")
 
+    # 4) No invented graph reasoning — relationship claims must be backed by real edges.
+    rel_reasons, valid_citations = _check_relationships(result, context, visible)
+    reasons.extend(rel_reasons)
+
     if reasons:
         return False, {}, reasons
 
@@ -80,6 +139,8 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     # Facts must declare a user_message source; drop fabricated-source facts. Categories stay separate.
     safe["confirmed_facts"] = [f for f in (safe.get("confirmed_facts") or []) if (f or {}).get("source") == "user_message"]
     safe["candidate_facts"] = [f for f in (safe.get("candidate_facts") or []) if (f or {}).get("source") == "user_message"]
+    # Only keep relationship citations that are real graph edges (the accept-path repair).
+    safe["relationships_referenced"] = valid_citations
     safe.setdefault("assumptions", [])
     safe.setdefault("missing_data", [])
     safe.setdefault("warnings", [])
