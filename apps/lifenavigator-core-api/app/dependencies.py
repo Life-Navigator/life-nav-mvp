@@ -162,7 +162,8 @@ def get_report_engine(
     education: EducationService = Depends(get_education_service),
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> UniversalReportEngine:
-    return UniversalReportEngine(domains=domains, education=education, supabase=supabase, trends=TrendAnalyzer(supabase), comp_benefits=CompensationBenefitsEngine(supabase), reco_os=RecommendationOS(supabase))
+    readiness = LifeReadinessEngine(domains=domains, education=education, supabase=supabase, planning=FinancialPlanningEngine(supabase, CompensationBenefitsEngine(supabase)))
+    return UniversalReportEngine(domains=domains, education=education, supabase=supabase, trends=TrendAnalyzer(supabase), comp_benefits=CompensationBenefitsEngine(supabase), reco_os=RecommendationOS(supabase), readiness=readiness)
 
 
 def get_readiness_engine(
