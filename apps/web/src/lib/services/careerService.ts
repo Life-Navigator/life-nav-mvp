@@ -2,6 +2,62 @@ type SB = any;
 
 // ── Career Profile ──────────────────────────────────────────────────────
 
+// The REAL columns on public.career_profiles (migrations 032 + 065). Anything not in this set is dropped
+// before the upsert, so a stray or mislabeled field can never fail the write with "column does not exist".
+const PROFILE_COLUMNS = new Set([
+  'current_title',
+  'current_company',
+  'industry',
+  'years_of_experience',
+  'desired_title',
+  'desired_salary_min',
+  'desired_salary_max',
+  'skills',
+  'certifications',
+  'linkedin_url',
+  'github_url',
+  'portfolio_url',
+  'summary',
+  'work_arrangement',
+  'current_income',
+  'income_trajectory',
+  'promotion_target',
+  'target_income',
+  'time_for_upskilling_hours_per_week',
+  'job_change_willingness',
+  'entrepreneurial_interest',
+]);
+
+// Friendly form field → real column. The Career form uses short names; the table uses current_*/_min.
+// This is the root-cause fix for "Failed to save profile": title/company/desired_salary were not columns.
+const FIELD_ALIASES: Record<string, string> = {
+  title: 'current_title',
+  company: 'current_company',
+  desired_salary: 'desired_salary_min',
+};
+
+// Map a form/body payload to a clean DB row: resolve aliases, keep only real columns, drop undefined.
+function toProfileRow(body: Record<string, unknown>): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(body || {})) {
+    if (value === undefined) continue;
+    const col = FIELD_ALIASES[key] ?? key;
+    if (PROFILE_COLUMNS.has(col)) row[col] = value;
+  }
+  return row;
+}
+
+// Echo friendly aliases back onto the row so the form can render saved data verbatim after a refresh.
+function withAliases(data: Record<string, unknown> | null) {
+  if (!data) return data;
+  return {
+    ...data,
+    title: data.current_title ?? '',
+    company: data.current_company ?? '',
+    desired_salary: data.desired_salary_min ?? '',
+  };
+}
+
 export async function getCareerProfile(supabase: SB, userId: string) {
   const { data, error } = await supabase
     .from('career_profiles')
@@ -10,7 +66,7 @@ export async function getCareerProfile(supabase: SB, userId: string) {
     .single();
 
   if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
-  return data;
+  return withAliases(data);
 }
 
 export async function upsertCareerProfile(
@@ -18,14 +74,15 @@ export async function upsertCareerProfile(
   userId: string,
   profile: Record<string, unknown>
 ) {
+  const row = toProfileRow(profile);
   const { data, error } = await supabase
     .from('career_profiles')
-    .upsert({ ...profile, user_id: userId }, { onConflict: 'user_id' })
+    .upsert({ ...row, user_id: userId }, { onConflict: 'user_id' })
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return withAliases(data);
 }
 
 // ── Job Applications ────────────────────────────────────────────────────

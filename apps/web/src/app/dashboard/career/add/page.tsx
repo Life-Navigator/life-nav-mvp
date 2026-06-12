@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -29,6 +29,35 @@ export default function AddCareerDataPage() {
   const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'done'>('idle');
   const [extractedData, setExtractedData] = useState<Record<string, unknown> | null>(null);
 
+  // Load any existing career profile so edits start from saved data and a refresh shows what was saved.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let on = true;
+    fetch('/api/career/profile')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const p = d?.profile;
+        if (!on || !p) return;
+        setProfile((prev) => ({
+          ...prev,
+          title: p.title ?? p.current_title ?? '',
+          company: p.company ?? p.current_company ?? '',
+          industry: p.industry ?? '',
+          years_of_experience: p.years_of_experience != null ? String(p.years_of_experience) : '',
+          skills: Array.isArray(p.skills) ? p.skills.join(', ') : (p.skills ?? ''),
+          desired_salary:
+            (p.desired_salary ?? p.desired_salary_min) != null
+              ? String(p.desired_salary ?? p.desired_salary_min)
+              : '',
+          work_arrangement: p.work_arrangement ?? 'hybrid',
+        }));
+      })
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, [isAuthenticated]);
+
   if (!isAuthenticated) return null;
 
   const handleManualSubmit = async (e: React.FormEvent) => {
@@ -55,7 +84,12 @@ export default function AddCareerDataPage() {
         }),
       });
 
-      if (!res.ok) throw new Error('Failed to save profile');
+      if (!res.ok) {
+        // Surface the server's machine-readable reason instead of a blind generic failure.
+        const detail = await res.json().catch(() => null);
+        const reason = detail?.error || detail?.code || `HTTP ${res.status}`;
+        throw new Error(`Couldn't save your career profile (${reason}). Please try again.`);
+      }
       setMessage({ type: 'success', text: 'Career profile saved successfully!' });
     } catch (err) {
       setMessage({ type: 'error', text: (err as Error).message });
