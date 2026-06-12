@@ -109,14 +109,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create scenario' }, { status: 500 });
     }
 
-    // Create initial version (v1)
+    // Create initial version (v1). Columns per migration 005: version_label (NOT name) and
+    // inputs_hash is NOT NULL with no default — an empty-input version hashes to a stable sentinel.
+    // version_number is assigned by the increment_scenario_version_number BEFORE-INSERT trigger.
     const { data: version, error: versionError } = await (supabaseAdmin as any)
       .from('scenario_versions')
       .insert({
         scenario_id: scenario.id,
         user_id: userId,
         version_number: 1,
-        name: 'Initial version',
+        version_label: 'Initial version',
+        inputs_hash: 'empty',
       })
       .select()
       .single();

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { safeApiError } from '@/lib/security/safe-error';
 import { recordUserEvent } from '@/lib/analytics/events';
+import { updateGoal } from '@/lib/services/goalsService';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,23 +42,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
     const body = await request.json();
-    const { id: _id, user_id: _uid, created_at: _ca, ...updateData } = body;
 
-    const { data: goal, error } = await (supabase as any)
-      .from('goals')
-      .update({ ...updateData, updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .eq('user_id', user.id)
-      .select()
-      .single();
-
-    if (error) return safeApiError({ code: 'validation_failed', internal: error });
+    let goal;
+    try {
+      // updateGoal aliases + whitelists the payload onto real public.goals columns and stamps
+      // updated_at; it scopes the write to (id, user_id) so RLS + ownership both hold.
+      goal = await updateGoal(supabase, user.id, id, body);
+    } catch (dbErr: any) {
+      return safeApiError({
+        code: 'db_persistence_error',
+        internal: dbErr,
+        context: { route: 'PUT /api/goals/[id]', table: 'public.goals' },
+      });
+    }
     if (!goal) return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
 
     await recordUserEvent(supabase, {
       user_id: user.id,
       event_type: 'goal_updated',
-      event_metadata: { fields: Object.keys(updateData) },
+      event_metadata: { fields: Object.keys(body || {}) },
       subject_kind: 'goal',
       subject_id: id,
     });

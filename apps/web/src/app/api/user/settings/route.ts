@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { safeApiError } from '@/lib/security/safe-error';
+import {
+  toProfilePrefsRow,
+  upsertUserPreferences,
+  getUserPreferences,
+  preferencesToApiShape,
+} from '@/lib/services/settingsService';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,15 +25,14 @@ export async function GET() {
     .eq('id', user.id)
     .single();
 
-  return NextResponse.json({
-    theme: profile?.theme || 'system',
-    language: profile?.locale?.split('-')[0] || 'en',
-    currency: 'USD',
-    notificationsEnabled: true,
-    dashboardLayout: 'default',
-    timeFormat: '12h',
-    dateFormat: 'MM/DD/YYYY',
-  });
+  let prefs: Record<string, unknown> | null = null;
+  try {
+    prefs = await getUserPreferences(supabase, user.id);
+  } catch {
+    prefs = null;
+  }
+
+  return NextResponse.json(preferencesToApiShape(profile ?? null, prefs));
 }
 
 export async function PUT(request: NextRequest) {
@@ -41,17 +46,43 @@ export async function PUT(request: NextRequest) {
 
   const body = await request.json();
 
-  const updates: Record<string, unknown> = {
-    theme: body.theme || 'system',
-    updated_at: new Date().toISOString(),
-  };
-  if (body.language) {
-    updates.locale = `${body.language}-US`;
+  // 1) Display preferences -> public.profiles (theme/locale/timezone) via whitelist mapper.
+  const profileRow = toProfilePrefsRow(body);
+  const { error: profileError } = await (supabase as any)
+    .from('profiles')
+    .update(profileRow)
+    .eq('id', user.id);
+  if (profileError) {
+    return safeApiError({
+      code: 'db_persistence_error',
+      internal: profileError,
+      context: { route: 'PUT /api/user/settings', table: 'public.profiles' },
+    });
   }
 
-  const { error } = await (supabase as any).from('profiles').update(updates).eq('id', user.id);
+  // 2) Notification + dashboard preferences -> public.user_preferences via whitelist mapper.
+  try {
+    await upsertUserPreferences(supabase, user.id, body);
+  } catch (prefError) {
+    return safeApiError({
+      code: 'db_persistence_error',
+      internal: prefError,
+      context: { route: 'PUT /api/user/settings', table: 'public.user_preferences' },
+    });
+  }
 
-  if (error) return safeApiError({ code: 'validation_failed', internal: error });
+  // 3) Return the freshly persisted, friendly shape so the client round-trips correctly.
+  const { data: profile } = await (supabase as any)
+    .from('profiles')
+    .select('theme, locale, timezone')
+    .eq('id', user.id)
+    .single();
+  let prefs: Record<string, unknown> | null = null;
+  try {
+    prefs = await getUserPreferences(supabase, user.id);
+  } catch {
+    prefs = null;
+  }
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, ...preferencesToApiShape(profile ?? null, prefs) });
 }

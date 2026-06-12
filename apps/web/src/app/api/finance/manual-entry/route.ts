@@ -9,7 +9,14 @@ import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
-const TYPES: FinanceEntryType[] = ['account', 'transaction', 'investment', 'debt'];
+const TYPES: FinanceEntryType[] = [
+  'account',
+  'transaction',
+  'investment',
+  'debt',
+  'asset',
+  'retirement',
+];
 
 // POST { type, data } — save a manual finance entry to the user's finance.* tables (RLS-scoped).
 export async function POST(request: NextRequest) {

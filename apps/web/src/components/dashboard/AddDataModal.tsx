@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useRef, useCallback, useState, useEffect } from 'react';
+import { Fragment, useRef, useCallback, useState, useEffect, type FormEvent } from 'react';
 import { Dialog, Transition } from '@headlessui/react';
 import Link from 'next/link';
 import { useFileUpload, UPLOAD_CONFIGS, type UploadDomain } from '@/lib/hooks/useFileUpload';
@@ -9,6 +9,275 @@ interface AddDataModalProps {
   isOpen: boolean;
   onClose: () => void;
   domain: 'financial' | 'health' | 'career' | 'education';
+  /** Called after a successful manual save so the parent can refresh its data. */
+  onSaved?: () => void;
+}
+
+/**
+ * Inline manual-entry field definitions, per domain.
+ *
+ * Each field's `name` is the FRIENDLY form key. The per-domain `buildPayload()` below maps these friendly
+ * keys to the EXACT shape each endpoint/service expects (alias mapping lives server-side in the *Service
+ * files; here we only need to send the friendly keys those mappers already understand):
+ *   - financial -> POST /api/finance/manual-entry  body { type:'account', data:{ name,type,institution,balance } }
+ *       (financeService.mapEntry maps name->account_name, type->account_type, institution->institution_name,
+ *        balance->current_balance)
+ *   - career    -> PUT  /api/career/profile        body { title, company, industry, ... }
+ *       (careerService.toProfileRow aliases title->current_title, company->current_company, ...)
+ *   - education -> POST /api/education/records      body { institution, degree_type, field_of_study, ... }
+ *       (educationService.toRecordRow aliases institution->institution_name)
+ *   - health    -> GATED (no write path); the manual form is not rendered for health.
+ */
+type FieldDef = {
+  name: string;
+  label: string;
+  type?: 'text' | 'number' | 'date' | 'select';
+  required?: boolean;
+  placeholder?: string;
+  options?: { value: string; label: string }[];
+};
+
+const manualForms: Record<
+  'financial' | 'career' | 'education',
+  { heading: string; fields: FieldDef[] }
+> = {
+  financial: {
+    heading: 'Add an account',
+    fields: [
+      { name: 'name', label: 'Account name', required: true, placeholder: 'e.g. Chase Checking' },
+      {
+        name: 'type',
+        label: 'Account type',
+        type: 'select',
+        options: [
+          { value: 'checking', label: 'Checking' },
+          { value: 'savings', label: 'Savings' },
+          { value: 'investment', label: 'Investment' },
+          { value: 'credit_card', label: 'Credit card' },
+          { value: 'loan', label: 'Loan' },
+        ],
+      },
+      { name: 'institution', label: 'Institution', placeholder: 'e.g. Chase' },
+      { name: 'balance', label: 'Current balance', type: 'number', placeholder: '0.00' },
+    ],
+  },
+  career: {
+    heading: 'Update your career profile',
+    fields: [
+      { name: 'title', label: 'Current title', placeholder: 'e.g. Software Engineer' },
+      { name: 'company', label: 'Current company', placeholder: 'e.g. Acme Inc' },
+      { name: 'industry', label: 'Industry', placeholder: 'e.g. Technology' },
+      {
+        name: 'years_of_experience',
+        label: 'Years of experience',
+        type: 'number',
+        placeholder: 'e.g. 5',
+      },
+      { name: 'desired_title', label: 'Desired title', placeholder: 'e.g. Staff Engineer' },
+    ],
+  },
+  education: {
+    heading: 'Add an education record',
+    fields: [
+      {
+        name: 'institution',
+        label: 'Institution',
+        required: true,
+        placeholder: 'e.g. State University',
+      },
+      { name: 'degree_type', label: 'Degree', placeholder: 'e.g. Bachelor of Science' },
+      { name: 'field_of_study', label: 'Field of study', placeholder: 'e.g. Computer Science' },
+      { name: 'gpa', label: 'GPA', type: 'number', placeholder: 'e.g. 3.8' },
+      { name: 'graduation_date', label: 'Graduation date', type: 'date' },
+    ],
+  },
+};
+
+// Map a domain to { endpoint, method, build } so the form posts the EXACT shape each service expects.
+function manualEntryRequest(
+  domain: 'financial' | 'career' | 'education',
+  values: Record<string, string>
+): { endpoint: string; method: 'POST' | 'PUT'; body: unknown } {
+  switch (domain) {
+    case 'financial':
+      // financeService expects { type, data }; an account feeds the net-worth resolver.
+      return {
+        endpoint: '/api/finance/manual-entry',
+        method: 'POST',
+        body: {
+          type: 'account',
+          data: {
+            name: values.name,
+            type: values.type || 'checking',
+            institution: values.institution,
+            balance: values.balance,
+          },
+        },
+      };
+    case 'career':
+      // careerService.upsertCareerProfile takes the friendly profile object directly.
+      return {
+        endpoint: '/api/career/profile',
+        method: 'PUT',
+        body: {
+          title: values.title,
+          company: values.company,
+          industry: values.industry,
+          years_of_experience: values.years_of_experience,
+          desired_title: values.desired_title,
+        },
+      };
+    case 'education':
+      // educationService.createRecord takes the friendly record object (institution is aliased).
+      return {
+        endpoint: '/api/education/records',
+        method: 'POST',
+        body: {
+          institution: values.institution,
+          degree_type: values.degree_type,
+          field_of_study: values.field_of_study,
+          gpa: values.gpa,
+          graduation_date: values.graduation_date,
+        },
+      };
+  }
+}
+
+const GENERIC_SAVE_ERROR = "We couldn't save this yet. Please check required fields and try again.";
+
+/**
+ * Inline manual-entry form. Posts the correctly-shaped payload to the domain's working endpoint, surfaces
+ * the server's real reason on failure, and calls onSaved + onClose on success.
+ */
+function ManualEntryForm({
+  domain,
+  colors,
+  onSaved,
+  onClose,
+}: {
+  domain: 'financial' | 'career' | 'education';
+  colors: (typeof colorClasses)[keyof typeof colorClasses];
+  onSaved?: () => void;
+  onClose: () => void;
+}) {
+  const form = manualForms[domain];
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Reset state when the domain changes (modal reused across domains).
+  useEffect(() => {
+    setValues({});
+    setError(null);
+    setSaving(false);
+  }, [domain]);
+
+  const setField = useCallback((name: string, value: string) => {
+    setValues((prev) => ({ ...prev, [name]: value }));
+  }, []);
+
+  const handleSubmit = useCallback(
+    async (e: FormEvent) => {
+      e.preventDefault();
+      setError(null);
+
+      // Client-side required-field check (mirrors the server's NOT NULL columns).
+      const missing = form.fields.filter((f) => f.required && !values[f.name]?.trim());
+      if (missing.length > 0) {
+        setError(GENERIC_SAVE_ERROR);
+        return;
+      }
+
+      setSaving(true);
+      try {
+        const { endpoint, method, body } = manualEntryRequest(domain, values);
+        const res = await fetch(endpoint, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+          // Surface the server's machine-readable reason, not a blanket failure.
+          let serverMsg: string | null = null;
+          try {
+            const data = await res.json();
+            serverMsg = data?.message || data?.error || null;
+          } catch {
+            /* non-JSON error body */
+          }
+          setError(serverMsg || GENERIC_SAVE_ERROR);
+          return;
+        }
+
+        // Success — refresh parent and close.
+        onSaved?.();
+        onClose();
+      } catch {
+        setError(GENERIC_SAVE_ERROR);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [domain, form.fields, values, onSaved, onClose]
+  );
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {form.fields.map((field) => (
+          <div key={field.name} className={field.type === 'select' ? 'md:col-span-2' : ''}>
+            <label
+              htmlFor={`manual-${field.name}`}
+              className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              {field.label}
+              {field.required && <span className="text-red-500 ml-0.5">*</span>}
+            </label>
+            {field.type === 'select' ? (
+              <select
+                id={`manual-${field.name}`}
+                value={values[field.name] ?? ''}
+                onChange={(e) => setField(field.name, e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              >
+                {(field.options ?? []).map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                id={`manual-${field.name}`}
+                type={field.type ?? 'text'}
+                inputMode={field.type === 'number' ? 'decimal' : undefined}
+                step={field.type === 'number' ? 'any' : undefined}
+                value={values[field.name] ?? ''}
+                placeholder={field.placeholder}
+                onChange={(e) => setField(field.name, e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {error && (
+        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={saving}
+        className={`flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white ${colors.bg} rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed`}
+      >
+        {saving ? 'Saving…' : 'Save'}
+      </button>
+    </form>
+  );
 }
 
 const domainConfig = {
@@ -17,7 +286,12 @@ const domainConfig = {
     color: 'green',
     integrations: [
       { name: 'Plaid', description: 'Connect your bank accounts', icon: '🏦', provider: 'plaid' },
-      { name: 'QuickBooks', description: 'Sync with QuickBooks', icon: '📊', provider: 'quickbooks' },
+      {
+        name: 'QuickBooks',
+        description: 'Sync with QuickBooks',
+        icon: '📊',
+        provider: 'quickbooks',
+      },
       { name: 'YNAB', description: 'Import from You Need A Budget', icon: '💰', provider: 'ynab' },
     ],
     uploadFormats: ['CSV', 'Excel', 'QFX', 'OFX'],
@@ -27,7 +301,12 @@ const domainConfig = {
     title: 'Add Health Data',
     color: 'red',
     integrations: [
-      { name: 'Apple Health', description: 'Sync with Apple Health', icon: '🍎', provider: 'apple_health' },
+      {
+        name: 'Apple Health',
+        description: 'Sync with Apple Health',
+        icon: '🍎',
+        provider: 'apple_health',
+      },
       { name: 'Google Fit', description: 'Connect Google Fit', icon: '💪', provider: 'google_fit' },
       { name: 'MyChart', description: 'Import medical records', icon: '🏥', provider: 'mychart' },
     ],
@@ -38,7 +317,12 @@ const domainConfig = {
     title: 'Add Career Data',
     color: 'blue',
     integrations: [
-      { name: 'LinkedIn', description: 'Import LinkedIn profile', icon: '💼', provider: 'linkedin' },
+      {
+        name: 'LinkedIn',
+        description: 'Import LinkedIn profile',
+        icon: '💼',
+        provider: 'linkedin',
+      },
       { name: 'Indeed', description: 'Sync job applications', icon: '📝', provider: 'indeed' },
       { name: 'Glassdoor', description: 'Connect Glassdoor', icon: '🔍', provider: 'glassdoor' },
     ],
@@ -49,9 +333,19 @@ const domainConfig = {
     title: 'Add Education Data',
     color: 'indigo',
     integrations: [
-      { name: 'Coursera', description: 'Import Coursera courses', icon: '🎓', provider: 'coursera' },
+      {
+        name: 'Coursera',
+        description: 'Import Coursera courses',
+        icon: '🎓',
+        provider: 'coursera',
+      },
       { name: 'Udemy', description: 'Sync Udemy progress', icon: '📚', provider: 'udemy' },
-      { name: 'LinkedIn Learning', description: 'Connect LinkedIn Learning', icon: '🎯', provider: 'linkedin_learning' },
+      {
+        name: 'LinkedIn Learning',
+        description: 'Connect LinkedIn Learning',
+        icon: '🎯',
+        provider: 'linkedin_learning',
+      },
     ],
     uploadFormats: ['CSV', 'PDF', 'JSON'],
     manualInputPath: '/dashboard/education/add',
@@ -102,7 +396,7 @@ function IntegrationButton({
   onConnect,
 }: {
   integration: { name: string; description: string; icon: string; provider: string };
-  colors: typeof colorClasses[keyof typeof colorClasses];
+  colors: (typeof colorClasses)[keyof typeof colorClasses];
   onConnect: (provider: string) => void;
 }) {
   return (
@@ -112,12 +406,8 @@ function IntegrationButton({
     >
       <span className="text-2xl mr-3">{integration.icon}</span>
       <div className="text-left">
-        <p className="text-sm font-medium text-gray-900 dark:text-white">
-          {integration.name}
-        </p>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          {integration.description}
-        </p>
+        <p className="text-sm font-medium text-gray-900 dark:text-white">{integration.name}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">{integration.description}</p>
       </div>
     </button>
   );
@@ -132,7 +422,7 @@ function UploadDropzone({
   onUploadSuccess,
 }: {
   domain: UploadDomain;
-  colors: typeof colorClasses[keyof typeof colorClasses];
+  colors: (typeof colorClasses)[keyof typeof colorClasses];
   onUploadSuccess?: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -193,9 +483,10 @@ function UploadDropzone({
         disabled={isUploading}
         className={`
           w-full p-6 border-2 border-dashed rounded-lg transition-all cursor-pointer
-          ${isDragOver
-            ? `${colors.border} ${colors.hoverBg}`
-            : 'border-gray-300 dark:border-gray-600'
+          ${
+            isDragOver
+              ? `${colors.border} ${colors.hoverBg}`
+              : 'border-gray-300 dark:border-gray-600'
           }
           ${!isUploading && !isDragOver ? `${colors.hoverBg} ${colors.hoverBorder}` : ''}
           ${isUploading ? 'cursor-not-allowed opacity-75' : ''}
@@ -206,16 +497,47 @@ function UploadDropzone({
         <div className="flex flex-col items-center">
           {/* Icon */}
           {isSuccess ? (
-            <svg className="w-10 h-10 text-green-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            <svg
+              className="w-10 h-10 text-green-500 mb-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M5 13l4 4L19 7"
+              />
             </svg>
           ) : isError ? (
-            <svg className="w-10 h-10 text-red-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-10 h-10 text-red-500 mb-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           ) : isUploading ? (
-            <svg className="w-10 h-10 text-gray-400 mb-3 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <svg
+              className="w-10 h-10 text-gray-400 mb-3 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
               <path
                 className="opacity-75"
                 fill="currentColor"
@@ -223,7 +545,12 @@ function UploadDropzone({
               />
             </svg>
           ) : (
-            <svg className="w-10 h-10 text-gray-400 dark:text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg
+              className="w-10 h-10 text-gray-400 dark:text-gray-500 mb-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -239,18 +566,12 @@ function UploadDropzone({
               <p className="text-sm font-medium text-green-600 dark:text-green-400">
                 Upload complete!
               </p>
-              <p className="text-xs text-green-500 dark:text-green-400 mt-1">
-                {state.file?.name}
-              </p>
+              <p className="text-xs text-green-500 dark:text-green-400 mt-1">{state.file?.name}</p>
             </div>
           ) : isError ? (
             <div className="text-center">
-              <p className="text-sm font-medium text-red-600 dark:text-red-400">
-                Upload failed
-              </p>
-              <p className="text-xs text-red-500 dark:text-red-400 mt-1">
-                {state.error}
-              </p>
+              <p className="text-sm font-medium text-red-600 dark:text-red-400">Upload failed</p>
+              <p className="text-xs text-red-500 dark:text-red-400 mt-1">{state.error}</p>
             </div>
           ) : isUploading ? (
             <div className="text-center w-full">
@@ -310,42 +631,50 @@ function UploadDropzone({
 /**
  * Main AddDataModal component
  */
-export default function AddDataModal({ isOpen, onClose, domain }: AddDataModalProps) {
+export default function AddDataModal({ isOpen, onClose, domain, onSaved }: AddDataModalProps) {
   const config = domainConfig[domain];
   const colors = colorClasses[config.color as keyof typeof colorClasses];
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
 
-  const handleIntegrationConnect = useCallback(async (provider: string) => {
-    setConnectingProvider(provider);
+  // Health has no manual write path (the domain is gated). Every other domain renders an inline form that
+  // posts to its working endpoint; financial/career/education are wired in ManualEntryForm.
+  const manualDomain =
+    domain === 'financial' || domain === 'career' || domain === 'education' ? domain : null;
 
-    try {
-      // Initiate OAuth flow or integration connection
-      const response = await fetch(`/api/integrations/${domain}/connect`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider }),
-      });
+  const handleIntegrationConnect = useCallback(
+    async (provider: string) => {
+      setConnectingProvider(provider);
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.authUrl) {
-          // Redirect to OAuth
-          window.location.href = data.authUrl;
+      try {
+        // Initiate OAuth flow or integration connection
+        const response = await fetch(`/api/integrations/${domain}/connect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.authUrl) {
+            // Redirect to OAuth
+            window.location.href = data.authUrl;
+          } else {
+            // Show success or next steps
+            alert(`Successfully initiated connection to ${provider}`);
+          }
         } else {
-          // Show success or next steps
-          alert(`Successfully initiated connection to ${provider}`);
+          const error = await response.json();
+          alert(error.message || 'Failed to connect integration');
         }
-      } else {
-        const error = await response.json();
-        alert(error.message || 'Failed to connect integration');
+      } catch (error) {
+        console.error('Integration connection error:', error);
+        alert('Failed to connect. Please try again.');
+      } finally {
+        setConnectingProvider(null);
       }
-    } catch (error) {
-      console.error('Integration connection error:', error);
-      alert('Failed to connect. Please try again.');
-    } finally {
-      setConnectingProvider(null);
-    }
-  }, [domain]);
+    },
+    [domain]
+  );
 
   const handleUploadSuccess = useCallback(() => {
     // Could close modal or show success message
@@ -413,9 +742,24 @@ export default function AddDataModal({ isOpen, onClose, domain }: AddDataModalPr
                           />
                           {connectingProvider === integration.provider && (
                             <div className="absolute inset-0 bg-white/75 dark:bg-gray-800/75 rounded-lg flex items-center justify-center">
-                              <svg className="w-6 h-6 animate-spin text-gray-500" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              <svg
+                                className="w-6 h-6 animate-spin text-gray-500"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                />
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                                />
                               </svg>
                             </div>
                           )}
@@ -451,16 +795,28 @@ export default function AddDataModal({ isOpen, onClose, domain }: AddDataModalPr
                           Manual Input
                         </h4>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          Enter your data manually using our form
+                          {manualDomain
+                            ? manualForms[manualDomain].heading
+                            : 'Enter your data manually using our form'}
                         </p>
                       </div>
                     </div>
-                    <Link
-                      href={config.manualInputPath}
-                      className={`flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white ${colors.bg} rounded-lg transition-colors`}
-                    >
-                      Start Manual Entry
-                    </Link>
+                    {manualDomain ? (
+                      <ManualEntryForm
+                        domain={manualDomain}
+                        colors={colors}
+                        onSaved={onSaved}
+                        onClose={onClose}
+                      />
+                    ) : (
+                      // Health is gated — no inline write path. Link to the full page (also gated) instead.
+                      <Link
+                        href={config.manualInputPath}
+                        className={`flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-white ${colors.bg} rounded-lg transition-colors`}
+                      >
+                        Start Manual Entry
+                      </Link>
+                    )}
                   </div>
                 </div>
 

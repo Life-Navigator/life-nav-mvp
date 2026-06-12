@@ -95,7 +95,61 @@ export async function deleteRecord(supabase: SB, userId: string, id: string) {
   if (error) throw error;
 }
 
-// ── Courses ─────────────────────────────────────────────────────────────
+// ── Courses (also backs Certifications) ─────────────────────────────────
+// Real columns on public.courses (migration 033). The Add-Course and Add-Certification forms send
+// friendly names (title, certificateUrl, certificateDate, skills, completed_at, platform) that are NOT
+// real columns — the column is `course_name` (NOT NULL), the date is `completion_date`, and there is no
+// `title`/`platform`/`completed_at` column. Sending those raw produced a PGRST204 "Failed to save".
+const COURSE_COLUMNS = new Set([
+  'course_name',
+  'provider',
+  'instructor',
+  'url',
+  'duration_hours',
+  'level',
+  'status',
+  'progress_percent',
+  'rating',
+  'certificate_url',
+  'skills_learned',
+  'start_date',
+  'completion_date',
+  'cost',
+  'notes',
+]);
+
+// Friendly form field → real column.
+const COURSE_ALIASES: Record<string, string> = {
+  title: 'course_name',
+  name: 'course_name',
+  certificateUrl: 'certificate_url',
+  certificate_url: 'certificate_url',
+  certificateDate: 'completion_date',
+  completed_at: 'completion_date',
+  completedAt: 'completion_date',
+  skills: 'skills_learned',
+};
+
+const COURSE_NUMERIC = new Set(['duration_hours', 'progress_percent', 'rating', 'cost']);
+
+export function toCourseRow(body: Record<string, unknown>): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(body || {})) {
+    if (value === undefined) continue;
+    if (key === 'user_id' || key === 'id') continue; // user_id is stamped from the session
+    const col = COURSE_ALIASES[key] ?? key;
+    if (!COURSE_COLUMNS.has(col)) continue; // drop stray keys (platform, credentialId, …)
+    if (value === '') {
+      row[col] = null; // '' → null so NUMERIC/DATE casts don't fail
+    } else if (COURSE_NUMERIC.has(col)) {
+      const n = Number(value);
+      row[col] = Number.isNaN(n) ? null : n;
+    } else {
+      row[col] = value;
+    }
+  }
+  return row;
+}
 
 export async function listCourses(supabase: SB, userId: string) {
   const { data, error } = await supabase
@@ -121,9 +175,11 @@ export async function getCourse(supabase: SB, userId: string, id: string) {
 }
 
 export async function createCourse(supabase: SB, userId: string, course: Record<string, unknown>) {
+  const row = toCourseRow(course);
+  if (!row.course_name) throw new Error('course_name (title) is required');
   const { data, error } = await supabase
     .from('courses')
-    .insert({ ...course, user_id: userId })
+    .insert({ ...row, user_id: userId })
     .select()
     .single();
 
@@ -139,7 +195,7 @@ export async function updateCourse(
 ) {
   const { data, error } = await supabase
     .from('courses')
-    .update(updates)
+    .update(toCourseRow(updates))
     .eq('user_id', userId)
     .eq('id', id)
     .select()
@@ -158,13 +214,14 @@ export async function deleteCourse(supabase: SB, userId: string, id: string) {
 // ── Certifications (completed courses with certificate_url) ─────────────
 
 export async function listCertifications(supabase: SB, userId: string) {
+  // A certification = a completed course. We intentionally do NOT require certificate_url (a user can
+  // record a cert without a public link) — completion_date is the canonical real column to sort by.
   const { data, error } = await supabase
     .from('courses')
     .select('*')
     .eq('user_id', userId)
     .eq('status', 'completed')
-    .not('certificate_url', 'is', null)
-    .order('completed_at', { ascending: false });
+    .order('completion_date', { ascending: false, nullsFirst: false });
 
   if (error) throw error;
   return data ?? [];
@@ -173,14 +230,15 @@ export async function listCertifications(supabase: SB, userId: string) {
 export function mapCourseToCertification(course: Record<string, any>) {
   return {
     id: course.id,
-    title: course.title,
+    // `course_name` is the real column; `title` never existed.
+    title: course.course_name,
     provider: course.provider || 'Unknown',
-    platform: course.platform || null,
+    platform: null, // no platform column on courses
     certificateUrl: course.certificate_url || null,
-    certificateDate: course.completed_at || course.created_at,
+    certificateDate: course.completion_date || course.created_at,
     skills: course.skills_learned || [],
     status: course.status,
-    completedAt: course.completed_at,
+    completedAt: course.completion_date,
     isStandalone: false,
     source: course.provider || 'manual',
   };
@@ -198,7 +256,7 @@ export function computeCertificationStats(certifications: Record<string, any>[])
   }
 
   const thisYear = certifications.filter((c) => {
-    const d = c.completed_at || c.created_at;
+    const d = c.completion_date || c.created_at;
     return d && new Date(d).getFullYear() === currentYear;
   }).length;
 

@@ -153,8 +153,19 @@ export default function PreferencesPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update settings');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message ||
+            errorData.error ||
+            "We couldn't save this yet. Please check required fields and try again."
+        );
+      }
+
+      // Adopt the server's persisted shape so the UI round-trips exactly what was saved.
+      const saved = await response.json().catch(() => null);
+      if (saved) {
+        setSettings((prev) => ({ ...prev, ...saved }));
+        if (saved.theme) setTheme(saved.theme);
       }
 
       toast({
@@ -164,10 +175,14 @@ export default function PreferencesPage() {
       });
     } catch (error) {
       console.error('Error updating settings:', error);
-      setError('Failed to update settings. Please try again.');
+      const msg =
+        error instanceof Error
+          ? error.message
+          : "We couldn't save this yet. Please check required fields and try again.";
+      setError(msg);
       toast({
         title: 'Update Failed',
-        description: 'There was an error updating your preferences.',
+        description: msg,
         type: 'error',
       });
     } finally {

@@ -82,12 +82,15 @@ export default function AddFinancialDataPage() {
         router.push('/dashboard/finance');
       } else {
         const errorData = await response.json().catch(() => null);
-        const reason = errorData?.error || errorData?.code || `HTTP ${response.status}`;
-        setError(`Couldn't save your financial data (${reason}). Please try again.`);
+        const reason =
+          errorData?.message || errorData?.error || errorData?.code || `HTTP ${response.status}`;
+        setError(
+          `We couldn't save this yet. Please check required fields and try again. (${reason})`
+        );
       }
     } catch (err) {
       console.error('Error adding financial data:', err);
-      setError('Failed to add financial data. Please try again.');
+      setError("We couldn't save this yet. Please check required fields and try again.");
     } finally {
       setLoading(false);
     }
@@ -283,22 +286,163 @@ export default function AddFinancialDataPage() {
               </>
             )}
 
-            {/* Add similar forms for investment and debt */}
             {dataType === 'investment' && (
-              <div className="text-center py-8">
-                <p className="text-gray-600 dark:text-gray-400">
-                  Investment entry form coming soon. For now, use the integrations to connect your
-                  brokerage account.
-                </p>
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Symbol / Ticker
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={investmentData.symbol}
+                      onChange={(e) =>
+                        setInvestmentData({ ...investmentData, symbol: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="e.g., AAPL"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={investmentData.name}
+                      onChange={(e) =>
+                        setInvestmentData({ ...investmentData, name: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="e.g., Apple Inc"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Shares
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      required
+                      value={investmentData.shares}
+                      onChange={(e) =>
+                        setInvestmentData({ ...investmentData, shares: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Cost / Share
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={investmentData.purchasePrice}
+                      onChange={(e) =>
+                        setInvestmentData({ ...investmentData, purchasePrice: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Current Price
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={investmentData.currentPrice}
+                      onChange={(e) =>
+                        setInvestmentData({ ...investmentData, currentPrice: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Purchase Date
+                  </label>
+                  <input
+                    type="date"
+                    value={investmentData.purchaseDate}
+                    onChange={(e) =>
+                      setInvestmentData({ ...investmentData, purchaseDate: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+              </>
             )}
 
             {dataType === 'debt' && (
-              <div className="text-center py-8">
-                <p className="text-gray-600 dark:text-gray-400">
-                  Debt entry form coming soon. For now, add debts as credit card or loan accounts.
-                </p>
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Debt Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={debtData.name}
+                    onChange={(e) => setDebtData({ ...debtData, name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="e.g., Visa Credit Card"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Debt Type
+                  </label>
+                  <select
+                    value={debtData.type}
+                    onChange={(e) => setDebtData({ ...debtData, type: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="credit_card">Credit Card</option>
+                    <option value="loan">Loan</option>
+                    <option value="mortgage">Mortgage</option>
+                    <option value="student_loan">Student Loan</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Current Balance
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={debtData.balance}
+                      onChange={(e) => setDebtData({ ...debtData, balance: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Interest Rate (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={debtData.interestRate}
+                      onChange={(e) => setDebtData({ ...debtData, interestRate: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
             {/* Submit Button */}
@@ -312,7 +456,7 @@ export default function AddFinancialDataPage() {
               </button>
               <button
                 type="submit"
-                disabled={loading || dataType === 'investment' || dataType === 'debt'}
+                disabled={loading}
                 className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Adding...' : 'Add Data'}

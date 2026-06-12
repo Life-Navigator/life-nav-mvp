@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserIdFromJWT } from '@/lib/auth/jwt';
 import { supabaseAdmin, createAuditLog } from '@/lib/scenario-lab/supabase-client';
-import { createInputSchema } from '@/lib/scenario-lab/validation';
+import { scenarioInputDataSchema } from '@/lib/scenario-lab/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,11 +44,11 @@ export async function GET(
       return NextResponse.json({ error: 'Version not found' }, { status: 404 });
     }
 
-    // Fetch inputs
+    // Fetch inputs (column is scenario_version_id per migration 005, not version_id)
     const { data: inputs, error: inputsError } = await (supabaseAdmin as any)
       .from('scenario_inputs')
       .select('*')
-      .eq('version_id', versionId)
+      .eq('scenario_version_id', versionId)
       .order('created_at', { ascending: true });
 
     if (inputsError) {
@@ -120,7 +120,7 @@ export async function POST(
 
     const validatedInputs = [];
     for (const input of body.inputs) {
-      const validation = createInputSchema.safeParse(input);
+      const validation = scenarioInputDataSchema.safeParse(input);
       if (!validation.success) {
         return NextResponse.json(
           { error: 'Validation failed', details: validation.error.errors },
@@ -130,31 +130,26 @@ export async function POST(
       validatedInputs.push(validation.data);
     }
 
-    // Delete existing inputs for these goal_id + field_name combinations
-    const deleteConditions = validatedInputs.map((input) => ({
-      goal_id: input.goal_id,
-      field_name: input.field_name,
-    }));
-
-    for (const condition of deleteConditions) {
+    // Delete existing manual inputs for these input_key values (UNIQUE is
+    // scenario_version_id + input_key + source_type).
+    for (const input of validatedInputs) {
       await (supabaseAdmin as any)
         .from('scenario_inputs')
         .delete()
-        .eq('version_id', versionId)
-        .eq('goal_id', condition.goal_id)
-        .eq('field_name', condition.field_name);
+        .eq('scenario_version_id', versionId)
+        .eq('input_key', input.input_key)
+        .eq('source_type', 'manual');
     }
 
-    // Insert new inputs
+    // Insert new inputs — column names match public.scenario_inputs (migration 005).
     const inputsToInsert = validatedInputs.map((input) => ({
-      version_id: versionId,
+      scenario_version_id: versionId,
       user_id: userId,
-      goal_id: input.goal_id,
-      field_name: input.field_name,
-      field_value: input.field_value,
-      field_type: input.field_type || 'text',
-      source: input.source || 'manual',
-      confidence: input.confidence || 1.0,
+      source_type: 'manual',
+      input_key: input.input_key,
+      input_value: input.input_value,
+      input_type: input.input_type,
+      unit: input.unit ?? null,
     }));
 
     const { data: insertedInputs, error: insertError } = await (supabaseAdmin as any)
@@ -238,7 +233,7 @@ export async function DELETE(
       .from('scenario_inputs')
       .delete()
       .eq('id', inputId)
-      .eq('version_id', versionId);
+      .eq('scenario_version_id', versionId);
 
     if (deleteError) {
       console.error('[API] Error deleting input:', deleteError);

@@ -528,10 +528,19 @@ export default function CertificationsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error('Failed to add certification');
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(
+          body.error || "We couldn't save this yet. Please check required fields and try again."
+        );
+      }
       await fetchCertifications();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add certification');
+      setError(
+        err instanceof Error
+          ? err.message
+          : "We couldn't save this yet. Please check required fields and try again."
+      );
     }
   };
 

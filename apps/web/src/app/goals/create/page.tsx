@@ -88,10 +88,23 @@ export default function MyBlocksGoalsPage() {
 
       if (response.ok) {
         const savedGoal = await response.json();
-        setGoals((prev) => [...prev, savedGoal.goal || newGoal]);
+        // Re-fetch so the timeline reflects the canonical DB row (mapped columns), not the
+        // client-only object. This proves persistence and reload in one step.
+        await fetchUserData();
+        return savedGoal.goal || newGoal;
       }
+
+      const err = await response.json().catch(() => null);
+      const reason =
+        err?.message ||
+        err?.error ||
+        "We couldn't save this yet. Please check required fields and try again.";
+      console.error('Goal create failed:', response.status, err);
+      alert(reason);
+      throw new Error(reason);
     } catch (error) {
       console.error('Failed to create goal:', error);
+      throw error;
     }
   };
 
@@ -105,7 +118,15 @@ export default function MyBlocksGoalsPage() {
 
       if (response.ok) {
         setGoals((prev) => prev.map((g) => (g.id === updatedGoal.id ? updatedGoal : g)));
+        return;
       }
+      const err = await response.json().catch(() => null);
+      const reason =
+        err?.message ||
+        err?.error ||
+        "We couldn't save this yet. Please check required fields and try again.";
+      console.error('Goal update failed:', response.status, err);
+      alert(reason);
     } catch (error) {
       console.error('Failed to update goal:', error);
     }

@@ -15,7 +15,24 @@ const str = (v: unknown): string | null => {
   return String(v);
 };
 
-export type FinanceEntryType = 'account' | 'transaction' | 'investment' | 'debt';
+export type FinanceEntryType =
+  | 'account'
+  | 'transaction'
+  | 'investment'
+  | 'debt'
+  | 'asset'
+  | 'retirement';
+
+// Normalize the various asset-type labels the UI sends into the canonical asset_type strings.
+const classifyAsset = (v: unknown): string => {
+  const s = String(v ?? '').toLowerCase();
+  if (['real_estate', 'home', 'property', 'realestate'].includes(s)) return 'real_estate';
+  if (['vehicle', 'auto', 'car'].includes(s)) return 'vehicle';
+  if (s === 'business') return 'business';
+  if (['collectible', 'collectibles'].includes(s)) return 'collectible';
+  if (['crypto', 'cryptocurrency'].includes(s)) return 'crypto';
+  return 'other';
+};
 
 // Each form type → { table, row } against the real finance schema.
 function mapEntry(
@@ -66,21 +83,57 @@ function mapEntry(
         },
       };
     case 'investment': {
-      const qty = num(d.shares);
+      // Friendly aliases: the Investments page sends ticker/costBasis; the /add page sends
+      // symbol/purchasePrice. Accept both → the REAL finance.investment_holdings columns.
+      const qty = num(d.shares ?? d.quantity);
       const price = num(d.currentPrice);
+      const symbol = str(d.symbol ?? d.ticker);
       return {
         table: 'investment_holdings',
         row: {
-          symbol: str(d.symbol),
+          symbol: symbol ? symbol.toUpperCase() : null,
           name: str(d.name),
           quantity: qty ?? 0,
-          cost_basis: num(d.purchasePrice),
+          cost_basis: num(d.purchasePrice ?? d.costBasis),
           current_price: price,
           current_value: qty != null && price != null ? qty * price : null,
+          asset_class: str(d.assetClass),
+          sector: str(d.sector),
           purchase_date: str(d.purchaseDate),
         },
       };
     }
+    case 'asset':
+      // Real non-account asset → finance.assets. Friendly aliases name/value/type.
+      return {
+        table: 'assets',
+        row: {
+          asset_name: str(d.name ?? d.assetName),
+          asset_type: classifyAsset(d.type ?? d.assetType),
+          current_value: num(d.value ?? d.currentValue) ?? 0,
+          purchase_price: num(d.purchasePrice),
+          purchase_date: str(d.purchaseDate),
+          description: str(d.description),
+          location: str(d.location),
+          metadata: { source: 'user_entered' },
+        },
+      };
+    case 'retirement':
+      // A retirement balance is modeled as a retirement-type financial account so it feeds the
+      // net-worth resolver's retirement bucket (one source of truth — no fake rows).
+      return {
+        table: 'financial_accounts',
+        row: {
+          account_name: str(d.name) || 'Retirement Account',
+          account_type: 'retirement',
+          institution_name: str(d.institution),
+          current_balance: num(d.balance) ?? 0,
+          currency: str(d.currency) || 'USD',
+          is_active: true,
+          is_manual: true,
+          metadata: { plan_type: str(d.planType) },
+        },
+      };
     default:
       throw new Error(`unknown finance entry type: ${type}`);
   }
@@ -110,7 +163,9 @@ export async function listFinanceEntries(supabase: SB, userId: string, type: Fin
       ? 'transactions'
       : type === 'investment'
         ? 'investment_holdings'
-        : 'financial_accounts';
+        : type === 'asset'
+          ? 'assets'
+          : 'financial_accounts'; // account | debt | retirement
   const { data, error } = await supabase
     .schema(SCHEMA)
     .from(table)
