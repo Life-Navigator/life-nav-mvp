@@ -448,7 +448,7 @@ const navigation = [
   { name: 'Home', href: '/dashboard', icon: HomeIcon, current: false, section: 'Core' },
   { name: 'My Life', href: '/dashboard/my-life', icon: CompassIcon, current: false },
   { name: 'Advisor', href: '/dashboard/advisor', icon: ChatIcon, current: false },
-  { name: 'Life Graph', href: '/dashboard/life-graph', icon: PuzzlePieceIcon, current: false },
+  { name: 'Life Graph', href: '/life-graph', icon: PuzzlePieceIcon, current: false },
   // ── Domains ──
   {
     name: 'Finance',
