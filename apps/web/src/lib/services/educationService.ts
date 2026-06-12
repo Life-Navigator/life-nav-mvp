@@ -1,5 +1,36 @@
 type SB = any;
 
+// Real columns on public.education_records (migration 033). Stray/mislabeled keys are dropped so a write
+// can never fail with "column does not exist".
+const RECORD_COLUMNS = new Set([
+  'institution_name',
+  'degree_type',
+  'field_of_study',
+  'gpa',
+  'start_date',
+  'end_date',
+  'graduation_date',
+  'is_current',
+  'status',
+  'achievements',
+  'metadata',
+]);
+
+// Friendly form field → real column. Root-cause fix: the Add Education form sends `institution`, but the
+// column is `institution_name` (NOT NULL) — the mismatch produced a PGRST204 "Failed to save record".
+const RECORD_ALIASES: Record<string, string> = { institution: 'institution_name' };
+
+function toRecordRow(body: Record<string, unknown>): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(body || {})) {
+    if (value === undefined) continue;
+    const col = RECORD_ALIASES[key] ?? key;
+    // empty string → null so NUMERIC/DATE columns (gpa, start_date…) don't fail their cast
+    if (RECORD_COLUMNS.has(col)) row[col] = value === '' ? null : value;
+  }
+  return row;
+}
+
 // ── Education Records ───────────────────────────────────────────────────
 
 export async function listRecords(supabase: SB, userId: string) {
@@ -28,7 +59,7 @@ export async function getRecord(supabase: SB, userId: string, id: string) {
 export async function createRecord(supabase: SB, userId: string, record: Record<string, unknown>) {
   const { data, error } = await supabase
     .from('education_records')
-    .insert({ ...record, user_id: userId })
+    .insert({ ...toRecordRow(record), user_id: userId })
     .select()
     .single();
 
@@ -44,7 +75,7 @@ export async function updateRecord(
 ) {
   const { data, error } = await supabase
     .from('education_records')
-    .update(updates)
+    .update(toRecordRow(updates))
     .eq('user_id', userId)
     .eq('id', id)
     .select()
