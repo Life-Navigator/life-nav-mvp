@@ -6,6 +6,8 @@ test ever touches a real downstream service.
 """
 from __future__ import annotations
 
+import os
+
 from fastapi import Depends
 
 from .agents.memory import MemoryAgent
@@ -261,6 +263,29 @@ def get_life_bridge(supabase: SupabaseClient = Depends(get_supabase)) -> LifeBri
 
 def get_relationship_manager(supabase: SupabaseClient = Depends(get_supabase)) -> RelationshipManager:
     return RelationshipManager(supabase, LifeDiscoveryService(supabase), LifeBridgeService(supabase, LifeDiscoveryService(supabase)))
+
+
+def get_advisor_orchestrator(
+    supabase: SupabaseClient = Depends(get_supabase),
+    rm: RelationshipManager = Depends(get_relationship_manager),
+    gemini: GeminiClient = Depends(get_gemini),
+) -> "AdvisorOrchestrator":
+    # Hybrid advisor: rules supply guardrails (classified facts, discovery scores, domain priorities,
+    # safety), the LLM leads the conversation within them, a validator gates the output. Env-flagged
+    # (default ON); falls back to pure rule-based automatically if Gemini is unavailable or output is
+    # rejected. The LLM never writes to the DB — persistence stays in the deterministic engine.
+    from .services.advisor_context import AdvisorContextBuilder
+    from .services.advisor_llm import GeminiAdvisorLLM
+    from .services.advisor_orchestrator import AdvisorOrchestrator
+    enabled = os.environ.get("ADVISOR_LLM_ENABLED", "true").lower() in ("1", "true", "yes")
+    # Per-domain discovery scores feed the LLM's question prioritisation. Built inline because
+    # get_discovery_coverage is defined later in this module (avoids a forward-ref NameError).
+    coverage = DiscoveryCoverageService(
+        LifeDiscoveryService(supabase), supabase,
+        FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)),
+    )
+    builder = AdvisorContextBuilder(supabase, coverage=coverage)
+    return AdvisorOrchestrator(rm, builder, GeminiAdvisorLLM(gemini), enabled=enabled)
 
 
 def get_recommendation_os(

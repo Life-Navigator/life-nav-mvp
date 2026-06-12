@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable, Optional
 
 import httpx
 
@@ -77,12 +77,16 @@ class GeminiClient:
             r.raise_for_status()
             return r.json()["embedding"]["values"]
 
-    async def generate(self, system_prompt: str, user_prompt: str) -> str:
+    async def generate(self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None) -> str:
         url = f"{GEMINI_BASE}/{self._generation_model}:generateContent?key={self._api_key}"
-        payload = {
+        payload: dict[str, Any] = {
             "systemInstruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
         }
+        # Advisor turns pin a low temperature for grounded, non-creative output; callers that omit it
+        # keep the model default (unchanged behaviour for every existing caller).
+        if temperature is not None:
+            payload["generationConfig"] = {"temperature": float(temperature)}
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             r = await _request_with_retry(lambda: client.post(url, json=payload), label="generate")
             r.raise_for_status()

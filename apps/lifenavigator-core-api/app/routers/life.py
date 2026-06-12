@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_discovery_coverage, get_life_bridge, get_life_discovery, get_my_life, get_relationship_manager
+from ..dependencies import authenticated, get_advisor_orchestrator, get_discovery_coverage, get_life_bridge, get_life_discovery, get_my_life, get_relationship_manager
 from ..models.common import UserContext
 from ..services.life_discovery import LifeDiscoveryService
 
@@ -79,10 +79,11 @@ async def discovery_answer(user: AuthenticatedUser = Depends(authenticated), svc
 
 
 @router.post("/discovery/chat")
-async def discovery_chat(user: AuthenticatedUser = Depends(authenticated), svc: RelationshipManager = Depends(get_relationship_manager),
+async def discovery_chat(user: AuthenticatedUser = Depends(authenticated), svc=Depends(get_advisor_orchestrator),
                          message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True)):
-    """Chat-native Relationship Manager: one advisor turn — answer the pending question (if any),
-    show what updated, reflect, and ask the next. The advisor IS the onboarding."""
+    """Chat-native hybrid advisor: one turn. The deterministic engine handles persistence + safety and
+    guarantees a fallback; the LLM leads the conversation within those guardrails (one strong question,
+    why it matters), gated by the output validator. The advisor IS the onboarding."""
     return await svc.converse(_ctx(user), message, pending_key or None)
 
 

@@ -1,0 +1,403 @@
+"""Hybrid Advisor Intelligence Layer — rules guide, the LLM leads, the validator gates.
+
+These tests prove the trust contract WITHOUT a live LLM:
+  * the context builder classifies facts and exposes discovery scores + the allowed-number guard,
+  * the constraint envelope never scripts the question (no ask/confirm/clarify mode) and forbids persistence,
+  * the validator rejects invented numbers / advice / medical-legal overreach and forces should_persist=False,
+  * the orchestrator always returns the deterministic result and only *replaces the text* on a valid LLM turn,
+    falling back cleanly on None / invalid / error,
+  * the 6 sprint scenarios behave correctly with a deterministic fake LLM.
+"""
+from __future__ import annotations
+
+from typing import Any, Optional
+
+import pytest
+
+from app.models.common import UserContext
+from app.services.advisor_context import AdvisorContext, AdvisorContextBuilder, numbers_in
+from app.services.advisor_llm import AdvisorLLM, NullAdvisorLLM, TEMPERATURE, parse_advisor_json
+from app.services.advisor_orchestrator import AdvisorOrchestrator, build_constraints, _compose
+from app.services.advisor_validator import validate
+
+
+# --------------------------------------------------------------------------- #
+# Test doubles
+# --------------------------------------------------------------------------- #
+def _ctx() -> UserContext:
+    return UserContext(user_id="u-test", email="t@example.com")
+
+
+class FakeSupabase:
+    """Returns no rejected goals by default (override `rejected` for the goal-correction case)."""
+
+    def __init__(self, rejected: Optional[list[dict[str, Any]]] = None) -> None:
+        self._rejected = rejected or []
+
+    async def select(self, table: str, **kwargs: Any) -> list[dict[str, Any]]:
+        if table == "rejected_goals":
+            return self._rejected
+        return []
+
+
+class FakeCoverage:
+    def __init__(self, domains: Optional[list[dict[str, Any]]] = None) -> None:
+        self._domains = domains if domains is not None else [
+            {"domain": "retirement", "label": "Retirement", "coverage_pct": 72, "status": "partial", "missing_inputs": ["target age"]},
+            {"domain": "home", "label": "Home", "coverage_pct": 41, "status": "partial", "missing_inputs": ["price", "down payment"]},
+            {"domain": "estate", "label": "Estate", "coverage_pct": 18, "status": "started", "missing_inputs": ["will"]},
+        ]
+
+    async def coverage(self, ctx: UserContext) -> dict[str, Any]:
+        return {"domains": self._domains, "overall_coverage_pct": 44}
+
+
+class FakeRM:
+    """Stand-in for the deterministic RelationshipManager — returns a fixed `base` and records the call."""
+
+    def __init__(self, base: dict[str, Any]) -> None:
+        self._base = base
+        self.calls: list[tuple[Any, str, Any]] = []
+
+    async def converse(self, ctx: UserContext, message: str, pending_key: Any = None) -> dict[str, Any]:
+        self.calls.append((ctx, message, pending_key))
+        return dict(self._base)
+
+
+class FakeLLM:
+    """Returns a fixed dict (or None) so orchestrator behaviour is deterministic."""
+
+    def __init__(self, out: Optional[dict[str, Any]]) -> None:
+        self._out = out
+
+    async def generate(self, context: Any, plan: dict[str, Any]) -> Optional[dict[str, Any]]:
+        return self._out
+
+
+class RaisingLLM:
+    async def generate(self, context: Any, plan: dict[str, Any]) -> Optional[dict[str, Any]]:
+        raise RuntimeError("model exploded")
+
+
+def _base(
+    *,
+    assistant: str = "Rule-based: tell me about your vision.",
+    complete: bool = False,
+    candidate_goals: Optional[list[dict[str, Any]]] = None,
+    panel: Optional[dict[str, Any]] = None,
+    pending_key: Optional[str] = "vision",
+) -> dict[str, Any]:
+    return {
+        "assistant_message": assistant,
+        "complete": complete,
+        "pending_key": pending_key,
+        "candidate_goals": candidate_goals or [],
+        "context_panel": panel or {
+            "life_vision": "retire early and help my kids through college",
+            "primary_objective": "financial independence",
+            "domains_touched": ["retirement", "education"],
+            "missing_areas": ["home", "estate"],
+            "top_risks": [], "top_opportunities": [], "top_constraints": [],
+            "discovery_completion_pct": 40,
+        },
+    }
+
+
+def _good_llm(**over: Any) -> dict[str, Any]:
+    out = {
+        "reflection": "You want to retire early while helping your kids through college.",
+        "next_question": "If resources got tight, which of those would you protect first?",
+        "why_this_question": "Knowing the priority shapes every tradeoff we model later.",
+        "summary": "",
+        "confirmed_facts": [{"label": "vision", "value": "retire early", "source": "user_message"}],
+        "candidate_facts": [],
+        "assumptions": [],
+        "candidate_goals": [],
+        "missing_data": [{"field": "risk_tolerance", "why_it_matters": "drives the plan"}],
+        "warnings": [],
+        "should_persist": False,
+    }
+    out.update(over)
+    return out
+
+
+async def _build_ctx(message: str, base: dict[str, Any], *, rejected=None, coverage=None) -> AdvisorContext:
+    builder = AdvisorContextBuilder(FakeSupabase(rejected=rejected), coverage=coverage or FakeCoverage())
+    return await builder.build(_ctx(), message, base)
+
+
+# --------------------------------------------------------------------------- #
+# numbers_in / allowed-number guard
+# --------------------------------------------------------------------------- #
+def test_numbers_in_normalises_currency_and_percent():
+    got = numbers_in("I make $120,000 and want 15% saved", "house is 450000")
+    assert "120000" in got and "15" in got and "450000" in got
+
+
+# --------------------------------------------------------------------------- #
+# Context builder — fact classification + discovery scores + priorities
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_context_classifies_confirmed_facts_and_scores():
+    ctx = await _build_ctx("we want to retire at 60", _base())
+    labels = {f["label"] for f in ctx.confirmed_facts}
+    assert "life_vision" in labels and "primary_objective" in labels  # known truths, not candidates
+    assert ctx.assumptions == []  # the deterministic engine never assumes
+    # discovery scores come straight from the coverage service, lowest-coverage domain first
+    assert [d["domain"] for d in ctx.discovery_scores] == ["retirement", "home", "estate"]
+    assert ctx.domain_priorities[0] == "estate"  # 18% — highest leverage next question
+
+
+@pytest.mark.asyncio
+async def test_context_prompt_dict_keeps_categories_separate():
+    ctx = await _build_ctx("retire at 60", _base())
+    d = ctx.prompt_dict()
+    for key in ("confirmed_facts", "candidate_facts", "assumptions", "areas_missing_data",
+                "discovery_scores_by_domain", "domain_priorities_lowest_coverage_first", "safety_constraints"):
+        assert key in d
+    assert d["candidate_facts"] == []  # deterministic engine asserts none; the LLM may propose
+
+
+@pytest.mark.asyncio
+async def test_context_allowed_numbers_from_message():
+    ctx = await _build_ctx("I have $50,000 saved", _base())
+    assert "50000" in ctx.allowed_numbers
+
+
+# --------------------------------------------------------------------------- #
+# Constraint envelope — guardrails, never a script
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_constraints_do_not_script_the_question():
+    ctx = await _build_ctx("retire at 60", _base())
+    c = build_constraints(_base(), ctx)
+    # The envelope provides constraints/permissions — NOT an ask/confirm/clarify "mode".
+    assert "mode" not in c
+    assert c["intent"] == "discovery"
+    assert c["max_questions"] == 1
+    assert c["persistence_allowed"] is False
+    assert c["must_classify_facts"] is True
+    assert "specific product recommendations" in c["disallowed_topics"]
+
+
+@pytest.mark.asyncio
+async def test_constraints_intent_is_summary_when_complete():
+    base = _base(complete=True)
+    ctx = await _build_ctx("that's everything", base)
+    c = build_constraints(base, ctx)
+    assert c["intent"] == "summary" and c["may_summarise"] is True
+
+
+def test_temperature_table_is_low_and_grounded():
+    assert TEMPERATURE["discovery"] == 0.40
+    assert TEMPERATURE["goal_extraction"] == 0.10
+    assert TEMPERATURE["structured"] == 0.00
+
+
+# --------------------------------------------------------------------------- #
+# Validator — the trust gate
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_validator_accepts_clean_output_and_forces_no_persist():
+    ctx = await _build_ctx("retire at 60", _base())
+    ok, safe, reasons = validate(_good_llm(should_persist=True), ctx)
+    assert ok and not reasons
+    assert safe["should_persist"] is False  # the LLM can never flip this on
+
+
+@pytest.mark.asyncio
+async def test_validator_rejects_invented_financial_number():
+    ctx = await _build_ctx("I want to buy a house", _base())  # no numbers in context
+    ok, _, reasons = validate(_good_llm(next_question="Can you afford the $450,000 home?"), ctx)
+    assert not ok and any("invented numbers" in r for r in reasons)
+
+
+@pytest.mark.asyncio
+async def test_validator_allows_number_present_in_context():
+    ctx = await _build_ctx("the house is $450,000", _base())  # 450000 now allowed
+    ok, _, reasons = validate(_good_llm(reflection="You're looking at the $450,000 home."), ctx)
+    assert ok, reasons
+
+
+@pytest.mark.asyncio
+async def test_validator_rejects_recommendation_language():
+    ctx = await _build_ctx("retire at 60", _base())
+    ok, _, reasons = validate(_good_llm(next_question="I recommend you invest in index funds, agreed?"), ctx)
+    assert not ok and any("advice" in r for r in reasons)
+
+
+@pytest.mark.asyncio
+async def test_validator_rejects_medical_advice():
+    ctx = await _build_ctx("I have chest pain", _base())
+    ok, _, reasons = validate(_good_llm(reflection="I diagnose you with a heart condition."), ctx)
+    assert not ok
+
+
+@pytest.mark.asyncio
+async def test_validator_rejects_multiple_questions():
+    ctx = await _build_ctx("retire at 60", _base())
+    ok, _, reasons = validate(_good_llm(next_question="What is your income? And your age?"), ctx)
+    assert not ok and any("more than one question" in r for r in reasons)
+
+
+@pytest.mark.asyncio
+async def test_validator_drops_rejected_goal_and_nonuser_facts():
+    rejected = [{"rejected_goal": "advance my career"}]
+    ctx = await _build_ctx("retire at 60", _base(), rejected=rejected)
+    out = _good_llm(
+        candidate_goals=[{"title": "advance my career", "domain": "career"}, {"title": "buy a home", "domain": "home"}],
+        candidate_facts=[{"label": "salary", "value": "x", "source": "model_guess"}],
+    )
+    ok, safe, _ = validate(out, ctx)
+    assert ok
+    assert [g["title"] for g in safe["candidate_goals"]] == ["buy a home"]  # rejected goal never resurrected
+    assert safe["candidate_facts"] == []  # non-user-sourced fact dropped
+
+
+# --------------------------------------------------------------------------- #
+# Orchestrator — rules persist, LLM leads the text, clean fallback
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_orchestrator_enhances_text_on_valid_llm():
+    base = _base()
+    rm = FakeRM(base)
+    orch = AdvisorOrchestrator(rm, AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(_good_llm()))
+    out = await orch.converse(_ctx(), "we want to retire at 60")
+    assert out["llm_status"] == "enhanced"
+    assert "protect first" in out["assistant_message"]  # the LLM's chosen question
+    assert "shapes every tradeoff" in out["assistant_message"]  # why-it-matters appended
+    assert out["pending_key"] == base["pending_key"]  # deterministic outcome preserved
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_falls_back_when_llm_unavailable():
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(None))
+    out = await orch.converse(_ctx(), "hi")
+    assert out["assistant_message"] == base["assistant_message"]  # untouched rule-based text
+    assert out["llm_status"] == "fallback:unavailable"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_falls_back_on_invalid_llm():
+    base = _base()
+    bad = _good_llm(next_question="You should invest $999,999 now, right?")  # advice + invented number
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(bad))
+    out = await orch.converse(_ctx(), "what should I do")
+    assert out["assistant_message"] == base["assistant_message"]
+    assert out["llm_status"].startswith("fallback:")
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_falls_back_on_llm_exception():
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), RaisingLLM())
+    out = await orch.converse(_ctx(), "hi")
+    assert out["assistant_message"] == base["assistant_message"]
+    assert out["llm_status"] == "fallback:error"
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_disabled_returns_rule_based_untouched():
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(_good_llm()), enabled=False)
+    out = await orch.converse(_ctx(), "hi")
+    assert out == base and "llm_status" not in out
+
+
+@pytest.mark.asyncio
+async def test_null_llm_always_falls_back():
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), NullAdvisorLLM())
+    out = await orch.converse(_ctx(), "hi")
+    assert out["llm_status"] == "fallback:unavailable"
+
+
+# --------------------------------------------------------------------------- #
+# JSON parsing tolerance
+# --------------------------------------------------------------------------- #
+def test_parse_advisor_json_strips_fences():
+    assert parse_advisor_json('```json\n{"a": 1}\n```') == {"a": 1}
+    assert parse_advisor_json('noise {"a": 2} trailing') == {"a": 2}
+    assert parse_advisor_json("not json") is None
+
+
+# --------------------------------------------------------------------------- #
+# The 6 sprint scenarios — deterministic fake LLM, full orchestrator path
+# --------------------------------------------------------------------------- #
+async def _run(message: str, llm_out: Optional[dict[str, Any]], *, base: Optional[dict[str, Any]] = None, rejected=None):
+    b = base or _base()
+    orch = AdvisorOrchestrator(
+        FakeRM(b),
+        AdvisorContextBuilder(FakeSupabase(rejected=rejected), coverage=FakeCoverage()),
+        FakeLLM(llm_out),
+    )
+    return await orch.converse(_ctx(), message)
+
+
+@pytest.mark.asyncio
+async def test_case1_fresh_user_asks_one_grounded_question():
+    out = await _run("Hi, I'm new here", _good_llm(
+        reflection="Welcome — let's start with what matters most to you.",
+        next_question="When you picture life going well in ten years, what stands out first?",
+        why_this_question="Your vision anchors every recommendation we build.",
+    ))
+    assert out["llm_status"] == "enhanced"
+    assert out["assistant_message"].count("?") == 1  # exactly one question
+
+
+@pytest.mark.asyncio
+async def test_case2_house_and_cashflow_does_not_recommend():
+    # "should I buy" must NOT trigger advice — the validator would reject it; a good turn gathers inputs.
+    out = await _run("Can I afford a house with my cash flow?", _good_llm(
+        reflection="You're weighing a home purchase against your monthly cash flow.",
+        next_question="If you bought in the next year, how much cash would you want left afterward?",
+        why_this_question="Your comfort buffer sets the real affordability ceiling.",
+        missing_data=[{"field": "purchase_price", "why_it_matters": "needed to size the payment"}],
+    ))
+    assert out["llm_status"] == "enhanced"
+    assert out.get("missing_data")  # surfaces missing inputs instead of answering
+
+
+@pytest.mark.asyncio
+async def test_case3_retire_and_college_priority_tradeoff():
+    out = await _run("I want to retire at 60 and pay for my kids' college", _good_llm(
+        reflection="Retiring at 60 and funding college are both on your mind.",
+        next_question="If you had to protect one, would it be retiring at 60 or fully funding college?",
+        why_this_question="The priority decides how we split savings between the two.",
+    ))
+    assert out["llm_status"] == "enhanced"
+    assert "protect one" in out["assistant_message"]
+
+
+@pytest.mark.asyncio
+async def test_case4_goal_correction_never_resurrects_rejected():
+    rejected = [{"rejected_goal": "advance my career"}]
+    out = await _run(
+        "No, I never said anything about my career",
+        _good_llm(candidate_goals=[{"title": "advance my career", "domain": "career"}]),
+        rejected=rejected,
+    )
+    # Even if the LLM proposes it again, the validator strips the rejected goal before it can surface.
+    assert out["llm_status"] == "enhanced"
+    assert all("career" not in (g.get("title") or "").lower() for g in out.get("candidate_goals", []))
+
+
+@pytest.mark.asyncio
+async def test_case5_medical_question_is_refused_via_fallback():
+    base = _base()
+    out = await _run("Do I have diabetes given my symptoms?",
+                     _good_llm(reflection="I diagnose you with diabetes."), base=base)
+    # Medical 'diagnosis' language is rejected → the safe deterministic text is shown instead.
+    assert out["assistant_message"] == base["assistant_message"]
+    assert out["llm_status"].startswith("fallback:")
+
+
+@pytest.mark.asyncio
+async def test_case6_how_much_down_gathers_inputs_not_a_number():
+    base = _base()
+    # An invented down-payment figure must be rejected (no number was in context).
+    out = await _run("How much should I put down on a house?",
+                     _good_llm(next_question="You should put down $90,000, agreed?"), base=base)
+    assert out["assistant_message"] == base["assistant_message"]  # fell back — no fabricated figure shown
+    assert out["llm_status"].startswith("fallback:")
