@@ -8,6 +8,7 @@
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import AddDataModal from '@/components/dashboard/AddDataModal';
+import StreamingText from '@/components/ui/StreamingText';
 import {
   ActionCard,
   DOMAIN_ACTIONS,
@@ -69,6 +70,11 @@ export default function AdvisorPage() {
   const onScroll = () => {
     const el = scrollRef.current;
     if (el) stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+  // Keep the latest text in view while it streams in (only if the user hasn't scrolled up).
+  const streamScroll = () => {
+    const el = scrollRef.current;
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
   };
   const router = useRouter();
   // Onboarding completion: discovery coverage (for action cards + confirmation), the manual-entry
@@ -341,9 +347,17 @@ export default function AdvisorPage() {
             {msgs.map((m, i) => (
               <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
                 <div
-                  className={`inline-block max-w-[85%] rounded-2xl px-4 py-2 text-sm ${m.role === 'advisor' ? 'bg-indigo-50 text-gray-800' : 'bg-gray-900 text-white'}`}
+                  className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${m.role === 'advisor' ? 'bg-indigo-50 text-gray-800' : 'bg-gray-900 text-white'}`}
                 >
-                  {m.text}
+                  {m.role === 'advisor' ? (
+                    <StreamingText
+                      text={m.text}
+                      animate={i === msgs.length - 1}
+                      onTick={streamScroll}
+                    />
+                  ) : (
+                    m.text
+                  )}
                 </div>
                 {m.updates && m.updates.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">

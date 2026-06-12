@@ -16,6 +16,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import StreamingText from '@/components/ui/StreamingText';
 
 interface ConversationSummary {
   id: string;
@@ -276,7 +277,15 @@ function ChatPageInner() {
                     : 'mr-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100',
                 ].join(' ')}
               >
-                {m.content}
+                {m.role === 'assistant' ? (
+                  <StreamingText
+                    text={m.content}
+                    animate={m.id === messages[messages.length - 1]?.id}
+                    onTick={() => messagesEndRef.current?.scrollIntoView({ block: 'end' })}
+                  />
+                ) : (
+                  m.content
+                )}
               </div>
             ))
           )}

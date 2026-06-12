@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from '@/hooks/useSession';
+import StreamingText from '@/components/ui/StreamingText';
 
 // Icons
 function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -416,7 +417,16 @@ export default function RoadmapChatPage() {
                         : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-700'
                     }`}
                   >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    <p className="text-sm whitespace-pre-wrap">
+                      {message.role === 'assistant' ? (
+                        <StreamingText
+                          text={message.content}
+                          animate={message.id === messages[messages.length - 1]?.id}
+                        />
+                      ) : (
+                        message.content
+                      )}
+                    </p>
                   </div>
                   {message.role === 'user' && (
                     <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-white flex-shrink-0">
