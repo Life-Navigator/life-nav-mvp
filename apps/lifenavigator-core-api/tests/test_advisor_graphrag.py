@@ -184,6 +184,23 @@ async def test_validator_accepts_real_relationship_with_citation():
 
 
 @pytest.mark.asyncio
+async def test_validator_accepts_citation_of_a_raw_direct_edge():
+    # Regression (caught in live validation): the LLM may explain a connection by citing the underlying
+    # real edges (constraint→objective), not just the derived 2-hop pair. Both must be accepted.
+    ctx = await _build(CONNECTED_GRAPH)
+    out = _llm(
+        reflection="Your retirement and education goals are tied together by your limited savings.",
+        relationships_referenced=[
+            {"from": "limited monthly savings", "to": "Financial Independence", "rel": "conflicts_with"},
+            {"from": "limited monthly savings", "to": "Education Funding", "rel": "conflicts_with"},
+        ],
+    )
+    ok, safe, reasons = validate(out, ctx)
+    assert ok, reasons
+    assert len(safe["relationships_referenced"]) == 2
+
+
+@pytest.mark.asyncio
 async def test_validator_rejects_relationship_when_no_edges():
     ctx = await _build(EMPTY_GRAPH)
     out = _llm(reflection="Your retirement goal is connected to your education-funding goal.")

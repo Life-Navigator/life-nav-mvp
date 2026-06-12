@@ -82,22 +82,27 @@ def build_relationships(graph: dict[str, Any]) -> tuple[list[dict[str, Any]], li
 
     relationship_edges: list[dict[str, Any]] = []
     adj: dict[str, set[str]] = {}
+    # A relationship the LLM may cite = any REAL direct edge, OR a real 2-hop connection (below).
+    connected_pairs: set[frozenset[str]] = set()
     for e in raw_edges:
         a, b = e.get("from"), e.get("to")
         if a not in by_id or b not in by_id:
             continue
+        la, lb = label(a), label(b)
         relationship_edges.append({
-            "from": label(a), "from_type": ntype(a),
-            "rel": e.get("rel"), "to": label(b), "to_type": ntype(b),
+            "from": la, "from_type": ntype(a),
+            "rel": e.get("rel"), "to": lb, "to_type": ntype(b),
             "confidence": e.get("confidence"),
         })
+        if _norm(la) != _norm(lb):
+            connected_pairs.add(frozenset({_norm(la), _norm(lb)}))
         adj.setdefault(a, set()).add(b)
         adj.setdefault(b, set()).add(a)
 
     # Real connections between primary nodes: a direct edge, or a single shared neighbour (2 hops).
     primary = [n["id"] for n in nodes if n.get("id") and _is_primary(n)]
     connections: list[dict[str, Any]] = []
-    connected_pairs: set[frozenset[str]] = set()
+    seen: set[frozenset[str]] = set()  # dedup the display list (citation gate is connected_pairs)
     for i in range(len(primary)):
         for j in range(i + 1, len(primary)):
             a, b = primary[i], primary[j]
@@ -112,9 +117,10 @@ def build_relationships(graph: dict[str, Any]) -> tuple[list[dict[str, Any]], li
                 basis, via, via_type = "shared_node", label(via_id), ntype(via_id)
             la, lb = label(a), label(b)
             pair = frozenset({_norm(la), _norm(lb)})
-            if pair in connected_pairs or _norm(la) == _norm(lb):
+            if _norm(la) == _norm(lb) or pair in seen:
                 continue
-            connected_pairs.add(pair)
+            seen.add(pair)
+            connected_pairs.add(pair)  # 2-hop primary links are citable too
             connections.append({
                 "a": la, "a_type": ntype(a), "b": lb, "b_type": ntype(b),
                 "basis": basis, "via": via, "via_type": via_type,
