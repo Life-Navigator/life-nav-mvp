@@ -63,68 +63,95 @@ def _is_primary(node: dict[str, Any]) -> bool:
     return node.get("type") in _PRIMARY_TYPES or str(node.get("id") or "").endswith("_hub")
 
 
-def build_relationships(graph: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], set[frozenset[str]]]:
-    """From a REAL personal_graph() result, derive:
-      - relationship_edges : label-resolved real edges  [{from, from_type, rel, to, to_type, confidence}]
-      - connections        : real primary-node links within 2 undirected hops, each with its `via` basis
-      - connected_pairs    : set of frozenset({norm(a), norm(b)}) used by the validator to gate claims
-    Everything here is computed from persisted edges only — never inferred. No edges → all empty.
+def derive_graph_relations(graph: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    """The ONE relationship algorithm, at NODE-ID level. Both the advisor (label view, below) and the Life
+    Graph workspace (id view) build on this, so they share an identical, real relationship model.
+
+    Returns (by_id, id_edges, id_connections):
+      - by_id          : {node_id: node}
+      - id_edges       : persisted edges with known endpoints  [{source, target, rel, confidence}]
+      - id_connections : real 2-hop primary-node links  [{source, target, basis, via}] where basis is
+                         "direct_edge" (already a persisted edge) or "shared_node" (via a single shared node)
+    Computed from persisted edges only — never inferred. No edges → empty.
     """
     nodes = graph.get("nodes") or []
     raw_edges = graph.get("edges") or []
     by_id = {n.get("id"): n for n in nodes if n.get("id")}
 
-    def label(nid: str) -> str:
-        return str((by_id.get(nid) or {}).get("label") or nid)
-
-    def ntype(nid: str) -> str:
-        return str((by_id.get(nid) or {}).get("type") or "")
-
-    relationship_edges: list[dict[str, Any]] = []
+    id_edges: list[dict[str, Any]] = []
     adj: dict[str, set[str]] = {}
-    # A relationship the LLM may cite = any REAL direct edge, OR a real 2-hop connection (below).
-    connected_pairs: set[frozenset[str]] = set()
     for e in raw_edges:
         a, b = e.get("from"), e.get("to")
         if a not in by_id or b not in by_id:
             continue
-        la, lb = label(a), label(b)
-        relationship_edges.append({
-            "from": la, "from_type": ntype(a),
-            "rel": e.get("rel"), "to": lb, "to_type": ntype(b),
-            "confidence": e.get("confidence"),
-        })
-        if _norm(la) != _norm(lb):
-            connected_pairs.add(frozenset({_norm(la), _norm(lb)}))
+        id_edges.append({"source": a, "target": b, "rel": e.get("rel"), "confidence": e.get("confidence")})
         adj.setdefault(a, set()).add(b)
         adj.setdefault(b, set()).add(a)
 
-    # Real connections between primary nodes: a direct edge, or a single shared neighbour (2 hops).
     primary = [n["id"] for n in nodes if n.get("id") and _is_primary(n)]
-    connections: list[dict[str, Any]] = []
-    seen: set[frozenset[str]] = set()  # dedup the display list (citation gate is connected_pairs)
+    id_connections: list[dict[str, Any]] = []
+    seen: set[frozenset[str]] = set()
     for i in range(len(primary)):
         for j in range(i + 1, len(primary)):
             a, b = primary[i], primary[j]
+            if a == b:
+                continue
             na, nb = adj.get(a, set()), adj.get(b, set())
             if b in na:
-                basis, via, via_type = "direct_edge", None, None
+                basis, via = "direct_edge", None
             else:
                 shared = na & nb
                 if not shared:
                     continue
-                via_id = sorted(shared)[0]
-                basis, via, via_type = "shared_node", label(via_id), ntype(via_id)
-            la, lb = label(a), label(b)
-            pair = frozenset({_norm(la), _norm(lb)})
-            if _norm(la) == _norm(lb) or pair in seen:
+                basis, via = "shared_node", sorted(shared)[0]
+            key = frozenset({a, b})
+            if key in seen:
                 continue
-            seen.add(pair)
-            connected_pairs.add(pair)  # 2-hop primary links are citable too
-            connections.append({
-                "a": la, "a_type": ntype(a), "b": lb, "b_type": ntype(b),
-                "basis": basis, "via": via, "via_type": via_type,
-            })
+            seen.add(key)
+            id_connections.append({"source": a, "target": b, "basis": basis, "via": via})
+    return by_id, id_edges, id_connections
+
+
+def build_relationships(graph: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], set[frozenset[str]]]:
+    """Advisor LABEL view over the shared relation core:
+      - relationship_edges : label-resolved real edges  [{from, from_type, rel, to, to_type, confidence}]
+      - connections        : real primary-node links within 2 undirected hops, each with its `via` basis
+      - connected_pairs    : set of frozenset({norm(a), norm(b)}) used by the validator to gate claims
+    """
+    by_id, id_edges, id_connections = derive_graph_relations(graph)
+
+    def label(nid: Optional[str]) -> str:
+        return str((by_id.get(nid) or {}).get("label") or nid)
+
+    def ntype(nid: Optional[str]) -> str:
+        return str((by_id.get(nid) or {}).get("type") or "")
+
+    relationship_edges: list[dict[str, Any]] = []
+    connected_pairs: set[frozenset[str]] = set()
+    for e in id_edges:
+        la, lb = label(e["source"]), label(e["target"])
+        relationship_edges.append({
+            "from": la, "from_type": ntype(e["source"]),
+            "rel": e.get("rel"), "to": lb, "to_type": ntype(e["target"]),
+            "confidence": e.get("confidence"),
+        })
+        if _norm(la) != _norm(lb):
+            connected_pairs.add(frozenset({_norm(la), _norm(lb)}))
+
+    connections: list[dict[str, Any]] = []
+    seen: set[frozenset[str]] = set()
+    for c in id_connections:
+        la, lb = label(c["source"]), label(c["target"])
+        pair = frozenset({_norm(la), _norm(lb)})
+        if _norm(la) == _norm(lb) or pair in seen:
+            continue
+        seen.add(pair)
+        connected_pairs.add(pair)  # 2-hop primary links are citable too
+        via_type = ntype(c["via"]) if c.get("via") else None
+        connections.append({
+            "a": la, "a_type": ntype(c["source"]), "b": lb, "b_type": ntype(c["target"]),
+            "basis": c["basis"], "via": (label(c["via"]) if c.get("via") else None), "via_type": via_type,
+        })
     # Bound the prompt — prefer connections that go through a meaningful shared node (objective/constraint).
     connections.sort(key=lambda c: (c["basis"] != "direct_edge", c.get("via_type") or ""))
     return relationship_edges[:40], connections[:15], connected_pairs
