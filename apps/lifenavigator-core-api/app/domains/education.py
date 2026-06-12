@@ -93,7 +93,9 @@ class EducationService(DomainService):
 
     async def _context(self, ctx: UserContext) -> dict[str, Any]:
         """Cross-domain inputs: Career current value + target, Finance debt."""
-        career_profiles = await self._rows("career_profiles", ctx, schema=CAREER, limit=1, order="updated_at.desc")
+        # career_profiles is in the PUBLIC schema (migration 032), not `career` — reading it from `career`
+        # returned nothing, so Education ROI never saw the user's real current income/title.
+        career_profiles = await self._rows("career_profiles", ctx, schema="public", limit=1, order="updated_at.desc")
         cp = career_profiles[0] if career_profiles else {}
         goals = await self._rows("education_goals", ctx, limit=1, order="updated_at.desc")
         goal = goals[0] if goals else {}

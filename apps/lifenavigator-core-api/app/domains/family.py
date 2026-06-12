@@ -90,7 +90,8 @@ class FamilyService(DomainService):
         estate = await self._rows("estate_plans", ctx, limit=1, order="updated_at.desc")
         guardianship = await self._rows("guardianship_plans", ctx, limit=1, order="updated_at.desc")
         college = await self._rows("college_planning", ctx, limit=50)
-        cp = await self._rows("career_profiles", ctx, schema=CAREER, limit=1, order="updated_at.desc")
+        # career_profiles is in the PUBLIC schema (migration 032), not `career` — see career/education fix.
+        cp = await self._rows("career_profiles", ctx, schema="public", limit=1, order="updated_at.desc")
         debts = await self._rows("debts", ctx, schema=FINANCE, limit=200)
         total_debt = sum(d for r in debts if (d := _num(r.get("current_balance") or r.get("balance"))) is not None) or 0.0
         income = await self._comp.market_value(
