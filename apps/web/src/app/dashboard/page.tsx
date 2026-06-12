@@ -1,4 +1,5 @@
 import DashboardClient from '@/components/dashboard/DashboardClient';
+import ExecutiveSummary from '@/components/dashboard/ExecutiveSummary';
 import LifeIntelligence from '@/components/dashboard/LifeIntelligence';
 import MissionControl from '@/components/dashboard/MissionControl';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
@@ -62,6 +63,12 @@ export default async function DashboardPage() {
   return (
     <>
       <div className="px-6 pt-6 max-w-[1400px] mx-auto w-full">
+        {/* Executive summary (P4): readiness, vision, next best action, priorities, risks,
+            opportunities, goal progress — 100% real data from /api/life/my-life + /api/goals,
+            honest empty states. The trust-first hero of the dashboard. */}
+        <div className="mb-6">
+          <ExecutiveSummary />
+        </div>
         {/* 1. Life snapshot (vision / primary objective / discovery), then status.
             Recommendations are NOT shown here — the top recommendation appears as a
             compact preview inside the Alerts & Notifications module below the domain
