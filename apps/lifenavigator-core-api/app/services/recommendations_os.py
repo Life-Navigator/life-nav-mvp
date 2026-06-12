@@ -497,6 +497,8 @@ class RecommendationOS:
             "expected_benefit": r.get("estimated_benefit") or (r.get("quantified_impact") or {}).get("description"),
             "narrative": r.get("narrative") or {}, "evidence": r.get("evidence"),
             "impacted_domains": r.get("impacted_domains"), "merged_from": r.get("merged_from"),
+            # Surface existing persisted explainability fields (P4 — no new data generated).
+            "assumptions": r.get("assumptions") or [], "updated_at": r.get("updated_at"),
         }
 
     @staticmethod
