@@ -5,6 +5,7 @@ import { Loader2, Network, AlertCircle } from 'lucide-react';
 import type { LifeGraphData, LifeGraphNode } from '@/types/lifeGraph';
 import LifeGraphSidebar from '@/components/lifeGraph/LifeGraphSidebar';
 import LifeGraph3D, { type LifeGraph3DHandle } from '@/components/lifeGraph/LifeGraph3D';
+import DecisionDrilldown from '@/components/lifeGraph/DecisionDrilldown';
 import LifeGraphNodePanel from '@/components/lifeGraph/LifeGraphNodePanel';
 import LifeGraphExplainabilityPanel from '@/components/lifeGraph/LifeGraphExplainabilityPanel';
 import LifeGraphAnalyticsStrip from '@/components/lifeGraph/LifeGraphAnalyticsStrip';
@@ -17,6 +18,7 @@ export default function LifeGraphPage() {
   const [selected, setSelected] = useState<LifeGraphNode | null>(null);
   const [trail, setTrail] = useState<Crumb[]>([{ id: '__root__', label: 'Life Graph' }]);
   const [focusIds, setFocusIds] = useState<Set<string> | null>(null);
+  const [decisionType, setDecisionType] = useState<string | null>(null);
   const graphRef = useRef<LifeGraph3DHandle | null>(null);
 
   useEffect(() => {
@@ -67,6 +69,11 @@ export default function LifeGraphPage() {
   const onExpand = useCallback(
     (n: LifeGraphNode) => {
       setSelected(n);
+      // A decision node opens its real explainable decision map (Prezi-style deep drill).
+      if (n.type === 'decision') {
+        setDecisionType(n.decisionIds?.[0] || n.id);
+        return;
+      }
       setFocusIds(neighborhood(n.id));
       setTrail((prev) => {
         if (prev[prev.length - 1]?.id === n.id) return prev;
@@ -186,6 +193,9 @@ export default function LifeGraphPage() {
             >
               ← Back to full brain
             </button>
+          )}
+          {decisionType && (
+            <DecisionDrilldown decisionType={decisionType} onClose={() => setDecisionType(null)} />
           )}
         </div>
 
