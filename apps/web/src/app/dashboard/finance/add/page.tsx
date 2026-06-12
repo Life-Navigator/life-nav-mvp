@@ -7,7 +7,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, getAuthHeaders } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 
 type DataType = 'account' | 'transaction' | 'investment' | 'debt';
 
@@ -62,86 +62,28 @@ export default function AddFinancialDataPage() {
     setError(null);
 
     try {
-      const headers = getAuthHeaders();
-      let endpoint = '';
-      let body = {};
+      // The friendly form fields for the active type; the API/service maps them to the real
+      // finance.* columns + writes under the user session (RLS). No external backend URL needed.
+      const dataByType: Record<DataType, Record<string, unknown>> = {
+        account: accountData,
+        transaction: transactionData,
+        investment: investmentData,
+        debt: debtData,
+      };
 
-      const env = (await import('@/lib/security/env-client')).clientEnvUrl(
-        'NEXT_PUBLIC_API_URL',
-        'http://localhost:8000'
-      );
-      if (env.ok === false) {
-        setError(
-          env.kind === 'loopback'
-            ? 'The backend API is not configured for this environment.'
-            : 'NEXT_PUBLIC_API_URL is not set.'
-        );
-        setLoading(false);
-        return;
-      }
-      const apiUrl = env.value;
-
-      switch (dataType) {
-        case 'account':
-          endpoint = `${apiUrl}/api/v1/finance/accounts`;
-          body = {
-            name: accountData.name,
-            account_type: accountData.type,
-            institution: accountData.institution,
-            balance: parseFloat(accountData.balance),
-            currency: accountData.currency,
-            is_active: true,
-          };
-          break;
-        case 'transaction':
-          endpoint = `${apiUrl}/api/v1/finance/transactions`;
-          body = {
-            description: transactionData.description,
-            amount: parseFloat(transactionData.amount),
-            category: transactionData.category,
-            transaction_date: transactionData.date,
-            account_id: transactionData.accountId || null,
-          };
-          break;
-        case 'investment':
-          endpoint = `${apiUrl}/api/v1/finance/investments`;
-          body = {
-            symbol: investmentData.symbol,
-            name: investmentData.name,
-            shares: parseFloat(investmentData.shares),
-            purchase_price: parseFloat(investmentData.purchasePrice),
-            current_price: parseFloat(investmentData.currentPrice),
-            purchase_date: investmentData.purchaseDate,
-          };
-          break;
-        case 'debt':
-          endpoint = `${apiUrl}/api/v1/finance/debts`;
-          body = {
-            name: debtData.name,
-            debt_type: debtData.type,
-            balance: parseFloat(debtData.balance),
-            interest_rate: parseFloat(debtData.interestRate),
-            minimum_payment: parseFloat(debtData.minimumPayment),
-            due_date: debtData.dueDate,
-          };
-          break;
-      }
-
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/finance/manual-entry', {
         method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: dataType, data: dataByType[dataType] }),
       });
 
       if (response.ok) {
         // Success - redirect back to finance dashboard
         router.push('/dashboard/finance');
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to add financial data');
+        const errorData = await response.json().catch(() => null);
+        const reason = errorData?.error || errorData?.code || `HTTP ${response.status}`;
+        setError(`Couldn't save your financial data (${reason}). Please try again.`);
       }
     } catch (err) {
       console.error('Error adding financial data:', err);
