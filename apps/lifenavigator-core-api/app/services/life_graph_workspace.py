@@ -68,6 +68,7 @@ def _map_node(node: dict[str, Any]) -> dict[str, Any]:
         "confidence": node.get("confidence"),
         "importance": _importance(node),
         "description": None,
+        "lastUpdated": node.get("updated_at"),
     }
     # Real lineage: a domain-entity node points back at the exact source row it came from.
     if node.get("table") and node.get("record_id"):
@@ -126,7 +127,7 @@ def recommendation_lineage(recommendations: Any, base_node_ids: set[str]) -> tup
             "id": rnode, "label": str(rec.get("title") or "Recommendation"), "type": "recommendation",
             "domain": domain, "score": rec.get("rank_score"), "confidence": rec.get("confidence"),
             "importance": _PRIORITY_IMPORTANCE.get(str(rec.get("priority") or "").lower(), 0.6),
-            "description": rec.get("description") or narrative.get("why"),
+            "description": rec.get("description") or narrative.get("why"), "lastUpdated": rec.get("updated_at"),
             "impactedDomains": impacted, "evidenceIds": ev_ids, "assumptions": assumptions, "missingData": missing,
             "dataUsed": [{"id": f"{rnode}:src{i}", "label": str(e.get("source_table") or "source"),
                           "value": str(e.get("statement") or ""), "sourceTable": e.get("source_table"),
