@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from app.services.life_graph_workspace import build_workspace, query_focus, _cosine
+from app.services.life_graph_workspace import build_workspace, query_focus, recommendation_lineage, _cosine
 
 # Same shape personal_graph() returns; FI and Education share a constraint → a real 2-hop connection.
 GRAPH: dict[str, Any] = {
@@ -100,6 +100,67 @@ def test_edges_to_unknown_nodes_are_dropped():
 # --------------------------------------------------------------------------- #
 # query-focus — real semantic relevance, honest empties
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# Recommendation + evidence lineage — real rows only
+# --------------------------------------------------------------------------- #
+REC = {
+    "id": "rec-1", "title": "Increase 401(k) to full employer match", "rec_type": "ACTION",
+    "category": "finance", "priority": "high", "confidence": 0.82, "rank_score": 0.91,
+    "description": "You're leaving employer match on the table.",
+    "impacted_domains": ["finance", "family"],
+    "evidence": [
+        {"statement": "401(k) statement: contributing 3% vs 6% match", "source_table": "documents:401k_statement"},
+        {"statement": "Cash flow supports a 3% increase", "source_table": "finance:cash_flow"},
+    ],
+    "assumptions": [{"label": "Tax treatment", "value": "pre-tax traditional 401(k)"}],
+    "quantified_impact": {"unlocked_capabilities": ["employer-match gap", "retirement projection"]},
+    "formula": {"impact": 0.9, "confidence": 0.82, "urgency": 0.7, "effort": 0.2},
+    "narrative": {"why": "Capturing the full match is free money."},
+}
+
+
+def test_recommendation_lineage_builds_real_nodes_and_edges():
+    nodes, edges = recommendation_lineage([REC], {"family_hub", "finance_hub"})
+    by_id = {n["id"]: n for n in nodes}
+    # recommendation node
+    rec = by_id["rec:rec-1"]
+    assert rec["type"] == "recommendation" and rec["domain"] == "finance" and rec["score"] == 0.91
+    assert rec["impactedDomains"] == ["finance", "family"]
+    assert rec["evidenceIds"] == ["ev:rec-1:0", "ev:rec-1:1"]
+    assert rec["assumptions"][0]["label"] == "Tax treatment"
+    assert [m["label"] for m in rec["missingData"]] == ["employer-match gap", "retirement projection"]
+    assert any(f["label"] == "impact" for f in rec["xai"]["weightedFactors"])
+    # evidence nodes + source nodes
+    assert by_id["ev:rec-1:0"]["type"] == "evidence"
+    assert by_id["src:documents:401k_statement"]["type"] == "source"
+    # edges: rec->evidence (persisted), evidence->source (persisted), rec->hub (computed, declared domains)
+    kinds = {(e["source"], e["type"], e["target"], e["provenance"]) for e in edges}
+    assert ("rec:rec-1", "evidenced_by", "ev:rec-1:0", "persisted_edge") in kinds
+    assert ("ev:rec-1:0", "from_source", "src:documents:401k_statement", "persisted_edge") in kinds
+    assert ("rec:rec-1", "impacts", "finance_hub", "computed_connection") in kinds
+    assert ("rec:rec-1", "impacts", "family_hub", "computed_connection") in kinds
+
+
+def test_recommendation_hub_edge_only_when_hub_exists():
+    # no hubs present → no rec→hub edges are fabricated (only real lineage remains)
+    _, edges = recommendation_lineage([REC], set())
+    assert all(e["type"] != "impacts" for e in edges)
+
+
+def test_build_workspace_merges_recommendation_lineage():
+    ws = build_workspace(GRAPH, [REC])
+    types = {n["type"] for n in ws["nodes"]}
+    assert {"recommendation", "evidence", "source"} <= types
+    # rec→family_hub edge appears because GRAPH has a family_hub
+    assert any(e["type"] == "impacts" and e["target"] == "family_hub" for e in ws["edges"])
+    assert ws["metrics"]["totalNodes"] == len(ws["nodes"]) and ws["metrics"]["totalEdges"] == len(ws["edges"])
+
+
+def test_build_workspace_no_recommendations_is_unchanged():
+    assert build_workspace(GRAPH, []) == build_workspace(GRAPH)
+    assert build_workspace(GRAPH, None) == build_workspace(GRAPH)
+
+
 def test_cosine_basic():
     assert _cosine([1, 0], [1, 0]) == 1.0
     assert _cosine([1, 0], [0, 1]) == 0.0

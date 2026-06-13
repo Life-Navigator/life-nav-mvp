@@ -36,7 +36,8 @@ _IMPORTANCE = {
     "Risk": 0.5, "Opportunity": 0.5, "Constraint": 0.5, "Dependency": 0.4,
 }
 _VALID_DOMAINS = {"finance", "career", "education", "health", "family", "estate", "insurance", "general"}
-_MAX_FOCUS_NODES = 80  # bound the per-query embedding cost; beyond this we honestly return no focus
+_MAX_FOCUS_NODES = 120  # bound the per-query embedding cost; beyond this we honestly return no focus
+_PRIORITY_IMPORTANCE = {"high": 0.85, "medium": 0.6, "low": 0.4}
 
 
 def _contract_type(node: dict[str, Any]) -> str:
@@ -82,8 +83,90 @@ def _map_node(node: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def build_workspace(graph: dict[str, Any]) -> dict[str, Any]:
-    """Pure mapping: a real personal_graph dict → LifeGraphWorkspace. Empty graph → empty workspace."""
+def _rec_domain(rec: dict[str, Any]) -> str:
+    for d in [*(rec.get("impacted_domains") or []), rec.get("category")]:
+        ds = str(d or "").lower()
+        if ds in _VALID_DOMAINS and ds != "general":
+            return ds
+    return "general"
+
+
+def recommendation_lineage(recommendations: Any, base_node_ids: set[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """REAL recommendation → evidence → source lineage from RecommendationOS rows. Every node/edge is
+    backed by stored recommendation data; nothing is inferred. recommendation→domain-hub edges are drawn
+    ONLY from a recommendation's own declared impacted_domains AND only when that hub node already exists.
+    Recommendations carry no objective/goal id, so we never fabricate a rec→specific-goal edge.
+    """
+    nodes: list[dict[str, Any]] = []
+    edges: list[dict[str, Any]] = []
+    src_seen: dict[str, dict[str, Any]] = {}
+    for rec in recommendations or []:
+        rid = rec.get("id")
+        if not rid:
+            continue
+        rnode = f"rec:{rid}"
+        domain = _rec_domain(rec)
+        impacted = [str(d) for d in (rec.get("impacted_domains") or [])]
+        evidence = [e for e in (rec.get("evidence") or []) if isinstance(e, dict)]
+        ev_ids = [f"ev:{rid}:{i}" for i in range(len(evidence))]
+        assumptions = [
+            {"id": f"{rnode}:a{i}", "label": str(a.get("label") or ""), "value": str(a.get("value") or "")}
+            for i, a in enumerate(rec.get("assumptions") or []) if isinstance(a, dict)
+        ]
+        unlocked = ((rec.get("quantified_impact") or {}).get("unlocked_capabilities")) or []
+        missing = [{"id": f"{rnode}:m{i}", "label": str(c), "value": "Unlocked once this is addressed"}
+                   for i, c in enumerate(unlocked)]
+        formula = rec.get("formula") or {}
+        wf = [{"id": f"{rnode}:f:{k}", "label": k.replace("_", " "), "weight": float(formula[k]),
+               "impact": "positive" if k in ("impact", "urgency", "evidence_strength") else "neutral"}
+              for k in ("impact", "confidence", "urgency", "evidence_strength", "effort")
+              if isinstance(formula.get(k), (int, float))]
+        narrative = rec.get("narrative") or {}
+        nodes.append({
+            "id": rnode, "label": str(rec.get("title") or "Recommendation"), "type": "recommendation",
+            "domain": domain, "score": rec.get("rank_score"), "confidence": rec.get("confidence"),
+            "importance": _PRIORITY_IMPORTANCE.get(str(rec.get("priority") or "").lower(), 0.6),
+            "description": rec.get("description") or narrative.get("why"),
+            "impactedDomains": impacted, "evidenceIds": ev_ids, "assumptions": assumptions, "missingData": missing,
+            "dataUsed": [{"id": f"{rnode}:src{i}", "label": str(e.get("source_table") or "source"),
+                          "value": str(e.get("statement") or ""), "sourceTable": e.get("source_table"),
+                          "confidence": rec.get("confidence")} for i, e in enumerate(evidence)],
+            "xai": {"reasoningSummary": narrative.get("why") or rec.get("description"),
+                    "formula": formula.get("formula"), "weightedFactors": wf},
+        })
+        for i, e in enumerate(evidence):
+            ev_id, st = ev_ids[i], e.get("source_table")
+            nodes.append({"id": ev_id, "label": str(e.get("statement") or "evidence")[:90], "type": "evidence",
+                          "domain": domain, "confidence": rec.get("confidence"), "importance": 0.35,
+                          "description": str(e.get("statement") or ""),
+                          "dataUsed": ([{"id": f"{ev_id}:src", "label": str(st), "sourceTable": st}] if st else [])})
+            conf = rec.get("confidence")
+            edges.append({"id": f"rec_ev:{rid}:{i}", "source": rnode, "target": ev_id, "label": "evidenced by",
+                          "type": "evidenced_by", "strength": conf if conf is not None else 0.6, "confidence": conf,
+                          "provenance": "persisted_edge", "via": None, "viaId": None, "citationId": ev_id,
+                          "evidenceIds": [ev_id]})
+            if st:
+                sid = f"src:{st}"
+                src_seen.setdefault(sid, {"id": sid, "label": str(st), "type": "source", "domain": "general",
+                                          "importance": 0.3, "description": f"Source table: {st}"})
+                edges.append({"id": f"ev_src:{rid}:{i}", "source": ev_id, "target": sid, "label": "from source",
+                              "type": "from_source", "strength": 0.5, "confidence": None,
+                              "provenance": "persisted_edge", "via": None, "viaId": None, "citationId": sid,
+                              "evidenceIds": []})
+        for d in impacted:
+            hub = f"{str(d).lower()}_hub"
+            if hub in base_node_ids:
+                edges.append({"id": f"rec_hub:{rid}:{d}", "source": rnode, "target": hub, "label": "impacts",
+                              "type": "impacts", "strength": 0.5, "confidence": rec.get("confidence"),
+                              "provenance": "computed_connection", "via": str(d), "viaId": hub,
+                              "citationId": rnode, "evidenceIds": []})
+    nodes.extend(src_seen.values())
+    return nodes, edges
+
+
+def build_workspace(graph: dict[str, Any], recommendations: Any = None) -> dict[str, Any]:
+    """Pure mapping: a real personal_graph dict (+ real RecommendationOS rows) → LifeGraphWorkspace.
+    Empty graph + no recommendations → empty workspace."""
     by_id, id_edges, id_connections = derive_graph_relations(graph or {})
     nodes = [_map_node(by_id[nid]) for nid in by_id]
 
@@ -118,6 +201,11 @@ def build_workspace(graph: dict[str, Any]) -> dict[str, Any]:
             "via": label(via), "viaId": via, "citationId": via,
             "evidenceIds": [via],
         })
+
+    # 3) Recommendation → evidence → source lineage (+ impacted-domain hub edges) — all from real rows.
+    rec_nodes, rec_edges = recommendation_lineage(recommendations, set(by_id.keys()))
+    nodes.extend(rec_nodes)
+    edges.extend(rec_edges)
 
     confidences = [n["confidence"] for n in nodes if isinstance(n.get("confidence"), (int, float))]
     strengths = [e["strength"] for e in edges if isinstance(e.get("strength"), (int, float))]
