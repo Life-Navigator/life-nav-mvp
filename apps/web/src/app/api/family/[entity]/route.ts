@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, ctx: Ctx) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await request.json();
-    const item = await createEntity(supabase, user.id, def.table, def.fields, body);
+    const item = await createEntity(supabase, user.id, def, body);
     return NextResponse.json({ item }, { status: 201 });
   } catch (err) {
     return safeApiError({ code: 'bad_request', internal: err });
