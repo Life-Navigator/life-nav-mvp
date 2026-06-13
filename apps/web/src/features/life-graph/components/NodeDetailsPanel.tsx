@@ -93,6 +93,23 @@ export function NodeDetailsPanel({
             )}
           </Panel>
 
+          <Panel title="Impacted goals / domains">
+            {node.impactedDomains?.length ? (
+              <div className="flex flex-wrap gap-1.5">
+                {node.impactedDomains.map((d) => (
+                  <span
+                    key={d}
+                    className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs capitalize text-slate-300"
+                  >
+                    {d}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <Empty text="No relationship recorded." />
+            )}
+          </Panel>
+
           <Panel title="Data used">
             {node.dataUsed?.length ? (
               node.dataUsed.map((d) => (

@@ -27,6 +27,13 @@ export type GraphDomain =
  */
 export type EdgeProvenance = 'persisted_edge' | 'computed_connection' | 'shared_node';
 
+/**
+ * View modes — all are real filters/layouts over the SAME API-provided graph (never inferred data).
+ *  brain: full 3D graph · network: full graph, fit camera · timeline: nodes with a timestamp, recent-first
+ *  sources: source + evidence lineage only · recommendations: recommendation + evidence + source only
+ */
+export type GraphView = 'brain' | 'network' | 'timeline' | 'sources' | 'recommendations';
+
 export interface LifeGraphDataPoint {
   id: string;
   label: string;
@@ -60,6 +67,9 @@ export interface LifeGraphNode {
   recommendationIds?: string[];
   sourceIds?: string[];
   goalIds?: string[];
+  /** Domains a recommendation declares it impacts (real field from RecommendationOS). */
+  impactedDomains?: string[];
+  lastUpdated?: string | null;
   xai?: {
     formula?: string | null;
     reasoningSummary?: string | null;
