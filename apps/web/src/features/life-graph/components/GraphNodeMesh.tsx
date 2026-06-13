@@ -76,7 +76,8 @@ export function GraphNodeMesh({
         </mesh>
       )}
 
-      <Html distanceFactor={110} center>
+      {/* pointerEvents="none" so the label never swallows clicks meant for the node mesh below it. */}
+      <Html distanceFactor={110} center pointerEvents="none">
         <div
           className={[
             'pointer-events-none whitespace-nowrap rounded-lg border px-2 py-1 text-center text-xs shadow-xl backdrop-blur',
