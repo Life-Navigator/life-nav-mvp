@@ -39,7 +39,9 @@ async def test_my_life_has_all_six_sections_with_sources():
         assert sec in out
     assert out["life_vision"]["source"] == "Advisor Discovery"
     assert out["what_matters_most"]["primary_objective"] == "Build family stability"
-    assert out["what_matters_most"]["depends_on"]  # reinforces the reveal
+    # depends_on/risks/opportunities are no longer archetype-derived — empty until evidence grounds them.
+    assert out["what_matters_most"]["depends_on"] == []
+    assert out["what_matters_most"]["risks"] == [] and out["what_matters_most"]["opportunities"] == []
     assert out["has_discovery"] is True
 
 

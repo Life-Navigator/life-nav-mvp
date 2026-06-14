@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..models.common import UserContext
-from .life_discovery import GENERIC_RISK_OPP_LABELS
+from .life_discovery import GENERIC_DEPENDENCY_LABELS, GENERIC_RISK_OPP_LABELS
 
 
 class MyLifeService:
@@ -124,11 +124,13 @@ class MyLifeService:
             "source": "Advisor Discovery" if authored else "Inferred from onboarding",
         }
 
-        # Section 2 — What Matters Most (grounded risks/opportunities only)
+        # Section 2 — What Matters Most (grounded risks/opportunities only). depends_on also drops
+        # archetype dependency labels (legacy rows) — objectives no longer create them.
         what_matters = {
             "primary_objective": po.get("title"),
             "reasoning": po.get("reasoning"),
-            "depends_on": [d["label"] for d in snap.get("open_dependencies", [])],
+            "depends_on": [d["label"] for d in snap.get("open_dependencies", [])
+                           if str(d.get("label", "")).strip().lower() not in GENERIC_DEPENDENCY_LABELS],
             "risks": risks_out,
             "constraints": [c["label"] for c in snap.get("active_constraints", [])],
             "opportunities": opps_out,

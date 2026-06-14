@@ -100,6 +100,20 @@ def _generic_risk_opp_labels() -> frozenset:
 GENERIC_RISK_OPP_LABELS = _generic_risk_opp_labels()
 
 
+def _generic_dependency_labels() -> frozenset:
+    # Archetype dependency labels (e.g. "Healthcare plan for retirement", "A withdrawal plan"). New
+    # objectives no longer create these; this set gates DISPLAY of any legacy rows still persisted for
+    # existing users until the cleanup migration removes them.
+    out: set[str] = set()
+    for spec in ROOT_OBJECTIVES.values():
+        for label, _domain in spec.get("dependencies", []):
+            out.add(str(label).strip().lower())
+    return frozenset(out)
+
+
+GENERIC_DEPENDENCY_LABELS = _generic_dependency_labels()
+
+
 # ── Life Theme layer (Sprint 34): statements -> weighted themes -> objectives (not keyword routing) ──
 THEMES: dict[str, list[str]] = {
     "freedom": ["freedom", "free", "depend on anyone", "don't want to depend", "not depend", "independent", "independence", "on my own", "not rely", "autonomy", "self-sufficient", "self sufficient"],
@@ -422,6 +436,13 @@ class LifeDiscoveryService:
         await self._sb.upsert("goals", {"id": goal_id, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
                                         "objective_id": obj_id, "title": surface_goal, "domain": "cross_domain", "status": "open"}, schema=LIFE)
         await self._edge(ctx, goal_id, obj_id, "advances", "cross_domain", a.get("confidence", 0.7))
+        # TRUST RULE (data → evidence → risks): an objective MUST NOT auto-create RISKS or OPPORTUNITIES from
+        # the ROOT_OBJECTIVES archetype — those are generic claims, not grounded in the user's real data
+        # ("Outliving your assets", "Sequence-of-returns risk", "Full employer 401(k) match", …). Risks and
+        # opportunities now come ONLY from evidence (Recommendation OS, real domain data, user statements).
+        # Dependencies are KEPT: they are honest open requirements/unknowns ("Confirm or upload evidence for
+        # X"), used by the decision brain's missing-information view + document-upload roadmap — NOT claims.
+        # They are gated OUT of the dashboard's "priorities" (my_life) so they never read as established facts.
         deps = []
         for label, domain in spec["dependencies"]:
             did = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:dep:{label}"))
@@ -430,17 +451,8 @@ class LifeDiscoveryService:
                                                    "satisfied": None, "prompt": f"Confirm or upload evidence for: {label}"}, schema=LIFE)
             await self._edge(ctx, obj_id, did, "requires", domain)
             deps.append({"label": label, "domain": domain})
-        for label, domain in spec.get("risks", []):
-            rid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:risk:{label}"))
-            await self._sb.upsert("risks", {"id": rid, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
-                                            "objective_id": obj_id, "label": label, "domain": domain, "severity": "medium"}, schema=LIFE)
-            await self._edge(ctx, obj_id, rid, "threatened_by", domain)
-        for label, domain in spec.get("opportunities", []):
-            oid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:opp:{label}"))
-            await self._sb.upsert("opportunities", {"id": oid, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
-                                                    "objective_id": obj_id, "label": label, "domain": domain}, schema=LIFE)
-            await self._edge(ctx, obj_id, oid, "accelerated_by", domain)
-        # Constraint intelligence — conflicts become first-class nodes, not optimistic recommendations.
+        # Constraint intelligence — these come from the USER's own statement (analyze()), not the archetype,
+        # so they are grounded ("explicitly provided by the user").
         constraints = a.get("constraints", [])
         for c in constraints:
             cid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:con:{c['label']}"))
@@ -452,8 +464,8 @@ class LifeDiscoveryService:
                 "surface_goal": surface_goal, "the_need_behind_the_need": spec["label"],
                 "confidence": a.get("confidence"), "themes": a.get("themes", {}), "reasoning": a.get("reasoning"),
                 "alternatives": a.get("alternatives", []), "needs_followup": False,
-                "dependencies": deps, "risks": [r[0] for r in spec.get("risks", [])],
-                "opportunities": [o[0] for o in spec.get("opportunities", [])],
+                # No archetype-derived risks/opportunities/dependencies — these are not grounded in user data.
+                "dependencies": deps, "risks": [], "opportunities": [],
                 "constraints": [{"label": c["label"], "detail": c.get("detail")} for c in constraints]}
 
     async def _rows(self, table: str, ctx: UserContext) -> list[dict]:

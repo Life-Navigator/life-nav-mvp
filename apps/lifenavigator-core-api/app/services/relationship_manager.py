@@ -356,13 +356,16 @@ class RelationshipManager:
             if updates:
                 # Rule 7: during discovery, nothing is finalized — use draft language, not "recommendations refreshed".
                 updates += ["✓ Life model updated", "✓ Discovery notes updated"]
-            # The "magic moment" (D2): surface goal → discovered objective → dependencies → confidence.
-            if rec.get("objective") and rec.get("dependencies"):
+            # The "magic moment" (D2): surface goal → discovered objective → confidence. We no longer
+            # fabricate archetype dependencies, so the reveal celebrates the discovered objective itself
+            # (requirements/recommendations surface later from real evidence, not from the objective).
+            if rec.get("objective"):
+                deps_revealed = rec.get("dependencies") or []
                 reveal = {
                     "you_said": rec.get("surface_goal"),
                     "we_discovered": rec["objective"],
-                    "dependencies": rec["dependencies"],
-                    "recommendations_unlocked": len(rec["dependencies"]),
+                    "dependencies": deps_revealed,
+                    "recommendations_unlocked": len(deps_revealed),
                     "confidence_pct": round((rec.get("confidence") or 0) * 100),
                 }
             # Rule 3: EXTRACT first, classify later — reflect the user's OWN words (the goal text),
