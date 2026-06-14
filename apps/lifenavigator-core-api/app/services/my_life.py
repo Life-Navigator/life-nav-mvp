@@ -113,6 +113,16 @@ class MyLifeService:
         obj_conf_pct = round((po.get("confidence") or 0) * 100)
         authored = bool(snap.get("vision_authored"))
         vision_confirmed = authored and obj_conf_pct >= 60 and discovery_pct >= 40
+        # Provenance (User Truth Model): confirmed > stated > inferred > assumed. The objective is an
+        # advisor INFERENCE until the user authors/confirms a high-confidence vision.
+        if vision_confirmed:
+            prov_type, prov_source = "user_confirmed", "Advisor Discovery"
+        elif authored:
+            prov_type, prov_source = "user_stated", "Advisor Discovery"
+        elif po.get("title"):
+            prov_type, prov_source = "advisor_inferred", "Inferred from onboarding"
+        else:
+            prov_type, prov_source = "assumption", "Not yet established"
         vision = {
             "life_vision": snap.get("life_vision"),
             "vision_authored": authored,
@@ -121,7 +131,14 @@ class MyLifeService:
             "objective_inferred": bool(po.get("title")) and not authored,
             "confidence_pct": obj_conf_pct,
             "discovery_completion_pct": discovery_pct,
-            "source": "Advisor Discovery" if authored else "Inferred from onboarding",
+            "source": prov_source,
+            # Per-item provenance the UI surfaces (where it came from / type / confidence / when).
+            "provenance": {
+                "provenance_type": prov_type,
+                "source": prov_source,
+                "confidence": (po.get("confidence") if po.get("confidence") is not None else None),
+                "updated_at": po.get("updated_at"),
+            },
         }
 
         # Section 2 — What Matters Most (grounded risks/opportunities only). depends_on also drops

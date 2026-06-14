@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   Loader2,
 } from 'lucide-react';
+import ProvenanceBadge, { type Provenance } from '@/components/ui/ProvenanceBadge';
 
 // Executive summary — the trust-first dashboard hero. 100% real data from /api/life/my-life
 // (vision · what-matters · readiness · next-best-action · constraints) + /api/goals (goal progress).
@@ -27,6 +28,7 @@ interface MyLife {
     vision_confirmed?: boolean;
     objective_inferred?: boolean;
     source?: string;
+    provenance?: Provenance | null;
   };
   what_matters_most?: {
     primary_objective?: string | null;
@@ -213,6 +215,7 @@ export default function ExecutiveSummary() {
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-indigo-500">
               <Compass className="h-3.5 w-3.5" />{' '}
               {v.vision_confirmed ? 'Your north star' : 'Your life model'}
+              {v.provenance && <ProvenanceBadge provenance={v.provenance} />}
             </div>
             {v.vision_confirmed && v.life_vision ? (
               <>

@@ -494,7 +494,7 @@ class LifeDiscoveryService:
             "vision_authored": bool(v0 and v0.get("vision_text") and vsource != "persona_bridge"),
             "primary_objective": ({"title": primary["title"], "confidence": primary.get("confidence"),
                                    "reasoning": primary.get("reasoning"), "alternatives": primary.get("alternatives"),
-                                   "themes": primary.get("themes")} if primary else None),
+                                   "themes": primary.get("themes"), "updated_at": primary.get("updated_at")} if primary else None),
             "objectives": [{"id": o["id"], "title": o["title"], "root": o.get("root_objective_key"),
                             "surface_goal": o.get("surface_goal"), "confidence": o.get("confidence"),
                             "themes": o.get("themes"), "why_chain": o.get("why_chain")} for o in objectives],

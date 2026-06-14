@@ -152,6 +152,7 @@ async def test_persona_bridge_vision_is_not_confirmed_north_star():
     assert v["vision_confirmed"] is False
     assert v["objective_inferred"] is True
     assert v["source"] == "Inferred from onboarding"
+    assert v["provenance"]["provenance_type"] == "advisor_inferred"  # inferred, NOT confirmed fact
 
 
 @pytest.mark.asyncio
@@ -161,6 +162,7 @@ async def test_authored_vision_is_advisor_sourced():
     await life.save_vision(CTX, vision_text="Retire by 60 and raise a secure family")  # no persona source
     v = (await _svc(sb).my_life(CTX))["life_vision"]
     assert v["vision_authored"] is True and v["source"] == "Advisor Discovery"
+    assert v["provenance"]["provenance_type"] in ("user_stated", "user_confirmed")  # never 'assumption'
 
 
 @pytest.mark.asyncio
