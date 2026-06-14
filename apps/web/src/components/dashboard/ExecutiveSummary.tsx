@@ -23,6 +23,10 @@ interface MyLife {
     primary_objective?: string | null;
     confidence_pct?: number;
     discovery_completion_pct?: number;
+    vision_authored?: boolean;
+    vision_confirmed?: boolean;
+    objective_inferred?: boolean;
+    source?: string;
   };
   what_matters_most?: {
     primary_objective?: string | null;
@@ -207,34 +211,89 @@ export default function ExecutiveSummary() {
           <ReadinessRing score={rd.overall ?? null} status={rd.status} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-indigo-500">
-              <Compass className="h-3.5 w-3.5" /> Your north star
+              <Compass className="h-3.5 w-3.5" />{' '}
+              {v.vision_confirmed ? 'Your north star' : 'Your life model'}
             </div>
-            {v.life_vision ? (
-              <p className="mt-1 text-lg font-semibold leading-snug text-gray-900">
-                “{v.life_vision}”
-              </p>
+            {v.vision_confirmed && v.life_vision ? (
+              <>
+                <p className="mt-1 text-lg font-semibold leading-snug text-gray-900">
+                  “{v.life_vision}”
+                </p>
+                {v.primary_objective && (
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                    <span className="font-medium text-gray-700">{v.primary_objective}</span>
+                    {typeof v.confidence_pct === 'number' && (
+                      <span className="text-xs text-gray-400">
+                        · {v.confidence_pct}% confidence
+                      </span>
+                    )}
+                    {typeof v.discovery_completion_pct === 'number' && (
+                      <span className="text-xs text-gray-400">
+                        · {v.discovery_completion_pct}% discovered
+                      </span>
+                    )}
+                  </div>
+                )}
+              </>
             ) : (
-              <EmptyLine text="Your vision will appear here after discovery." />
-            )}
-            {v.primary_objective && (
-              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                <span className="font-medium text-gray-700">{v.primary_objective}</span>
-                {typeof v.confidence_pct === 'number' && (
-                  <span className="text-xs text-gray-400">· {v.confidence_pct}% confidence</span>
+              // Not user-authored / low-confidence → never present it as a polished north star.
+              <div className="mt-1">
+                <p className="text-base font-semibold leading-snug text-gray-900">
+                  Your life model is still forming.
+                </p>
+                {v.primary_objective ? (
+                  <p className="mt-1 text-sm leading-relaxed text-gray-600">
+                    It currently points toward{' '}
+                    <span className="font-medium text-gray-800">{v.primary_objective}</span>
+                    {v.objective_inferred ? ' (inferred from your onboarding)' : ''}, but we need
+                    more detail before treating this as your confirmed north star.
+                    {typeof v.discovery_completion_pct === 'number'
+                      ? ` ${v.discovery_completion_pct}% discovered so far.`
+                      : ''}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-sm leading-relaxed text-gray-500">
+                    Talk to your advisor so we can ground it in what matters to you.
+                  </p>
                 )}
-                {typeof v.discovery_completion_pct === 'number' && (
-                  <span className="text-xs text-gray-400">
-                    · {v.discovery_completion_pct}% discovered
-                  </span>
-                )}
+                <Link
+                  href="/dashboard/advisor"
+                  className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"
+                >
+                  Refine with your advisor <ArrowRight className="h-3 w-3" />
+                </Link>
               </div>
             )}
           </div>
         </div>
       </Card>
 
-      {/* Next best action */}
-      {nba && nba.title && (
+      {/* Honest 'not enough info' state — never a fabricated action/issue */}
+      {nba && nba.kind === 'insufficient' && (
+        <Card className="border-gray-200 bg-gray-50">
+          <div className="flex items-start gap-2">
+            <Compass className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                {nba.label || 'Highest priority issue'}
+              </div>
+              <p className="mt-1 text-sm font-medium text-gray-800">{nba.title}</p>
+              {nba.needed_to_act && (
+                <p className="mt-1 text-sm text-gray-500">{nba.needed_to_act}</p>
+              )}
+              <Link
+                href="/dashboard/advisor"
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"
+              >
+                Add this with your advisor <ArrowRight className="h-3 w-3" />
+              </Link>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Next best action / grounded priority issue */}
+      {nba && nba.kind !== 'insufficient' && nba.title && (
         <Card className="border-indigo-200 bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -305,7 +364,7 @@ export default function ExecutiveSummary() {
               ))}
             </ul>
           ) : (
-            <EmptyLine text="No risks identified yet — they surface from your real situation, not assumptions." />
+            <EmptyLine text="No grounded risks identified yet — they surface from your real situation and recommendations, never generic assumptions." />
           )}
         </Card>
 

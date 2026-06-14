@@ -9,6 +9,7 @@ import React, { useEffect, useState } from 'react';
 
 interface Snapshot {
   life_vision: string | null;
+  vision_authored?: boolean;
   primary_objective: {
     title: string;
     confidence: number | null;
@@ -20,6 +21,33 @@ interface Snapshot {
   active_constraints: { label: string; detail?: string }[];
   objectives: { title: string; confidence: number | null }[];
 }
+
+// Archetype objective-template risks/opportunities (mirror of backend life_discovery.ROOT_OBJECTIVES /
+// GENERIC_RISK_OPP_LABELS). These are NOT grounded in real data, so the dashboard must not present them
+// as personalized opportunities. Grounded opportunities surface via ExecutiveSummary (/api/life/my-life).
+const ARCHETYPE_RISK_OPP = new Set(
+  [
+    'Income loss while dependents rely on you',
+    'No estate plan for guardianship',
+    'Employer dependent-care FSA + family benefits',
+    'Overextending on the mortgage',
+    'First-time buyer programs',
+    'Outliving your assets',
+    'Sequence-of-returns risk',
+    'Full employer 401(k) match',
+    'Tax-advantaged accounts',
+    'Skill obsolescence',
+    'Internal promotion path',
+    'Higher-paying market move',
+    'Debt without a payoff',
+    'Employer tuition assistance',
+    'GI Bill / scholarships',
+    'Undetected chronic risk factors',
+    'Employer wellness + HSA',
+    'The state decides without a plan',
+    'Trust structures',
+  ].map((s) => s.toLowerCase())
+);
 interface Plan {
   conflicts: { between: string[]; type: string; reason: string; suggested_focus: string }[];
 }
@@ -61,6 +89,11 @@ export default function LifeIntelligence() {
 
   if (!loaded || !s || !s.objectives?.length) return null; // no discovery yet → MissionControl handles onboarding
   const po = s.primary_objective;
+  // Grounding gate: never surface archetype-template opportunities as if they were personalized.
+  const groundedOpps = (s.top_opportunities || []).filter(
+    (o) => !ARCHETYPE_RISK_OPP.has(String(o).toLowerCase())
+  );
+  const visionConfirmed = !!(s.vision_authored && s.life_vision);
 
   return (
     <div className="mb-6">
@@ -74,11 +107,19 @@ export default function LifeIntelligence() {
       <div className="mt-2 grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Vision + primary objective */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          {s.life_vision && <div className="text-sm text-gray-700 italic">“{s.life_vision}”</div>}
+          {visionConfirmed ? (
+            <div className="text-sm text-gray-700 italic">“{s.life_vision}”</div>
+          ) : (
+            <div className="text-sm text-gray-600">
+              Your life model is still forming{po ? ` — currently pointing toward ${po.title}` : ''}
+              .
+            </div>
+          )}
           {po && (
             <div className="mt-3">
               <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
-                Primary objective
+                Primary objective{' '}
+                {!visionConfirmed && <span className="text-amber-600">· inferred</span>}
               </div>
               <div className="text-lg font-bold text-gray-900">
                 {po.title}
@@ -133,7 +174,7 @@ export default function LifeIntelligence() {
       </div>
 
       {/* Constraints + opportunities + conflicts */}
-      {s.active_constraints?.length || s.top_opportunities?.length || plan?.conflicts?.length ? (
+      {s.active_constraints?.length || groundedOpps.length || plan?.conflicts?.length ? (
         <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
           {s.active_constraints?.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
@@ -146,10 +187,10 @@ export default function LifeIntelligence() {
               ))}
             </div>
           )}
-          {s.top_opportunities?.length > 0 && (
+          {groundedOpps.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
               <h3 className="text-xs font-bold text-emerald-700 uppercase">Opportunities</h3>
-              {s.top_opportunities.map((o) => (
+              {groundedOpps.map((o) => (
                 <div key={o} className="text-sm text-gray-700 mt-1">
                   {o}
                 </div>
