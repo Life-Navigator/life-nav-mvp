@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..models.common import UserContext
+from .life_discovery import GENERIC_RISK_OPP_LABELS
 
 
 class MyLifeService:
@@ -85,25 +86,54 @@ class MyLifeService:
             health = {}
         po = snap.get("primary_objective") or {}
 
-        # Section 1 — Life Vision (the north star)
+        # Grounded risks/opportunities ONLY (Dashboard Trust Fix). Source from the recommendation engine
+        # (evidence-backed) — archetype objective-template labels (GENERIC_RISK_OPP_LABELS) are NOT surfaced
+        # as personalized dashboard risks/opps without real grounding. They still live in the Life Graph.
+        ranked: list[dict[str, Any]] = []
+        try:
+            pri = await self._os.prioritize(ctx, top=6)
+            ranked = pri.get("top_actions") or []
+        except Exception:  # noqa: BLE001
+            ranked = []
+
+        def _typ(x: dict[str, Any]) -> str:
+            return str(x.get("rec_type") or x.get("classification") or "").upper()
+
+        grounded_risks = [x["title"] for x in ranked if _typ(x) == "RISK" and x.get("title")]
+        grounded_opps = [x["title"] for x in ranked if _typ(x) == "OPPORTUNITY" and x.get("title")]
+        # Keep any genuinely user-specific (non-archetype) snapshot risks/opps; drop the generic templates.
+        extra_risks = [r for r in (snap.get("top_risks") or []) if str(r).strip().lower() not in GENERIC_RISK_OPP_LABELS]
+        extra_opps = [o for o in (snap.get("top_opportunities") or []) if str(o).strip().lower() not in GENERIC_RISK_OPP_LABELS]
+        risks_out = list(dict.fromkeys([*grounded_risks, *extra_risks]))[:5]
+        opps_out = list(dict.fromkeys([*grounded_opps, *extra_opps]))[:5]
+
+        # Section 1 — Life Vision (the north star). Only a USER-AUTHORED, high-confidence vision is treated
+        # as a confirmed north star; otherwise the model is "still forming" and the objective is inferred.
+        discovery_pct = round((health.get("model_quality") or 0) * 100)
+        obj_conf_pct = round((po.get("confidence") or 0) * 100)
+        authored = bool(snap.get("vision_authored"))
+        vision_confirmed = authored and obj_conf_pct >= 60 and discovery_pct >= 40
         vision = {
             "life_vision": snap.get("life_vision"),
+            "vision_authored": authored,
+            "vision_confirmed": vision_confirmed,
             "primary_objective": po.get("title"),
-            "confidence_pct": round((po.get("confidence") or 0) * 100),
-            "discovery_completion_pct": round((health.get("model_quality") or 0) * 100),
-            "source": "Advisor Discovery",
+            "objective_inferred": bool(po.get("title")) and not authored,
+            "confidence_pct": obj_conf_pct,
+            "discovery_completion_pct": discovery_pct,
+            "source": "Advisor Discovery" if authored else "Inferred from onboarding",
         }
 
-        # Section 2 — What Matters Most (reinforces the Discovery Reveal)
+        # Section 2 — What Matters Most (grounded risks/opportunities only)
         what_matters = {
             "primary_objective": po.get("title"),
             "reasoning": po.get("reasoning"),
             "depends_on": [d["label"] for d in snap.get("open_dependencies", [])],
-            "risks": snap.get("top_risks"),
+            "risks": risks_out,
             "constraints": [c["label"] for c in snap.get("active_constraints", [])],
-            "opportunities": snap.get("top_opportunities"),
+            "opportunities": opps_out,
             "supporting_objectives": [o["title"] for o in snap.get("objectives", [])[1:]],
-            "source": "Life Graph",
+            "source": "Recommendation OS + Advisor Discovery",
         }
 
         # Section 3 — Life Readiness snapshot (cross-domain; missing surfaced honestly)
@@ -116,29 +146,27 @@ class MyLifeService:
         except Exception:  # noqa: BLE001
             readiness = {"overall": None, "domains": [], "source": "Life Readiness Engine"}
 
-        # Section 4 — Next Best Action OR Highest Priority Issue (P4). Prefer the top ACTION/
-        # OPPORTUNITY (something the user can DO). If only RISK/DEPENDENCY recs exist, DON'T mislabel
-        # a risk as an action — reframe it as the highest-priority issue with what's needed to make
-        # it actionable.
-        next_action = None
-        try:
-            pri = await self._os.prioritize(ctx, top=6)
-            ranked = pri.get("top_actions") or []
-            action = next((x for x in ranked if (x.get("rec_type") or "ACTION") in ("ACTION", "OPPORTUNITY")), None)
-            if action:
-                next_action = {"kind": "action", "label": "Your next best action", "title": action["title"],
-                               "why": action.get("why"), "recommended_action": action.get("recommended_action"),
-                               "expected_benefit": action.get("expected_benefit"), "confidence_pct": round((action.get("confidence") or 0) * 100),
-                               "quantified_impact": action.get("quantified_impact"), "rec_type": action.get("rec_type", "ACTION"),
-                               "source": "Recommendation OS"}
-            elif ranked:
-                issue = ranked[0]
-                next_action = {"kind": "priority_issue", "label": "Highest priority issue", "title": issue["title"],
-                               "why": issue.get("why"), "priority": "high", "rec_type": issue.get("rec_type", "RISK"),
-                               "needed_to_act": "Add your income, savings rate, and retirement details so we can turn this into a concrete recommendation.",
-                               "confidence_pct": round((issue.get("confidence") or 0) * 100), "source": "Recommendation OS"}
-        except Exception:  # noqa: BLE001
-            pass
+        # Section 4 — Next Best Action OR Highest Priority Issue (P4). Prefer the top ACTION/OPPORTUNITY
+        # (something the user can DO). If only RISK/DEPENDENCY recs exist, reframe as the highest-priority
+        # issue. If NOTHING is grounded, say so honestly + list the inputs needed — never invent an issue.
+        action = next((x for x in ranked if _typ(x) in ("ACTION", "OPPORTUNITY")), None)
+        if action:
+            next_action = {"kind": "action", "label": "Your next best action", "title": action["title"],
+                           "why": action.get("why"), "recommended_action": action.get("recommended_action"),
+                           "expected_benefit": action.get("expected_benefit"), "confidence_pct": round((action.get("confidence") or 0) * 100),
+                           "quantified_impact": action.get("quantified_impact"), "rec_type": action.get("rec_type", "ACTION"),
+                           "source": "Recommendation OS"}
+        elif ranked:
+            issue = ranked[0]
+            next_action = {"kind": "priority_issue", "label": "Highest priority issue", "title": issue["title"],
+                           "why": issue.get("why"), "priority": "high", "rec_type": issue.get("rec_type", "RISK"),
+                           "needed_to_act": "Add your income, savings rate, and retirement details so we can turn this into a concrete recommendation.",
+                           "confidence_pct": round((issue.get("confidence") or 0) * 100), "source": "Recommendation OS"}
+        else:
+            next_action = {"kind": "insufficient", "label": "Highest priority issue",
+                           "title": "Not enough information to identify a highest-priority issue yet.",
+                           "needed_to_act": "Add income, savings rate, major debts, retirement target, and family obligations so LifeNavigator can identify your highest-priority issue.",
+                           "source": "Recommendation OS"}
 
         # Section 5 — Current Constraints (what's blocking progress)
         constraints = [{"label": c["label"], "detail": c.get("detail"), "source": "Advisor Discovery"}

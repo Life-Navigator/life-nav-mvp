@@ -84,6 +84,22 @@ ROOT_OBJECTIVES: dict[str, dict[str, Any]] = {
     },
 }
 
+# Generic, archetype-level risk/opportunity labels attached to ROOT_OBJECTIVES. These are concept
+# TEMPLATES for an objective, NOT grounded in a user's real data. The dashboard must never surface them as
+# personalized risks/opportunities unless a real engine/evidence grounds them (gated in my_life). The Life
+# Graph still renders them as relationship nodes — this set only gates DASHBOARD display.
+def _generic_risk_opp_labels() -> frozenset:
+    out: set[str] = set()
+    for spec in ROOT_OBJECTIVES.values():
+        for coll in ("risks", "opportunities"):
+            for label, _domain in spec.get(coll, []):
+                out.add(str(label).strip().lower())
+    return frozenset(out)
+
+
+GENERIC_RISK_OPP_LABELS = _generic_risk_opp_labels()
+
+
 # ── Life Theme layer (Sprint 34): statements -> weighted themes -> objectives (not keyword routing) ──
 THEMES: dict[str, list[str]] = {
     "freedom": ["freedom", "free", "depend on anyone", "don't want to depend", "not depend", "independent", "independence", "on my own", "not rely", "autonomy", "self-sufficient", "self sufficient"],
@@ -456,8 +472,14 @@ class LifeDiscoveryService:
         opps = [o for o in await self._rows("opportunities", ctx) if o.get("objective_id") in active_ids]
         cons = [c for c in await self._rows("constraints", ctx) if c.get("objective_id") in active_ids]
         primary = max(objectives, key=lambda o: float(o.get("confidence") or 0), default=None)
+        v0 = vision[0] if vision else None
+        vsource = str((v0.get("prompts") or {}).get("source") or "") if v0 else ""
         return {
-            "life_vision": vision[0].get("vision_text") if vision else None,
+            "life_vision": v0.get("vision_text") if v0 else None,
+            # Authored = the user actually stated it (via the advisor). persona_bridge visions are
+            # synthesized from onboarding and must NOT be presented as a confirmed north star.
+            "vision_source": vsource or None,
+            "vision_authored": bool(v0 and v0.get("vision_text") and vsource != "persona_bridge"),
             "primary_objective": ({"title": primary["title"], "confidence": primary.get("confidence"),
                                    "reasoning": primary.get("reasoning"), "alternatives": primary.get("alternatives"),
                                    "themes": primary.get("themes")} if primary else None),

@@ -104,3 +104,66 @@ async def test_next_best_action_prefers_action_over_risk(monkeypatch):
     out = await svc.my_life(CTX)
     nba = out["next_best_action"]
     assert nba and nba["rec_type"] == "ACTION" and "401(k)" in nba["title"]  # RISK was skipped
+
+
+# ---- Dashboard Trust Fix: no invented risks/opps, honest north star, honest priority ----
+@pytest.mark.asyncio
+async def test_generic_archetype_risks_and_opps_are_not_surfaced():
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    await life.discover_goal(CTX, surface_goal="retire early", why_chain=[{"a": "freedom and independence"}])
+    out = await _svc(sb).my_life(CTX)
+    risks = out["what_matters_most"]["risks"]
+    opps = out["what_matters_most"]["opportunities"]
+    # Archetype templates must NOT appear as personalized dashboard risks/opps without grounding.
+    for generic in ("Outliving your assets", "Sequence-of-returns risk"):
+        assert generic not in risks
+    for generic in ("Full employer 401(k) match", "Tax-advantaged accounts"):
+        assert generic not in opps
+
+
+@pytest.mark.asyncio
+async def test_grounded_recommendation_risk_surfaces(monkeypatch):
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    await life.discover_goal(CTX, surface_goal="retire early", why_chain=[{"a": "freedom"}])
+    svc = _svc(sb)
+
+    async def fake_prioritize(ctx, top=6):
+        return {"top_actions": [{"title": "Underfunded emergency reserve", "rec_type": "RISK", "confidence": 0.8}]}
+
+    monkeypatch.setattr(svc._os, "prioritize", fake_prioritize)
+    out = await svc.my_life(CTX)
+    assert "Underfunded emergency reserve" in out["what_matters_most"]["risks"]  # grounded → shown
+    assert out["next_best_action"]["kind"] == "priority_issue"
+
+
+@pytest.mark.asyncio
+async def test_persona_bridge_vision_is_not_confirmed_north_star():
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    await life.save_vision(CTX, vision_text="Build security and progress through mid-career.",
+                           prompts={"source": "persona_bridge"})
+    await life.discover_goal(CTX, surface_goal="retire early", why_chain=[{"a": "freedom"}])
+    v = (await _svc(sb).my_life(CTX))["life_vision"]
+    assert v["vision_authored"] is False
+    assert v["vision_confirmed"] is False
+    assert v["objective_inferred"] is True
+    assert v["source"] == "Inferred from onboarding"
+
+
+@pytest.mark.asyncio
+async def test_authored_vision_is_advisor_sourced():
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    await life.save_vision(CTX, vision_text="Retire by 60 and raise a secure family")  # no persona source
+    v = (await _svc(sb).my_life(CTX))["life_vision"]
+    assert v["vision_authored"] is True and v["source"] == "Advisor Discovery"
+
+
+@pytest.mark.asyncio
+async def test_no_grounded_action_yields_honest_insufficient_state():
+    nba = (await _svc(FakeSupabase({})).my_life(CTX))["next_best_action"]
+    assert nba["kind"] == "insufficient"
+    assert "Not enough information" in nba["title"]
+    assert "income" in nba["needed_to_act"].lower()
