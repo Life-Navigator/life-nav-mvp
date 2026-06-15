@@ -1,9 +1,49 @@
 # Beta Go / No-Go Report
 
+> ## ✅ UPDATED VERDICT (after GO-remediation sprint): GO
+>
+> The single blocker (latency) was remediated via **streaming**. End-to-end, live, measured:
+>
+> | Success criterion                                      | Target                | Result                                                                                                             |     |
+> | ------------------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------ | --- |
+> | Fallback rate                                          | remains 0%            | **0%** (eval 0/24 + decision probe 0/16)                                                                           | ✅  |
+> | Trust violations                                       | remain 0              | **0** (advice/numbers/archetype/provenance all clean)                                                              | ✅  |
+> | Perceived latency                                      | improves meaningfully | **first useful text 1.3s** (was ~9s) via SSE streaming                                                             | ✅  |
+> | p95 < 6s **OR** streaming makes first-token acceptable | either                | streaming first-token **1.3s** (raw full-answer p95 still ~13–16s)                                                 | ✅  |
+> | Hard-decision answers                                  | less evasive          | vision-deflection **19%** (was the majority); **56%** ask a decision-relevant input; same-message numbers now used | ✅  |
+>
+> **What shipped in remediation (live v94 on Fly + frontend wired to SSE):**
+>
+> 1. **Streaming** — new `POST /v1/life/discovery/chat/stream` (SSE): emits a fast deterministic `ack`
+>    (~1.3s) then the fully validated `final`. Web advisor page consumes it with graceful fallback.
+> 2. **`context_build` parallelized** (`asyncio.gather`) — the 3 independent reads now overlap.
+> 3. **Decision-engagement prompt (v2.2.0)** — surfaces the user's stated numbers
+>    (`numbers_you_may_reference`) and instructs the advisor to reflect them and frame the decision instead
+>    of deflecting to "what's your vision". Proven: _"with your $120k income and $60k in savings… $450k house."_
+> 4. **Validator carve-outs (trust intact)** — the richer reflections tripped two false positives
+>    (re-introducing ~12% fallback); fixed precisely: the relationship gate ignores benign "connects to your
+>    vision/goals" but still catches goal-to-goal claims; the advice gate ignores the advisor _reflecting_
+>    the user's own "how much should I…" question. Genuine advice / fabricated relationships still rejected
+>    (4 new tests). This restored fallback to **0%**.
+> 5. **Persistence bug fixed** — fire-and-forget turn-log writes were being GC'd (most rows dropped under
+>    load); now hold a strong task ref → **6/6** turns persist.
+>
+> **Honest residuals (P1, not blockers):** raw full-answer latency is still ~9s server (p95 ~13–16s) —
+> streaming masks it with a 1.3s first paint but doesn't shrink it (flash is already fast; a real cut needs
+> prompt trimming or a faster model). Cross-turn number carry: same-message numbers are used, but figures
+> stated a _prior_ turn aren't yet threaded into context (`TOP_20_ADVISOR_IMPROVEMENTS.md` #8). Frontend
+> streaming deploys to users on the Vercel build of this branch; the backend is already live (Fly v94).
+>
+> The original NO-GO analysis is preserved below for the record.
+
+---
+
+# Beta Go / No-Go Report (original — pre-remediation)
+
 **Question:** Is LifeNavigator ready for a 20-person beta?
 **Decision:**
 
-# 🔴 NO GO
+# 🔴 NO GO _(superseded by the GO verdict above)_
 
 Narrowly — and now down to **a single blocker**. The trust foundation is solid, the fallback fix is proven
 live, and the durable observability is now live in production (migration applied, metrics endpoint

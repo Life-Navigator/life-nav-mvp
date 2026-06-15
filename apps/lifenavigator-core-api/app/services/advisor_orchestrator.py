@@ -36,6 +36,12 @@ from .advisor_validator import validate
 
 log = logging.getLogger("core.advisor")
 
+# Strong references to in-flight best-effort turn-log writes. asyncio only keeps a weak reference to a
+# fire-and-forget task, so without this the task can be garbage-collected mid-await and the insert is
+# silently dropped (observed: most rows lost under load). Module scope so it survives the per-request
+# orchestrator instance. Each task removes itself on completion.
+_PENDING_WRITES: set = set()
+
 
 def build_constraints(base: dict[str, Any], context: Any) -> dict[str, Any]:
     """The rule ENVELOPE the LLM must reason inside — constraints and permissions, NOT a scripted move.
@@ -98,12 +104,10 @@ class AdvisorOrchestrator:
         self._sb = supabase  # best-effort advisor-turn persistence (ops.advisor_turns)
         self.prompt_version = ADVISOR_PROMPT_VERSION
 
-    async def converse(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
-                       *, conversation_id: Optional[str] = None, trace: bool = False) -> dict[str, Any]:
+    def _init_trace(self, message: str, conversation_id: Optional[str], user_id: str) -> dict[str, Any]:
         # Per-turn telemetry (P0.1/P0.4/P0.5) — stage timings + outcome, logged + best-effort persisted.
-        t0 = time.perf_counter()
-        tr: dict[str, Any] = {
-            "turn_id": str(uuid.uuid4()), "conversation_id": conversation_id, "user_id": ctx.user_id,
+        return {
+            "turn_id": str(uuid.uuid4()), "conversation_id": conversation_id, "user_id": user_id,
             "timestamp": datetime.now(timezone.utc).isoformat(), "prompt_version": self.prompt_version,
             "llm_status": "", "validator_result": "n/a", "validator_reason": "", "validator_repairs": [],
             "fallback_used": False, "fallback_reason": "", "stages_ms": {}, "latency_ms": 0,
@@ -111,20 +115,11 @@ class AdvisorOrchestrator:
             "graph_edges_available": 0, "relationships_referenced": [], "confidence": None,
             "llm_response_raw": "", "user_message": (message or "")[:4000], "advisor_response": "",
         }
-        mark = t0
 
-        def lap(name: str) -> None:
-            nonlocal mark
-            now = time.perf_counter()
-            tr["stages_ms"][name] = round((now - mark) * 1000, 1)
-            mark = now
-
-        # 1) Deterministic turn — persistence (candidate/rejected goals), canonical writes, safe fallback text.
-        base = await self._rm.converse(ctx, message, pending_key)
-        lap("deterministic_turn")
-        if not self._enabled:
-            tr["llm_status"] = base.get("llm_status") or "disabled"
-            return self._finish(ctx, base, tr, t0, trace)
+    async def _enhance(self, base: dict[str, Any], ctx: UserContext, message: str, tr: dict[str, Any], lap) -> None:
+        """LLM enhancement: build context → generate → validate → compose. Mutates base + tr in place.
+        Never raises — on any failure, base keeps its deterministic fallback text and llm_status is set.
+        Shared by converse() and converse_stream() so both paths produce identical outcomes/telemetry."""
         try:
             context = await self._ctx.build(ctx, message, base)
             lap("context_build")
@@ -140,20 +135,20 @@ class AdvisorOrchestrator:
             if out is None:
                 base["llm_status"] = "fallback:unavailable"
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, "llm_unavailable_or_unparseable", "n/a"
-                return self._finish(ctx, base, tr, t0, trace)
+                return
             ok, safe, reasons = validate(out, context)
             lap("validate")
             if not ok:
                 base["llm_status"] = "fallback:" + ("; ".join(reasons))[:140]
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"], tr["validator_reason"] = (
                     True, "; ".join(reasons), "rejected", "; ".join(reasons))
-                return self._finish(ctx, base, tr, t0, trace)
+                return
             composed = _compose(safe)
             lap("compose")
             if not composed:
                 base["llm_status"] = "fallback:empty"
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, "empty_composed", "accepted"
-                return self._finish(ctx, base, tr, t0, trace)
+                return
             # Merge: only the human-facing text changes; all deterministic outcomes are preserved.
             base["assistant_message"] = composed
             base["llm_status"] = "enhanced"
@@ -165,11 +160,58 @@ class AdvisorOrchestrator:
             tr["validator_result"] = "repaired" if safe.get("_repairs") else "accepted"
             tr["validator_repairs"] = safe.get("_repairs") or []
             tr["relationships_referenced"] = safe.get("relationships_referenced") or []
-            return self._finish(ctx, base, tr, t0, trace)
         except Exception as e:  # noqa: BLE001 — never break the user experience
             base["llm_status"] = "fallback:error"
             tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, f"error:{type(e).__name__}", "n/a"
+
+    async def converse(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
+                       *, conversation_id: Optional[str] = None, trace: bool = False) -> dict[str, Any]:
+        t0 = time.perf_counter()
+        tr = self._init_trace(message, conversation_id, ctx.user_id)
+        mark = t0
+
+        def lap(name: str) -> None:
+            nonlocal mark
+            now = time.perf_counter()
+            tr["stages_ms"][name] = round((now - mark) * 1000, 1)
+            mark = now
+
+        # 1) Deterministic turn — persistence (candidate/rejected goals), canonical writes, safe fallback text.
+        base = await self._rm.converse(ctx, message, pending_key)
+        lap("deterministic_turn")
+        if not self._enabled:
+            tr["llm_status"] = base.get("llm_status") or "disabled"
             return self._finish(ctx, base, tr, t0, trace)
+        await self._enhance(base, ctx, message, tr, lap)
+        return self._finish(ctx, base, tr, t0, trace)
+
+    async def converse_stream(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
+                              *, conversation_id: Optional[str] = None, trace: bool = False):
+        """Progressive variant: yield a fast deterministic ACK first (the trust-safe text we'd show on
+        fallback anyway, ready in ~1s), then the fully validated enhanced answer. Same telemetry/persistence
+        as converse(). The validator still gates everything the user accepts as advice — the ack only mirrors
+        the deterministic engine, which never fabricates. Yields event dicts: {"type": "ack"|"final", ...}."""
+        t0 = time.perf_counter()
+        tr = self._init_trace(message, conversation_id, ctx.user_id)
+        mark = t0
+
+        def lap(name: str) -> None:
+            nonlocal mark
+            now = time.perf_counter()
+            tr["stages_ms"][name] = round((now - mark) * 1000, 1)
+            mark = now
+
+        base = await self._rm.converse(ctx, message, pending_key)
+        lap("deterministic_turn")
+        # Fast first paint — the deterministic, trust-safe acknowledgment.
+        yield {"type": "ack", "assistant_message": base.get("assistant_message") or "",
+               "pending_key": base.get("pending_key") or "", "turn_id": tr["turn_id"]}
+        if self._enabled:
+            await self._enhance(base, ctx, message, tr, lap)
+        else:
+            tr["llm_status"] = base.get("llm_status") or "disabled"
+        self._finish(ctx, base, tr, t0, trace)  # log + best-effort persist + (optional) attach _trace
+        yield {"type": "final", **base}
 
     def _finish(self, ctx: UserContext, base: dict[str, Any], tr: dict[str, Any], t0: float, trace: bool) -> dict[str, Any]:
         """Finalize telemetry: stamp latency/outcome, emit a metadata log line, best-effort persist, and
@@ -194,7 +236,9 @@ class AdvisorOrchestrator:
                    "llm_response_raw": (tr["llm_response_raw"] or "")[:8000]}
             try:
                 import asyncio
-                asyncio.ensure_future(self._persist(row))
+                task = asyncio.ensure_future(self._persist(row))
+                _PENDING_WRITES.add(task)  # hold a strong ref so the task isn't GC'd before it completes
+                task.add_done_callback(_PENDING_WRITES.discard)
             except Exception:  # noqa: BLE001
                 pass
         if trace:

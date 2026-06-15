@@ -25,10 +25,44 @@ _RELATION = re.compile(
     re.IGNORECASE,
 )
 
+# Phrases that inherently assert a link between TWO entities — the real "invented graph reasoning" risk.
+# (Single-target discovery talk like "tied to this goal" / "connects to your vision" is NOT here — that was
+# a false-positive fallback source. A two-named-goal claim is caught separately, below.)
+_RELATION_ASSERT = re.compile(
+    r"\b(connection between|interrelated|interconnected|tied together|"
+    r"work against each other|competes? with|trade ?off against|at odds with|reinforces?|"
+    r"both (?:support|feed|point|connect|relate)|are connected|are linked|are related|"
+    r"connected to each other|relate to each other)\b",
+    re.IGNORECASE,
+)
+
+
+def _asserts_goal_relationship(text: str, goals: list[str]) -> bool:
+    """True only if the text asserts a relationship that needs a real graph edge:
+      * explicit two-entity / mutual phrasing ("connection between", "interrelated", "compete with"), OR
+      * a single-target relation phrase ("connected to", "tied to") that names ≥2 of the user's OWN goals
+        (i.e. claims goal-A links to goal-B).
+    Generic "…tied to this goal / connects to your vision/future…" is benign discovery language and passes."""
+    if _RELATION_ASSERT.search(text):
+        return True
+    if _RELATION.search(text):
+        low = text.lower()
+        # A single-target phrase is a goal-to-goal claim when it links two goals: either ≥2 of the user's
+        # OWN goal labels appear, or the text says "goal"/"objective" ≥2 times ("retirement goal is
+        # connected to your education goal"). One "…tied to this goal" is benign discovery talk.
+        named = sum(1 for g in goals if g and len(str(g)) > 3 and str(g).lower() in low)
+        goal_words = len(re.findall(r"\b(?:goals?|objectives?)\b", low))
+        if named >= 2 or goal_words >= 2:
+            return True
+    return False
+
 # Phrases that mean the advisor is RECOMMENDING / advising rather than discovering — not allowed here
 # (recommendations come from the recommendation engine; medical/legal/tax advice is never allowed).
+# Note: the "you should <verb>" directive is excluded when preceded by "much " / "whether " — that is the
+# advisor REFLECTING the user's own question ("how much you should put down"), not giving advice. A genuine
+# directive ("You should put 20% down") is not so preceded and is still caught (as is "put down <amount>").
 _ADVICE = re.compile(
-    r"\b(i recommend|i'?d recommend|i advise|i suggest you|you should (?:put|invest|buy|sell|borrow|take|withdraw|contribute|refinance)|"
+    r"\b(i recommend|i'?d recommend|i advise|i suggest you|(?<!much )(?<!whether )you should (?:put|invest|buy|sell|borrow|take|withdraw|contribute|refinance)|"
     r"you must (?:invest|buy|sell|borrow|put|pay)|the best option is|the right (?:amount|choice) is|"
     r"put down \d|i diagnose|you have (?:a )?(?:condition|disease|disorder)|you should take \w+ ?mg|prescrib|"
     r"for tax purposes you should|legally you (?:should|must)|you qualify for a tax)\b",
@@ -89,7 +123,8 @@ def _check_relationships(result: dict[str, Any], context: AdvisorContext, visibl
     if invalid:
         bad = ", ".join(f"{(c or {}).get('from')}–{(c or {}).get('to')}" for c in invalid)
         reasons.append(f"unsupported relationship referenced (not in graph): {bad}")
-    if _RELATION.search(visible):
+    goal_labels = list(context.candidate_goals or []) + ([context.primary_objective] if context.primary_objective else [])
+    if _asserts_goal_relationship(visible, goal_labels):
         if not pairs:
             reasons.append("relationship mentioned but the user's graph has no edges")
         elif not valid:

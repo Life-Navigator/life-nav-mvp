@@ -18,6 +18,7 @@ says nothing about connections.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -213,6 +214,9 @@ class AdvisorContext:
             "discovery_scores_by_domain": self.discovery_scores,
             "domain_priorities_lowest_coverage_first": self.domain_priorities,
             "discovery_completion_pct": self.discovery_pct,
+            # The user's own stated figures — SAFE to reference/reflect back (validator allows these).
+            # Surfacing them explicitly so the advisor engages the numbers instead of deflecting.
+            "numbers_you_may_reference": sorted(self.allowed_numbers),
             "relationship_edges": self.relationship_edges,
             "graph_connections": self.connections,
             "relationships_available": self.relationships_available,
@@ -287,9 +291,11 @@ class AdvisorContextBuilder:
         cands = [c.get("goal") for c in (base.get("candidate_goals") or []) if c.get("goal")]
         if not cands:
             cands = list(panel.get("priorities_i_heard") or [])
-        rejected = await self._rejected(ctx)
-        scores, priorities = await self._scores(ctx)
-        edges, connections, connected_pairs = await self._relationships(ctx)
+        # These three reads are independent (rejected goals, discovery scores, personal graph) — run them
+        # concurrently to cut the context_build stage (~16% of turn latency) roughly to its slowest read.
+        rejected, (scores, priorities), (edges, connections, connected_pairs) = await asyncio.gather(
+            self._rejected(ctx), self._scores(ctx), self._relationships(ctx)
+        )
         risks = [str(r) for r in (panel.get("top_risks") or [])]
         opps = [str(o) for o in (panel.get("top_opportunities") or [])]
         cons = [str(c) for c in (panel.get("top_constraints") or [])]

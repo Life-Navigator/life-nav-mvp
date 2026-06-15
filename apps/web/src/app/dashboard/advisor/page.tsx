@@ -50,6 +50,7 @@ interface Msg {
   text: string;
   updates?: string[];
   reveal?: Reveal | null;
+  stream?: boolean; // a fast deterministic ack still awaiting the validated answer
 }
 
 export default function AdvisorPage() {
@@ -205,8 +206,8 @@ export default function AdvisorPage() {
     setPanel(t.context_panel || {});
     setComplete(t.complete);
   };
-  const send = async (message: string, pending_key: string | null) => {
-    setBusy(true);
+  // Non-streaming fallback (used if the SSE stream is unavailable).
+  const sendBlocking = async (message: string, pending_key: string | null) => {
     const t = await fetch('/api/life/discovery-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -215,7 +216,72 @@ export default function AdvisorPage() {
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null);
     apply(t);
-    setBusy(false);
+  };
+
+  const send = async (message: string, pending_key: string | null) => {
+    setBusy(true);
+    try {
+      const resp = await fetch('/api/life/discovery-chat-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, pending_key: pending_key ?? '' }),
+      });
+      if (!resp.ok || !resp.body) {
+        await sendBlocking(message, pending_key);
+        return;
+      }
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      let sawFinal = false;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf('\n\n')) >= 0) {
+          const frame = buf.slice(0, nl);
+          buf = buf.slice(nl + 2);
+          const line = frame.split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          let evt: Turn & { type: string; assistant_message: string };
+          try {
+            evt = JSON.parse(line.slice(5).trim());
+          } catch {
+            continue;
+          }
+          if (evt.type === 'ack') {
+            // Fast first paint — show the deterministic acknowledgment immediately.
+            setMsgs((m) => [...m, { role: 'advisor', text: evt.assistant_message, stream: true }]);
+          } else if (evt.type === 'final') {
+            sawFinal = true;
+            // Replace the streaming placeholder with the validated answer; apply all state updates.
+            setMsgs((m) => {
+              const copy = [...m];
+              const last = copy[copy.length - 1];
+              const finalMsg: Msg = {
+                role: 'advisor',
+                text: evt.assistant_message,
+                updates: evt.updates,
+                reveal: evt.reveal,
+              };
+              if (last && last.role === 'advisor' && last.stream) copy[copy.length - 1] = finalMsg;
+              else copy.push(finalMsg);
+              return copy;
+            });
+            setPending(evt.pending_key);
+            setOptions(evt.options ?? null);
+            setPanel(evt.context_panel || {});
+            setComplete(evt.complete);
+          }
+        }
+      }
+      if (!sawFinal) await sendBlocking(message, pending_key); // stream cut off → safe fallback
+    } catch {
+      await sendBlocking(message, pending_key);
+    } finally {
+      setBusy(false);
+    }
   };
   useEffect(() => {
     send('', null); /* open the conversation */

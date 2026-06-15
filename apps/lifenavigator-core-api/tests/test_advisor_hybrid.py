@@ -256,6 +256,60 @@ async def test_validator_keeps_single_choice_question_untouched():
 
 
 @pytest.mark.asyncio
+async def test_validator_allows_reflecting_users_own_should_question():
+    # The advisor reflecting the user's own "how much should I put down" is NOT advice (false-positive fix).
+    ctx = await _build_ctx("How much should I put down on a house?", _base())
+    out = _good_llm(reflection="You're looking to understand how much you should put down on a house.",
+                    next_question="What price range are the homes you're considering?")
+    ok, _, reasons = validate(out, ctx)
+    assert ok and not reasons
+
+
+@pytest.mark.asyncio
+async def test_validator_still_rejects_genuine_directive_advice():
+    ctx = await _build_ctx("what do I do", _base())
+    ok, _, reasons = validate(_good_llm(next_question="You should invest in index funds, right?"), ctx)
+    assert not ok and any("advice" in r for r in reasons)
+
+
+@pytest.mark.asyncio
+async def test_validator_allows_connecting_topic_to_vision_without_edges():
+    # Generic "connects to your broader vision/goals" is discovery talk, not a fabricated goal-to-goal edge.
+    ctx = await _build_ctx("I want to become a manager", _base())  # fresh user → no graph edges
+    out = _good_llm(reflection="Becoming a manager connects to your broader life vision and your goals.",
+                    why_this_question="It helps relate this to your future and your priorities.")
+    ok, _, reasons = validate(out, ctx)
+    assert ok and not reasons
+
+
+@pytest.mark.asyncio
+async def test_validator_allows_single_goal_discovery_language():
+    # The real false positive from the live eval: "tied to this significant goal" is benign (one goal).
+    ctx = await _build_ctx("I am a veteran and want to buy a home", _base())  # no edges
+    out = _good_llm(why_this_question="This helps us understand the needs and aspirations tied to this significant goal.")
+    ok, _, reasons = validate(out, ctx)
+    assert ok and not reasons
+
+
+@pytest.mark.asyncio
+async def test_validator_still_rejects_two_entity_relationship_without_edge():
+    ctx = await _build_ctx("retire and fund college", _base())  # no edges
+    out = _good_llm(reflection="There's a connection between your retirement and your education funding.")
+    ok, _, reasons = validate(out, ctx)
+    assert not ok and any("relationship" in r for r in reasons)
+
+
+@pytest.mark.asyncio
+async def test_validator_rejects_two_named_goals_linked_without_edge():
+    # A single-target phrase that names TWO of the user's own goals IS a goal-to-goal claim → needs an edge.
+    base = _base(candidate_goals=[{"goal": "retirement"}, {"goal": "college funding"}])
+    ctx = await _build_ctx("retire and fund college", base)  # no edges
+    out = _good_llm(reflection="Your retirement is connected to your college funding.")
+    ok, _, reasons = validate(out, ctx)
+    assert not ok and any("relationship" in r for r in reasons)
+
+
+@pytest.mark.asyncio
 async def test_validator_drops_rejected_goal_and_nonuser_facts():
     rejected = [{"rejected_goal": "advance my career"}]
     ctx = await _build_ctx("retire at 60", _base(), rejected=rejected)
@@ -357,6 +411,28 @@ async def test_gemini_advisor_llm_captures_token_usage():
     assert out is not None
     assert llm.last_usage == {"prompt_tokens": 120, "completion_tokens": 45, "total_tokens": 165}
     assert llm.last_raw  # raw text retained for the trace / llm_response_raw
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_stream_emits_ack_then_final():
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(_good_llm()))
+    events = [e async for e in orch.converse_stream(_ctx(), "what should I do")]
+    assert [e["type"] for e in events] == ["ack", "final"]
+    # ack is the fast deterministic text; final is the LLM-enhanced answer
+    assert events[0]["assistant_message"] == base["assistant_message"]
+    assert events[1]["llm_status"] == "enhanced"
+    assert events[1]["assistant_message"] and events[1]["assistant_message"] != base["assistant_message"]
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_stream_falls_back_to_ack_on_llm_failure():
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), RaisingLLM())
+    events = [e async for e in orch.converse_stream(_ctx(), "hi")]
+    assert [e["type"] for e in events] == ["ack", "final"]
+    assert events[1]["llm_status"] == "fallback:error"
+    assert events[1]["assistant_message"] == base["assistant_message"]  # deterministic text preserved
 
 
 @pytest.mark.asyncio
