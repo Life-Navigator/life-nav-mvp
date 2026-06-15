@@ -185,6 +185,9 @@ class AdvisorContext:
     connections: list[dict[str, Any]] = field(default_factory=list)
     connected_pairs: set[frozenset[str]] = field(default_factory=set)
     safety_constraints: list[str] = field(default_factory=lambda: list(_SAFETY))
+    # P0.1 cross-turn context: the recent turns this session (most-recent last), so the advisor never
+    # "starts over". [{ "user": "...", "advisor": "..." }]. Read from analytics.advisor_turns, not persisted.
+    conversation_so_far: list[dict[str, str]] = field(default_factory=list)
 
     @property
     def relationships_available(self) -> bool:
@@ -220,6 +223,8 @@ class AdvisorContext:
             "relationship_edges": self.relationship_edges,
             "graph_connections": self.connections,
             "relationships_available": self.relationships_available,
+            # P0.1: the recent conversation so the advisor uses prior turns and never starts over.
+            "conversation_so_far": self.conversation_so_far,
             "user_message": self.user_message,
             "safety_constraints": self.safety_constraints,
         }
@@ -285,8 +290,10 @@ class AdvisorContextBuilder:
             out.append({"label": "goal", "value": g, "source": "user_message"})
         return out
 
-    async def build(self, ctx: UserContext, message: str, base: dict[str, Any]) -> AdvisorContext:
-        """`base` is the deterministic RelationshipManager.converse() result for this turn."""
+    async def build(self, ctx: UserContext, message: str, base: dict[str, Any],
+                    history: Optional[list[dict[str, str]]] = None) -> AdvisorContext:
+        """`base` is the deterministic RelationshipManager.converse() result for this turn. `history` is the
+        recent conversation (most-recent last, [{user, advisor}]) — P0.1 cross-turn context."""
         panel = base.get("context_panel") or {}
         cands = [c.get("goal") for c in (base.get("candidate_goals") or []) if c.get("goal")]
         if not cands:
@@ -299,7 +306,11 @@ class AdvisorContextBuilder:
         risks = [str(r) for r in (panel.get("top_risks") or [])]
         opps = [str(o) for o in (panel.get("top_opportunities") or [])]
         cons = [str(c) for c in (panel.get("top_constraints") or [])]
-        allowed_numbers = numbers_in(message, *cands, *risks, *opps, *cons, panel.get("life_vision"))
+        # P0.1: numbers the user stated in PRIOR turns are still their own — allow the advisor to reflect
+        # them (the validator checks against this exact set), so it never "loses" $60k said two turns ago.
+        hist = list(history or [])[-6:]
+        prior_user_msgs = [str(h.get("user") or "") for h in hist]
+        allowed_numbers = numbers_in(message, *prior_user_msgs, *cands, *risks, *opps, *cons, panel.get("life_vision"))
         stage = base.get("pending_key") or ("complete" if base.get("complete") else "discovery")
         return AdvisorContext(
             user_id=ctx.user_id,
@@ -323,4 +334,5 @@ class AdvisorContextBuilder:
             relationship_edges=edges,
             connections=connections,
             connected_pairs=connected_pairs,
+            conversation_so_far=[{"user": str(h.get("user") or ""), "advisor": str(h.get("advisor") or "")} for h in hist],
         )

@@ -55,6 +55,12 @@ interface Msg {
 
 export default function AdvisorPage() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  // Stable id for this chat session so the backend can thread cross-turn context (P0.1). Generated once.
+  const [conversationId] = useState<string>(() =>
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `conv-${Date.now()}`
+  );
   const [pending, setPending] = useState<string | null>(null);
   const [options, setOptions] = useState<string[] | null>(null);
   const [panel, setPanel] = useState<Panel>({});
@@ -211,7 +217,11 @@ export default function AdvisorPage() {
     const t = await fetch('/api/life/discovery-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, pending_key: pending_key ?? '' }),
+      body: JSON.stringify({
+        message,
+        pending_key: pending_key ?? '',
+        conversation_id: conversationId,
+      }),
     })
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null);
@@ -224,7 +234,11 @@ export default function AdvisorPage() {
       const resp = await fetch('/api/life/discovery-chat-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, pending_key: pending_key ?? '' }),
+        body: JSON.stringify({
+          message,
+          pending_key: pending_key ?? '',
+          conversation_id: conversationId,
+        }),
       });
       if (!resp.ok || !resp.body) {
         await sendBlocking(message, pending_key);

@@ -116,16 +116,42 @@ class AdvisorOrchestrator:
             "llm_response_raw": "", "user_message": (message or "")[:4000], "advisor_response": "",
         }
 
-    async def _enhance(self, base: dict[str, Any], ctx: UserContext, message: str, tr: dict[str, Any], lap) -> None:
+    async def _fetch_history(self, ctx: UserContext, conversation_id: Optional[str]) -> list[dict[str, str]]:
+        """P0.1 cross-turn context — read the recent turns of THIS conversation from the existing telemetry
+        table (analytics.advisor_turns). No new store/schema. Tenant-scoped (user_id AND conversation_id);
+        best-effort (returns [] on any failure or when there's no conversation_id). Oldest-first."""
+        if not conversation_id or self._sb is None:
+            return []
+        try:
+            rows = await self._sb.select(
+                "advisor_turns",
+                columns="user_message,advisor_response,created_at",
+                filters={"user_id": f"eq.{ctx.user_id}", "conversation_id": f"eq.{conversation_id}"},
+                order="created_at.desc", limit=6, schema="analytics",
+            )
+            rows = list(reversed(rows or []))  # oldest-first
+            return [{"user": str(r.get("user_message") or ""), "advisor": str(r.get("advisor_response") or "")}
+                    for r in rows if r.get("user_message")]
+        except Exception:  # noqa: BLE001 — context is an enhancement; never break the turn
+            return []
+
+    async def _enhance(self, base: dict[str, Any], ctx: UserContext, message: str, tr: dict[str, Any], lap,
+                       history: Optional[list[dict[str, str]]] = None) -> None:
         """LLM enhancement: build context → generate → validate → compose. Mutates base + tr in place.
         Never raises — on any failure, base keeps its deterministic fallback text and llm_status is set.
         Shared by converse() and converse_stream() so both paths produce identical outcomes/telemetry."""
         try:
-            context = await self._ctx.build(ctx, message, base)
+            context = await self._ctx.build(ctx, message, base, history or [])
             lap("context_build")
             constraints = build_constraints(base, context)
             lap("plan")
             out = await self._llm.generate(context, constraints)
+            if out is None:
+                # One retry: transient Gemini failures (502/timeout/truncated JSON) surface as None and
+                # otherwise drop the turn to the generic deterministic opener. The retried output still
+                # passes through validate() below, so this changes resilience, not the trust gate.
+                out = await self._llm.generate(context, constraints)
+                tr["llm_retry"] = True
             lap("llm_generate")
             usage = getattr(self._llm, "last_usage", {}) or {}
             tr["prompt_tokens"], tr["completion_tokens"], tr["total_tokens"] = (
@@ -182,7 +208,9 @@ class AdvisorOrchestrator:
         if not self._enabled:
             tr["llm_status"] = base.get("llm_status") or "disabled"
             return self._finish(ctx, base, tr, t0, trace)
-        await self._enhance(base, ctx, message, tr, lap)
+        history = await self._fetch_history(ctx, conversation_id)
+        lap("history_fetch")
+        await self._enhance(base, ctx, message, tr, lap, history)
         return self._finish(ctx, base, tr, t0, trace)
 
     async def converse_stream(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
@@ -207,7 +235,9 @@ class AdvisorOrchestrator:
         yield {"type": "ack", "assistant_message": base.get("assistant_message") or "",
                "pending_key": base.get("pending_key") or "", "turn_id": tr["turn_id"]}
         if self._enabled:
-            await self._enhance(base, ctx, message, tr, lap)
+            history = await self._fetch_history(ctx, conversation_id)
+            lap("history_fetch")
+            await self._enhance(base, ctx, message, tr, lap, history)
         else:
             tr["llm_status"] = base.get("llm_status") or "disabled"
         self._finish(ctx, base, tr, t0, trace)  # log + best-effort persist + (optional) attach _trace
