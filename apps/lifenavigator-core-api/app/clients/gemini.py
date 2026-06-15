@@ -78,20 +78,32 @@ class GeminiClient:
             return r.json()["embedding"]["values"]
 
     async def generate(self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None) -> str:
+        text, _ = await self.generate_with_usage(system_prompt, user_prompt, temperature)
+        return text
+
+    async def generate_with_usage(
+        self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None
+    ) -> tuple[str, dict[str, int]]:
+        """Like generate() but also returns token usage {prompt_tokens, completion_tokens, total_tokens}
+        from Gemini's usageMetadata — for advisor telemetry / cost metering."""
         url = f"{GEMINI_BASE}/{self._generation_model}:generateContent?key={self._api_key}"
         payload: dict[str, Any] = {
             "systemInstruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
         }
-        # Advisor turns pin a low temperature for grounded, non-creative output; callers that omit it
-        # keep the model default (unchanged behaviour for every existing caller).
         if temperature is not None:
             payload["generationConfig"] = {"temperature": float(temperature)}
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             r = await _request_with_retry(lambda: client.post(url, json=payload), label="generate")
             r.raise_for_status()
             data = r.json()
-            try:
-                return data["candidates"][0]["content"]["parts"][0]["text"]
-            except (KeyError, IndexError, TypeError):
-                return ""
+        u = data.get("usageMetadata") or {}
+        usage = {
+            "prompt_tokens": int(u.get("promptTokenCount") or 0),
+            "completion_tokens": int(u.get("candidatesTokenCount") or 0),
+            "total_tokens": int(u.get("totalTokenCount") or 0),
+        }
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"], usage
+        except (KeyError, IndexError, TypeError):
+            return "", usage

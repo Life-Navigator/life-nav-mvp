@@ -287,7 +287,7 @@ def get_advisor_orchestrator(
         FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)),
     )
     builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life)
-    return AdvisorOrchestrator(rm, builder, GeminiAdvisorLLM(gemini), enabled=enabled)
+    return AdvisorOrchestrator(rm, builder, GeminiAdvisorLLM(gemini), enabled=enabled, supabase=supabase)
 
 
 def get_recommendation_os(

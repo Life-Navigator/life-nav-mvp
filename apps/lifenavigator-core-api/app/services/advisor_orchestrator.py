@@ -22,12 +22,19 @@ make the advisor feel more human and perceptive, never fabricate or write.
 """
 from __future__ import annotations
 
+import json
+import logging
+import time
+import uuid
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from ..models.common import UserContext
 from .advisor_context import AdvisorContextBuilder
 from .advisor_llm import AdvisorLLM, ADVISOR_PROMPT_VERSION
 from .advisor_validator import validate
+
+log = logging.getLogger("core.advisor")
 
 
 def build_constraints(base: dict[str, Any], context: Any) -> dict[str, Any]:
@@ -82,33 +89,71 @@ def _compose(safe: dict[str, Any]) -> str:
 
 
 class AdvisorOrchestrator:
-    def __init__(self, relationship_manager: Any, context_builder: AdvisorContextBuilder, llm: AdvisorLLM, *, enabled: bool = True) -> None:
+    def __init__(self, relationship_manager: Any, context_builder: AdvisorContextBuilder, llm: AdvisorLLM,
+                 *, enabled: bool = True, supabase: Any = None) -> None:
         self._rm = relationship_manager
         self._ctx = context_builder
         self._llm = llm
         self._enabled = enabled
+        self._sb = supabase  # best-effort advisor-turn persistence (ops.advisor_turns)
         self.prompt_version = ADVISOR_PROMPT_VERSION
 
-    async def converse(self, ctx: UserContext, message: str, pending_key: Optional[str] = None) -> dict[str, Any]:
+    async def converse(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
+                       *, conversation_id: Optional[str] = None, trace: bool = False) -> dict[str, Any]:
+        # Per-turn telemetry (P0.1/P0.4/P0.5) — stage timings + outcome, logged + best-effort persisted.
+        t0 = time.perf_counter()
+        tr: dict[str, Any] = {
+            "turn_id": str(uuid.uuid4()), "conversation_id": conversation_id, "user_id": ctx.user_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(), "prompt_version": self.prompt_version,
+            "llm_status": "", "validator_result": "n/a", "validator_reason": "", "validator_repairs": [],
+            "fallback_used": False, "fallback_reason": "", "stages_ms": {}, "latency_ms": 0,
+            "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
+            "graph_edges_available": 0, "relationships_referenced": [], "confidence": None,
+            "llm_response_raw": "", "user_message": (message or "")[:4000], "advisor_response": "",
+        }
+        mark = t0
+
+        def lap(name: str) -> None:
+            nonlocal mark
+            now = time.perf_counter()
+            tr["stages_ms"][name] = round((now - mark) * 1000, 1)
+            mark = now
+
         # 1) Deterministic turn — persistence (candidate/rejected goals), canonical writes, safe fallback text.
         base = await self._rm.converse(ctx, message, pending_key)
+        lap("deterministic_turn")
         if not self._enabled:
-            return base
+            tr["llm_status"] = base.get("llm_status") or "disabled"
+            return self._finish(ctx, base, tr, t0, trace)
         try:
             context = await self._ctx.build(ctx, message, base)
+            lap("context_build")
             constraints = build_constraints(base, context)
+            lap("plan")
             out = await self._llm.generate(context, constraints)
+            lap("llm_generate")
+            usage = getattr(self._llm, "last_usage", {}) or {}
+            tr["prompt_tokens"], tr["completion_tokens"], tr["total_tokens"] = (
+                usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), usage.get("total_tokens", 0))
+            tr["llm_response_raw"] = getattr(self._llm, "last_raw", "") or ""
+            tr["graph_edges_available"] = len(getattr(context, "relationship_edges", []) or [])
             if out is None:
                 base["llm_status"] = "fallback:unavailable"
-                return base
+                tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, "llm_unavailable_or_unparseable", "n/a"
+                return self._finish(ctx, base, tr, t0, trace)
             ok, safe, reasons = validate(out, context)
+            lap("validate")
             if not ok:
                 base["llm_status"] = "fallback:" + ("; ".join(reasons))[:140]
-                return base
+                tr["fallback_used"], tr["fallback_reason"], tr["validator_result"], tr["validator_reason"] = (
+                    True, "; ".join(reasons), "rejected", "; ".join(reasons))
+                return self._finish(ctx, base, tr, t0, trace)
             composed = _compose(safe)
+            lap("compose")
             if not composed:
                 base["llm_status"] = "fallback:empty"
-                return base
+                tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, "empty_composed", "accepted"
+                return self._finish(ctx, base, tr, t0, trace)
             # Merge: only the human-facing text changes; all deterministic outcomes are preserved.
             base["assistant_message"] = composed
             base["llm_status"] = "enhanced"
@@ -117,7 +162,47 @@ class AdvisorOrchestrator:
                 base["missing_data"] = safe["missing_data"]  # advisory display only — not persisted
             if safe.get("relationships_referenced"):
                 base["relationships_referenced"] = safe["relationships_referenced"]  # real cited edges
-            return base
-        except Exception:  # noqa: BLE001 — never break the user experience
+            tr["validator_result"] = "repaired" if safe.get("_repairs") else "accepted"
+            tr["validator_repairs"] = safe.get("_repairs") or []
+            tr["relationships_referenced"] = safe.get("relationships_referenced") or []
+            return self._finish(ctx, base, tr, t0, trace)
+        except Exception as e:  # noqa: BLE001 — never break the user experience
             base["llm_status"] = "fallback:error"
-            return base
+            tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, f"error:{type(e).__name__}", "n/a"
+            return self._finish(ctx, base, tr, t0, trace)
+
+    def _finish(self, ctx: UserContext, base: dict[str, Any], tr: dict[str, Any], t0: float, trace: bool) -> dict[str, Any]:
+        """Finalize telemetry: stamp latency/outcome, emit a metadata log line, best-effort persist, and
+        attach the full trace only when explicitly requested (dev trace mode)."""
+        tr["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
+        tr["llm_status"] = base.get("llm_status") or tr.get("llm_status") or ""
+        tr["advisor_response"] = base.get("assistant_message") or ""
+        # Metadata-only log line (no full message/response/raw → keeps PII out of logs).
+        log.info(json.dumps({
+            "event": "advisor_turn", "turn_id": tr["turn_id"], "user": ctx.user_id,
+            "llm_status": tr["llm_status"], "validator_result": tr["validator_result"],
+            "fallback": tr["fallback_used"], "fallback_reason": tr["fallback_reason"],
+            "repairs": tr["validator_repairs"], "latency_ms": tr["latency_ms"], "stages_ms": tr["stages_ms"],
+            "tokens": tr["total_tokens"], "edges": tr["graph_edges_available"], "msg_len": len(tr.get("user_message") or ""),
+        }))
+        # Best-effort durable write (analytics.advisor_turns, service-role only). Swallow if table absent.
+        # jsonb columns (stages_ms / relationships_referenced / validator_repairs) are passed as native
+        # dict/list — PostgREST serializes the row to JSON, so they land as jsonb objects/arrays (NOT
+        # double-encoded JSON strings).
+        if self._sb is not None:
+            row = {**tr, "advisor_response": tr["advisor_response"][:4000],
+                   "llm_response_raw": (tr["llm_response_raw"] or "")[:8000]}
+            try:
+                import asyncio
+                asyncio.ensure_future(self._persist(row))
+            except Exception:  # noqa: BLE001
+                pass
+        if trace:
+            base["_trace"] = tr
+        return base
+
+    async def _persist(self, row: dict[str, Any]) -> None:
+        try:
+            await self._sb.insert("advisor_turns", row, schema="analytics")
+        except Exception:  # noqa: BLE001 — table may not exist yet; logging still works
+            pass

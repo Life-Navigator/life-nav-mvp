@@ -234,10 +234,25 @@ async def test_validator_rejects_medical_advice():
 
 
 @pytest.mark.asyncio
-async def test_validator_rejects_multiple_questions():
+async def test_validator_repairs_multiple_questions_instead_of_rejecting():
+    # P0.3: a multi-question turn is REPAIRED (trimmed to the first question) and ACCEPTED, not rejected.
+    # This is the fix for the 17% fallback rate (all "more than one question").
     ctx = await _build_ctx("retire at 60", _base())
-    ok, _, reasons = validate(_good_llm(next_question="What is your income? And your age?"), ctx)
-    assert not ok and any("more than one question" in r for r in reasons)
+    ok, safe, reasons = validate(_good_llm(next_question="What is your income? And your age?"), ctx)
+    assert ok and not reasons
+    assert safe["next_question"] == "What is your income?"  # trimmed to the first question
+    assert "multi_question_trimmed" in safe.get("_repairs", [])
+
+
+@pytest.mark.asyncio
+async def test_validator_keeps_single_choice_question_untouched():
+    # A single question offering choices has ONE "?" — it must pass unchanged (no spurious repair).
+    ctx = await _build_ctx("buy a home", _base())
+    q = "What matters most: buying sooner, preserving liquidity, or maximizing long-term wealth?"
+    ok, safe, reasons = validate(_good_llm(next_question=q), ctx)
+    assert ok and not reasons
+    assert safe["next_question"] == q
+    assert "multi_question_trimmed" not in safe.get("_repairs", [])
 
 
 @pytest.mark.asyncio
@@ -320,6 +335,42 @@ def test_parse_advisor_json_strips_fences():
     assert parse_advisor_json('```json\n{"a": 1}\n```') == {"a": 1}
     assert parse_advisor_json('noise {"a": 2} trailing') == {"a": 2}
     assert parse_advisor_json("not json") is None
+
+
+# --------------------------------------------------------------------------- #
+# P0.1 — token capture (telemetry) flows from Gemini → GeminiAdvisorLLM.last_usage
+# --------------------------------------------------------------------------- #
+class _UsageGemini:
+    configured = True
+
+    async def generate_with_usage(self, system, user, temperature=None):
+        import json as _json
+        return _json.dumps(_good_llm()), {"prompt_tokens": 120, "completion_tokens": 45, "total_tokens": 165}
+
+
+@pytest.mark.asyncio
+async def test_gemini_advisor_llm_captures_token_usage():
+    from app.services.advisor_llm import GeminiAdvisorLLM
+    ctx = await _build_ctx("retire at 60", _base())
+    llm = GeminiAdvisorLLM(_UsageGemini())
+    out = await llm.generate(ctx, {"intent": "discovery"})
+    assert out is not None
+    assert llm.last_usage == {"prompt_tokens": 120, "completion_tokens": 45, "total_tokens": 165}
+    assert llm.last_raw  # raw text retained for the trace / llm_response_raw
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_trace_mode_returns_diagnostics():
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(_good_llm()))
+    out = await orch.converse(_ctx(), "what should I do", trace=True)
+    tr = out.get("_trace")
+    assert tr and tr["llm_status"] == "enhanced"
+    assert tr["validator_result"] in ("accepted", "repaired")
+    assert "llm_generate" in tr["stages_ms"] and tr["latency_ms"] >= 0
+    # default (no trace) must NOT leak diagnostics to the client
+    out2 = await orch.converse(_ctx(), "what should I do")
+    assert "_trace" not in out2
 
 
 # --------------------------------------------------------------------------- #

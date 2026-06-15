@@ -137,27 +137,29 @@ class GeminiAdvisorLLM:
 
     def __init__(self, gemini: Any) -> None:
         self._g = gemini
+        # Per-request telemetry the orchestrator reads after generate() (fresh instance per request via DI).
+        self.last_usage: dict[str, int] = {}
+        self.last_raw: str = ""
 
     @property
     def available(self) -> bool:
         return self._g is not None and bool(getattr(self._g, "configured", False))
 
     async def generate(self, context: Any, plan: dict[str, Any]) -> Optional[dict[str, Any]]:
+        self.last_usage, self.last_raw = {}, ""
         if not self.available:
             return None
+        user = json.dumps({"guardrails": context.prompt_dict(), "constraints": plan}, ensure_ascii=False, default=str)
+        prompt = f"GUARDRAILS_AND_CONSTRAINTS:\n{user}\n\nReason within these guardrails and return the JSON object now."
         try:
-            user = json.dumps({"guardrails": context.prompt_dict(), "constraints": plan}, ensure_ascii=False, default=str)
-            raw = await self._g.generate(
-                ADVISOR_SYSTEM,
-                f"GUARDRAILS_AND_CONSTRAINTS:\n{user}\n\nReason within these guardrails and return the JSON object now.",
-                temperature=_temperature_for(plan),
-            )
+            raw, usage = await self._g.generate_with_usage(ADVISOR_SYSTEM, prompt, temperature=_temperature_for(plan))
+            self.last_usage, self.last_raw = usage, raw or ""
             return parse_advisor_json(raw)
-        except TypeError:
-            # Older Gemini client without a temperature kwarg — degrade gracefully, keep the advisor working.
+        except AttributeError:
+            # Older Gemini client without generate_with_usage — degrade gracefully (no token telemetry).
             try:
-                user = json.dumps({"guardrails": context.prompt_dict(), "constraints": plan}, ensure_ascii=False, default=str)
-                raw = await self._g.generate(ADVISOR_SYSTEM, f"GUARDRAILS_AND_CONSTRAINTS:\n{user}\n\nReturn the JSON object now.")
+                raw = await self._g.generate(ADVISOR_SYSTEM, prompt, temperature=_temperature_for(plan))
+                self.last_raw = raw or ""
                 return parse_advisor_json(raw)
             except Exception:  # noqa: BLE001
                 return None

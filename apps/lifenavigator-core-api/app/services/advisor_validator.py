@@ -38,6 +38,13 @@ _ADVICE = re.compile(
 _FIN_NUM = re.compile(r"\$\d[\d,]*(?:\.\d+)?|\d[\d,]*(?:\.\d+)?%|\b\d{3,}\b")
 
 
+def _first_question(text: str) -> str:
+    """Keep everything up to and including the FIRST question mark (the first question), dropping any
+    trailing extra questions. Preserves a single choice-question ('…a, b, or c?') untouched."""
+    i = text.find("?")
+    return text[: i + 1].strip() if i != -1 else text.strip()
+
+
 def _financial_numbers(text: str) -> set[str]:
     out: set[str] = set()
     for m in _FIN_NUM.findall(text or ""):
@@ -115,8 +122,8 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     # 3) Must actually ask a question (discovery turns), unless it's a pure summary turn.
     if not next_q and not summary:
         reasons.append("no next_question and no summary")
-    if next_q.count("?") > 1:
-        reasons.append("more than one question")
+    # NOTE: a multi-question reply is REPAIRED (trimmed to the first question), not rejected — see below.
+    # A single question that offers choices ("…sooner, liquidity, or wealth?") has one "?" and is untouched.
 
     # 4) No invented graph reasoning — relationship claims must be backed by real edges.
     rel_reasons, valid_citations = _check_relationships(result, context, visible)
@@ -127,7 +134,17 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
 
     # ── Repairs (kept safe even when accepted) ──
     safe = dict(result)
+    repairs: list[str] = []
     safe["should_persist"] = False  # the LLM NEVER persists — persistence is deterministic
+    # Repair (not reject) a multi-question turn: keep the reflection + the FIRST question, drop the extra.
+    # This salvages the LLM's good, on-topic reply on exactly the high-value decision questions instead of
+    # discarding it for a generic rule-based fallback — without weakening any safety gate.
+    if next_q.count("?") > 1:
+        trimmed = _first_question(next_q)
+        if trimmed and trimmed != next_q:
+            safe["next_question"] = trimmed
+            repairs.append("multi_question_trimmed")
+    safe["_repairs"] = repairs
     # Drop any candidate goal that matches a previously rejected goal (never resurrect).
     rej = {r.lower() for r in context.rejected_goals}
     cg = []

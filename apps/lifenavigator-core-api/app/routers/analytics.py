@@ -43,3 +43,19 @@ async def metrics(
         raise HTTPException(status_code=403, detail="Admin access required")
     await access.log_admin_access(ctx, user.email, "/v1/admin/metrics", "granted")
     return await svc.dashboard()
+
+
+@router.get("/admin/advisor-metrics")
+async def advisor_metrics(
+    user: AuthenticatedUser = Depends(authenticated),
+    svc: AnalyticsService = Depends(get_analytics_service),
+    access: PlatformAccess = Depends(get_platform_access),
+):
+    """Advisor observability dashboard (P0.1) — admin-only. Fallback rate, latency p95, validator
+    failure rate, avg confidence/edges/tokens over the last 30 days. Counts/rates only — no PII."""
+    ctx = UserContext(user_id=user.user_id)
+    if not access.is_admin(user.email):
+        await access.log_admin_access(ctx, user.email, "/v1/admin/advisor-metrics", "denied")
+        raise HTTPException(status_code=403, detail="Admin access required")
+    await access.log_admin_access(ctx, user.email, "/v1/admin/advisor-metrics", "granted")
+    return await svc.advisor_metrics()

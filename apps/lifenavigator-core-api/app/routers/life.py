@@ -80,11 +80,18 @@ async def discovery_answer(user: AuthenticatedUser = Depends(authenticated), svc
 
 @router.post("/discovery/chat")
 async def discovery_chat(user: AuthenticatedUser = Depends(authenticated), svc=Depends(get_advisor_orchestrator),
-                         message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True)):
+                         message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True),
+                         conversation_id: str = Body(default="", embed=True), trace: bool = Body(default=False, embed=True)):
     """Chat-native hybrid advisor: one turn. The deterministic engine handles persistence + safety and
     guarantees a fallback; the LLM leads the conversation within those guardrails (one strong question,
-    why it matters), gated by the output validator. The advisor IS the onboarding."""
-    return await svc.converse(_ctx(user), message, pending_key or None)
+    why it matters), gated by the output validator. The advisor IS the onboarding.
+
+    `trace=true` returns the full per-turn diagnostic trace, but ONLY when ADVISOR_TRACE_ENABLED is set
+    (developer-only — never exposed to end users in production)."""
+    import os
+    trace_ok = trace and os.environ.get("ADVISOR_TRACE_ENABLED", "").lower() in ("1", "true", "yes")
+    return await svc.converse(_ctx(user), message, pending_key or None,
+                              conversation_id=conversation_id or None, trace=trace_ok)
 
 
 from ..services.my_life import MyLifeService  # noqa: E402
