@@ -12,10 +12,10 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const pathname = usePathname();
-  // P0: the Advisor (chat-native onboarding) + roadmap chat are immersive — collapse the sidebar +
-  // drop the header/navbar so onboarding is full-screen. Sidebar stays collapsed (not removed) so a
-  // user is never trapped mid-onboarding.
-  const isImmersive = pathname === '/dashboard/roadmap/chat' || pathname === '/dashboard/advisor';
+  // P0: the Advisor (chat-native onboarding) is immersive — collapse the sidebar + drop the
+  // header/navbar so onboarding is full-screen. Sidebar stays collapsed (not removed) so a user is
+  // never trapped mid-onboarding. (roadmap/chat removed in pilot P0-2 — it now redirects here.)
+  const isImmersive = pathname === '/dashboard/advisor';
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">

@@ -18,6 +18,8 @@ import {
   statusForFinal,
   streamDurationMs,
 } from '@/lib/arcana/streaming';
+import AdviceDisclaimer from '@/components/advice/AdviceDisclaimer';
+import { levelFromThemes } from '@/lib/advice/disclosure';
 import {
   ActionCard,
   DOMAIN_ACTIONS,
@@ -595,6 +597,12 @@ export default function AdvisorPage() {
             )}
             <div ref={endRef} />
           </div>
+          {/* Context-aware advice disclosure: silent during early discovery (no domain themes yet);
+              escalates only once the advisor surfaces finance/health/legal/tax/estate themes. */}
+          <AdviceDisclaimer
+            level={levelFromThemes([...(panel.top_themes || []), ...(panel.top_risks || [])])}
+            className="mt-2"
+          />
           {/* Bottom region — pinned below the messages, bounded and independently scrollable so the
               input and EVERY CTA (review, "enter dashboard") stay reachable, never clipped. */}
           <div className="shrink-0 max-h-[60vh] overflow-y-auto border-t border-gray-200 bg-gray-50 pt-3">
