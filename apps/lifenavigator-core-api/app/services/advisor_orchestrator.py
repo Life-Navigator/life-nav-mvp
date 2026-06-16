@@ -73,25 +73,55 @@ def build_constraints(base: dict[str, Any], context: Any) -> dict[str, Any]:
 
 
 def _compose(safe: dict[str, Any]) -> str:
-    """Assemble the human-facing message the LLM chose: reflection → (its summary) → question → why.
-
-    The LLM controls whether to summarise (we include the summary only if it returned one), so the rules
-    never force a 'summary turn'.
+    """Assemble the human-facing message as the V3 five-section advisor turn, exposing the reasoning the
+    model already performs: Decision Frame → Tradeoffs → What We Know → What We Still Need → Best Next
+    Question. Every section here was already trust-checked by validate(); we only format it. Sections are
+    rendered only when present, so sparse early-discovery turns stay clean. Falls back to the legacy
+    reflection/summary/question shape if a turn predates the V3 fields.
     """
     parts: list[str] = []
-    refl = str(safe.get("reflection") or "").strip()
-    if refl:
-        parts.append(refl)
+
+    frame = str(safe.get("decision_frame") or safe.get("reflection") or "").strip()
+    if frame:
+        parts.append(frame)
+
+    tradeoffs = safe.get("tradeoffs") or []
+    rows = []
+    for t in tradeoffs:
+        if not isinstance(t, dict):
+            continue
+        opt = str(t.get("option") or "").strip()
+        ben = str(t.get("benefit") or "").strip()
+        cost = str(t.get("cost") or "").strip()
+        if not (opt or ben or cost):
+            continue
+        if ben and cost:
+            rows.append(f"- **{opt}** — {ben}; but {cost}" if opt else f"- {ben}; but {cost}")
+        else:
+            rows.append(f"- **{opt}** — {ben or cost}" if opt else f"- {ben or cost}")
+    if rows:
+        parts.append("**The tradeoffs:**\n" + "\n".join(rows))
+
+    know = [str(x).strip() for x in (safe.get("what_we_know") or []) if str(x).strip()]
+    if know:
+        parts.append("**What we know:**\n" + "\n".join(f"- {k}" for k in know))
+
+    need = [str(x).strip() for x in (safe.get("what_we_still_need") or []) if str(x).strip()]
+    if need:
+        parts.append("**What would sharpen this:**\n" + "\n".join(f"- {n}" for n in need))
+
     s = str(safe.get("summary") or "").strip()
     if s:
         parts.append(s)
+
     q = str(safe.get("next_question") or "").strip()
-    if q:
-        parts.append(q)
     why = str(safe.get("why_this_question") or "").strip()
-    if q and why:
-        parts.append(why)
-    return " ".join(parts).strip()
+    if q:
+        parts.append(f"**{q}**")
+        if why:
+            parts.append(f"_{why}_")
+
+    return "\n\n".join(parts).strip()
 
 
 class AdvisorOrchestrator:

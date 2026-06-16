@@ -142,7 +142,18 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     next_q = str(result.get("next_question") or "").strip()
     why_q = str(result.get("why_this_question") or "").strip()
     summary = str(result.get("summary") or "").strip()
-    visible = " ".join([reflection, next_q, why_q, summary])
+    # V3 exposes the advisor's reasoning as five user-visible sections. EVERY field rendered to the user must
+    # pass the SAME trust checks (advice + invented numbers), so they are folded into `visible` here. This
+    # widens coverage of the existing gate; it does not change the gate's logic, thresholds, or allowed set.
+    frame = str(result.get("decision_frame") or "").strip()
+    tradeoffs = result.get("tradeoffs") or []
+    tradeoff_text = " ".join(
+        f"{(t or {}).get('option', '')} {(t or {}).get('benefit', '')} {(t or {}).get('cost', '')}"
+        for t in tradeoffs if isinstance(t, dict)
+    )
+    know = " ".join(str(x) for x in (result.get("what_we_know") or []) if x)
+    need = " ".join(str(x) for x in (result.get("what_we_still_need") or []) if x)
+    visible = " ".join([frame, tradeoff_text, know, need, reflection, next_q, why_q, summary])
 
     # 1) No final advice / recommendation / medical-legal-tax overreach.
     if _ADVICE.search(visible):
