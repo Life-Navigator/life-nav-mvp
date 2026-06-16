@@ -281,7 +281,9 @@ class VertexClaudeAdvisorLLM:
         body = {
             "anthropic_version": "vertex-2023-10-16",
             "max_tokens": 2048,
-            "temperature": _temperature_for(plan),
+            # NOTE: `temperature` is deprecated/rejected (HTTP 400) by newer Claude models (Opus 4.5+), which
+            # manage sampling internally. Older models accepted it; omitting it is safe for all and avoids the
+            # 400 → fallback. (Advisor JSON output stays well-formed without an explicit temperature.)
             "system": ADVISOR_SYSTEM,
             "messages": [{"role": "user", "content": prompt}],
         }

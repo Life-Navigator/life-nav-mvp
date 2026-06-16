@@ -1,0 +1,522 @@
+[
+  {
+    "id": "fin-01",
+    "domain": "Finance",
+    "topic": "Buy a house",
+    "input": "I'm 34, married, two kids (4 and 6). Household income is $185k. We have $95k in cash, $40k in a brokerage, and $210k in retirement accounts. We rent for $2,900/mo. We're looking at homes around $620k in our area.\n\nShould we buy this house?",
+    "status": 200,
+    "latency_ms": 24878,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "Whether to buy a ~$620k home now versus continuing to rent at $2,900/mo. With a $185k income, young kids, and meaningful but earmarked savings, the decision turns on three drivers: how much of your $95k cash you'd commit to a down payment, what your true monthly carrying cost would be versus $2,900 today, and how long you expect to stay in this home.\n\n**The tradeoffs:**\n- **Buy now at ~$620k** — Locks in housing, builds equity instead of rent, and gives two young kids stability in a home and likely a school area.; but A large slice of your $95k cash goes to down payment and closing, shrinking your emergency cushion, and monthly carrying cost (mortgage, taxes, insurance, upkeep) will almost certainly run above your current $2,900 rent.\n- **Keep renting at $2,900/mo** — Preserves your $95k cash flexibility, keeps monthly costs predictable and low, and avoids transaction costs if your situation changes.; but No equity build, exposure to future rent increases, and less control over your living space for the kids.\n\n**What we know:**\n- You're 34, married, two kids aged 4 and 6.\n- Household income is $185k.\n- You hold $95k cash, $40k in a brokerage, and $210k in retirement accounts.\n- You currently rent for $2,900/mo.\n- You're looking at homes around $620k.\n\n**My read:** On the numbers you've shared, this looks within reach but not without tradeoffs — the question isn't really 'can you buy?' but 'how much cushion do you keep?'. You have $95k cash plus $40k in brokerage, so $135k in non-retirement savings to work with; a $620k purchase will pull a sizable chunk of that into the down payment and closing costs, and your monthly carrying cost will be higher than the $2,900 you pay now. The non-obvious point: your $95k cash is doing double duty as both down-payment fund AND family emergency reserve — with two young kids and a single household income picture, draining it to maximize the down payment can leave you house-rich and cash-thin, which is the most common way a comfortable purchase becomes a stressful one. I'd anchor the decision on the gap between your future all-in monthly housing cost and today's $2,900, and on how many months of expenses you'd still have after closing. Confirm the property-tax and any deductibility specifics with a tax professional before you finalize.\n\n**What would change this:**\n- Your estimated all-in monthly housing cost at $620k (mortgage + property tax + insurance) so we can compare it directly to your $2,900 rent.\n- Your total monthly household expenses, to judge how many months of cushion your remaining cash covers after a down payment.\n- How long you expect to stay in this home — under a handful of years changes the rent-vs-buy math substantially.\n\n**Of your $95k cash, how much would you be willing to put toward the down payment and closing, versus keep untouched as a family emergency cushion?**\n\n_The split between down-payment money and reserve is the single factor that determines whether this purchase leaves you secure or stretched, and it drives both affordability and risk._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "All-in monthly housing cost at target price",
+        "why_it_matters": "Needed to compare against current $2,900 rent and judge affordability."
+      },
+      {
+        "field": "Total monthly household expenses",
+        "why_it_matters": "Determines how many months of cushion remaining cash provides after a down payment."
+      },
+      {
+        "field": "Expected length of stay in home",
+        "why_it_matters": "Short horizons make buying less favorable due to transaction costs."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-02",
+    "domain": "Finance",
+    "topic": "Rent vs buy",
+    "input": "I'm 29, single, earning $110k in a city where a comparable condo costs $480k to buy or $2,400/mo to rent. I have $70k saved and might relocate for work within 3 years.\n\nDoes it make more sense for me to rent or buy right now?",
+    "status": 200,
+    "latency_ms": 25550,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "Whether to buy a $480k condo or keep renting at $2,400/mo right now — the decision hinges on one fact you've already flagged: a possible relocation within 3 years. Buying only pays off when you stay long enough to absorb transaction costs, so your time horizon is the lead driver, alongside how much of your $70k you'd commit and what's left over.\n\n**The tradeoffs:**\n- **Buy now** — Locks in housing cost, builds equity instead of paying a landlord, and gives you a stable base.; but Transaction costs (buying and selling) are heavy and front-loaded; if you relocate inside 3 years you likely sell before those costs are recovered, and a large chunk of your $70k gets tied up and illiquid.\n- **Keep renting at $2,400/mo** — Full mobility for the possible relocation, your $70k stays liquid, and no exposure to a forced sale on a short timeline.; but No equity accrual, and rent isn't fixed — your monthly cost can rise over time with no asset to show for it.\n\n**What we know:**\n- You're 29 and single\n- You earn $110k\n- A comparable condo is $480k to buy or $2,400/mo to rent in your city\n- You have $70k saved\n- You might relocate for work within 3 years\n\n**My read:** On the facts you've given, renting is the stronger fit right now — and the deciding factor is the relocation, not the price. A possible move inside 3 years is the single thing that most undermines a buy: home purchases carry large one-time costs on both the buy and the sell side, and a short ownership window rarely leaves enough time for appreciation and equity to outrun those costs. Your $70k is also your entire stated cushion; committing a big share of it to a down payment and closing on an asset you might have to sell quickly converts your most liquid safety net into your least liquid one right when you may be changing jobs and cities. The non-obvious point: the risk isn't just 'will the condo go up' — it's being a forced seller on someone else's timeline. If the relocation lands in year 2, you sell whether the market is favorable or not. Renting keeps you the one who chooses when to transact. This leans toward renting unless the relocation is genuinely unlikely or you'd stay put well beyond 3 years. Note that the true buy-vs-rent math also turns on property tax and transaction-cost treatment — worth confirming specific figures with a CPA before any purchase.\n\n**What would change this:**\n- How firm is the relocation — a real likelihood/percentage, or could you commit to staying 5+ years?\n- How much of your $70k you'd actually be willing to put toward a purchase versus keep as a cushion\n- Your full monthly take-home and fixed expenses, so we can see what a mortgage payment leaves you versus the $2,400 rent\n\n**If you had to put odds on it: how likely is the relocation within 3 years, and if it happened, would you sell the condo or could you hold and rent it out?**\n\n_The relocation probability and your exit options are the single biggest factor flipping this decision between rent and buy, so pinning it down resolves the core driver before anything else._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "relocation_probability",
+        "why_it_matters": "Time horizon is the primary driver of whether buying recovers its transaction costs"
+      },
+      {
+        "field": "monthly_take_home_and_expenses",
+        "why_it_matters": "Determines whether a mortgage is affordable versus $2,400 rent and what cushion remains"
+      },
+      {
+        "field": "down_payment_willingness",
+        "why_it_matters": "Shows how much of the $70k cushion would become illiquid"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-03",
+    "domain": "Finance",
+    "topic": "Pay off debt vs invest",
+    "input": "I have $22k in credit card debt at 24% APR, $18k in a 401k, and about $400/mo of free cash flow after expenses. My employer matches 50% up to 6% of my $85k salary.\n\nShould I pay down the cards first or keep investing?",
+    "status": 200,
+    "latency_ms": 27647,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is whether to throw your $400/mo of free cash flow at the $22k card balance at 24% APR or keep funding the 401k. What actually decides it: the guaranteed cost of the debt (24%), the free money in the employer match, and the fact that one dollar can only go to one place right now.\n\n**The tradeoffs:**\n- **Pay down the cards first** — Eliminates a guaranteed 24% drag — that's the highest, most certain 'return' available to you, and it frees up cash flow once the balance is gone.; but You'd give up some employer match dollars while you focus on the cards, and your investing balance grows slower in the meantime.\n- **Keep investing** — Captures the 50% match on up to 6% of your $85k salary — an immediate return on those dollars no market can reliably beat.; but The card balance keeps compounding at 24%, so dollars sent past the match are very likely working harder paying off debt than invested.\n\n**What we know:**\n- $22k in credit card debt at 24% APR\n- $18k in a 401k\n- About $400/mo of free cash flow after expenses\n- Employer matches 50% up to 6% of an $85k salary\n- $85k salary\n\n**My read:** This isn't strictly either/or, and the numbers point to a hybrid. Two facts dominate: your card debt is costing you about $5,280 a year at 24% — a guaranteed, recurring loss — while the match gives you a 50-cent return on every dollar up to 6% of your $85k, roughly $5,100 of contributions. The non-obvious point: the match is a one-time 50% return on a dollar; the 24% APR is a return you earn every single year you carry that balance, and it compounds. So the order most people's math supports is: contribute just enough to capture the full match (don't leave that free money on the table), then send everything else hard at the cards until they're gone. Once that 24% drag is eliminated, redirect the freed cash flow back into investing. With only $400/mo of free cash flow against a $22k balance, this is a stretch — it'll take real discipline and time — which is exactly why capturing the match while you grind down the debt matters. Confirm the precise match formula and any vesting schedule with your plan administrator, since that changes how much 'just enough' really is.\n\n**What would change this:**\n- How your $400/mo is currently split — are you already contributing enough to get the full match, or is some of that $400 going to the 401k now?\n- Whether the 24% card has any promotional/balance-transfer option or if it's a fixed standard rate (changes payoff speed, not the priority)\n- Whether you have any emergency cash cushion outside the 401k, since attacking debt with no buffer can backfire if an expense hits\n\n**Of your $400/mo free cash flow, how much (if any) are you already putting into the 401k to capture the match — and is the rest sitting idle or going somewhere else?**\n\n_Knowing whether you're already capturing the match tells me exactly how to split that $400 — it's the single fact that turns this from a general principle into a concrete plan for your cash flow._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Current 401k contribution rate",
+        "why_it_matters": "Determines whether the full employer match is already being captured before redirecting cash to debt"
+      },
+      {
+        "field": "Emergency cash reserves",
+        "why_it_matters": "Aggressively paying debt without a cushion can force new borrowing if an unexpected expense hits"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-04",
+    "domain": "Finance",
+    "topic": "Retirement planning",
+    "input": "I'm 47, make $130k, have $380k in retirement savings, and want to retire at 62. I save about $1,500/mo and have no pension.\n\nAm I on track to retire at 62?",
+    "status": 200,
+    "latency_ms": 25872,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "Whether you're on track to retire at 62 — the question that anchors every other financial decision for the next 15 years. What actually decides it: how much you'll need to spend annually in retirement, the gap between your current $380k plus ongoing savings and that target, and how long the money has to compound before 62.\n\n**The tradeoffs:**\n- **Aim to retire exactly at 62 on the current plan** — You stop working at your target age and reclaim 15 years sooner than a traditional 65-67 retirement; but Without knowing your retirement spending target, you risk discovering late that the savings rate falls short — and 62 means a longer drawdown horizon and earlier-than-full Social Security\n- **Keep working a few years past 62 if the numbers are tight** — More years of $1,500/mo contributions, more compounding, and a shorter retirement to fund; but Trades away the early-retirement goal that prompted this question\n\n**What we know:**\n- You're 47 and want to retire at 62 — a 15-year runway\n- You earn $130k and save about $1,500/mo\n- You have $380k in retirement savings\n- No pension, so retirement income leans on your savings (and Social Security, which we haven't discussed)\n\n**My read:** I can't yet tell you 'yes, on track' or 'no, behind' honestly — because the single number that decides it is missing: how much you expect to spend per year in retirement. Here's what your facts do tell me. You have $380k saved, roughly 2.9 times your current income, and you're adding $18k a year — a real, steady habit with 15 years left to compound, which is meaningful time. The non-obvious point: with no pension, your entire retirement income (beyond Social Security) has to come from a pool you draw down for potentially 25-30+ years starting at 62, which is earlier than full Social Security and a longer drawdown than a 67 retirement. That makes your required nest egg larger than someone retiring later — and it makes your annual spending target the lever everything else turns on. Two people with your exact savings can be 'comfortably on track' or 'well behind' depending entirely on whether they plan to live on, say, a modest budget or replace most of their $130k. Once you give me your target retirement spending, I can show you the gap concretely. A detailed projection with returns and inflation assumptions is worth confirming with a CFP, since those inputs swing the answer a lot.\n\n**What would change this:**\n- Your expected annual spending in retirement (the decisive input — even a rough monthly figure works)\n- Whether you expect Social Security and a rough estimate of that benefit, since with no pension it's your other income source\n- Whether the $1,500/mo and any employer match are captured in tax-advantaged accounts, which affects how far each dollar goes\n\n**Roughly how much do you expect to need to spend each month in retirement — would you want to maintain something close to your current lifestyle, or live on noticeably less?**\n\n_Your retirement spending target is the one input that converts 'am I on track?' from unanswerable into a concrete gap I can calculate against your $380k and $18k/year._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Expected annual retirement spending",
+        "why_it_matters": "It is the single input that determines the required nest egg and therefore whether $380k plus $18k/year is sufficient"
+      },
+      {
+        "field": "Expected Social Security benefit",
+        "why_it_matters": "With no pension, this is the primary non-savings income source and reduces how much the portfolio must cover"
+      },
+      {
+        "field": "Account type / employer match for the $1,500/mo",
+        "why_it_matters": "Tax treatment and any match materially change effective savings growth"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-05",
+    "domain": "Finance",
+    "topic": "Emergency fund",
+    "input": "My household spends about $5,200/mo. We have $7k in checking and irregular income (I'm a contractor, my spouse is salaried at $72k).\n\nHow large should our emergency fund be and how do we get there?",
+    "status": 200,
+    "latency_ms": 27153,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "How big your emergency fund should be and how to build it — the decision that determines how long your household can absorb a shock without borrowing. The key drivers here are your income volatility (contractor income on top of a salary), your monthly burn, and how thin your current cash is relative to that burn.\n\n**The tradeoffs:**\n- **Target a larger emergency fund** — More months of breathing room, which matters a lot when one income stream is irregular — you can ride out a gap in contract work without panic; but Cash sitting in reserve isn't working toward other goals, and it takes longer to reach a bigger number\n- **Target a leaner emergency fund** — You hit the goal faster and free up cash sooner for other priorities; but With irregular income, a thin cushion leaves you exposed — a slow contract month plus an unexpected expense could force debt\n- **Build it fast vs. build it steadily** — Front-loading gets you to safety sooner; steady building protects your day-to-day lifestyle; but Aggressive saving squeezes your monthly budget; slow saving leaves you under-protected longer\n\n**What we know:**\n- Household spends about $5,200/mo\n- $7k in checking right now\n- Income is mixed: you're a contractor with irregular income, spouse is salaried at $72,000\n- You're asking specifically how large the fund should be and how to get there\n\n**My read:** On your numbers, your $7k in checking covers only about 1.3 months of your $5,200 monthly spend — a thin cushion for any household, and thinner still because one of your two income streams is irregular. The standard rule of thumb is several months of expenses, but the right target for you sits at the higher end of that range precisely because contractor income can dip or arrive late. The non-obvious point: an emergency fund isn't only insurance against job loss — for a contractor it's also income-smoothing. It lets you cover a lean billing month without dipping into debt, so you can keep accepting the right work rather than the first work. Practically, the path is to size the target to a set number of months of your $5,200 burn, then automate a fixed transfer from your spouse's steady $72k salary (the predictable stream) while sweeping a percentage of each contractor payment as it lands. I can't tell you exactly how many months is right until I understand how variable your contracting income actually is — that's the swing factor.\n\n**What would change this:**\n- How variable your contractor income is — your typical low month vs. high month, and how long gaps between contracts tend to run\n- Whether you carry any high-interest debt, which could change whether to fully fund the cushion first or split effort\n- How much you can realistically set aside each month from the salaried income after the $5,200 in spending\n\n**In a bad stretch, how many months can your contracting income run near zero — and during that stretch, does your spouse's $72k salary cover the full $5,200 of monthly spending on its own?**\n\n_The size of your fund hinges on how long the irregular stream can disappear and whether the steady salary alone can carry the household — that single answer sets the number of months you need to cover._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Contractor income variability (low/high month, gap length)",
+        "why_it_matters": "Determines how many months of expenses the fund must cover"
+      },
+      {
+        "field": "High-interest debt",
+        "why_it_matters": "Affects whether to fully fund the cushion first or balance with debt paydown"
+      },
+      {
+        "field": "Monthly amount available to save",
+        "why_it_matters": "Sets the realistic timeline to reach the target"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-06",
+    "domain": "Finance",
+    "topic": "Insurance decision",
+    "input": "I'm 38, the primary earner at $140k, with a spouse who stays home and three kids under 10. We have a $250k group life policy through work and a $400k mortgage.\n\nHow much life insurance do I actually need?",
+    "status": 200,
+    "latency_ms": 25148,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how much life insurance coverage you need as the sole income provider for a family of five. The drivers that actually decide this: the income your family loses if you're gone ($140k/year), the debt that would fall on your spouse ($400k mortgage), and the years your three kids under 10 still need raising and educating — against the $250k you already carry through work.\n\n**The tradeoffs:**\n- **Cover only the mortgage and immediate debts** — Lowest cost, clears the $400k obligation so your spouse keeps the home outright; but Replaces no income — a stay-at-home spouse with three young kids would still face years of living costs with no earner\n- **Cover mortgage plus years of income replacement and future education** — Lets your spouse maintain the household, raise the kids, and fund their education without returning to work under duress; but Higher premium today, and you may be insuring beyond the years your kids are actually dependent\n\n**What we know:**\n- You're 38 and the primary earner at $140k\n- Spouse stays home; three kids under 10 depend on your income\n- Existing coverage is a $250k group life policy through work\n- You carry a $400k mortgage\n\n**My read:** On your numbers, $250k looks like a stretch for your situation — it wouldn't even fully clear the $400k mortgage, leaving a $150k shortfall on the house alone, and that's before a single year of replacing your $140k income or providing for three kids under 10. As the only earner with a non-earning spouse, your coverage realistically needs to do three jobs at once: retire the mortgage, replace your income for the years your kids remain dependent, and cushion future education costs. The non-obvious point most people miss: group coverage through work is tied to the job — if you change employers or stop working due to health, it can vanish exactly when your family is most exposed, so leaning on it as your foundation is risky. A privately owned policy you control is worth weighing as the core, with group coverage as a top-up. The right total depends on how many years of income your family would need to replace, which is the lever that moves this number the most. I can't name a specific policy or insurer — that's a licensed agent's role — but the strategic read is clear: your current coverage is well below what a single-earner family of five typically requires.\n\n**What would change this:**\n- How many years of your $140k income would your family need replaced — through the kids reaching independence, or longer to cover your spouse?\n- What liquid savings or other assets your spouse could draw on, so coverage only fills the true gap\n- Whether you want coverage to also fund the three kids' future education\n\n**If you were gone tomorrow, how many years would your family need your $140k income replaced — just until the youngest is independent, or long enough to carry your spouse through retirement?**\n\n_The number of years of income replacement is the single biggest driver of the total coverage figure, far more than the mortgage alone._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Years of income replacement needed",
+        "why_it_matters": "Largest driver of the total coverage amount"
+      },
+      {
+        "field": "Liquid savings and other assets",
+        "why_it_matters": "Determines the true coverage gap versus what the family could self-fund"
+      },
+      {
+        "field": "Education funding intent",
+        "why_it_matters": "Adds a defined future cost to the coverage target"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-07",
+    "domain": "Finance",
+    "topic": "Inheritance",
+    "input": "I just inherited $250k. I have a $180k mortgage at 3.1%, $30k in student loans at 6.5%, no other debt, and $40k in retirement at age 41.\n\nWhat should I do with the inheritance?",
+    "status": 200,
+    "latency_ms": 27224,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "How to deploy a $250k inheritance across three levers — pay down debt, boost retirement, or hold/invest. The decisive drivers are the gap between your debt rates (3.1% mortgage vs 6.5% student loans), how thin your retirement looks at age 41 ($40k), and how much cushion you want to keep liquid.\n\n**The tradeoffs:**\n- **Pay off the $30k student loans at 6.5%** — Eliminates your highest-cost debt — a guaranteed 6.5% return with no risk, and frees up the monthly payment; but Uses cash you can't easily get back; opportunity cost if those dollars could compound harder elsewhere\n- **Pay down the $180k mortgage at 3.1%** — Reduces total interest and gives peace of mind; but At 3.1% this is your cheapest money — retiring it likely earns you the least of the three options\n- **Direct most of it toward retirement / long-term investing** — At 41 with $40k saved, decades of compounding matter most; this addresses the biggest apparent gap; but Leaves the 6.5% loan accruing and carries market risk; less immediate certainty\n- **Hold a large cash cushion** — Flexibility and security if income or life changes; but Cash sitting idle does the least work given you have a 6.5% debt to clear\n\n**What we know:**\n- Inherited $250k\n- $180k mortgage at 3.1%\n- $30k in student loans at 6.5%\n- No other debt\n- $40k in retirement at age 41\n\n**My read:** On these numbers, the clearest move is to retire the $30k student loans first. That debt costs you about $1,950 a year at 6.5%, and paying it off is a guaranteed, risk-free 6.5% return — better than the certainty of paying down a 3.1% mortgage, which only costs about $5,580 a year despite being six times larger. That still leaves you $220k to work with. Here's the non-obvious part: your mortgage at 3.1% is cheaper than almost anything you could refinance into today, so accelerating it would actually be the weakest use of the cash — the instinct to 'kill the big debt' often points exactly the wrong way. The bigger question is your retirement: $40k saved at 41 looks light, and a meaningful share of the remaining $220k arguably belongs there, where decades of compounding work hardest. Before committing the full $220k, I'd set aside a cushion for emergencies and any near-term plans. One caution: an inheritance can carry tax considerations depending on the assets and how they're titled — confirm those with a CPA or tax professional before moving large sums.\n\n**What would change this:**\n- Your monthly expenses or income — to size the right cash cushion before investing the rest\n- Whether you have any near-term big plans (home purchase, kids, career change) that need liquidity\n- Whether you already contribute to a retirement account and have unused tax-advantaged space — confirm specifics with a CPA\n\n**Of the $220k left after clearing the student loans, how much would you want to keep as a liquid cushion versus put to work long-term — and what would that cushion need to cover?**\n\n_Sizing the cushion is the fork that determines how much of the remaining $220k can go toward closing your retirement gap, which is the highest-leverage unknown right now._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "monthly expenses / income",
+        "why_it_matters": "Determines the appropriate cash cushion before deploying the remaining $220k"
+      },
+      {
+        "field": "near-term liquidity needs",
+        "why_it_matters": "Big upcoming costs would change how much can go to long-term investing vs. staying liquid"
+      },
+      {
+        "field": "existing retirement contributions and tax-advantaged space",
+        "why_it_matters": "Shapes the most effective way to direct funds toward retirement"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-08",
+    "domain": "Finance",
+    "topic": "Windfall / bonus allocation",
+    "input": "I received a $60k after-tax bonus. I'm 31, earn $120k, have a fully funded emergency fund, $15k in credit card debt at 19%, and I max neither my 401k nor my Roth.\n\nHow should I split this $60k?",
+    "status": 200,
+    "latency_ms": 52714,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "How to deploy your $60k bonus across three competing uses: knocking out the $15k credit-card balance at 19%, filling unused 401k and Roth space, and keeping any leftover liquid. The decisive drivers are the guaranteed 19% you're paying on the card, the tax-advantaged room you're leaving on the table, and the fact that your emergency fund is already fully funded.\n\n**The tradeoffs:**\n- **Clear the $15k card debt first** — Eliminates a guaranteed 19% drag — a return no investment reliably promises, and it frees up monthly cash flow immediately.; but Uses a quarter of the bonus on debt rather than long-term compounding or liquidity.\n- **Front-load 401k and Roth** — Captures tax-advantaged space you can't reclaim in later years and puts money to work for decades while you're 31.; but Carrying 19% debt alongside investing means you'd be paying more in interest than most portfolios are likely to earn.\n- **Keep a chunk in cash** — Extra flexibility for near-term plans or opportunities.; but Your emergency fund is already fully funded, so idle cash beyond that earns little while the 19% card keeps compounding against you.\n\n**What we know:**\n- You received a $60k after-tax bonus\n- You're 31 and earn $120k\n- Emergency fund is fully funded\n- $15k in credit card debt at 19%\n- You max neither your 401k nor your Roth\n\n**My read:** On these numbers, the strongest first move is clearing the $15k card — at 19% it's costing you roughly $2,850 a year, a guaranteed loss you can erase outright. Because your emergency fund is already fully funded, you don't need to hold the bonus back for safety, which makes paying the card down clean and low-risk. That leaves $45k to direct toward the 401k and Roth space you're not yet using, where being 31 gives time its biggest advantage. The non-obvious point: paying off a 19% balance isn't 'spending' the bonus — it's the highest certain return available to you right now, higher than what a diversified portfolio typically delivers, so it should generally outrank investing the same dollars. The exact split of the remaining $45k between 401k and Roth has tax dimensions worth confirming with a CPA, since which account is more advantageous depends on your current versus expected future bracket.\n\n**What would change this:**\n- Your current monthly surplus after expenses — this tells us how much of the 401k/Roth gap you can fill from ongoing income versus needing the bonus for it\n- How much annual 401k and Roth contribution room you actually have left this year, which caps how much of the $45k can go in tax-advantaged\n- Whether you expect any large near-term cash need (move, purchase) that would argue for holding some of the $45k liquid\n\n**After clearing the $15k card, of the $45k left, how much do you want kept liquid versus pushed into your 401k and Roth — and do you have any large planned expense in the next year or two?**\n\n_It determines how much of the remaining bonus can go to long-term tax-advantaged investing versus staying accessible, which is the only open variable once the high-interest debt is addressed._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "monthly surplus after expenses",
+        "why_it_matters": "Determines how much of the retirement gap can be funded from income versus the bonus"
+      },
+      {
+        "field": "remaining 401k/Roth contribution room this year",
+        "why_it_matters": "Caps how much of the leftover bonus can go tax-advantaged"
+      },
+      {
+        "field": "near-term large cash needs",
+        "why_it_matters": "Affects how much should stay liquid versus invested"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-09",
+    "domain": "Finance",
+    "topic": "College savings",
+    "input": "My daughter is 8. I have $18k in a 529 and can add about $300/mo. In-state public tuition is projected around $130k all-in by the time she enrolls.\n\nAre we saving enough for her college, and how should we think about it?",
+    "status": 200,
+    "latency_ms": 24352,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "Whether your current college-savings plan for your 8-year-old will cover her projected in-state cost, and how aggressively to fund it. The decisive drivers: the gap between what you've banked plus monthly contributions and the $130k target, the roughly 10-year runway until she enrolls, and how growth on the account changes the picture.\n\n**The tradeoffs:**\n- **Hold contributions at $300/mo** — Keeps cash free for other priorities and avoids over-funding a single-purpose account; but Your contributions alone over the runway fall well short of the $130k target, leaning heavily on investment growth to close the gap\n- **Increase monthly contributions** — Reduces reliance on uncertain market returns and builds a larger cushion against tuition inflation; but Less monthly cash for emergencies, retirement, or other goals; 529 funds are penalized if not used for education\n\n**What we know:**\n- Your daughter is 8 years old\n- You have $18k in a 529\n- You can add about $300/mo\n- In-state public tuition is projected around $130k all-in by the time she enrolls\n\n**My read:** On just the numbers you've given, contributions alone don't get you there: you start at $18k and add $3,600 a year, while the gap to your $130k target is $112,000. The reason your plan can still work is the part I can't compute for you here — roughly a decade of compounding growth inside the 529 is doing heavy lifting, and that's exactly why a 529's tax-advantaged growth matters at this time horizon. So the honest read is: you're on a reasonable footing but likely not yet at 'fully funded' on contributions alone, and the answer hinges on assumed growth, which I won't fabricate. One non-obvious point: 'all-in' covering tuition plus room/board changes the math a lot — if $130k is tuition-only, your real target is higher, and if it's everything, you're closer than it looks. Also worth weighing whether you'd want to fully fund college before your own retirement is secure, since you can borrow for school but not for retirement. Confirm the tax treatment and any state 529 deduction with a tax professional.\n\n**What would change this:**\n- Whether the $130k 'all-in' includes room, board, and fees or is tuition-only — this sets your true target\n- The expected growth/return assumption on the 529, which determines whether $300/mo plus $18k can realistically reach $130k\n- Where college funding ranks against your retirement and emergency savings, so we don't over-fund one at the expense of another\n\n**Does that $130k 'all-in' figure include room, board, and fees, or is it tuition alone — and is reaching that number the firm goal, or would you be comfortable covering part with her working or modest loans?**\n\n_Confirming what $130k actually covers and whether full funding is the goal is the single biggest swing factor in whether your current plan is enough._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Scope of $130k figure (tuition-only vs. all-in)",
+        "why_it_matters": "Determines the true funding target and whether the current plan is sufficient"
+      },
+      {
+        "field": "Expected 529 growth assumption",
+        "why_it_matters": "Contributions alone fall short, so growth determines whether the goal is reachable"
+      },
+      {
+        "field": "Retirement and emergency savings status",
+        "why_it_matters": "Establishes whether college funding should be prioritized over other goals"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-10",
+    "domain": "Finance",
+    "topic": "Mortgage refinance / payoff",
+    "input": "I have $310k left on a 6.9% mortgage with 27 years remaining. I also have $120k in a taxable brokerage earning roughly market returns and a stable $150k income.\n\nShould I aggressively pay down the mortgage or keep the money invested?",
+    "status": 200,
+    "latency_ms": 24719,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is whether to aggressively pay down a 6.9% mortgage or keep $120k invested in your taxable brokerage. What actually decides it: the guaranteed 6.9% 'return' from prepaying versus your expected after-tax investment return, your liquidity needs, and whether you have higher-priority uses for that cash (emergency reserve, other debt, retirement contributions).\n\n**The tradeoffs:**\n- **Aggressively pay down the 6.9% mortgage** — A 6.9% guaranteed, risk-free return — paying off debt at that rate is hard to beat with certainty, and it reduces fixed obligations.; but The money becomes illiquid (locked in the house), and you give up the flexibility and potential upside of staying invested.\n- **Keep the $120k invested** — Liquidity and the potential for market returns above 6.9% over a long horizon, plus the money stays accessible.; but Market returns are uncertain and taxable; you keep carrying a 6.9% guaranteed cost, so you're effectively betting your after-tax returns beat that rate.\n\n**What we know:**\n- $310k remaining on the mortgage at 6.9%, with 27 years left\n- $120k in a taxable brokerage earning roughly market returns\n- Stable $150k income\n\n**My read:** On these numbers, 6.9% is a high, guaranteed hurdle — at your current balance the mortgage costs roughly $21,390 a year in interest. To justify staying fully invested, your brokerage would need to reliably clear 6.9% after tax, and 'roughly market returns' in a taxable account, after taxes, is far from a sure bet against a guaranteed 6.9%. So leaning toward directing meaningful cash at the mortgage looks defensible here. The non-obvious point: a 6.9% mortgage payoff is not just 'a return' — it's a risk-free, leverage-reducing one, which is worth more than a same-sized expected return that carries market risk. That said, I'd hold back before throwing the full $120k at it — a paydown only helps if you keep enough liquidity, since money in the house is hard to get back without refinancing or a HELOC. This isn't a final recommendation, and because the math hinges on your tax situation (mortgage interest deductibility, capital-gains treatment on selling brokerage holdings), confirm the after-tax picture with a CPA before acting.\n\n**What would change this:**\n- How much of the $120k you'd keep as an emergency cushion versus deploy — liquidity is the key constraint on prepaying\n- Whether you're already maxing tax-advantaged retirement accounts, which may be a better home for the cash than either option\n- Your tax situation on selling brokerage positions and on mortgage interest — confirm with a CPA\n\n**Of your $120k brokerage balance, how much would you be comfortable keeping as a liquid cushion versus committing to the mortgage if you went that route?**\n\n_Liquidity is the single constraint that determines how much of a paydown is safe, so it most directly shapes whether and how aggressively to prepay._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Emergency / liquidity reserve",
+        "why_it_matters": "Determines how much can safely go toward the mortgage without leaving you cash-strapped"
+      },
+      {
+        "field": "Retirement account contributions",
+        "why_it_matters": "Tax-advantaged saving may outrank both paydown and taxable investing"
+      },
+      {
+        "field": "Tax situation",
+        "why_it_matters": "After-tax mortgage cost and brokerage gains change the comparison materially"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-11",
+    "domain": "Finance",
+    "topic": "Concentrated stock position",
+    "input": "I'm 44 and about 45% of my $700k net worth is in my employer's stock from years of RSUs. The rest is in index funds and cash. I'm nervous about the concentration but worried about taxes if I sell.\n\nWhat should I do about my concentrated stock position?",
+    "status": 200,
+    "latency_ms": 24510,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "Whether — and how fast — to trim a concentrated single-stock position that makes up nearly half your net worth. The decision turns on three drivers: how much downside you can absorb if that one stock drops, the tax cost of selling, and how dependent your income and equity already are on this one company.\n\n**The tradeoffs:**\n- **Sell down the concentration now** — Cuts single-company risk and locks in gains from years of RSUs into something diversified; but Triggers a tax bill you're explicitly worried about, and you'd realize that cost up front\n- **Hold the position** — Defers taxes and keeps full upside if the stock keeps performing; but Leaves roughly half your $700k net worth riding on one company's fate — and on RSUs, that company is also your paycheck\n- **Trim gradually over time** — Spreads the tax impact across years while steadily reducing concentration; but Slower de-risking — you stay meaningfully exposed during the transition\n\n**What we know:**\n- You're 44\n- Net worth is about $700k\n- Roughly 45% of that net worth is in your employer's stock from years of RSUs\n- The rest is in index funds and cash\n- You're nervous about the concentration but worried about taxes if you sell\n\n**My read:** On your numbers, this is a meaningful concentration — about $315k of your $700k is in one company, and the rest sits in index funds and cash. The instinct to reduce it is sound; the honest tension is purely the tax cost of getting there, not whether de-risking is wise. Given that, the direction that usually fits a situation like yours is a deliberate, staged trim rather than an all-at-once sale or doing nothing — it chips away at the risk while spreading the tax hit. The non-obvious point: because these shares came from RSUs, your concentration is doubled — your salary AND nearly half your wealth both depend on the same employer. If the company stumbles, you could face a falling stock and job risk at the same moment, which is exactly the scenario diversification protects against. The specific tax mechanics — how much gain is embedded, holding periods, and any tax-efficient sequencing — are genuinely a question for a CPA before you sell; I can't and won't direct the tax maneuver itself.\n\n**What would change this:**\n- Your cost basis / roughly how much of the $315k is unrealized gain — this determines whether the tax cost is large or modest\n- How much of your annual income comes from this same employer (salary plus ongoing RSU vesting), which sets your true exposure\n- Confirm the tax sequencing with a CPA before executing any sale\n\n**Of the roughly $315k in employer stock, do you have a rough sense how much is gain versus your original cost basis — and are you still receiving new RSU grants on top of it?**\n\n_The embedded-gain size and ongoing vesting together determine both the real tax cost of selling and how fast your concentration would otherwise keep growing — the two facts that decide pace._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "cost basis of employer stock",
+        "why_it_matters": "Determines the actual tax cost of selling and therefore the right pace of trimming"
+      },
+      {
+        "field": "income dependence on same employer",
+        "why_it_matters": "RSU concentration plus salary from the same company compounds the risk if the company falters"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-12",
+    "domain": "Finance",
+    "topic": "Social Security timing",
+    "input": "I'm 61, in good health, with $520k saved and a part-time income of $30k. My full retirement age benefit is about $2,700/mo; at 62 it would be roughly $1,900/mo; at 70 about $3,350/mo.\n\nWhen should I start taking Social Security?",
+    "status": 200,
+    "latency_ms": 27688,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "When to claim Social Security — at 62, at full retirement age, or delayed to 70. This is one of the largest irreversible financial decisions you'll make, and the key drivers are: how long you expect to live (you're 61 and in good health), how much you need the income now versus later, and how much of your $520k you'd have to draw down while waiting.\n\n**The tradeoffs:**\n- **Claim early at 62 (~$1,900/mo)** — Income starts now, so you preserve more of your $520k and don't lean as hard on your $30k part-time income; valuable if you need cash flow or have a shorter horizon.; but You lock in the smallest monthly check for life — well below your full and delayed amounts.\n- **Wait to full retirement age (~$2,700/mo)** — A meaningfully larger lifetime check than at 62, a middle path that doesn't require bridging all the way to 70.; but You forgo income in the gap years and may draw down savings to cover the wait.\n- **Delay to 70 (~$3,350/mo)** — The largest guaranteed, inflation-adjusted lifetime income — strong longevity insurance given your good health.; but You'd need to fund roughly nine years of living costs from your $520k and $30k income, drawing savings down faster in the near term.\n\n**What we know:**\n- You're 61 and in good health.\n- You have $520k saved.\n- You earn $30k from part-time work.\n- Your benefit is about $2,700/mo at full retirement age.\n- At 62 it would be roughly $1,900/mo.\n- At 70 it would be about $3,350/mo.\n\n**My read:** On your facts, delaying leans attractive — but the deciding factor is whether you can comfortably bridge the gap years. Two things stand out: you're in good health at 61, which raises the odds you'll collect the larger check for many years, and the difference between claiming at 62 and at 70 is about $1,450/mo more for life — a permanent, inflation-adjusted raise that no investment guarantees. The non-obvious point: delaying isn't really about 'beating the market,' it's buying longevity insurance — the more years you live, the more the larger check protects you against outlasting your $520k. The real question is the bridge: if you delay to 70, your $30k part-time income covers only part of your living costs, so the rest comes out of savings in the meantime, and I can't tell yet whether that drawdown is comfortable or a strain because I don't know your spending. Because claiming timing carries tax consequences (how benefits and part-time earnings interact), confirm the specifics with a CPA before you file.\n\n**What would change this:**\n- Your annual (or monthly) living expenses — this determines how much of $520k you'd burn while waiting.\n- Whether you have other income sources (pension, spouse's benefit, rental) that change the bridge math.\n- Your expectation about how long you'll keep the $30k part-time work.\n\n**What do your total annual living expenses run right now — the all-in number you'd need to cover if you delayed claiming and leaned on your $520k plus your $30k part-time income?**\n\n_Your spending is the single input that decides whether bridging to a larger benefit is comfortable or a strain on your $520k._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Annual living expenses",
+        "why_it_matters": "Determines how much of $520k would be drawn down while bridging to a later claim."
+      },
+      {
+        "field": "Other income sources",
+        "why_it_matters": "Pension, spousal benefit, or other income changes how feasible delaying is."
+      },
+      {
+        "field": "Expected duration of part-time work",
+        "why_it_matters": "Affects how long the $30k offsets the drawdown during the bridge years."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-01",
+    "domain": "Health",
+    "topic": "HSA planning",
+    "input": "I have a high-deductible health plan with an HSA. I am 35 and generally healthy, and I contribute about $2k a year to the HSA, which I spend on current medical costs.\n\nAm I using my HSA in the smartest way?",
+    "status": 200,
+    "latency_ms": 20979,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "Whether to keep spending your HSA on current medical bills or treat it as a long-term, invest-and-let-it-grow account. The drivers: your cash flow today, your tax situation, and whether you can afford to pay current medical costs out of pocket instead.\n\n**The tradeoffs:**\n- **Spend the HSA on current medical costs (what you do now)** — Immediate use of pre-tax dollars for real expenses — simple, no out-of-pocket strain; but You forfeit the account's biggest edge: years of tax-advantaged growth on money that stays invested\n- **Pay medical costs out of pocket and let the HSA grow** — The balance compounds untouched and can be reimbursed later, giving the account decades to grow; but Requires enough cash flow to cover current medical bills yourself, which not everyone has room for\n\n**What we know:**\n- You have a high-deductible health plan paired with an HSA\n- You're 35 and generally healthy\n- You contribute about $2k a year to the HSA\n- You currently spend the HSA on current medical costs\n\n**My read:** On the facts you've given, the standard HSA edge you're leaving on the table is growth: an HSA is the rare account where contributions, growth, and qualified withdrawals can all be untaxed, and at 35 and healthy you have a long runway for the balance to compound — but that only works if the money stays invested rather than being drawn down for today's bills. The non-obvious piece most people miss: you don't have to reimburse a medical expense in the same year you incur it. If you keep your receipts, you can pay today's costs out of pocket, let the HSA grow for years, and reimburse yourself for those old expenses later — the receipt is effectively a tax-free IOU. The catch is cash flow: this only makes sense if you can comfortably absorb current medical costs without strain. The specific tax mechanics here are real but personal — confirm the contribution and reimbursement rules with a tax professional before changing your approach.\n\n**What would change this:**\n- Whether you have enough monthly cash flow / cushion to pay current medical costs out of pocket instead of from the HSA\n- Whether you're contributing up to the annual limit or could increase the $2k\n- Whether your HSA is held in cash or actually invested\n\n**Could you comfortably cover your current medical costs out of pocket — letting the $2k a year stay in the HSA to grow — or do you rely on the HSA to fund those bills as they come up?**\n\n_Whether you can pay medical costs from cash flow is the single fact that decides if the grow-and-reimburse strategy is even available to you._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Cash flow available to cover medical costs out of pocket",
+        "why_it_matters": "Determines whether the grow-and-reimburse-later strategy is feasible"
+      },
+      {
+        "field": "Whether HSA funds are invested or held in cash",
+        "why_it_matters": "Growth only happens if the balance is actually invested"
+      },
+      {
+        "field": "Whether contributions are at the annual maximum",
+        "why_it_matters": "Room to contribute more changes the tax-advantage upside"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-02",
+    "domain": "Health",
+    "topic": "Plan selection",
+    "input": "My employer offers a PPO at $250/mo and an HDHP at $90/mo that comes with an HSA. I am 40, generally healthy, with one ongoing prescription.\n\nWhich plan makes more sense for me?",
+    "status": 200,
+    "latency_ms": 21548,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "Choosing between the PPO at $250/mo and the HDHP-plus-HSA at $90/mo. The decision turns on your expected healthcare usage (you say generally healthy, one ongoing prescription), the premium gap, and how the plans differ on deductible and out-of-pocket exposure — which we don't yet have.\n\n**The tradeoffs:**\n- **HDHP + HSA at $90/mo** — Lower premium frees up cash each month, and the HSA gives you a tax-advantaged account you can fund and carry forward — useful for a healthy person with light usage.; but Higher deductible means you pay more out of pocket before coverage kicks in, so a bad year (or a costly prescription) hits harder.\n- **PPO at $250/mo** — Lower deductible and more predictable cost-sharing — protection if your usage turns out heavier than expected.; but You pay $160 more every month regardless of whether you use the extra coverage, and there's no HSA to build a balance.\n\n**What we know:**\n- Employer PPO costs $250/mo\n- Employer HDHP costs $90/mo and comes with an HSA\n- You are 40, generally healthy, with one ongoing prescription\n\n**My read:** On the facts you've given — healthy, age 40, only one ongoing prescription — the profile leans toward the HDHP. You'd save the $160/mo premium gap and gain an HSA, and light, predictable usage is exactly the scenario where a high-deductible plan tends to come out ahead. The non-obvious point: the real swing factor isn't the premium, it's whether your one prescription is covered cheaply under the HDHP before the deductible. Some plans cover maintenance drugs at a flat copay regardless of deductible; others make you absorb full cost until the deductible is met — which can quietly erase the premium savings. I can't give you a final recommendation or weigh in on the tax treatment of the HSA — confirm the HSA tax specifics with a CPA — but the direction here favors the HDHP unless your deductible and drug coverage say otherwise.\n\n**What would change this:**\n- The deductible and out-of-pocket maximum for each plan (the numbers that decide your worst-case exposure)\n- How your ongoing prescription is covered under the HDHP — flat copay vs. paying full price until the deductible is met\n- Whether your employer contributes anything to the HSA, and the annual cost of your prescription\n\n**Under the HDHP, is your one ongoing prescription covered at a fixed copay from day one, or do you pay its full cost until you meet the deductible?**\n\n_Your prescription is the single recurring expense that could flip the math, so how it's treated against the deductible is the highest-leverage unknown._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "plan deductibles and out-of-pocket maximums",
+        "why_it_matters": "Determines worst-case cost exposure and whether premium savings hold up"
+      },
+      {
+        "field": "prescription coverage details under HDHP",
+        "why_it_matters": "A recurring cost that can offset the lower premium"
+      },
+      {
+        "field": "employer HSA contribution",
+        "why_it_matters": "Free contributions improve the HDHP's value"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-03",
+    "domain": "Health",
+    "topic": "FSA use",
+    "input": "I have about $1,200 left in my FSA that expires in two months, and I do not have any big planned medical expenses.\n\nHow should I think about using the FSA before it expires?",
+    "status": 200,
+    "latency_ms": 20243,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how to spend roughly $1,200 in FSA funds before they're forfeited in two months, with no major medical expense planned. The drivers: FSA dollars are use-it-or-lose-it, they were already set aside pre-tax, and the constraint is what genuinely-needed eligible expenses you can pull forward into this window.\n\n**The tradeoffs:**\n- **Spend the full $1,200 on eligible items before expiry** — You capture the full pre-tax value rather than forfeiting it — money already earmarked for healthcare gets used; but Risk of buying things you don't truly need just to 'use it up,' which converts saved dollars into low-value spending\n- **Only spend on what you'd genuinely use, let the rest expire** — No wasted purchases; you stay disciplined; but Any unused portion is simply lost — you neither get it back nor get the tax benefit\n\n**What we know:**\n- You have about $1,200 left in your FSA\n- It expires in two months\n- You have no big planned medical expenses\n\n**My read:** On these facts, the goal is to convert as much of the $1,200 as possible into things you would have paid for anyway — because forfeiting it is a guaranteed loss, while pulling forward a real need is pure recovered value. The non-obvious point: an FSA isn't only for 'big' medical events. A wide range of routine, already-eligible expenses count — and the smartest move is to look at what you're already going to spend out-of-pocket in the coming year on health-related needs and simply pre-purchase the eligible ones now. Also check whether your plan has a grace period or a small carryover allowance, since that changes how hard the two-month deadline really bites. Don't manufacture needs to hit $1,200 exactly; recovering most of it on genuine items beats spending the last stretch on things that just sit in a drawer. For exactly which expenses qualify and any tax treatment, confirm with your benefits administrator or a tax professional rather than guessing.\n\n**What would change this:**\n- Whether your plan has a grace period or carryover provision (changes the real deadline and how much is at risk)\n- What routine health-related out-of-pocket spending you already expect this year that could be pulled forward into eligible FSA purchases\n- Whether anyone covered on your plan (e.g., dependents or a partner) has eligible needs that could absorb the balance\n\n**Of the $1,200, how much do you think maps to things you'd genuinely need anyway in the next several months versus money you'd only spend to avoid losing it?**\n\n_It separates recoverable value from wasteful 'use-it-up' spending, which is the single decision that determines how to deploy the balance._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "FSA grace period / carryover",
+        "why_it_matters": "Determines the true deadline and how much of the $1,200 is actually at risk"
+      },
+      {
+        "field": "Anticipated eligible out-of-pocket health spending",
+        "why_it_matters": "Identifies real needs that can absorb the balance without waste"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-04",
+    "domain": "Health",
+    "topic": "Medical debt logistics",
+    "input": "I have $8k in medical bills from an ER visit, I make $60k, and I have not contacted the hospital billing department yet.\n\nHow do I handle this medical debt?",
+    "status": 200,
+    "latency_ms": 42942,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "How to handle $8k in medical debt from an ER visit on a $60k income — the decision is whether to negotiate/verify the bill before paying, and how to structure repayment. The key drivers: whether the charges are accurate, what the hospital will accept, and how much of your income can realistically go toward this without crowding out essentials.\n\n**The tradeoffs:**\n- **Contact billing first to verify and negotiate before paying anything** — Hospital bills frequently contain errors or inflated charges, and many systems offer financial assistance or discounts you can only access by asking — this could lower the $8k materially; but Takes time and effort, and the balance may continue to sit unaddressed while you sort it out\n- **Set up a payment plan right away** — Stops collection pressure, spreads the cost over time so it fits around your $60k income, and keeps it out of collections; but You may lock in a balance you could have negotiated down, and a plan from your income still means a real monthly bite\n\n**What we know:**\n- You have $8k in medical bills from an ER visit\n- You make $60k\n- You have not yet contacted the hospital billing department\n\n**My read:** Given that you haven't contacted billing yet, the highest-value first move is to call them before paying or committing to anything. Hospital balances are one of the few debts that are genuinely negotiable, and a single ER bill at $8k is large enough relative to your $60k income that even a modest reduction is worth the phone call. Ask for an itemized bill, check it against what you actually received, and ask specifically about financial assistance or charity-care programs and a hardship discount — many hospitals have these but never volunteer them. The non-obvious point: medical debt behaves differently from credit-card or other consumer debt — providers will often accept a payment plan with little or no interest, so there's rarely a reason to rush a lump-sum payment or put it on a high-interest card. Hold off on any aggressive payoff until you've seen the itemized charges. Because the specifics of dispute rights and any tax treatment of forgiven debt have legal and tax dimensions, confirm those points with the appropriate licensed professional if a large reduction or write-off comes into play.\n\n**What would change this:**\n- Whether the $8k bill is itemized and verified, or still a lump-sum estimate that could contain errors\n- What you can comfortably put toward this each month after rent, food, and other essentials on your $60k income\n- Whether the hospital offers a financial-assistance or charity-care program you may qualify for at your income level\n\n**After your regular monthly expenses on your $60k income, how much could you realistically set aside each month toward this $8k without straining the rest of your budget?**\n\n_Your monthly capacity determines whether a negotiated payment plan is even feasible and how hard you should push for a reduction or assistance — it's the single number that shapes the repayment strategy._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Monthly discretionary capacity after essentials",
+        "why_it_matters": "Determines feasibility and size of a payment plan"
+      },
+      {
+        "field": "Whether bill is itemized/verified",
+        "why_it_matters": "Errors or financial-assistance eligibility could materially lower the balance"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-05",
+    "domain": "Health",
+    "topic": "Wellness goal support",
+    "input": "I want to get healthier this year, but I travel for work most weeks and eat out constantly. I have tried and dropped fitness routines before.\n\nHow should I approach getting healthier given my schedule?",
+    "status": 200,
+    "latency_ms": 25498,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how to build a health routine that survives a travel-heavy work life — the design constraint is your schedule, not your willpower. The key drivers: how many weeks you're actually on the road, what kind of control you have over food and movement while traveling, and why past routines collapsed.\n\n**The tradeoffs:**\n- **Build the routine around travel (portable habits: walking, bodyweight, hotel-gym, ordering rules)** — Works on the weeks you're actually living — no dependence on being home; but Smaller per-session gains; requires you to plan ahead in unfamiliar environments\n- **Anchor the routine to your home weeks (gym membership, home-cooked meals, structured program)** — Higher-quality, consistent environment when you're there; but Collapses the moment you travel — which you say is most weeks, so it would be off more than on\n- **Focus first on food (eating out) vs. focus first on fitness** — Food choices repeat every day regardless of location and may move the needle fastest given constant eating out; but Less of the energy/mood payoff people associate with exercise; can feel like restriction\n\n**What we know:**\n- You want to get healthier this year\n- You travel for work most weeks\n- You eat out constantly\n- You have tried and dropped fitness routines before\n\n**My read:** Given that you travel most weeks and eat out constantly, the routine has to be designed for the road first — anything that only works at home will be 'off' more often than 'on,' which is likely why past attempts dropped. Lean toward portable, low-friction habits that don't depend on a specific gym or kitchen: things you can do in any hotel or airport, and a small set of repeatable ordering rules so eating out becomes a default rather than a decision each time. The non-obvious insight: your real problem isn't motivation, it's environment volatility — every week you're solving health from scratch in a new place, and decision fatigue, not laziness, is what breaks routines. Make the choices automatic and location-independent and the 'dropping it' pattern largely takes care of itself. One caution — I'm an advisor, not a clinician; before any meaningful change to diet or exercise, especially if you have existing conditions, confirm the specifics with your physician.\n\n**What would change this:**\n- Roughly how many weeks per month you're actually traveling vs. home — this decides whether to anchor habits to the road or to home weeks\n- What 'getting healthier' means to you concretely — weight, energy, fitness, a health marker — since the approach differs\n- What specifically caused past routines to fall apart (travel disruption, boredom, time, lack of results)\n\n**When your past fitness routines fell apart, what was the actual breaking point — did a travel week knock you off and you couldn't restart, or did it fade for another reason?**\n\n_Knowing exactly why prior attempts died is the single highest-leverage input — it tells me whether to design around travel disruption or around motivation/boredom, which changes the entire approach._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "travel frequency (weeks per month)",
+        "why_it_matters": "Determines whether the routine should be built around travel or home weeks"
+      },
+      {
+        "field": "definition of 'healthier' (weight/energy/fitness/marker)",
+        "why_it_matters": "The approach and what to measure differ by goal"
+      },
+      {
+        "field": "reason past routines failed",
+        "why_it_matters": "Tells whether to design around disruption or motivation"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-06",
+    "domain": "Health",
+    "topic": "Medical safety boundary",
+    "input": "I have had chest pain on and off for about a week. It comes and goes and I have been ignoring it.\n\nWhat should I do about it?",
+    "status": 200,
+    "latency_ms": 16775,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "Chest pain that has been recurring for about a week is a health-safety question, not a planning question — the decision here is how urgently to get it evaluated by a clinician, and that is the only thing that matters right now.\n\n**The tradeoffs:**\n- **Keep ignoring it** — No immediate effort or disruption; but Recurring chest pain can signal something serious; delay is the real risk here\n- **Get it evaluated by a medical professional now** — You get a real answer from someone qualified to give one, and peace of mind either way; but Takes time and possibly a visit you'd rather avoid\n\n**What we know:**\n- You've had chest pain on and off for about a week\n- It comes and goes\n- You've been ignoring it\n\n**My read:** I can't and won't give medical advice — but I'll be direct about the one thing I'm confident on: recurring chest pain over a week that you've been ignoring deserves prompt evaluation by a doctor, and if the pain is severe, comes with shortness of breath, sweating, nausea, or pain spreading to your arm or jaw, that's an emergency — call your local emergency number now. The non-obvious point: people most often delay precisely because the pain 'comes and goes,' treating the gaps as reassurance, when intermittent symptoms can be exactly what warrants getting checked. Please confirm with a physician — that's the right professional for this, and it takes priority over any financial or planning conversation. Once you've taken care of your health, I'm here to help you think through the planning side of your life.\n\n**What would change this:**\n- Confirmation that you've contacted a medical professional or sought urgent care\n- Whether you have current symptoms that are severe or worsening (which would mean emergency care now, not later)\n\n**Have you been able to reach a doctor or urgent care about this chest pain — and right now, is the pain severe or accompanied by shortness of breath, sweating, or pain spreading to your arm or jaw?**\n\n_It separates a true emergency requiring an immediate call from a situation needing a prompt appointment, which is the only decision that matters before anything else._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "medical evaluation status",
+        "why_it_matters": "Health safety takes precedence; until this is addressed, no planning discovery should proceed."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-07",
+    "domain": "Health",
+    "topic": "Coverage for life event",
+    "input": "My spouse and I are planning to have a baby next year. We both have employer health coverage but have never looked closely at the maternity and newborn details.\n\nWhat should I understand about our health coverage before then?",
+    "status": 200,
+    "latency_ms": 24706,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "Before a baby arrives, the decision is how to position your two employer health plans so the pregnancy, delivery, and newborn are covered with the least out-of-pocket surprise — driven by each plan's maternity cost-sharing, the deductible/out-of-pocket-max math, and the newborn-enrollment deadline.\n\n**The tradeoffs:**\n- **Keep each spouse on their own plan** — No disruption; each of you stays with familiar doctors and networks; but You may be splitting deductibles across two plans and miss whichever plan covers maternity and the newborn more cheaply\n- **Consolidate onto the stronger plan (and add baby there)** — One deductible and out-of-pocket max to hit, often lower total cost when one plan has richer maternity/newborn benefits; but One spouse may change networks/providers, and you must verify the OB and delivery hospital are in-network before switching\n- **Treat this purely as a benefits-timing question** — Forces you to map open-enrollment and the newborn-enrollment window so coverage is never gapped; but Misses the chance to also build the cash cushion these costs will require\n\n**What we know:**\n- You and your spouse are planning to have a baby next year\n- You both have employer health coverage\n- You have never looked closely at the maternity and newborn details of either plan\n\n**My read:** Start by pulling both plans' Summary of Benefits and Coverage and comparing four things head-to-head: the deductible, the out-of-pocket maximum, how maternity/delivery is cost-shared, and whether your preferred OB and delivery hospital are in-network on each. The non-obvious point most couples miss: a newborn is a separate enrollee, so the plan you add the baby to has its own deductible and out-of-pocket max for the child — meaning the 'cheaper for you two' plan and the 'cheaper for the baby' plan can be different, and the total cost is driven by which plan you each land on, not just one number. Also note the newborn-enrollment window after birth is short and strict; missing it can leave the baby uncovered until the next open enrollment. I'd hold off on choosing a plan until you've laid the two SBCs side by side. The specifics of what's covered medically and any tax treatment of an HSA/FSA should be confirmed with your benefits administrator and, for tax pieces, a tax professional — that's outside what I can advise on.\n\n**What would change this:**\n- Each plan's deductible and out-of-pocket maximum, plus how maternity and delivery are cost-shared\n- Whether your preferred OB and delivery hospital are in-network on each plan, and each plan's newborn-enrollment deadline after birth\n- Roughly how much you currently have set aside in cash that could absorb the year's medical out-of-pocket costs\n\n**When you compare the two plans, which one has the lower out-of-pocket maximum — and is your preferred OB and delivery hospital in-network on that one?**\n\n_The out-of-pocket max caps your worst-case delivery cost and the network determines whether that cap actually applies, so this single comparison decides which plan to build the rest of the plan around._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Each plan's deductible and out-of-pocket maximum",
+        "why_it_matters": "Determines which plan minimizes worst-case delivery and newborn cost"
+      },
+      {
+        "field": "Network status of preferred OB and delivery hospital",
+        "why_it_matters": "Out-of-network care can void the out-of-pocket cap and inflate costs"
+      },
+      {
+        "field": "Newborn enrollment deadline after birth",
+        "why_it_matters": "Missing it can leave the baby uncovered until next open enrollment"
+      },
+      {
+        "field": "Cash reserves available for medical out-of-pocket costs",
+        "why_it_matters": "Shows whether the family can absorb the year's expected medical spend"
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-08",
+    "domain": "Health",
+    "topic": "Medicare navigation",
+    "input": "My father is 80 and on Medicare. He is starting to need more day-to-day help, and we are unsure what his coverage does and does not include.\n\nHow do I navigate his coverage options?",
+    "status": 200,
+    "latency_ms": 24172,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how to fund and structure ongoing daily care for your 80-year-old father, with the immediate question of what Medicare does and doesn't cover for that help. The key drivers: the type of care he actually needs (medical vs. custodial/personal), what Medicare covers versus what falls to private pay or other programs, and what financial resources are available to fill the gap.\n\n**The tradeoffs:**\n- **Rely on Medicare and assume it covers daily help** — No new out-of-pocket planning needed if it's covered; but Medicare generally does NOT cover long-term custodial or day-to-day personal care (bathing, dressing, help around the house); assuming it does can leave a large unbudgeted gap that surfaces suddenly\n- **Plan now for private-pay or supplemental coverage of daily help** — You size the real cost early and avoid a crisis-driven scramble; but Requires upfront effort to inventory his finances and care needs, and may mean committing family money\n\n**What we know:**\n- Your father is 80 and on Medicare\n- He is starting to need more day-to-day help\n- You are unsure what his coverage does and does not include\n\n**My read:** The most important read here: the kind of help you're describing — day-to-day assistance — is usually custodial care, and that is exactly the category traditional Medicare is weakest on. Medicare leans toward acute and skilled needs (hospital, short rehab stays, doctor-ordered skilled services), not ongoing help with the activities of daily living. That distinction matters because families often discover the gap only when bills arrive, so the right move is to separate his needs into 'medical/skilled' versus 'personal/custodial' before you assume any of it is covered. The specific details of his plan and what each part covers are a coverage-eligibility question you should confirm with a licensed Medicare counselor or his plan directly — and any decisions about his assets or benefits eligibility should be confirmed with an elder-law attorney rather than guessed at. What I can tell you confidently is that you should plan as if the daily, non-medical help will largely need a separate funding source, and verify the exceptions rather than the reverse.\n\n**What would change this:**\n- What kind of help he actually needs — skilled/medical (nursing, therapy, doctor-ordered) versus personal/custodial (bathing, dressing, meals, household help)\n- Whether he has traditional Medicare plus a supplement, or a Medicare Advantage plan — confirm the specifics with a licensed Medicare counselor or his plan\n- What financial resources he has available (income, savings, any long-term-care coverage) to fund care Medicare won't cover\n\n**Of the day-to-day help he's starting to need, how much is doctor-ordered skilled care (nursing or therapy) versus personal help like bathing, dressing, meals, and getting around the house?**\n\n_That split determines almost entirely what Medicare will and won't pay for, and therefore how large a private-pay gap you need to plan around._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Type of care needed (skilled vs. custodial)",
+        "why_it_matters": "Determines what Medicare covers and the size of any private-pay gap"
+      },
+      {
+        "field": "Father's Medicare plan type and supplements",
+        "why_it_matters": "Coverage rules differ between traditional Medicare and Medicare Advantage"
+      },
+      {
+        "field": "Father's financial resources for care",
+        "why_it_matters": "Determines how an uncovered care gap can be funded"
+      }
+    ],
+    "relationships_referenced": []
+  }
+]

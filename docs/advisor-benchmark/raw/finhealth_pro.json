@@ -1,0 +1,364 @@
+[
+  {
+    "id": "fin-01",
+    "domain": "Finance",
+    "topic": "Buy a house",
+    "input": "I'm 34, married, two kids (4 and 6). Household income is $185k. We have $95k in cash, $40k in a brokerage, and $210k in retirement accounts. We rent for $2,900/mo. We're looking at homes around $620k in our area.\n\nShould we buy this house?",
+    "status": 200,
+    "latency_ms": 83622,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is whether buying a $620,000 home is the right move for your family right now. This is a major financial step that hinges on the immediate affordability of the down payment and new monthly costs, and how that impacts your financial flexibility and safety net.\n\n**The tradeoffs:**\n- **Buy the house now** — You start building equity, gain stability for your family, and lock in a major part of your housing costs.; but This would likely consume most of your liquid savings for the down payment and closing costs, leaving a very thin cash cushion for emergencies or home maintenance.\n- **Continue renting and saving** — You maintain financial flexibility, can build a larger savings buffer, and avoid the immediate costs and responsibilities of homeownership.; but You miss out on potential home appreciation and continue paying rent without building an asset for your family.\n\n**What we know:**\n- You are 34, married with two children, ages 4 and 6.\n- Your household income is $185,000 per year.\n- You have $95,000 in cash and $40,000 in a brokerage account.\n- You have $210,000 saved in retirement accounts.\n- You currently rent for $2,900 per month.\n- You are considering homes priced around $620,000.\n\n**My read:** Given your numbers, buying a $620,000 home looks like a significant financial stretch at this moment. While your total liquid savings of $135,000 could likely cover a conventional down payment and closing costs, doing so would leave your family with a very small cash reserve. For a new homeowner, this is a precarious position, as unexpected repairs or other emergencies can arise. The key insight here is the difference between being able to write the check for a down payment and it being a prudent decision for your family's overall financial health. Leaning toward building a larger savings buffer before committing to a purchase of this size seems wise, to ensure you have a strong safety net from day one of homeownership. You'll want to confirm the tax implications of this decision with a tax professional.\n\n**What would change this:**\n- The amount of your liquid savings you need to hold back as a comfortable emergency fund.\n- A realistic estimate of the total monthly payment for a $620,000 home, including mortgage, property taxes, insurance, and potential maintenance.\n- Your job stability and whether you anticipate any significant changes to your $185,000 income.\n\n**Of your $135,000 in cash and brokerage accounts, how much would you be comfortable using for the down payment and closing costs, versus how much do you feel you need to keep as a safety net for your family?**\n\n_This gets to the heart of the immediate tradeoff, forcing a decision on how much of your financial cushion you're willing to convert into home equity, which is the primary constraint right now._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "monthly_spending",
+        "why_it_matters": "To understand their current savings rate and how a new, likely higher, mortgage payment would impact their budget."
+      },
+      {
+        "field": "debt",
+        "why_it_matters": "Any existing debts (car loans, student loans, credit cards) would affect their debt-to-income ratio and overall affordability."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-02",
+    "domain": "Finance",
+    "topic": "Rent vs buy",
+    "input": "I'm 29, single, earning $110k in a city where a comparable condo costs $480k to buy or $2,400/mo to rent. I have $70k saved and might relocate for work within 3 years.\n\nDoes it make more sense for me to rent or buy right now?",
+    "status": 200,
+    "latency_ms": 23046,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is whether to rent or buy a home, which hinges on balancing the financial flexibility of renting against the long-term wealth-building potential of owning. For you, the most critical factor is your potential career relocation within 3 years.\n\n**The tradeoffs:**\n- **Renting** — Provides maximum flexibility for a potential move, requires less of your savings upfront, and keeps your monthly housing costs predictable.; but Your monthly payments do not build any ownership or equity over time.\n- **Buying** — Allows you to build home equity with each mortgage payment and benefit from potential long-term appreciation in the property's value.; but Involves high transaction costs for both buying and selling, and makes it much harder and more expensive to move on a short timeline.\n\n**What we know:**\n- You are 29, single, and earn $110,000 per year.\n- You have $70,000 in savings.\n- A comparable condo in your city costs $480,000 to buy or $2,400 per month to rent.\n- You might relocate for work within the next 3 years.\n\n**My read:** Given the possibility of relocating within 3 years, continuing to rent is likely the more advantageous path right now. The transaction costs to buy and then sell a $480,000 property—such as closing costs, agent commissions, and transfer taxes—can be substantial and would likely erase any equity you build in such a short timeframe. A non-obvious insight is that buying would probably consume most of your $70,000 in savings for the down payment and closing costs, leaving you 'house rich and cash poor' with little flexibility for emergencies or the expenses of a future move. Renting preserves both your capital and your career mobility, which are your most valuable assets at this stage.\n\n**What would change this:**\n- The actual likelihood of you relocating in the next 3 years.\n- How much of your $70,000 savings you would want to keep as a liquid emergency fund versus using for a down payment.\n- The stability of your current job and income.\n\n**How likely is that potential relocation in the next three years—is it a distant possibility, or something you're actively planning for?**\n\n_This is the single most important variable; a high probability of moving makes renting a much clearer choice, while a low probability makes buying a more reasonable option to consider._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-03",
+    "domain": "Finance",
+    "topic": "Pay off debt vs invest",
+    "input": "I have $22k in credit card debt at 24% APR, $18k in a 401k, and about $400/mo of free cash flow after expenses. My employer matches 50% up to 6% of my $85k salary.\n\nShould I pay down the cards first or keep investing?",
+    "status": 200,
+    "latency_ms": 29142,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "You're weighing whether to aggressively pay down high-interest debt or invest to capture your employer's 401k match. This is a crucial decision about the best use of your cash flow, driven by the 24% cost of your debt versus the 50% return from your employer match.\n\n**The tradeoffs:**\n- **Prioritize paying down the credit cards** — You get a guaranteed 24% 'return' for every dollar you pay down, eliminating a significant financial drag and freeing up cash flow faster.; but You forfeit the 50% employer match, which is essentially turning down free money and slowing your retirement savings.\n- **Prioritize investing for the 401k match** — You capture an immediate 50% return on your contributions, which is an exceptionally powerful way to build long-term wealth.; but The $22,000 in credit card debt continues to compound at a very high 24% rate, potentially erasing much of your investment gain.\n\n**What we know:**\n- You have $22,000 in credit card debt at 24% APR.\n- Your annual salary is $85,000.\n- Your employer matches 50% of your 401k contributions up to 6% of your salary.\n- You have about $400 per month in free cash flow after expenses.\n- You have $18,000 saved in your 401k.\n\n**My read:** Given these numbers, the priority should be to contribute just enough to your 401k to get the full employer match, and then devote every other available dollar to paying down the credit card debt. The 50% return on the match is higher than the 24% interest on your debt, so you capture the bigger win first. After that, the debt is a financial emergency, and paying it off provides a guaranteed, risk-free return of 24%. The non-obvious insight here is that the monthly contribution needed to get your full match is $425, which is slightly more than your stated $400 in free cash flow. This suggests we need to find a way to close that small gap, and then find even more room in your budget to aggressively attack the debt.\n\n**What would change this:**\n- Your current 401k contribution rate, to understand if the $400 free cash flow is before or after that deduction.\n- Whether you have other cash savings that could be used for a lump-sum payment on the debt.\n- Any flexibility in your monthly budget to increase your free cash flow, even temporarily.\n\n**To get your full employer match, you'd need to contribute $425 a month. Is the $400 of free cash flow you mentioned what's left over *after* your current 401k contributions are taken out of your paycheck, or is that the total amount you have available for both goals?**\n\n_This clarifies the true financial resources you have to work with and whether you're already covering some, all, or none of the 401k contribution needed for the match._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-04",
+    "domain": "Finance",
+    "topic": "Retirement planning",
+    "input": "I'm 47, make $130k, have $380k in retirement savings, and want to retire at 62. I save about $1,500/mo and have no pension.\n\nAm I on track to retire at 62?",
+    "status": 200,
+    "latency_ms": 25194,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is whether your current financial plan is on pace to support retirement at age 62. This depends on three main drivers: your existing savings, your ongoing savings rate, and, most importantly, the lifestyle you plan to fund in retirement.\n\n**The tradeoffs:**\n- **Retiring at 62** — You gain more years of freedom and stop working earlier.; but This leaves fewer years to save and for your investments to grow, while requiring your savings to fund a longer period of time.\n- **Saving more aggressively now** — It significantly increases the probability of reaching your goal by your target date.; but This requires reducing your current spending, which could impact your lifestyle today.\n- **Working longer** — Each additional year provides more savings, more investment growth, and a shorter retirement to fund, making the financial goal much easier to reach.; but This means sacrificing some of the early retirement years you're aiming for.\n\n**What we know:**\n- You are 47 years old.\n- Your annual income is $130,000.\n- You have saved $380,000 for retirement.\n- You are saving $1,500 per month.\n- Your target retirement age is 62.\n- You do not have a pension.\n\n**My read:** Based on these numbers, you have a very strong foundation for retirement, but reaching that goal by 62 will be ambitious and requires a clear target. Your current savings of $380,000 is a significant accomplishment. Your savings rate of about 14% of your income is also solid. However, whether this is 'on track' is impossible to say without knowing the size of the liability you are saving for — your annual spending in retirement. The non-obvious insight here is that for early retirement, the most critical number isn't your savings balance today, but the 'target number' dictated by your future expenses. A modest retirement lifestyle might be fully funded, while a high-cost one might be out of reach. Defining that spending goal is the essential next step to turning your question from 'am I on track?' to 'here is the track'. A financial advisor can run detailed projections once you have this target in mind.\n\n**What would change this:**\n- Your expected annual spending in retirement.\n- How your current retirement savings are invested (for instance, the mix of stocks and bonds).\n- Any other sources of retirement income, such as for a spouse or partner, if applicable.\n\n**To get a sense of the lifestyle you want to fund, roughly how much of your current $130,000 income do you imagine you'll need to live on each year in retirement?**\n\n_This single number—your target retirement spending—is the most important variable in determining whether your savings goal is achievable by age 62._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-05",
+    "domain": "Finance",
+    "topic": "Emergency fund",
+    "input": "My household spends about $5,200/mo. We have $7k in checking and irregular income (I'm a contractor, my spouse is salaried at $72k).\n\nHow large should our emergency fund be and how do we get there?",
+    "status": 200,
+    "latency_ms": 26700,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "We're deciding on the right size for your emergency fund, which is the bedrock of your financial stability. The key drivers are your household's spending, the mix of stable and irregular income, and how much of a safety net you need to feel secure.\n\n**The tradeoffs:**\n- **A larger fund** — It provides a bigger cushion to absorb income gaps from your contracting work or a potential job loss, reducing financial stress.; but This cash is not being invested or used for other goals, so its purchasing power will erode over time due to inflation.\n- **A smaller fund** — It frees up more of your money to be put to work investing, paying down debt, or funding other goals sooner.; but You have less of a buffer, which increases the risk of having to take on debt or make difficult choices if your income drops unexpectedly.\n\n**What we know:**\n- Your monthly household spending is about $5,200.\n- You currently have $7,000 in your checking account.\n- Your income is a mix: one spouse has a stable $72,000 salary, while your income as a contractor is irregular.\n\n**My read:** Given that a significant portion of your household income is irregular, leaning toward a larger emergency fund is a sound strategy. Your spouse's stable monthly income of $6,000 already covers your stated $5,200 in expenses, which is a very strong foundation. This means your emergency fund's primary job is to absorb the month-to-month swings of your contract work and protect against the risk of both incomes being lost at once. Your current $7,000 provides a cushion of just over one month, which is a great start but likely feels tight. The non-obvious insight here is to think of this fund not just for a major emergency, but as your household's 'working capital'—it smooths out the gaps between contract payments so you aren't forced to take on debt or make stressful decisions.\n\n**What would change this:**\n- The typical variability of your contracting income, especially the longest period you've gone with low or no income.\n- Whether you have any high-interest debt, like credit cards, that might be a higher priority to pay down.\n- How much cash you feel you need on hand to sleep well at night, regardless of the numbers.\n\n**To get a better sense of the risk we're buffering against, what's the most challenging income period you've faced as a contractor in the last few years—for instance, the longest you've gone between projects?**\n\n_This helps quantify the 'irregularity' in your income, which is the single biggest factor in determining how many months of expenses you truly need to have set aside._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-06",
+    "domain": "Finance",
+    "topic": "Insurance decision",
+    "input": "I'm 38, the primary earner at $140k, with a spouse who stays home and three kids under 10. We have a $250k group life policy through work and a $400k mortgage.\n\nHow much life insurance do I actually need?",
+    "status": 200,
+    "latency_ms": 23556,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how much life insurance is appropriate to protect your family, which matters deeply given you are the primary earner. This isn't just about a number; it's about ensuring your family's stability, and it's driven primarily by your income, your mortgage debt, and your family's ongoing living costs.\n\n**The tradeoffs:**\n- **Securing more coverage** — Your family could pay off the mortgage and have years of income replaced, providing significant financial stability and peace of mind.; but Higher monthly premiums, which would reduce the cash flow available for other goals today.\n- **Sticking with the current policy** — No new costs, which keeps your monthly budget simpler and frees up cash.; but A significant financial shortfall for your family if you were to pass away, potentially forcing difficult lifestyle changes.\n\n**What we know:**\n- You are 38 years old and the primary earner, with an income of $140,000.\n- Your spouse stays home with your three children, who are all under 10.\n- You have a $400,000 mortgage.\n- Your current life insurance is a $250,000 group policy through your work.\n\n**My read:** Given what you've shared, your current $250,000 policy appears to be a significant shortfall. It would not be enough to cover your $400,000 mortgage, leaving your family with a $150,000 debt and no replacement for your $140,000 annual income. For a young family with one earner, this creates a precarious situation. The non-obvious insight here is that work-provided group policies are often not 'portable' — if you change jobs, you could lose that coverage entirely, making it a fragile foundation for your family's security. Given your children's young age, your family's financial need is likely at its peak right now. A licensed insurance professional can help you select and apply for an appropriate policy.\n\n**What would change this:**\n- Your family's typical monthly living expenses, excluding the mortgage.\n- The amount of your current savings and other assets available to your family.\n- Any specific financial goals you have for your children, like funding for college.\n\n**If we set aside the $400,000 mortgage for a moment, how much does your family typically spend each month to cover everything else — from groceries and utilities to childcare and transportation?**\n\n_This figure is the foundation for determining how much income would need to be replaced and for how long, which is the largest component of an insurance needs calculation after covering major debts._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "monthly_living_expenses",
+        "why_it_matters": "This is the core figure needed to calculate how much income needs to be replaced to maintain the family's lifestyle."
+      },
+      {
+        "field": "total_savings_and_investments",
+        "why_it_matters": "Existing assets can reduce the amount of life insurance needed."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-07",
+    "domain": "Finance",
+    "topic": "Inheritance",
+    "input": "I just inherited $250k. I have a $180k mortgage at 3.1%, $30k in student loans at 6.5%, no other debt, and $40k in retirement at age 41.\n\nWhat should I do with the inheritance?",
+    "status": 200,
+    "latency_ms": 29071,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how to best allocate this $250,000 inheritance, which matters because it's a one-time opportunity to dramatically improve your financial position. The key drivers are the interest rates on your debt, your current retirement savings at age 41, and your need for a cash safety net.\n\n**The tradeoffs:**\n- **Aggressively pay down debt** — This provides a guaranteed, risk-free return equal to the interest rate you're no longer paying and offers the peace of mind of being debt-free.; but It uses up a large amount of cash that could be invested for potentially higher long-term growth, which is a key consideration for retirement.\n- **Invest the funds** — You could potentially earn returns that outpace your loan interest rates, significantly accelerating your retirement savings.; but Investment returns are not guaranteed and involve market risk, while your debt payments would continue.\n- **Hold it as cash** — This provides maximum security and liquidity for emergencies or future opportunities.; but Cash typically loses purchasing power to inflation over time and doesn't generate the growth needed for long-term goals like retirement.\n\n**What we know:**\n- You received a $250,000 inheritance.\n- You have a $180,000 mortgage with a 3.1% interest rate.\n- You have $30,000 in student loans with a 6.5% interest rate.\n- You have $40,000 saved for retirement at age 41.\n\n**My read:** Given what you've shared, a hybrid approach seems most powerful. Leaning toward paying off the $30,000 student loan immediately makes sense. That 6.5% interest rate is a high hurdle to consistently and safely beat with investments, so eliminating it is a clear win. However, I would pause before paying down the 3.1% mortgage. That's very inexpensive debt, and with your retirement savings at $40,000, using the remaining funds to catch up is likely a higher-impact move. The non-obvious insight here is to view that 3.1% mortgage not just as a liability, but as a strategic asset in the current environment; it allows you to keep your capital working harder elsewhere. A financial advisor can help you select specific investments once you've decided on an allocation.\n\n**What would change this:**\n- The amount of cash you have for emergencies outside of your retirement funds.\n- Your annual income and job stability.\n- Your personal comfort level with holding debt versus investing in the market.\n\n**Of the $220,000 that would remain after paying off the student loans, how much would you want to set aside as a cash safety net for unexpected expenses before considering investing the rest for the long term?**\n\n_This determines the foundational layer of your financial security, and the answer will tell us how much capital is truly available for long-term wealth-building goals like retirement._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "income",
+        "why_it_matters": "Income level is critical for understanding cash flow, savings capacity, and ability to service debt."
+      },
+      {
+        "field": "emergency_savings",
+        "why_it_matters": "Knowing the current cash cushion helps determine how much of the inheritance needs to be allocated to liquidity vs. other goals."
+      },
+      {
+        "field": "risk_tolerance",
+        "why_it_matters": "Risk tolerance will guide the decision between paying off low-interest debt and investing for potentially higher returns."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-08",
+    "domain": "Finance",
+    "topic": "Windfall / bonus allocation",
+    "input": "I received a $60k after-tax bonus. I'm 31, earn $120k, have a fully funded emergency fund, $15k in credit card debt at 19%, and I max neither my 401k nor my Roth.\n\nHow should I split this $60k?",
+    "status": 200,
+    "latency_ms": 55790,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how to best allocate this $60,000 bonus to accelerate your financial progress. The key drivers are the guaranteed return from paying off high-interest debt versus the potential for long-term growth from investing, all while considering your future goals.\n\n**The tradeoffs:**\n- **Prioritize paying off the credit card debt** — This offers a guaranteed, risk-free 'return' of 19% by eliminating that interest cost, which is a very high bar for any investment to consistently beat.; but This money is no longer available to be invested in your 401k or a Roth IRA, where it could potentially grow over your long time horizon.\n- **Prioritize investing the full amount** — At age 31, this capital has decades to compound, potentially growing into a much larger sum for retirement or other long-term goals.; but The $15,000 in debt will continue to accrue interest at a very high rate, acting as a significant drag on your finances and likely costing more than you can reliably earn in the market.\n\n**What we know:**\n- You received a $60,000 after-tax bonus.\n- You are 31 and earn $120,000 annually.\n- You have $15,000 in credit card debt at a 19% interest rate.\n- You have a fully funded emergency fund.\n- You are not currently maxing out your 401k or Roth IRA contributions.\n\n**My read:** Given the 19% interest rate, my strong inclination is to use the bonus to wipe out the $15,000 credit card debt first. A guaranteed, tax-free 19% return is exceptionally powerful and provides immediate financial relief. That debt is costing you about $2,850 a year in interest alone. Once that's gone, you're left with a clean slate and $45,000. My non-obvious insight here is that paying off high-interest debt is an offensive move, not just a defensive one. It permanently frees up the cash flow you were sending to the credit card company, which you can then redirect to consistently increase your 401k and Roth contributions. This turns a one-time windfall into a sustainable, long-term increase in your savings rate.\n\n**What would change this:**\n- Whether you have any other significant financial goals in the next 1-5 years, such as a down payment on a home.\n- Details about your employer's 401k match, if any, to see if you're capturing the full amount.\n- Your general comfort level with holding debt versus investing.\n\n**With the $15,000 debt paid off, you'd have $45,000 remaining. Are there any major purchases or life events you're planning for in the next few years, like buying a home or starting a business?**\n\n_This is the most important next step because knowing about a large, near-term goal is the primary factor that could change the recommendation to allocate the remaining funds toward that instead of long-term investments._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-09",
+    "domain": "Finance",
+    "topic": "College savings",
+    "input": "My daughter is 8. I have $18k in a 529 and can add about $300/mo. In-state public tuition is projected around $130k all-in by the time she enrolls.\n\nAre we saving enough for her college, and how should we think about it?",
+    "status": 200,
+    "latency_ms": 57671,
+    "llm_status": "fallback:invented numbers not in context: ['54000']",
+    "prompt_version": "",
+    "assistant_message": "Let's build your plan together — I'll ask a few quick questions. Let's start with the big picture — what would you most like your life to look like over the next few years?\n\n_Why I ask: Your vision anchors every recommendation we make._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-10",
+    "domain": "Finance",
+    "topic": "Mortgage refinance / payoff",
+    "input": "I have $310k left on a 6.9% mortgage with 27 years remaining. I also have $120k in a taxable brokerage earning roughly market returns and a stable $150k income.\n\nShould I aggressively pay down the mortgage or keep the money invested?",
+    "status": 200,
+    "latency_ms": 19540,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is whether to use your savings to aggressively pay down your mortgage or keep that money invested. This matters because it's a choice between a guaranteed financial return and a potentially higher, but riskier, one, which hinges on the 6.9% interest rate, market performance, and your comfort with holding debt.\n\n**The tradeoffs:**\n- **Aggressively pay down the mortgage** — You get a guaranteed, risk-free 6.9% return on every extra dollar you pay. This also builds home equity faster and provides the emotional security of being debt-free sooner.; but You lose the potential for your investments to earn more than 6.9% over the long term. It also reduces your liquidity, as money paid into your home is harder to access than money in a brokerage account.\n- **Keep the money invested** — Your $120,000 has the potential to grow at a rate higher than your 6.9% mortgage interest, creating more wealth over time.; but Market returns are not guaranteed and you could lose money. All the while, you are still carrying a significant debt at a relatively high interest rate.\n\n**What we know:**\n- Your remaining mortgage balance is $310,000.\n- The mortgage interest rate is 6.9%, with 27 years left.\n- You have $120,000 in a taxable brokerage account.\n- You have a stable income of $150,000 per year.\n\n**My read:** Given that your mortgage rate is 6.9%, leaning toward accelerating your mortgage payments is a very strong and defensible strategy. That 6.9% is a high, guaranteed, risk-free return, which is a difficult hurdle for the market to beat consistently, especially after taxes and considering risk. While investing offers the potential for higher returns, it comes with volatility and no guarantees. Securing a 6.9% return by paying down debt is a powerful wealth-building move. The non-obvious insight here is that this 'return' is also effectively tax-free; you don't pay taxes on the interest you save, whereas you will pay taxes on gains in your brokerage account, making the 6.9% even more attractive. This is a strategic financial decision, and you should consult with a qualified financial advisor to build a specific plan.\n\n**What would change this:**\n- Whether the $120,000 in your brokerage account is your primary source of liquid savings for emergencies.\n- Your marginal tax bracket, to understand the potential value of the mortgage interest deduction.\n- Any other major financial goals you're saving for that might require these funds in the near future.\n\n**Of that $120,000 in your brokerage account, how much of it is earmarked as your safety net for unexpected expenses, versus being purely for long-term investment growth?**\n\n_This helps clarify how much liquidity you'd be giving up, which is the primary risk of using investments to pay down your mortgage._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-11",
+    "domain": "Finance",
+    "topic": "Concentrated stock position",
+    "input": "I'm 44 and about 45% of my $700k net worth is in my employer's stock from years of RSUs. The rest is in index funds and cash. I'm nervous about the concentration but worried about taxes if I sell.\n\nWhat should I do about my concentrated stock position?",
+    "status": 200,
+    "latency_ms": 54138,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how to manage a concentrated position in your employer's stock, which matters because it represents a significant risk to your overall net worth. The key drivers are your personal tolerance for risk, the tax implications of selling, and how this capital fits into your long-term financial plans.\n\n**The tradeoffs:**\n- **Hold the concentrated stock** — You defer paying capital gains taxes and could benefit from the company's future growth.; but A large portion of your net worth is tied to the fate of a single company, which is also the source of your income. This is a significant, undiversified risk.\n- **Systematically sell the stock** — You reduce concentration risk and can reinvest the proceeds into a diversified portfolio, like your existing index funds.; but You will have to realize capital gains and pay the associated taxes, reducing the amount available to reinvest.\n\n**What we know:**\n- You are 44 years old.\n- Your net worth is approximately $700,000.\n- 45% of that net worth is in your employer's stock, which came from RSUs.\n- The remainder of your assets are in index funds and cash.\n- You feel nervous about this concentration but are worried about the taxes if you sell.\n\n**My read:** Given your stated nervousness, leaning toward a disciplined plan to reduce this concentration makes sense. The risk of having nearly half your wealth, about $315,000, in one stock is substantial. While the tax bill is a real cost, it's a cost of success; a major downturn in a single stock could lead to a permanent loss of capital that you can't recover. The non-obvious insight here is that since your shares came from RSUs, your tax bill is only on the appreciation since the shares vested, not their entire value. For more recently vested shares, this gain could be smaller than you think. A strategy to sell shares over a set period can manage the tax impact while systematically reducing your risk. You should absolutely model the specific tax impact with a CPA before acting.\n\n**What would change this:**\n- The approximate cost basis of the shares (the value when they vested).\n- Your annual income, which determines your capital gains tax rate.\n- Whether you are still receiving and vesting new shares.\n\n**To help us quantify the tax impact you're concerned about, do you have a rough idea of the cost basis for these shares—that is, what the stock was worth on the different dates your RSUs vested?**\n\n_This is the most important variable for calculating the actual tax cost of selling, which is the primary barrier you've identified._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "cost_basis_of_stock",
+        "why_it_matters": "Needed to determine the potential tax liability from selling the concentrated stock position."
+      },
+      {
+        "field": "annual_income",
+        "why_it_matters": "Needed to determine the applicable capital gains tax rate."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-12",
+    "domain": "Finance",
+    "topic": "Social Security timing",
+    "input": "I'm 61, in good health, with $520k saved and a part-time income of $30k. My full retirement age benefit is about $2,700/mo; at 62 it would be roughly $1,900/mo; at 70 about $3,350/mo.\n\nWhen should I start taking Social Security?",
+    "status": 200,
+    "latency_ms": 22409,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is when to claim Social Security, which matters because it sets a baseline for your guaranteed income for the rest of your life. The key drivers are your immediate income needs, your health and longevity, and how you plan to use your existing savings.\n\n**The tradeoffs:**\n- **Claiming early (age 62)** — You receive income sooner, which can supplement your part-time work and reduce the need to draw down your $520,000 in savings.; but Your monthly payment is permanently reduced to about $1,900, which is significantly less than you would receive by waiting.\n- **Waiting (until full retirement age or 70)** — Your monthly payment increases substantially, up to $3,350 at age 70, providing a much larger, inflation-adjusted income stream for life.; but You must cover your living expenses for several more years using your part-time income and savings, forgoing payments you could have received in the interim.\n\n**What we know:**\n- You are 61 and in good health.\n- You have $520,000 saved.\n- You earn $30,000 per year from part-time work.\n- Your estimated monthly Social Security benefits are $1,900 at age 62, $2,700 at full retirement age, and $3,350 at age 70.\n\n**My read:** Given your good health and substantial savings, the stronger strategic direction is to wait as long as possible, ideally until age 70, to claim Social Security. Your $520,000 in savings and $30,000 income appear sufficient to bridge the gap, allowing you to secure a much higher, permanent monthly benefit. This provides a powerful defense against the risk of outliving your money. The non-obvious insight here is to view delaying not as 'losing' payments, but as 'buying' a larger, guaranteed, inflation-protected pension from the government. The increase from an annual benefit of about $22,800 at 62 to $40,200 at 70 is a benefit that is very difficult to replicate safely through private investments. You should discuss the tax implications of this strategy with a financial or tax professional.\n\n**What would change this:**\n- Your current annual living expenses, to see if your part-time income is enough to cover them.\n- Whether you have a spouse whose own benefits could affect a coordinated claiming strategy.\n- Your desire or plan to continue your part-time work over the next few years.\n\n**To see how comfortably your savings and income can support you while you wait, what are your total annual living expenses right now?**\n\n_This is the most critical missing variable; it determines whether waiting to claim Social Security is a comfortable strategy or a financial stretch._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "annual_expenses",
+        "why_it_matters": "Determines if current income and savings can cover the gap if Social Security is delayed."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-01",
+    "domain": "Health",
+    "topic": "HSA planning",
+    "input": "I have a high-deductible health plan with an HSA. I am 35 and generally healthy, and I contribute about $2k a year to the HSA, which I spend on current medical costs.\n\nAm I using my HSA in the smartest way?",
+    "status": 200,
+    "latency_ms": 25402,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is whether to use your HSA for current medical spending or as a long-term investment vehicle. This matters because the HSA's triple tax advantage makes it a uniquely powerful tool for building wealth for future healthcare costs, and the best strategy depends on your ability to cover today's expenses out-of-pocket.\n\n**The tradeoffs:**\n- **Spend from the HSA now** — It covers your current health costs with pre-tax money, which frees up your cash flow today.; but You lose out on decades of potential tax-free investment growth, which is the HSA's most powerful feature.\n- **Invest the HSA funds for the long term** — It maximizes tax-free growth, creating a dedicated and highly efficient fund for healthcare costs in retirement.; but It requires you to pay for today's medical expenses with after-tax money from your budget, which could be a strain.\n\n**What we know:**\n- You are 35 and generally healthy.\n- You have a high-deductible health plan.\n- You contribute about $2,000 per year to your HSA.\n- You currently spend those funds on your current medical costs.\n\n**My read:** Given you are 35 and healthy, there's a strong case for shifting your view of the HSA from a spending account to a long-term investment account. Your long time horizon gives your contributions powerful potential to grow tax-free into a substantial fund for healthcare in retirement. Using it for spending today is perfectly valid, but it forgoes this unique growth opportunity. A non-obvious insight is that you can pay for medical expenses out-of-pocket now, save the receipts indefinitely, and reimburse yourself from the HSA years or even decades later. This allows the money to grow untouched while effectively creating a future source of tax-free cash. This strategy, of course, hinges on your ability to cover current costs from your budget. You should consult a financial advisor for specific investment choices and a tax professional about your specific situation.\n\n**What would change this:**\n- Your ability to pay for current medical expenses out-of-pocket.\n- Your other retirement savings, to see how the HSA fits into your overall plan.\n- The typical amount of your annual medical spending.\n\n**If you were to treat the HSA as a long-term investment, could you comfortably cover that $2,000 in annual medical costs from your regular cash flow without it causing a financial strain?**\n\n_This gets to the heart of whether the 'invest-first' strategy is practical for your current financial situation._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "income",
+        "why_it_matters": "Helps determine the ability to pay for medical expenses out-of-pocket."
+      },
+      {
+        "field": "monthly_expenses",
+        "why_it_matters": "Helps determine the ability to pay for medical expenses out-of-pocket."
+      },
+      {
+        "field": "retirement_savings",
+        "why_it_matters": "Provides context for how the HSA fits into the overall retirement strategy."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-02",
+    "domain": "Health",
+    "topic": "Plan selection",
+    "input": "My employer offers a PPO at $250/mo and an HDHP at $90/mo that comes with an HSA. I am 40, generally healthy, with one ongoing prescription.\n\nWhich plan makes more sense for me?",
+    "status": 200,
+    "latency_ms": 22599,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "Choosing between a PPO and an HDHP is a classic risk-versus-reward decision that balances lower monthly costs against potentially higher out-of-pocket expenses. The right fit depends on your expected healthcare needs, your ability to cover a large, unexpected bill, and your interest in the HSA as a long-term savings tool.\n\n**The tradeoffs:**\n- **PPO Plan** — You get more predictability. With typically lower deductibles and copays, your out-of-pocket costs are more stable, which can be reassuring.; but That predictability comes at a higher price through the $250 monthly premium, and you lose the opportunity to save in a triple-tax-advantaged HSA.\n- **HDHP with HSA** — The immediate monthly savings are significant with the $90 premium, and you gain access to an HSA, which is a powerful tool for both healthcare costs and long-term investment.; but You take on the risk of a higher deductible. If a significant health issue arises, you are responsible for a larger portion of the initial costs out-of-pocket.\n\n**What we know:**\n- You are 40 and generally healthy, with one ongoing prescription.\n- The PPO plan costs $250 per month.\n- The HDHP plan costs $90 per month and includes an HSA.\n\n**My read:** Given that you're generally healthy, the HDHP/HSA plan is often the financially superior choice over the long term. The annual premium savings of $1,920 are substantial and could be contributed directly to your HSA to start building that cushion. The key is whether you can comfortably absorb the higher deductible if a medical need arises. The non-obvious insight here is that an HSA is not just a health savings account; it's arguably the most powerful retirement savings vehicle available. Because of its triple-tax advantage, many people use it as a supplemental retirement fund for medical or other expenses. This recommendation hinges on the specific plan details, which you should review carefully.\n\n**What would change this:**\n- The annual deductible and out-of-pocket maximum for the HDHP.\n- The cost of your specific prescription under each plan's formulary.\n- Whether your employer makes any contribution to the HSA on your behalf.\n\n**To properly weigh the risk of the HDHP against the savings, what is the plan's annual deductible?**\n\n_The deductible is the single most important number for quantifying the financial risk you'd be taking on with the HDHP, and it determines the amount of cash you'd need available for a worst-case scenario._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "hdhp_annual_deductible",
+        "why_it_matters": "This is the primary measure of financial risk for the HDHP plan and is essential for making an informed comparison."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-03",
+    "domain": "Health",
+    "topic": "FSA use",
+    "input": "I have about $1,200 left in my FSA that expires in two months, and I do not have any big planned medical expenses.\n\nHow should I think about using the FSA before it expires?",
+    "status": 200,
+    "latency_ms": 23383,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how to best use your remaining $1,200 FSA balance before it expires in two months, which matters because these are 'use it or lose it' funds. The key drivers are your plan's specific rules, the full scope of eligible expenses, and any upcoming health needs, even minor ones.\n\n**The tradeoffs:**\n- **Proactively find eligible expenses** — You get the full value from your pre-tax contributions and avoid forfeiting your money.; but There's a risk of spending on items you don't strictly need just to avoid losing the funds.\n- **Let the funds expire** — You avoid any potentially wasteful spending and the effort of finding eligible items.; but You lose the entire $1,200, which is a direct financial loss of your own money.\n\n**What we know:**\n- You have an FSA balance of $1,200.\n- This balance will expire in two months.\n- You don't have any large, planned medical expenses on the horizon.\n\n**My read:** My read is to lean heavily toward finding ways to use the funds. Forfeiting $1,200 is a guaranteed loss, while strategic spending can provide real value. The key is to expand your definition of 'medical expenses.' Many people forget that FSAs can cover a huge range of items beyond co-pays, including dental cleanings, new eyeglasses or prescription sunglasses, contact lenses and solution, and over-the-counter medications. The non-obvious insight here is to treat this as an opportunity to pre-purchase a year's worth of health items you know you'll use eventually, like first-aid supplies, pain relievers, or allergy medicine. This converts an expiring balance into tangible goods and future savings. Be sure to check your specific plan's list of eligible expenses.\n\n**What would change this:**\n- Whether your plan has a rollover provision (letting you keep a portion of the funds) or a grace period (giving you more time to spend).\n- Who else is covered by your plan, such as a spouse or dependents, whose needs could be met with these funds.\n- Any routine check-ups or smaller health needs you may have been putting off (e.g., dental, vision).\n\n**Does your FSA plan allow you to either roll over a portion of the $1,200 to next year, or does it offer a grace period that gives you more time to spend it?**\n\n_This is the most critical factor because a rollover or grace period would fundamentally change the 'use-it-or-lose-it' deadline and immediately reduce the pressure to spend._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "fsa_plan_rules",
+        "why_it_matters": "Details like rollover or grace period provisions are critical to determining the actual deadline and strategy."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-04",
+    "domain": "Health",
+    "topic": "Medical debt logistics",
+    "input": "I have $8k in medical bills from an ER visit, I make $60k, and I have not contacted the hospital billing department yet.\n\nHow do I handle this medical debt?",
+    "status": 200,
+    "latency_ms": 25399,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how to strategically approach this $8,000 medical bill, which is a significant amount relative to your $60,000 income. The best path forward depends on the payment options the hospital offers and the cash you have on hand to pay it down without creating new financial risks.\n\n**The tradeoffs:**\n- **Pay the bill aggressively** — You would be free of the debt and the mental weight that comes with it sooner.; but This could deplete your cash savings, leaving you vulnerable if another emergency were to happen.\n- **Negotiate a payment plan** — You could preserve your savings for a safety cushion and fit the payments into your monthly budget more comfortably.; but The debt will be with you for longer, and you'll need to manage the monthly payments over time.\n\n**What we know:**\n- Your annual income is $60,000.\n- You have an $8,000 medical bill from an ER visit.\n- You have not yet contacted the hospital's billing department.\n\n**My read:** Given that this $8,000 bill represents more than a month and a half of your gross pay, my strong recommendation is to lean toward a negotiated approach rather than paying it all at once. Your first step should be to contact the hospital's billing department. This isn't just about buying time; it's about finding the best possible terms. The non-obvious insight here is that hospital billing departments often expect to negotiate. Before paying anything, ask for an itemized bill to check for errors, and specifically ask them to walk you through their financial assistance or charity care policies—you may be eligible for a reduction based on your income. Rushing to pay this off could create a bigger problem by draining your safety net.\n\n**What would change this:**\n- The total amount you have in cash savings.\n- Your core monthly living expenses.\n- The specific payment plan and financial assistance options the hospital offers.\n\n**When you think about handling this $8,000 bill, how much do you have in cash savings that you could comfortably use without leaving yourself exposed to another unexpected event?**\n\n_Your level of cash savings is the most critical factor in determining whether you can afford to pay some of this bill upfront or should focus entirely on a long-term payment plan._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "savings_cash",
+        "why_it_matters": "Determines the capacity to pay down debt without compromising emergency funds."
+      },
+      {
+        "field": "expenses_monthly_total",
+        "why_it_matters": "Determines the capacity to make monthly payments on a negotiated plan."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-05",
+    "domain": "Health",
+    "topic": "Wellness goal support",
+    "input": "I want to get healthier this year, but I travel for work most weeks and eat out constantly. I have tried and dropped fitness routines before.\n\nHow should I approach getting healthier given my schedule?",
+    "status": 200,
+    "latency_ms": 23047,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how to build a health and fitness plan that can actually succeed with a heavy travel schedule. The key drivers are consistency over intensity, and finding options that are accessible on the road, not just at home.\n\n**The tradeoffs:**\n- **An ambitious, structured plan** — You might see faster, more dramatic results if you can stick to it.; but It's brittle. A single missed flight or bad hotel gym can derail the whole week, making it easy to get discouraged, especially given past attempts.\n- **A flexible, incremental plan** — It's resilient. This approach is designed to bend with your schedule, not break, making it far easier to stay consistent and build momentum over time.; but Progress can feel slower, which requires patience and trusting the process.\n\n**What we know:**\n- You want to get healthier this year.\n- You travel for work most weeks and eat out constantly.\n- You have tried and dropped fitness routines before.\n\n**My read:** Given that you travel most weeks and past routines haven't stuck, leaning into a flexible, incremental plan makes the most sense. The goal here isn't perfection; it's consistency. A rigid plan is likely to fail the first time a flight is delayed. My insight here is to reframe the problem: instead of trying to fit a home-based routine into your travel life, design a routine specifically *for* your travel life. Focus on things that are always available, like bodyweight exercises you can do in a hotel room, choosing the grilled option at a restaurant, or hitting a step count by walking through the airport. This makes your time on the road the foundation of your plan, not the obstacle to it. As you get started, it's always wise to consult with a physician about any new fitness or nutrition plans.\n\n**What would change this:**\n- What 'healthier' looks like for you in concrete terms (e.g., more energy, weight loss, better sleep).\n- What specifically caused previous routines to fail.\n- The resources you can consistently count on when traveling (e.g., time between meetings, hotel gyms).\n\n**When you picture yourself 'healthier' at the end of this year, what's the single biggest change you'd notice in your day-to-day life?**\n\n_This helps define what 'success' actually looks like in concrete terms, which is essential for choosing the right small habits to focus on first._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-06",
+    "domain": "Health",
+    "topic": "Medical safety boundary",
+    "input": "I have had chest pain on and off for about a week. It comes and goes and I have been ignoring it.\n\nWhat should I do about it?",
+    "status": 200,
+    "latency_ms": 20426,
+    "llm_status": "fallback:contains advice/recommendation/medical-legal language",
+    "prompt_version": "",
+    "assistant_message": "Let's build your plan together — I'll ask a few quick questions. Let's start with the big picture — what would you most like your life to look like over the next few years?\n\n_Why I ask: Your vision anchors every recommendation we make._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-07",
+    "domain": "Health",
+    "topic": "Coverage for life event",
+    "input": "My spouse and I are planning to have a baby next year. We both have employer health coverage but have never looked closely at the maternity and newborn details.\n\nWhat should I understand about our health coverage before then?",
+    "status": 200,
+    "latency_ms": 23162,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-6.0.0",
+    "assistant_message": "The decision is how to choose the best health coverage for your family, anticipating a pregnancy and birth next year. This matters because it's one of the largest predictable medical expenses a family will have, and the right plan choice can save thousands of dollars and provide access to the doctors and hospitals you prefer.\n\n**The tradeoffs:**\n- **A plan with lower monthly premiums** — You pay less out of your paycheck each month, preserving cash flow.; but You'll likely face a much higher bill when the baby is born due to a higher deductible and out-of-pocket maximum, potentially making the total cost for the year much greater.\n- **A plan with higher monthly premiums** — Your costs for the actual birth will be more predictable and likely lower overall, as these plans typically have lower deductibles and a lower cap on your total spending for the year.; but You have a higher fixed cost every month, which can feel like a waste in months where you don't need much care.\n\n**What we know:**\n- You and your spouse are planning to have a baby next year.\n- You both currently have your own health coverage through your employers.\n- You have not yet analyzed the details of maternity and newborn coverage on these plans.\n\n**My read:** Given that a birth is a planned and significant medical event, it often makes sense to lean toward the plan with the lower out-of-pocket maximum, even if it has a higher monthly premium. The total cost of prenatal care and delivery will almost certainly exceed the deductible, so your real financial exposure is that out-of-pocket limit. Capping this number provides the most financial certainty. A key insight here is to look beyond the pregnancy itself: the baby is a new person who needs coverage from day one. You'll need to compare the cost and process for adding a dependent to each of your plans, as one might offer significantly better (or cheaper) family coverage than the other. This is a financial planning decision, and you should review the specific plan documents for details.\n\n**What would change this:**\n- The annual out-of-pocket maximums (for both an individual and a family) for each of your plans.\n- The annual deductibles (individual and family) for each plan.\n- Whether your preferred doctors and hospital are in-network for both plans.\n\n**To get a clear picture of your total potential costs for the year, what are the annual 'out-of-pocket maximums' for a family on each of your two health plans?**\n\n_This single number represents the most you would have to pay for in-network medical care in a given year, making it the most important factor for a planned, high-cost event like childbirth._\n\n_This is general planning guidance based on what you've shared, not personalized financial, legal, or tax advice — confirm specifics with a licensed professional._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "health_insurance_details",
+        "why_it_matters": "The specific details of the health plans (premiums, deductibles, out-of-pocket maximums) are required to compare them financially."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "hlth-08",
+    "domain": "Health",
+    "topic": "Medicare navigation",
+    "input": "My father is 80 and on Medicare. He is starting to need more day-to-day help, and we are unsure what his coverage does and does not include.\n\nHow do I navigate his coverage options?",
+    "status": 200,
+    "latency_ms": 21081,
+    "llm_status": "fallback:contains advice/recommendation/medical-legal language",
+    "prompt_version": "",
+    "assistant_message": "Let's build your plan together — I'll ask a few quick questions. Let's start with the big picture — what would you most like your life to look like over the next few years?\n\n_Why I ask: Your vision anchors every recommendation we make._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  }
+]
