@@ -17,7 +17,12 @@ import pytest
 from app.models.common import UserContext
 from app.services.advisor_context import AdvisorContext, AdvisorContextBuilder, numbers_in
 from app.services.advisor_llm import AdvisorLLM, NullAdvisorLLM, TEMPERATURE, parse_advisor_json
-from app.services.advisor_orchestrator import AdvisorOrchestrator, build_constraints, _compose
+from app.services.advisor_orchestrator import (
+    AdvisorOrchestrator,
+    build_constraints,
+    _compose,
+    discovery_contract_violations,
+)
 from app.services.advisor_validator import validate
 
 
@@ -625,3 +630,115 @@ async def test_provider_failure_falls_back_to_fallback_llm(monkeypatch):
     out = await orch.converse(_ctx(), "Help me think about my goals", )  # general → pro primary (None) → fallback
     assert out["llm_status"] == "enhanced"
     assert "Fallback saved it?" in out["assistant_message"]
+
+
+# --------------------------------------------------------------------------- #
+# Discovery mode (onboarding) — must NOT run the advisor six-section template.
+# Proves: discovery is conversational; advisor mode is preserved; candidate
+# facts are not asserted; streaming follows the same mode; safety still wins.
+# --------------------------------------------------------------------------- #
+def _six_section_llm(**over: Any) -> dict[str, Any]:
+    """A clean, validator-passing advisor turn that DOES populate the six sections (so we can prove
+    advisor mode renders them and discovery mode does not)."""
+    out = _good_llm(
+        decision_frame="Here's how I see the decision.",
+        tradeoffs=[{"option": "Aggressive pace", "benefit": "reach it sooner", "cost": "more risk"}],
+        what_we_know=["You value financial independence"],
+        recommendation="lean toward a measured pace",
+        what_we_still_need=["your target timeline"],
+    )
+    out.update(over)
+    return out
+
+
+def test_discovery_contract_violations_detects_advisor_artifacts():
+    bad = ("**My read:** your primary objective is financial independence.\n\n"
+           "**The tradeoffs:**\n- A; but B\n\n**What we know:**\n- x\n\n"
+           "**What would change this:**\n- y\n\n"
+           "_This is general planning guidance ... not personalized ... licensed professional._")
+    v = discovery_contract_violations(bad)
+    for marker in ("**The tradeoffs:**", "**What we know:**", "**My read:**",
+                   "**What would change this:**", "licensed professional", "your primary objective is"):
+        assert marker in v
+    # A genuine discovery turn trips nothing.
+    assert discovery_contract_violations(
+        "It sounds like financial independence may matter to you. When you picture it, what changes?"
+    ) == []
+
+
+@pytest.mark.asyncio
+async def test_discovery_mode_returns_conversational_rm_output():
+    # Even with an LLM that WOULD produce the six-section advisor turn, discovery mode must keep the
+    # RelationshipManager's conversational reply verbatim and skip enhancement entirely.
+    base = _base(assistant="It sounds like financial independence may matter to you — should I treat that as a goal?")
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_six_section_llm()))
+    out = await orch.converse(_ctx(), "Reach financial independence", mode="discovery")
+    assert out["assistant_message"] == base["assistant_message"]   # untouched, conversational
+    assert out["llm_status"] == "discovery"
+    assert discovery_contract_violations(out["assistant_message"]) == []   # no sections / disclaimer / fact
+    assert out["pending_key"] == base["pending_key"]
+
+
+@pytest.mark.asyncio
+async def test_advisor_mode_still_renders_six_section_template():
+    # Default mode (advisor) is UNCHANGED — the six-section template + disclaimer remain available.
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_six_section_llm()))
+    out = await orch.converse(_ctx(), "what should I do about retirement")
+    assert out["llm_status"] == "enhanced"
+    assert "**My read:**" in out["assistant_message"]
+    assert "**The tradeoffs:**" in out["assistant_message"]
+    assert "licensed professional" in out["assistant_message"]   # advisor scope disclaimer present
+    # And the advisor template is exactly what discovery mode is contractually forbidden from emitting.
+    assert discovery_contract_violations(out["assistant_message"])
+
+
+@pytest.mark.asyncio
+async def test_discovery_mode_does_not_state_candidate_goal_as_fact():
+    # A persona-seeded / inferred objective must never be asserted as confirmed in discovery.
+    base = _base(assistant="Earlier you mentioned financial independence — want me to treat that as one of your goals?")
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_six_section_llm()))
+    out = await orch.converse(_ctx(), "", mode="discovery")
+    assert "your primary objective is" not in out["assistant_message"].lower()
+    assert out["assistant_message"] == base["assistant_message"]
+
+
+@pytest.mark.asyncio
+async def test_discovery_stream_follows_mode():
+    base = _base(assistant="Tell me, in your words, what matters most right now?")
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_six_section_llm()))
+    events = [e async for e in orch.converse_stream(_ctx(), "Reach financial independence", mode="discovery")]
+    assert [e["type"] for e in events] == ["ack", "final"]
+    final = events[-1]
+    assert final["assistant_message"] == base["assistant_message"]   # conversational, not enhanced
+    assert final["llm_status"] == "discovery"
+    assert discovery_contract_violations(final["assistant_message"]) == []
+
+
+@pytest.mark.asyncio
+async def test_advisor_stream_still_enhances():
+    # The streaming advisor path (default mode) still enhances — discovery mode didn't degrade it.
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_six_section_llm()))
+    events = [e async for e in orch.converse_stream(_ctx(), "what should I do")]
+    final = events[-1]
+    assert final["type"] == "final"
+    assert final["llm_status"] == "enhanced"
+    assert "**My read:**" in final["assistant_message"]
+
+
+@pytest.mark.asyncio
+async def test_health_safety_wins_before_discovery_mode(monkeypatch):
+    # The deterministic urgent-care net must fire BEFORE discovery mode returns the conversational reply.
+    monkeypatch.setenv("HEALTH_SAFETY_FALLBACK_ENABLED", "true")
+    base = _base(assistant="What would you like to focus on?")
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_six_section_llm()))
+    out = await orch.converse(_ctx(), "I'm having severe chest pain and can't breathe", mode="discovery")
+    assert out["llm_status"] == "safety_fallback"
+    assert out["assistant_message"] != base["assistant_message"]   # replaced by the safety response

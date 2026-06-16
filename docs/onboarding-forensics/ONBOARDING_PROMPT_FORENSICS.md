@@ -1,5 +1,7 @@
 # Onboarding Prompt & Rule Forensics
 
+> **⚠️ CORRECTION (2026-06-16, added after the core-api consolidation audit).** This document's conclusion that the advisor code lives in a _"separate repo not available locally"_ / `EXTERNAL` is **WRONG**. Follow-up git investigation proved the code is **in this monorepo**, on branch `origin/advisor/p0-upgrade-2.3.0` (deployed to Fly from this repo); `origin/main` is just 66 commits behind. The exact source is now identified: `/v1/life/discovery/chat[/stream]` is wired to `get_advisor_orchestrator` (`routers/life.py`), whose `_compose` (`advisor_orchestrator.py:87`) renders the six sections from `advisor_llm.py:46-69,148-174` with a disclaimer appended and the objective stated via `advisor_context.py:322-323`. See `docs/core-api-consolidation/ONBOARDING_REMOTE_ROOT_CAUSE.md`. **The fix is implemented** (discovery mode) on `platform/discovery-mode-fix` — see `docs/discovery-mode-fix/`. The forensics below were correct that the behavior is not on `main`, not the frontend's fault, and not caused by the P0/streaming work — only the "separate repo" framing was wrong.
+
 **Date:** 2026-06-16 · **Type:** evidence-only root-cause investigation. No fixes, no rewrites, no proposals. Every conclusion cites `file:line` or is marked `UNKNOWN`/`EXTERNAL` (provably not in this repo).
 
 ## Scope boundary (read this first — it determines everything)

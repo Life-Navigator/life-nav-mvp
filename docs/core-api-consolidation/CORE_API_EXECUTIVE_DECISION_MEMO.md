@@ -1,5 +1,7 @@
 # Core-API Consolidation — Executive Decision Memo
 
+> **✅ IMPLEMENTATION UPDATE (2026-06-16).** The onboarding root cause identified here has been **fixed** on branch `platform/discovery-mode-fix` (off the deployed advisor branch): `/v1/life/discovery/chat[/stream]` now run in `mode="discovery"`, returning the conversational `RelationshipManager` reply and skipping the advisor six-section composition / disclaimer / objective-as-fact; advisor mode is preserved (default); health-safety still wins first. 7 new tests pass (51 total in `test_advisor_hybrid.py`). The MIGRATE_THEN_RETIRE plan stands; see `docs/discovery-mode-fix/` (incl. `MAIN_CONSOLIDATION_PLAN.md` with PR sequencing).
+
 **Date:** 2026-06-16 · Evidence-only audit (no changes made). Companion docs: `CORE_API_INVENTORY.md`, `CORE_API_ROUTE_MAP.md`, `CORE_API_DIVERGENCE_REPORT.md`, `ONBOARDING_REMOTE_ROOT_CAUSE.md`, `CORE_API_VALUABLE_ASSETS.md`, `CORE_API_DECOMMISSION_PLAN.md`, `CORE_API_MIGRATION_PLAN.md`.
 
 ## Correction to the prior forensic audit (intellectual honesty)

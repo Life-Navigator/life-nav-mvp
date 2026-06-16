@@ -85,16 +85,19 @@ async def discovery_answer(user: AuthenticatedUser = Depends(authenticated), svc
 async def discovery_chat(user: AuthenticatedUser = Depends(authenticated), svc=Depends(get_advisor_orchestrator),
                          message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True),
                          conversation_id: str = Body(default="", embed=True), trace: bool = Body(default=False, embed=True)):
-    """Chat-native hybrid advisor: one turn. The deterministic engine handles persistence + safety and
-    guarantees a fallback; the LLM leads the conversation within those guardrails (one strong question,
-    why it matters), gated by the output validator. The advisor IS the onboarding.
+    """Chat-native onboarding — runs in DISCOVERY mode: the conversational RelationshipManager leads
+    (one warm reflection + one natural question), persisting to the canonical life model. Discovery mode
+    deliberately SKIPS the advisor LLM enhancement / six-section template / advice disclaimer so onboarding
+    never reads like a consultant report. The deterministic health-safety net still wins first. (Advisor
+    mode — the LLM-led six-section decision turn — remains available via the orchestrator for advisor/
+    decision surfaces; it is simply not used on this onboarding route.)
 
     `trace=true` returns the full per-turn diagnostic trace, but ONLY when ADVISOR_TRACE_ENABLED is set
     (developer-only — never exposed to end users in production)."""
     import os
     trace_ok = trace and os.environ.get("ADVISOR_TRACE_ENABLED", "").lower() in ("1", "true", "yes")
     return await svc.converse(_ctx(user), message, pending_key or None,
-                              conversation_id=conversation_id or None, trace=trace_ok)
+                              conversation_id=conversation_id or None, trace=trace_ok, mode="discovery")
 
 
 @router.post("/discovery/chat/stream")
@@ -110,7 +113,8 @@ async def discovery_chat_stream(user: AuthenticatedUser = Depends(authenticated)
 
     async def event_stream():
         async for evt in svc.converse_stream(_ctx(user), message, pending_key or None,
-                                             conversation_id=conversation_id or None, trace=trace_ok):
+                                             conversation_id=conversation_id or None, trace=trace_ok,
+                                             mode="discovery"):
             yield f"data: {_json.dumps(evt, default=str)}\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream",

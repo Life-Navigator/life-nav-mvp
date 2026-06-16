@@ -84,6 +84,24 @@ def _is_repairable(reasons: list[str]) -> bool:
     return ("invented numbers" in txt) or ("relationship" in txt)
 
 
+# Discovery/onboarding response contract — the phrases that mark advisor/consultant output. Discovery
+# turns must contain NONE of these (the RelationshipManager never produces them; this is a tripwire that
+# proves the contract holds and alerts if a future change regresses discovery into advisor mode).
+_DISCOVERY_FORBIDDEN = (
+    "**The tradeoffs:**", "**What we know:**", "**My read:**", "**What would change this:**",
+    "not personalized", "licensed professional",  # the advisor scope disclaimer
+    "your primary objective is",  # stating an inferred/candidate objective as a confirmed fact
+)
+
+
+def discovery_contract_violations(text: str) -> list[str]:
+    """Return any advisor-mode artifacts present in a discovery turn (case-insensitive). Empty list = the
+    turn honors the conversational discovery contract (one reflection + one question, no sections, no
+    disclaimer, no objective-as-fact). Used by the discovery-mode tripwire + tests."""
+    low = (text or "").lower()
+    return [p for p in _DISCOVERY_FORBIDDEN if p.lower() in low]
+
+
 def _compose(safe: dict[str, Any]) -> str:
     """Assemble the human-facing message as the V3 five-section advisor turn, exposing the reasoning the
     model already performs: Decision Frame → Tradeoffs → What We Know → What We Still Need → Best Next
@@ -172,6 +190,17 @@ class AdvisorOrchestrator:
         log.info(json.dumps({"event": "advisor_safety_fallback", "turn_id": tr["turn_id"],
                              "user": tr.get("user_id"), "indicator": indicator}))
         return True
+
+    def _enforce_discovery_contract(self, base: dict[str, Any], tr: dict[str, Any]) -> None:
+        """Tripwire for discovery/onboarding turns: they must carry NO advisor-mode artifacts (six-section
+        labels, advice disclaimer, or an inferred objective stated as confirmed fact). The RelationshipManager
+        never emits these, so this is defense-in-depth — it records + logs a warning if a future change ever
+        regresses discovery into advisor output. Non-mutating; never breaks the turn."""
+        violations = discovery_contract_violations(base.get("assistant_message") or "")
+        if violations:
+            tr["discovery_contract_violations"] = violations
+            log.warning(json.dumps({"event": "discovery_contract_violation",
+                                    "turn_id": tr.get("turn_id"), "violations": violations}))
 
     def _route(self, ctx: UserContext, message: str, context_obj: Any, tr: dict[str, Any]) -> tuple[Any, Any]:
         """Select (primary_llm, fallback_llm) for this turn. Default (router off) → the DI-provided single LLM,
@@ -304,9 +333,11 @@ class AdvisorOrchestrator:
             tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, f"error:{type(e).__name__}", "n/a"
 
     async def converse(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
-                       *, conversation_id: Optional[str] = None, trace: bool = False) -> dict[str, Any]:
+                       *, conversation_id: Optional[str] = None, trace: bool = False,
+                       mode: str = "advisor") -> dict[str, Any]:
         t0 = time.perf_counter()
         tr = self._init_trace(message, conversation_id, ctx.user_id)
+        tr["mode"] = mode
         mark = t0
 
         def lap(name: str) -> None:
@@ -318,8 +349,16 @@ class AdvisorOrchestrator:
         # 1) Deterministic turn — persistence (candidate/rejected goals), canonical writes, safe fallback text.
         base = await self._rm.converse(ctx, message, pending_key)
         lap("deterministic_turn")
-        # Health urgent-care safety net runs BEFORE any model (deterministic, no LLM).
+        # Health urgent-care safety net runs BEFORE any model (deterministic, no LLM) — wins in EVERY mode.
         if self._health_safety_check(message, base, tr):
+            return self._finish(ctx, base, tr, t0, trace)
+        # Discovery/onboarding mode: keep the RelationshipManager's conversational reply verbatim — NO LLM
+        # enhancement, NO six-section advisor template, NO advice disclaimer, NO objective-as-fact. This is
+        # the fix for advisor-mode contaminating onboarding. Advisor mode (default) is unchanged below.
+        if mode == "discovery":
+            self._enforce_discovery_contract(base, tr)
+            tr["llm_status"] = base.get("llm_status") or "discovery"
+            base["llm_status"] = "discovery"
             return self._finish(ctx, base, tr, t0, trace)
         if not self._enabled:
             tr["llm_status"] = base.get("llm_status") or "disabled"
@@ -331,7 +370,8 @@ class AdvisorOrchestrator:
         return self._finish(ctx, base, tr, t0, trace)
 
     async def converse_stream(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
-                              *, conversation_id: Optional[str] = None, trace: bool = False):
+                              *, conversation_id: Optional[str] = None, trace: bool = False,
+                              mode: str = "advisor"):
         """Progressive variant: yield a fast deterministic ACK first (the trust-safe text we'd show on
         fallback anyway, ready in ~1s), then the fully validated enhanced answer. Same telemetry/persistence
         as converse(). The validator still gates everything the user accepts as advice — the ack only mirrors
@@ -359,6 +399,14 @@ class AdvisorOrchestrator:
         # Fast first paint — the deterministic, trust-safe acknowledgment.
         yield {"type": "ack", "assistant_message": base.get("assistant_message") or "",
                "pending_key": base.get("pending_key") or "", "turn_id": tr["turn_id"]}
+        # Discovery/onboarding mode: the conversational ack IS the answer — skip LLM enhancement / advisor
+        # template / disclaimer entirely. Health-safety (above) still wins first.
+        if mode == "discovery":
+            self._enforce_discovery_contract(base, tr)
+            base["llm_status"] = "discovery"
+            self._finish(ctx, base, tr, t0, trace)
+            yield {"type": "final", **base}
+            return
         if self._enabled:
             history = await self._fetch_history(ctx, conversation_id)
             lap("history_fetch")
