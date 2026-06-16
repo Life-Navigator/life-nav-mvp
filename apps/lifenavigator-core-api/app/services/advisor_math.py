@@ -83,13 +83,19 @@ def _safe_eval(expr: str) -> float:
 
 
 def _forms(v: float) -> set[str]:
-    """String forms a number may appear as in prose, matching the gate's normalization (no $/%/commas)."""
+    """String forms a verified number may appear as in prose, matching the gate's normalization (no $/%/commas).
+    Includes k/M-reduced forms so a verified 45000 also matches the model writing it as '$45k' (→ '45')."""
     out: set[str] = set()
     r = round(v)
     out.add(str(int(r)))
     if abs(v - r) > 1e-9:
         out.add(f"{v:.1f}".rstrip("0").rstrip("."))
         out.add(f"{v:.2f}".rstrip("0").rstrip("."))
+    # k/M-reduced notation (only when it divides cleanly), so '$45k'/'$1.35M' forms of a verified value match
+    for div in (1_000.0, 1_000_000.0):
+        q = v / div
+        if abs(q) >= 1 and abs(q - round(q, 2)) < 1e-9:
+            out.add(str(int(round(q))) if abs(q - round(q)) < 1e-9 else f"{q:.2f}".rstrip("0").rstrip("."))
     return out
 
 
