@@ -48,7 +48,7 @@ def test_classify_risk():
 # ── Routing rules ───────────────────────────────────────────────────────────────
 def test_finance_high_stakes_routes_to_opus_when_premium_on(premium_on):
     r = ModelRouter(_factory)
-    d = r.route(message="Can I afford a $620k house on $185k income?", tier="elite")
+    d = r.route(message="Can I afford a $620k house on $185k income?", tier="premium")
     assert d.domain == "finance" and d.risk_level == "high"
     assert d.selected_role == "finance_high_stakes"
     assert d.selected_model == "claude_opus_4_8" and d.premium is True
@@ -57,7 +57,7 @@ def test_finance_high_stakes_routes_to_opus_when_premium_on(premium_on):
 
 def test_health_high_stakes_routes_to_opus_when_premium_on(premium_on):
     r = ModelRouter(_factory)
-    d = r.route(message="Which plan is better, PPO or HDHP with an HSA?", tier="plus")
+    d = r.route(message="Which plan is better, PPO or HDHP with an HSA?", tier="premium")
     assert d.domain == "health"
     assert d.selected_role == "health_high_stakes"
     assert d.selected_model == "claude_opus_4_8"
@@ -75,7 +75,7 @@ def test_career_education_family_route_to_pro_not_opus(pro_on):
     for msg, dom in [("Should I take the promotion to manager?", "career"),
                      ("Is the $120k MBA worth it?", "education"),
                      ("We need guardianship and a will for our kids", "family")]:
-        d = r.route(message=msg, tier="elite")
+        d = r.route(message=msg, tier="premium")
         assert d.domain == dom
         assert d.selected_model == "gemini_2_5_pro", f"{dom} should use Pro, got {d.selected_model}"
 
@@ -84,7 +84,7 @@ def test_career_education_family_route_to_pro_not_opus(pro_on):
 def test_premium_off_demotes_finance_to_standard(pro_on):
     # PREMIUM_ROUTING_ENABLED defaults off → opus not usable → demote.
     r = ModelRouter(_factory)
-    d = r.route(message="Can I afford a $620k house?", tier="elite")
+    d = r.route(message="Can I afford a $620k house?", tier="premium")
     assert d.selected_model != "claude_opus_4_8"
     assert d.selected_model in ("gemini_2_5_pro", "gemini_flash")
     assert any("demoted" in n for n in d.notes)
@@ -93,7 +93,7 @@ def test_premium_off_demotes_finance_to_standard(pro_on):
 def test_router_default_all_premium_off_uses_gemini():
     # No env set at all (besides fixtures not applied): nothing premium enabled.
     r = ModelRouter(_factory)
-    d = r.route(message="Can I afford a $620k house?", tier="elite")
+    d = r.route(message="Can I afford a $620k house?", tier="premium")
     assert d.selected_model in ("gemini_2_5_pro", "gemini_flash")  # never opus
     assert d.primary_llm[1] != "claude_opus_4_8"
 
@@ -101,11 +101,11 @@ def test_router_default_all_premium_off_uses_gemini():
 # ── Plan / token limit fallback ──────────────────────────────────────────────────
 def test_premium_budget_exhausted_falls_back(monkeypatch, premium_on):
     monkeypatch.setenv("MODEL_USAGE_LIMITS_ENABLED", "true")
-    monkeypatch.setenv("PLAN_PLUS_PREMIUM_CALLS", "2")
+    monkeypatch.setenv("PLAN_PREMIUM_PREMIUM_CALLS", "2")
     led = InMemoryUsageLedger()
     led.increment("t1", "u1", "premium_calls", 2)  # at the cap
     r = ModelRouter(_factory, ledger=led)
-    d = r.route(message="Can I afford a $620k house?", tier="plus", tenant_id="t1", user_id="u1")
+    d = r.route(message="Can I afford a $620k house?", tier="premium", tenant_id="t1", user_id="u1")
     assert d.budget_state == "exhausted"
     assert d.selected_model != "claude_opus_4_8"  # graceful demotion, not failure
     assert any("premium_budget_exhausted" in n for n in d.notes)
@@ -165,7 +165,7 @@ def test_health_safety_response_is_actionable_not_generic():
 # ── Provider failure fallback: router always supplies a constructible fallback ──
 def test_router_always_supplies_fallback(premium_on):
     r = ModelRouter(_factory)
-    d = r.route(message="Can I afford a $620k house?", tier="elite")
+    d = r.route(message="Can I afford a $620k house?", tier="premium")
     assert d.fallback_llm is not None and d.fallback_llm[1] in reg.MODELS
 
 

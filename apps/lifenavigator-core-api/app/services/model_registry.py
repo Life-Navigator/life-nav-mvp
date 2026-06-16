@@ -22,6 +22,7 @@ _DEFAULTS = {
     "GEMINI_PRO_ADVISOR_ENABLED": "false",
     "HEALTH_SAFETY_FALLBACK_ENABLED": "true",   # deterministic, no LLM — safe to keep ON always
     "MODEL_USAGE_LIMITS_ENABLED": "false",
+    "USAGE_TRACKING_ENABLED": "false",          # write per-turn usage to analytics.model_usage (needs migration)
 }
 
 
@@ -37,25 +38,25 @@ MODELS: dict[str, dict[str, Any]] = {
     "gemini_flash_lite": {
         "provider": "google_aistudio", "model_id": "gemini-2.5-flash-lite",
         "enabled_flag": None, "max_tokens": 2048, "timeout_s": 30, "cost_estimate": 0.001,
-        "latency_budget_ms": 8000, "tiers": ["free", "plus", "elite"],
+        "latency_budget_ms": 8000, "tiers": ["free", "plus", "premium", "enterprise"],
         "benchmark_score": None, "trust_score": None, "last_evaluated": "untested",
     },
     "gemini_flash": {
         "provider": "google_aistudio", "model_id": "gemini-2.5-flash",
         "enabled_flag": None, "max_tokens": 2048, "timeout_s": 30, "cost_estimate": 0.003,
-        "latency_budget_ms": 13000, "tiers": ["free", "plus", "elite"],
+        "latency_budget_ms": 13000, "tiers": ["free", "plus", "premium", "enterprise"],
         "benchmark_score": 6.66, "trust_score": 8.5, "last_evaluated": "2026-06-16",
     },
     "gemini_2_5_pro": {
         "provider": "google_aistudio", "model_id": "gemini-2.5-pro",
         "enabled_flag": "GEMINI_PRO_ADVISOR_ENABLED", "max_tokens": 2048, "timeout_s": 45,
-        "cost_estimate": 0.011, "latency_budget_ms": 27000, "tiers": ["plus", "elite"],
+        "cost_estimate": 0.011, "latency_budget_ms": 27000, "tiers": ["plus", "premium", "enterprise"],
         "benchmark_score": 7.60, "trust_score": 8.7, "last_evaluated": "2026-06-16",
     },
     "claude_opus_4_8": {
         "provider": "vertex_anthropic", "model_id": "claude-opus-4-8",
         "enabled_flag": "CLAUDE_OPUS_4_8_ENABLED", "max_tokens": 2048, "timeout_s": 90,
-        "cost_estimate": 0.15, "latency_budget_ms": 26000, "tiers": ["plus", "elite"],
+        "cost_estimate": 0.15, "latency_budget_ms": 26000, "tiers": ["premium", "enterprise"],
         "benchmark_score": 8.84, "trust_score": 9.3, "last_evaluated": "2026-06-16",
         "premium": True,  # counts against premium allowance
     },
@@ -78,6 +79,7 @@ ROLES: dict[str, dict[str, str]] = {
     "education":           {"primary": "gemini_2_5_pro",    "fallback": "gemini_flash"},
     "family":              {"primary": "gemini_2_5_pro",    "fallback": "gemini_flash"},
     "report_writer":       {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
+    "executive_review":    {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
     # Critic role defined but DISABLED (benchmark pending) — see is_role_enabled / docs.
     "critic":              {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
 }
@@ -124,9 +126,10 @@ def plan_limits(tier: str) -> dict[str, Optional[int]]:
     prefix = f"PLAN_{t.upper()}"
     # Defaults are conservative placeholders; free gets 0 premium so it never routes to Opus by default.
     base = {
-        "free":  {"premium": 0,   "standard": None, "reports": 0},
-        "plus":  {"premium": 50,  "standard": None, "reports": 10},
-        "elite": {"premium": 500, "standard": None, "reports": 100},
+        "free":       {"premium": 0,    "standard": None, "reports": 0},
+        "plus":       {"premium": 50,   "standard": None, "reports": 10},
+        "premium":    {"premium": 500,  "standard": None, "reports": 100},
+        "enterprise": {"premium": 5000, "standard": None, "reports": 1000},
     }.get(t, {"premium": 0, "standard": None, "reports": 0})
     return {
         "monthly_premium_model_calls": _int_env(f"{prefix}_PREMIUM_CALLS", base["premium"]),

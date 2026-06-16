@@ -397,6 +397,16 @@ class AdvisorOrchestrator:
                 task.add_done_callback(_PENDING_WRITES.discard)
             except Exception:  # noqa: BLE001
                 pass
+        # Best-effort usage ledger increment (atomic via analytics.bump_model_usage). Default OFF
+        # (USAGE_TRACKING_ENABLED) and swallows errors → no behavior change until the migration is applied.
+        if self._sb is not None and reg.flag("USAGE_TRACKING_ENABLED"):
+            try:
+                import asyncio
+                t = asyncio.ensure_future(self._persist_usage(ctx, tr))
+                _PENDING_WRITES.add(t)
+                t.add_done_callback(_PENDING_WRITES.discard)
+            except Exception:  # noqa: BLE001
+                pass
         if trace:
             base["_trace"] = tr
         return base
@@ -405,4 +415,22 @@ class AdvisorOrchestrator:
         try:
             await self._sb.insert("advisor_turns", row, schema="analytics")
         except Exception:  # noqa: BLE001 — table may not exist yet; logging still works
+            pass
+
+    async def _persist_usage(self, ctx: UserContext, tr: dict[str, Any]) -> None:
+        """Atomic per-turn usage increment to analytics.model_usage. Premium vs standard from the routing
+        decision; safety + model-fallback flags from the trace. tenant defaults to the user (single-tenant)."""
+        try:
+            routing = tr.get("routing") or {}
+            premium = bool(routing.get("premium"))
+            period = datetime.now(timezone.utc).strftime("%Y-%m")
+            tenant = str(getattr(ctx, "tenant_id", "") or ctx.user_id)
+            await self._sb.rpc("bump_model_usage", {
+                "p_tenant": tenant, "p_user": str(ctx.user_id), "p_period": period,
+                "p_premium": 1 if premium else 0, "p_standard": 0 if premium else 1,
+                "p_reports": 0, "p_safety": 1 if tr.get("safety_flags") else 0,
+                "p_fallbacks": 1 if tr.get("model_fallback") else 0,
+                "p_cost": float(routing.get("estimated_cost") or 0),
+            }, schema="analytics")
+        except Exception:  # noqa: BLE001 — best-effort; table/function may be absent pre-migration
             pass
