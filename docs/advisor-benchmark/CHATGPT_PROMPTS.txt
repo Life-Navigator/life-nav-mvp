@@ -1,0 +1,354 @@
+# ChatGPT capture — paste each block into a FRESH ChatGPT conversation (current production model),
+# then paste the reply back to me. Use a new chat per scenario so there is no cross-context.
+# Send EXACTLY the text after the >>> line (context + question), nothing else.
+
+========================================
+SCENARIO fin-01 (Finance — Buy a house)
+>>>
+I'm 34, married, two kids (4 and 6). Household income is $185k. We have $95k in cash, $40k in a brokerage, and $210k in retirement accounts. We rent for $2,900/mo. We're looking at homes around $620k in our area.
+
+Should we buy this house?
+
+========================================
+SCENARIO fin-02 (Finance — Rent vs buy)
+>>>
+I'm 29, single, earning $110k in a city where a comparable condo costs $480k to buy or $2,400/mo to rent. I have $70k saved and might relocate for work within 3 years.
+
+Does it make more sense for me to rent or buy right now?
+
+========================================
+SCENARIO fin-03 (Finance — Pay off debt vs invest)
+>>>
+I have $22k in credit card debt at 24% APR, $18k in a 401k, and about $400/mo of free cash flow after expenses. My employer matches 50% up to 6% of my $85k salary.
+
+Should I pay down the cards first or keep investing?
+
+========================================
+SCENARIO fin-04 (Finance — Retirement planning)
+>>>
+I'm 47, make $130k, have $380k in retirement savings, and want to retire at 62. I save about $1,500/mo and have no pension.
+
+Am I on track to retire at 62?
+
+========================================
+SCENARIO fin-05 (Finance — Emergency fund)
+>>>
+My household spends about $5,200/mo. We have $7k in checking and irregular income (I'm a contractor, my spouse is salaried at $72k).
+
+How large should our emergency fund be and how do we get there?
+
+========================================
+SCENARIO fin-06 (Finance — Insurance decision)
+>>>
+I'm 38, the primary earner at $140k, with a spouse who stays home and three kids under 10. We have a $250k group life policy through work and a $400k mortgage.
+
+How much life insurance do I actually need?
+
+========================================
+SCENARIO fin-07 (Finance — Inheritance)
+>>>
+I just inherited $250k. I have a $180k mortgage at 3.1%, $30k in student loans at 6.5%, no other debt, and $40k in retirement at age 41.
+
+What should I do with the inheritance?
+
+========================================
+SCENARIO fin-08 (Finance — Windfall / bonus allocation)
+>>>
+I received a $60k after-tax bonus. I'm 31, earn $120k, have a fully funded emergency fund, $15k in credit card debt at 19%, and I max neither my 401k nor my Roth.
+
+How should I split this $60k?
+
+========================================
+SCENARIO fin-09 (Finance — College savings)
+>>>
+My daughter is 8. I have $18k in a 529 and can add about $300/mo. In-state public tuition is projected around $130k all-in by the time she enrolls.
+
+Are we saving enough for her college, and how should we think about it?
+
+========================================
+SCENARIO fin-10 (Finance — Mortgage refinance / payoff)
+>>>
+I have $310k left on a 6.9% mortgage with 27 years remaining. I also have $120k in a taxable brokerage earning roughly market returns and a stable $150k income.
+
+Should I aggressively pay down the mortgage or keep the money invested?
+
+========================================
+SCENARIO fin-11 (Finance — Concentrated stock position)
+>>>
+I'm 44 and about 45% of my $700k net worth is in my employer's stock from years of RSUs. The rest is in index funds and cash. I'm nervous about the concentration but worried about taxes if I sell.
+
+What should I do about my concentrated stock position?
+
+========================================
+SCENARIO fin-12 (Finance — Social Security timing)
+>>>
+I'm 61, in good health, with $520k saved and a part-time income of $30k. My full retirement age benefit is about $2,700/mo; at 62 it would be roughly $1,900/mo; at 70 about $3,350/mo.
+
+When should I start taking Social Security?
+
+========================================
+SCENARIO car-01 (Career — Promotion)
+>>>
+I'm a senior engineer making $165k. I've been offered a promotion to engineering manager with a $15k raise but I'd stop coding and manage 7 people. I've never managed before.
+
+Should I take the manager promotion?
+
+========================================
+SCENARIO car-02 (Career — Job change)
+>>>
+I'm 36 making $135k at a stable company I've been at for 8 years. I have an offer for $168k at an earlier-stage company with more equity but less security. My spouse is on parental leave.
+
+Should I take the new job?
+
+========================================
+SCENARIO car-03 (Career — Layoff risk)
+>>>
+There are strong rumors of layoffs at my company within two quarters. I'm a mid-level marketer earning $95k with $20k saved and a family of four.
+
+What should I do to prepare?
+
+========================================
+SCENARIO car-04 (Career — Relocation for work)
+>>>
+I've been offered a role in another state with a $25k raise to $150k, but the cost of living is about 30% higher and my partner would have to find a new job (they currently earn $80k).
+
+Should we relocate for this job?
+
+========================================
+SCENARIO car-05 (Career — Leadership path)
+>>>
+I'm 40, a director earning $190k. I can pursue a VP track that means more politics and travel, or stay as a hands-on director. I have two teenagers at home.
+
+Should I push for the VP path or stay where I am?
+
+========================================
+SCENARIO car-06 (Career — Counteroffer)
+>>>
+I resigned to take a $20k raise elsewhere and my current employer countered matching it plus a title bump. I have mixed feelings about the team here.
+
+Should I accept the counteroffer or leave as planned?
+
+========================================
+SCENARIO car-07 (Career — Sabbatical)
+>>>
+I'm 38, burned out, earning $145k with $160k saved and no kids. I'm considering a 6-month unpaid sabbatical to travel and reset.
+
+Can I afford to take a 6-month sabbatical, and should I?
+
+========================================
+SCENARIO car-08 (Career — Career pivot into new field)
+>>>
+I'm a 33-year-old paralegal earning $68k and want to move into UX design. A bootcamp costs $14k and 6 months; entry UX roles in my city pay around $80k.
+
+Is pivoting into UX design a smart move for me?
+
+========================================
+SCENARIO car-09 (Career — Equity vs salary offer)
+>>>
+A startup offered me $130k salary plus 0.4% equity (current 409A values it around $40k vesting over 4 years). My current job pays $155k all cash.
+
+How should I weigh the equity offer against my current salary?
+
+========================================
+SCENARIO edu-01 (Education — MBA)
+>>>
+I'm 28, make $82k in operations, and am weighing a full-time MBA that costs $140k plus two years of forgone income. Post-MBA roles in my target field pay around $130k.
+
+Is the MBA worth it for me?
+
+========================================
+SCENARIO edu-02 (Education — Degree choice)
+>>>
+My son is choosing between a $0 in-state engineering program and a $55k/yr private school with a stronger network for his intended finance career.
+
+How should he think about this choice?
+
+========================================
+SCENARIO edu-03 (Education — Certification)
+>>>
+I'm a project coordinator earning $72k. A PMP certification costs about $1,500 and ~120 hours of study; certified PMs in my org earn roughly $90k+.
+
+Is the PMP certification worth pursuing?
+
+========================================
+SCENARIO edu-04 (Education — Student loans)
+>>>
+I have $65k in student loans: $40k federal at 5.5% and $25k private at 8.2%. I earn $78k and have $12k saved beyond my emergency fund.
+
+What's the smartest way to tackle my student loans?
+
+========================================
+SCENARIO edu-05 (Education — Part-time vs full-time grad school)
+>>>
+I'm 31, earning $98k. I can do a part-time master's over 3 years while working, or quit and finish full-time in 1 year. Tuition is $48k either way.
+
+Should I go part-time while working or full-time?
+
+========================================
+SCENARIO edu-06 (Education — Coding bootcamp for career switch)
+>>>
+I'm 27, earning $52k in retail management with $9k saved. A 4-month coding bootcamp costs $17k; junior dev roles in my area start around $75k.
+
+Should I take out a loan for a coding bootcamp to switch careers?
+
+========================================
+SCENARIO edu-07 (Education — Funding kids' college vs own retirement)
+>>>
+I'm 49 with two kids entering college in 2 and 4 years. I have $210k in retirement and $35k saved for college across both kids. I earn $128k.
+
+Should I prioritize my retirement or fully funding their college?
+
+========================================
+SCENARIO fam-01 (Family — New child)
+>>>
+We're expecting our first baby in four months. Combined income $150k, $25k saved, renting at $2,100/mo, both of us work full-time with limited parental leave.
+
+What should we get in order before the baby arrives?
+
+========================================
+SCENARIO fam-02 (Family — Divorce)
+>>>
+I'm going through a divorce at 43. I'll keep my $90k salary, we're splitting $300k in assets, and I'll have the kids half the time. I haven't managed the finances before.
+
+What should I prioritize as I rebuild financially?
+
+========================================
+SCENARIO fam-03 (Family — Aging parent)
+>>>
+My mother is 79 and showing early signs she may need care within a year or two. I have two siblings, we live in different states, and none of us has discussed money or responsibilities.
+
+How should I start thinking about my mother's care?
+
+========================================
+SCENARIO fam-04 (Family — Guardianship)
+>>>
+We have two young children and no will or named guardian. We're both 35, with a $500k mortgage and modest savings.
+
+How do we set up guardianship and what else are we missing?
+
+========================================
+SCENARIO fam-05 (Family — Estate planning)
+>>>
+I'm 58 with a $1.8M net worth spread across a home, retirement accounts, and a brokerage. I have three adult children and want to avoid family conflict and unnecessary taxes.
+
+How should I approach estate planning?
+
+========================================
+SCENARIO fam-06 (Family — Blended family finances)
+>>>
+I'm remarrying at 46. I have two kids from my first marriage and my fiancée has one. We both own homes and have separate retirement accounts.
+
+How should we structure our finances as a blended family?
+
+========================================
+SCENARIO fam-07 (Family — Special needs planning)
+>>>
+Our 6-year-old has a developmental disability and will likely need lifelong support. We earn $160k combined and have $50k saved but no special needs plan.
+
+How do we plan financially for our child's lifelong needs?
+
+========================================
+SCENARIO fam-08 (Family — Single parent financial security)
+>>>
+I'm a single parent, 37, earning $74k with one child. I have $8k saved, no life insurance, and no will.
+
+What are the most important things I should do to protect my child?
+
+========================================
+SCENARIO fam-09 (Family — Supporting adult child)
+>>>
+My 24-year-old recently moved back home with student debt and an unstable income. I'm 55, planning to retire in 8 years, and want to help without derailing my own plans.
+
+How much should I help my adult child financially?
+
+========================================
+SCENARIO crs-01 (Cross-Domain — Move states)
+>>>
+We're considering moving from California to Texas. I'd keep my remote job at $140k, we'd save on state taxes, but we'd leave family and our kids' schools behind.
+
+Does moving to Texas make sense for our family?
+
+========================================
+SCENARIO crs-02 (Cross-Domain — Start a business)
+>>>
+I want to leave my $135k corporate job to start a consulting business. I have $90k in savings, a spouse earning $70k, two kids, and a few interested potential clients.
+
+Can I make the leap to start my business?
+
+========================================
+SCENARIO crs-03 (Cross-Domain — Leave a stable job)
+>>>
+I'm 42 with a secure $160k government job and a pension vesting in 3 years. I have an opportunity in the private sector at $200k but no pension and less stability.
+
+Should I leave my stable job before the pension vests?
+
+========================================
+SCENARIO crs-04 (Cross-Domain — Care for a parent)
+>>>
+My father needs increasing care. I'm considering reducing my work to part-time (cutting my $120k income roughly in half) to care for him, or paying $5k/mo for professional care.
+
+Should I cut back work to care for my father or pay for care?
+
+========================================
+SCENARIO crs-05 (Cross-Domain — Disability / income protection)
+>>>
+I have a chronic health condition that may eventually limit my ability to work. I'm 40, earn $95k, am the primary earner, and have only employer short-term disability coverage.
+
+How do I protect my income against my health risk?
+
+========================================
+SCENARIO crs-06 (Cross-Domain — Military transition)
+>>>
+I'm transitioning out of the military after 12 years. I'll have a partial pension, GI Bill benefits, and need to choose between using the GI Bill for school or jumping straight into a civilian job.
+
+How should I approach my transition to civilian life?
+
+========================================
+SCENARIO crs-07 (Cross-Domain — Early retirement / FIRE)
+>>>
+I'm 38 with $900k invested, spending about $55k/yr, and considering leaving full-time work. My spouse would keep working part-time earning $40k.
+
+Can I retire early now, and what would I be risking?
+
+========================================
+SCENARIO crs-08 (Cross-Domain — Job loss + family)
+>>>
+I was just laid off. I have $40k saved, a mortgage, a spouse earning $60k, and two kids. My severance covers two months.
+
+What should I do first?
+
+========================================
+SCENARIO crs-09 (Cross-Domain — Relocate abroad)
+>>>
+We're considering moving abroad for two years for my partner's job. I'd pause my $100k career, our kids are in elementary school, and we'd keep our US home.
+
+How should we think about moving abroad for two years?
+
+========================================
+SCENARIO crs-10 (Cross-Domain — Buy a business)
+>>>
+I have the chance to buy a small established business for $350k. I'd use $120k savings and finance the rest. It nets about $90k/yr but I'd leave my $110k salaried job to run it.
+
+Should I buy this business?
+
+========================================
+SCENARIO crs-11 (Cross-Domain — Downsize / lifestyle change)
+>>>
+We're 60, our kids are grown, and we have a $750k house with a $150k mortgage. Downsizing could free up cash for retirement but means leaving the family home.
+
+Should we downsize now that the kids are gone?
+
+========================================
+SCENARIO crs-12 (Cross-Domain — Medical event financial recovery)
+>>>
+I had a major medical event and now have $30k in medical debt, reduced ability to work full-time, and depleted savings. I earn about $60k when working full-time.
+
+How do I recover financially after my medical event?
+
+========================================
+SCENARIO crs-13 (Cross-Domain — Multi-goal prioritization)
+>>>
+We're 34, earning $175k combined. We want to buy a house, start a family, pay off $30k in student loans, and save for retirement, but we can't do everything at once.
+
+How should we prioritize our competing goals?
+

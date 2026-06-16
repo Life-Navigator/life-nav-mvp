@@ -1,0 +1,402 @@
+[
+  {
+    "id": "fin-01",
+    "domain": "Finance",
+    "topic": "Buy a house",
+    "input": "I'm 34, married, two kids (4 and 6). Household income is $185k. We have $95k in cash, $40k in a brokerage, and $210k in retirement accounts. We rent for $2,900/mo. We're looking at homes around $620k in our area.\n\nShould we buy this house?",
+    "assistant_message": "Based on the numbers alone, you're in a reasonable position to buy, but I'd want to verify the monthly payment before committing.\n\nA $620k home with 20% down would require about $124k upfront, leaving you with very little liquidity after closing costs. A more balanced approach may be 10–15% down while preserving emergency reserves.\n\nKey questions:\n\nWhat would the total monthly payment be (mortgage, taxes, insurance, HOA)?\nWould it stay below roughly 25–30% of gross income?\nDo you still have 6+ months of expenses afterward?\n\nYou have strong retirement savings for age 34 and meaningful cash reserves. If the payment is manageable and you plan to stay in the home at least 7–10 years, buying is reasonable. If there's uncertainty about location or employment, renting another few years is also defensible.",
+    "captured": true
+  },
+  {
+    "id": "fin-02",
+    "domain": "Finance",
+    "topic": "Rent vs buy",
+    "input": "I'm 29, single, earning $110k in a city where a comparable condo costs $480k to buy or $2,400/mo to rent. I have $70k saved and might relocate for work within 3 years.\n\nDoes it make more sense for me to rent or buy right now?",
+    "assistant_message": "Renting is likely the better choice.\n\nThe biggest factor is your potential relocation within 3 years. Buying generally works best when you expect to stay put for at least 5–7 years because of transaction costs.\n\nFinancially:\n\nRent: $2,400/month\nCondo: likely mortgage, taxes, insurance, maintenance, and closing costs that exceed rent\nRelocation risk: high\n\nYou have solid savings, but flexibility has value. I'd continue investing the difference between ownership costs and rent while preserving mobility for career opportunities.",
+    "captured": true
+  },
+  {
+    "id": "fin-03",
+    "domain": "Finance",
+    "topic": "Pay off debt vs invest",
+    "input": "I have $22k in credit card debt at 24% APR, $18k in a 401k, and about $400/mo of free cash flow after expenses. My employer matches 50% up to 6% of my $85k salary.\n\nShould I pay down the cards first or keep investing?",
+    "assistant_message": "Pay off the credit cards aggressively.\n\nA guaranteed 24% return from eliminating credit card debt is almost impossible to beat elsewhere.\n\nMy order would be:\n\nContribute enough to get the full employer 401(k) match.\nDirect every remaining dollar toward the credit cards.\nBuild emergency reserves if needed.\nIncrease retirement contributions after the cards are gone.\n\nDon't stop capturing the match—it is effectively an immediate 50% return. Beyond that, the credit cards are the emergency.",
+    "captured": true
+  },
+  {
+    "id": "fin-04",
+    "domain": "Finance",
+    "topic": "Retirement planning",
+    "input": "I'm 47, make $130k, have $380k in retirement savings, and want to retire at 62. I save about $1,500/mo and have no pension.\n\nAm I on track to retire at 62?",
+    "assistant_message": "You're in reasonably good shape, but you're not clearly on track yet.\n\nAt age 47:\n\nRetirement assets: $380k\nSaving: $18k/year\nRetirement target: 15 years away\n\nIf your portfolio grows around historical market averages, you could potentially reach $900k–$1.3M by age 62. Whether that's enough depends heavily on spending expectations.\n\nI'd estimate you're in the \"needs refinement but still achievable\" category.\n\nNext steps:\n\nEstimate retirement spending.\nProject Social Security benefits.\nIncrease savings if possible.\nRun a retirement projection rather than relying on asset balances alone.",
+    "captured": true
+  },
+  {
+    "id": "fin-05",
+    "domain": "Finance",
+    "topic": "Emergency fund",
+    "input": "My household spends about $5,200/mo. We have $7k in checking and irregular income (I'm a contractor, my spouse is salaried at $72k).\n\nHow large should our emergency fund be and how do we get there?",
+    "assistant_message": "For a household with irregular income, I'd target 9–12 months of essential expenses.\n\nYour spending is about $5,200/month.\n\nThat suggests:\n\nMinimum target: ~$31k\nStrong target: ~$47k–$62k\n\nWith only $7k currently, I'd prioritize building cash reserves before taking significant investment risk.\n\nUse separate accounts:\n\nOperating account\nTax account\nEmergency fund\n\nThat structure is especially valuable for contractors.",
+    "captured": true
+  },
+  {
+    "id": "fin-06",
+    "domain": "Finance",
+    "topic": "Insurance decision",
+    "input": "I'm 38, the primary earner at $140k, with a spouse who stays home and three kids under 10. We have a $250k group life policy through work and a $400k mortgage.\n\nHow much life insurance do I actually need?",
+    "assistant_message": "You're likely underinsured.\n\nYou have:\n\nStay-at-home spouse\nThree children\n$400k mortgage\n$140k income\n\nA common range would be 10–15x income plus major obligations.\n\nThat suggests roughly:\n\n$1.5M–$2.5M of total coverage\n\nYour $250k group policy barely covers the mortgage.\n\nI'd strongly consider an individual term life policy to supplement employer coverage.",
+    "captured": true
+  },
+  {
+    "id": "fin-07",
+    "domain": "Finance",
+    "topic": "Inheritance",
+    "input": "I just inherited $250k. I have a $180k mortgage at 3.1%, $30k in student loans at 6.5%, no other debt, and $40k in retirement at age 41.\n\nWhat should I do with the inheritance?",
+    "assistant_message": "I'd prioritize the 6.5% student loans before the 3.1% mortgage.\n\nPossible allocation:\n\nPay off $30k student loans.\nMaintain a strong emergency fund.\nMax retirement accounts.\nInvest the remainder in diversified index funds.\n\nAt age 41 with only $40k in retirement savings, retirement funding deserves significant attention.\n\nI would not rush to pay down a 3.1% mortgage.",
+    "captured": true
+  },
+  {
+    "id": "fin-08",
+    "domain": "Finance",
+    "topic": "Windfall / bonus allocation",
+    "input": "I received a $60k after-tax bonus. I'm 31, earn $120k, have a fully funded emergency fund, $15k in credit card debt at 19%, and I max neither my 401k nor my Roth.\n\nHow should I split this $60k?",
+    "assistant_message": "My order:\n\nPay off the $15k credit card debt.\nIncrease retirement contributions.\nMax Roth IRA.\nInvest remaining funds in taxable accounts.\n\nA possible split:\n\n$15k credit cards\n~$7k Roth IRA\nSignificant 401(k) increase\nRemaining amount invested\n\nEliminating 19% debt is the highest-return move available.",
+    "captured": true
+  },
+  {
+    "id": "fin-09",
+    "domain": "Finance",
+    "topic": "College savings",
+    "input": "My daughter is 8. I have $18k in a 529 and can add about $300/mo. In-state public tuition is projected around $130k all-in by the time she enrolls.\n\nAre we saving enough for her college, and how should we think about it?",
+    "assistant_message": "You're probably on a reasonable path but not fully funded.\n\nCurrent:\n\n$18k balance\n$300/month contributions\n10 years remaining\n\nDepending on investment returns, you could end up somewhere around $70k–$100k by enrollment.\n\nProjected tuition is $130k.\n\nThat means:\n\nYou're likely covering a substantial portion.\nYou may not fully fund the entire amount.\n\nRemember that retirement remains the higher priority. Children can borrow for college; parents cannot borrow for retirement.",
+    "captured": true
+  },
+  {
+    "id": "fin-10",
+    "domain": "Finance",
+    "topic": "Mortgage refinance / payoff",
+    "input": "I have $310k left on a 6.9% mortgage with 27 years remaining. I also have $120k in a taxable brokerage earning roughly market returns and a stable $150k income.\n\nShould I aggressively pay down the mortgage or keep the money invested?",
+    "assistant_message": "At 6.9%, I'd lean toward accelerated mortgage repayment.\n\nA guaranteed 6.9% after-tax return is attractive.\n\nPossible approach:\n\nKeep adequate emergency reserves.\nContinue retirement investing.\nDirect excess cash toward mortgage reduction.\n\nI would not necessarily liquidate the entire brokerage account, but I would likely split excess savings between investing and mortgage paydown.",
+    "captured": true
+  },
+  {
+    "id": "fin-11",
+    "domain": "Finance",
+    "topic": "Concentrated stock position",
+    "input": "I'm 44 and about 45% of my $700k net worth is in my employer's stock from years of RSUs. The rest is in index funds and cash. I'm nervous about the concentration but worried about taxes if I sell.\n\nWhat should I do about my concentrated stock position?",
+    "assistant_message": "The concentration risk is likely a bigger issue than the taxes.\n\nNearly half your net worth depends on one company.\n\nAsk yourself:\n\n\"If I had cash today, would I invest 45% of my net worth in this stock?\"\n\nIf not, diversification is probably appropriate.\n\nA gradual sale strategy can:\n\nManage taxes\nReduce risk\nImprove portfolio resilience\n\nDiversification often feels painful before it's necessary and obvious afterward.",
+    "captured": true
+  },
+  {
+    "id": "fin-12",
+    "domain": "Finance",
+    "topic": "Social Security timing",
+    "input": "I'm 61, in good health, with $520k saved and a part-time income of $30k. My full retirement age benefit is about $2,700/mo; at 62 it would be roughly $1,900/mo; at 70 about $3,350/mo.\n\nWhen should I start taking Social Security?",
+    "assistant_message": "The answer depends primarily on longevity expectations and cash-flow needs.\n\nGenerally:\n\nNeed income now → claim earlier.\nStrong health and longevity expectations → delay.\nConcern about outliving assets → delay.\n\nGiven good health and only $520k saved, delaying benefits can be valuable because it increases guaranteed lifetime income.\n\nMany people in your position benefit from delaying closer to 70 if practical.",
+    "captured": true
+  },
+  {
+    "id": "car-01",
+    "domain": "Career",
+    "topic": "Promotion",
+    "input": "I'm a senior engineer making $165k. I've been offered a promotion to engineering manager with a $15k raise but I'd stop coding and manage 7 people. I've never managed before.\n\nShould I take the manager promotion?",
+    "assistant_message": "Take the promotion only if you want the work.\n\nManagement and engineering are different careers.\n\nQuestions:\n\nDo you enjoy coaching people?\nDo you enjoy conflict resolution?\nDo you want organizational influence?\n\nA $15k raise alone would not convince me.\n\nTake it if you're interested in leadership—not because of the compensation.",
+    "captured": true
+  },
+  {
+    "id": "car-02",
+    "domain": "Career",
+    "topic": "Job change",
+    "input": "I'm 36 making $135k at a stable company I've been at for 8 years. I have an offer for $168k at an earlier-stage company with more equity but less security. My spouse is on parental leave.\n\nShould I take the new job?",
+    "assistant_message": "I would lean toward staying put for now.\n\nYour spouse is on parental leave, which reduces flexibility.\n\nThe raise is attractive, but so is stability during a major life transition.\n\nIf:\n\nEmergency fund is strong\nStartup is financially healthy\nEquity is meaningful\n\nthen the move becomes more attractive.\n\nOtherwise I'd wait until family circumstances stabilize.",
+    "captured": true
+  },
+  {
+    "id": "car-03",
+    "domain": "Career",
+    "topic": "Layoff risk",
+    "input": "There are strong rumors of layoffs at my company within two quarters. I'm a mid-level marketer earning $95k with $20k saved and a family of four.\n\nWhat should I do to prepare?",
+    "assistant_message": "Act as if layoffs are coming.\n\nImmediately:\n\nReduce discretionary spending.\nBuild cash reserves.\nUpdate resume and LinkedIn.\nReconnect with your network.\nStart interviewing before you need to.\n\nThe best time to look for a job is before you're unemployed.",
+    "captured": true
+  },
+  {
+    "id": "car-04",
+    "domain": "Career",
+    "topic": "Relocation for work",
+    "input": "I've been offered a role in another state with a $25k raise to $150k, but the cost of living is about 30% higher and my partner would have to find a new job (they currently earn $80k).\n\nShould we relocate for this job?",
+    "assistant_message": "Probably not.\n\nYour raise:\n\n+$25k\n\nPotential losses:\n\nPartner's $80k income\nHigher cost of living\nRelocation disruption\n\nFinancially this may actually be a step backward.\n\nI'd only move if the role substantially improves long-term career opportunities.",
+    "captured": true
+  },
+  {
+    "id": "car-05",
+    "domain": "Career",
+    "topic": "Leadership path",
+    "input": "I'm 40, a director earning $190k. I can pursue a VP track that means more politics and travel, or stay as a hands-on director. I have two teenagers at home.\n\nShould I push for the VP path or stay where I am?",
+    "assistant_message": "This is more of a life decision than a career decision.\n\nVP path:\n\nMore income\nMore influence\nMore travel\nMore politics\n\nDirector path:\n\nMore balance\nMore family time\nLess stress\n\nWith teenagers at home, I'd carefully evaluate whether the incremental compensation justifies the tradeoff.",
+    "captured": true
+  },
+  {
+    "id": "car-06",
+    "domain": "Career",
+    "topic": "Counteroffer",
+    "input": "I resigned to take a $20k raise elsewhere and my current employer countered matching it plus a title bump. I have mixed feelings about the team here.\n\nShould I accept the counteroffer or leave as planned?",
+    "assistant_message": "I usually favor leaving.\n\nCounteroffers often solve compensation but not the underlying reasons people resigned.\n\nAsk:\n\nWhy did you start looking?\nWhat changed besides money?\n\nIf the answer is \"nothing,\" leaving is often the better long-term choice.",
+    "captured": true
+  },
+  {
+    "id": "car-07",
+    "domain": "Career",
+    "topic": "Sabbatical",
+    "input": "I'm 38, burned out, earning $145k with $160k saved and no kids. I'm considering a 6-month unpaid sabbatical to travel and reset.\n\nCan I afford to take a 6-month sabbatical, and should I?",
+    "assistant_message": "Financially, probably yes.\n\nEmotionally, maybe.\n\nEstimate:\n\nSix months of spending\nHealthcare costs\nTravel budget\n\nIf those fit comfortably within your savings and you maintain a runway for reentry, a sabbatical can be worthwhile.\n\nBurnout ignored often becomes more expensive later.",
+    "captured": true
+  },
+  {
+    "id": "car-08",
+    "domain": "Career",
+    "topic": "Career pivot into new field",
+    "input": "I'm a 33-year-old paralegal earning $68k and want to move into UX design. A bootcamp costs $14k and 6 months; entry UX roles in my city pay around $80k.\n\nIs pivoting into UX design a smart move for me?",
+    "assistant_message": "Potentially, but validate demand first.\n\nBefore spending $14k:\n\nComplete free UX coursework.\nBuild sample projects.\nTalk with working UX professionals.\nReview local job postings.\n\nUX remains competitive. Make sure you're attracted to the actual work, not just the salary increase.",
+    "captured": true
+  },
+  {
+    "id": "car-09",
+    "domain": "Career",
+    "topic": "Equity vs salary offer",
+    "input": "A startup offered me $130k salary plus 0.4% equity (current 409A values it around $40k vesting over 4 years). My current job pays $155k all cash.\n\nHow should I weigh the equity offer against my current salary?",
+    "assistant_message": "Treat startup equity as a bonus, not guaranteed compensation.\n\nCurrent job:\n\n$155k certain\n\nStartup:\n\n$130k salary\nEquity with uncertain value\n\nYou are effectively accepting a pay cut today in exchange for upside later.\n\nOnly do that if:\n\nYou believe strongly in the company\nThe risk fits your finances",
+    "captured": true
+  },
+  {
+    "id": "edu-01",
+    "domain": "Education",
+    "topic": "MBA",
+    "input": "I'm 28, make $82k in operations, and am weighing a full-time MBA that costs $140k plus two years of forgone income. Post-MBA roles in my target field pay around $130k.\n\nIs the MBA worth it for me?",
+    "assistant_message": "Based on these numbers alone, the MBA looks difficult to justify financially.\n\nCost:\n\n$140k tuition\n~$164k lost income\n\nTotal economic cost exceeds $300k.\n\nExpected salary increase:\n\n~$48k annually\n\nThe MBA could still make sense for network, career pivot, or leadership opportunities, but financially it's not an automatic win.",
+    "captured": true
+  },
+  {
+    "id": "edu-02",
+    "domain": "Education",
+    "topic": "Degree choice",
+    "input": "My son is choosing between a $0 in-state engineering program and a $55k/yr private school with a stronger network for his intended finance career.\n\nHow should he think about this choice?",
+    "assistant_message": "I'd start with the cheaper engineering option.\n\nGraduating debt-free creates flexibility.\n\nA strong student from the in-state program can still reach finance through:\n\nInternships\nNetworking\nClubs\nGraduate education later\n\nPaying $220k for networking requires a very high confidence level.",
+    "captured": true
+  },
+  {
+    "id": "edu-03",
+    "domain": "Education",
+    "topic": "Certification",
+    "input": "I'm a project coordinator earning $72k. A PMP certification costs about $1,500 and ~120 hours of study; certified PMs in my org earn roughly $90k+.\n\nIs the PMP certification worth pursuing?",
+    "assistant_message": "This looks attractive.\n\nInvestment:\n\n$1,500\n120 study hours\n\nPotential earnings increase:\n\n~$18k+ annually\n\nAssuming certification genuinely improves advancement prospects, the return appears strong.",
+    "captured": true
+  },
+  {
+    "id": "edu-04",
+    "domain": "Education",
+    "topic": "Student loans",
+    "input": "I have $65k in student loans: $40k federal at 5.5% and $25k private at 8.2%. I earn $78k and have $12k saved beyond my emergency fund.\n\nWhat's the smartest way to tackle my student loans?",
+    "assistant_message": "Focus on the 8.2% private loans first.\n\nSuggested order:\n\nMaintain emergency fund.\nApply extra savings toward private loans.\nContinue minimum federal payments.\nAccelerate federal loans after private debt is gone.\n\nThe interest-rate spread matters.",
+    "captured": true
+  },
+  {
+    "id": "edu-05",
+    "domain": "Education",
+    "topic": "Part-time vs full-time grad school",
+    "input": "I'm 31, earning $98k. I can do a part-time master's over 3 years while working, or quit and finish full-time in 1 year. Tuition is $48k either way.\n\nShould I go part-time while working or full-time?",
+    "assistant_message": "Part-time while working is usually the better financial decision.\n\nSame tuition.\n\nDifferences:\n\nMaintain income\nMaintain benefits\nAvoid career interruption\nReduce risk\n\nI'd need a compelling reason to recommend quitting.",
+    "captured": true
+  },
+  {
+    "id": "edu-06",
+    "domain": "Education",
+    "topic": "Coding bootcamp for career switch",
+    "input": "I'm 27, earning $52k in retail management with $9k saved. A 4-month coding bootcamp costs $17k; junior dev roles in my area start around $75k.\n\nShould I take out a loan for a coding bootcamp to switch careers?",
+    "assistant_message": "Proceed carefully.\n\nThe biggest risk is assuming a bootcamp automatically leads to employment.\n\nBefore borrowing:\n\nComplete free coding resources.\nBuild projects.\nConfirm interest and aptitude.\n\nOnly borrow once you've validated the career path.",
+    "captured": true
+  },
+  {
+    "id": "edu-07",
+    "domain": "Education",
+    "topic": "Funding kids' college vs own retirement",
+    "input": "I'm 49 with two kids entering college in 2 and 4 years. I have $210k in retirement and $35k saved for college across both kids. I earn $128k.\n\nShould I prioritize my retirement or fully funding their college?",
+    "assistant_message": "Prioritize retirement.\n\nYou're 49 with:\n\n$210k retirement savings\nCollege approaching quickly\n\nYour children have more funding options than you do.\n\nHelp where possible, but retirement security comes first.",
+    "captured": true
+  },
+  {
+    "id": "fam-01",
+    "domain": "Family",
+    "topic": "New child",
+    "input": "We're expecting our first baby in four months. Combined income $150k, $25k saved, renting at $2,100/mo, both of us work full-time with limited parental leave.\n\nWhat should we get in order before the baby arrives?",
+    "assistant_message": "Focus on five areas:\n\nEmergency fund.\nLife insurance.\nEstate documents.\nChildcare planning.\nHealth insurance review.\n\nYou don't need every baby gadget. You do need financial resilience and a clear plan.",
+    "captured": true
+  },
+  {
+    "id": "fam-02",
+    "domain": "Family",
+    "topic": "Divorce",
+    "input": "I'm going through a divorce at 43. I'll keep my $90k salary, we're splitting $300k in assets, and I'll have the kids half the time. I haven't managed the finances before.\n\nWhat should I prioritize as I rebuild financially?",
+    "assistant_message": "Priorities:\n\nUnderstand cash flow.\nBuild emergency reserves.\nReview insurance.\nUpdate beneficiaries.\nCreate a retirement plan.\n\nAvoid major lifestyle inflation or large purchases during the adjustment period.",
+    "captured": true
+  },
+  {
+    "id": "fam-03",
+    "domain": "Family",
+    "topic": "Aging parent",
+    "input": "My mother is 79 and showing early signs she may need care within a year or two. I have two siblings, we live in different states, and none of us has discussed money or responsibilities.\n\nHow should I start thinking about my mother's care?",
+    "assistant_message": "Start the conversation now.\n\nDiscuss:\n\nCare preferences\nFinances\nLegal documents\nHealthcare directives\nResponsibilities among siblings\n\nThe earlier these conversations occur, the more options everyone has.",
+    "captured": true
+  },
+  {
+    "id": "fam-04",
+    "domain": "Family",
+    "topic": "Guardianship",
+    "input": "We have two young children and no will or named guardian. We're both 35, with a $500k mortgage and modest savings.\n\nHow do we set up guardianship and what else are we missing?",
+    "assistant_message": "Immediately:\n\nCreate wills.\nName guardians.\nEstablish powers of attorney.\nReview life insurance.\nUpdate beneficiaries.\n\nChoosing guardians is often the most important decision.",
+    "captured": true
+  },
+  {
+    "id": "fam-05",
+    "domain": "Family",
+    "topic": "Estate planning",
+    "input": "I'm 58 with a $1.8M net worth spread across a home, retirement accounts, and a brokerage. I have three adult children and want to avoid family conflict and unnecessary taxes.\n\nHow should I approach estate planning?",
+    "assistant_message": "Comprehensive estate planning is appropriate.\n\nConsider:\n\nWill\nRevocable trust\nPowers of attorney\nHealthcare directives\nBeneficiary reviews\n\nThe primary goal is often clarity and communication, not just tax reduction.",
+    "captured": true
+  },
+  {
+    "id": "fam-06",
+    "domain": "Family",
+    "topic": "Blended family finances",
+    "input": "I'm remarrying at 46. I have two kids from my first marriage and my fiancée has one. We both own homes and have separate retirement accounts.\n\nHow should we structure our finances as a blended family?",
+    "assistant_message": "Use a blended-family mindset.\n\nConsider:\n\nPrenuptial agreement\nSeparate vs joint accounts\nEstate planning updates\nClear inheritance goals\n\nAmbiguity creates conflict. Clarity prevents it.",
+    "captured": true
+  },
+  {
+    "id": "fam-07",
+    "domain": "Family",
+    "topic": "Special needs planning",
+    "input": "Our 6-year-old has a developmental disability and will likely need lifelong support. We earn $160k combined and have $50k saved but no special needs plan.\n\nHow do we plan financially for our child's lifelong needs?",
+    "assistant_message": "Start planning immediately.\n\nKey steps:\n\nSpecial needs attorney\nSpecial needs trust\nGovernment-benefit coordination\nLong-term care planning\nLife insurance review\n\nThe plan should survive you.",
+    "captured": true
+  },
+  {
+    "id": "fam-08",
+    "domain": "Family",
+    "topic": "Single parent financial security",
+    "input": "I'm a single parent, 37, earning $74k with one child. I have $8k saved, no life insurance, and no will.\n\nWhat are the most important things I should do to protect my child?",
+    "assistant_message": "Top priorities:\n\nTerm life insurance.\nWill naming guardian.\nBeneficiary review.\nEmergency fund.\nDisability insurance.\n\nThose actions provide disproportionate protection for your child.",
+    "captured": true
+  },
+  {
+    "id": "fam-09",
+    "domain": "Family",
+    "topic": "Supporting adult child",
+    "input": "My 24-year-old recently moved back home with student debt and an unstable income. I'm 55, planning to retire in 8 years, and want to help without derailing my own plans.\n\nHow much should I help my adult child financially?",
+    "assistant_message": "Help with structure, not dependency.\n\nConsider:\n\nDefined timeline\nClear expectations\nRent or savings goals\nCareer milestones\n\nProtect your retirement while helping them regain independence.",
+    "captured": true
+  },
+  {
+    "id": "crs-01",
+    "domain": "Cross-Domain",
+    "topic": "Move states",
+    "input": "We're considering moving from California to Texas. I'd keep my remote job at $140k, we'd save on state taxes, but we'd leave family and our kids' schools behind.\n\nDoes moving to Texas make sense for our family?",
+    "assistant_message": "The financial benefits are real, but money is only part of the equation.\n\nEvaluate:\n\nFamily support network\nSchool quality\nCommunity\nLong-term happiness\n\nI'd quantify the financial gain and then decide whether it compensates for the non-financial losses.",
+    "captured": true
+  },
+  {
+    "id": "crs-02",
+    "domain": "Cross-Domain",
+    "topic": "Start a business",
+    "input": "I want to leave my $135k corporate job to start a consulting business. I have $90k in savings, a spouse earning $70k, two kids, and a few interested potential clients.\n\nCan I make the leap to start my business?",
+    "assistant_message": "Possibly, but don't leap blindly.\n\nI'd want:\n\n12 months of expenses\nSeveral committed clients\nRealistic revenue projections\n\nYour spouse's income provides useful stability, which makes entrepreneurship more feasible.",
+    "captured": true
+  },
+  {
+    "id": "crs-03",
+    "domain": "Cross-Domain",
+    "topic": "Leave a stable job",
+    "input": "I'm 42 with a secure $160k government job and a pension vesting in 3 years. I have an opportunity in the private sector at $200k but no pension and less stability.\n\nShould I leave my stable job before the pension vests?",
+    "assistant_message": "I would strongly consider staying until the pension vests.\n\nThree years can dramatically increase the value of lifetime benefits.\n\nCalculate the pension value before making the decision. It may exceed the salary difference.",
+    "captured": true
+  },
+  {
+    "id": "crs-04",
+    "domain": "Cross-Domain",
+    "topic": "Care for a parent",
+    "input": "My father needs increasing care. I'm considering reducing my work to part-time (cutting my $120k income roughly in half) to care for him, or paying $5k/mo for professional care.\n\nShould I cut back work to care for my father or pay for care?",
+    "assistant_message": "Explore hybrid solutions first.\n\nThe choice isn't necessarily:\n\nAll caregiving\nAll professional care\n\nYou may combine family involvement with professional support.\n\nProtecting your own financial future matters too.",
+    "captured": true
+  },
+  {
+    "id": "crs-05",
+    "domain": "Cross-Domain",
+    "topic": "Disability / income protection",
+    "input": "I have a chronic health condition that may eventually limit my ability to work. I'm 40, earn $95k, am the primary earner, and have only employer short-term disability coverage.\n\nHow do I protect my income against my health risk?",
+    "assistant_message": "Disability insurance is the priority.\n\nAs primary earner:\n\nLong-term disability coverage\nEmergency reserves\nEstate documents\nRetirement savings\n\nYour ability to earn income is your largest asset.",
+    "captured": true
+  },
+  {
+    "id": "crs-06",
+    "domain": "Cross-Domain",
+    "topic": "Military transition",
+    "input": "I'm transitioning out of the military after 12 years. I'll have a partial pension, GI Bill benefits, and need to choose between using the GI Bill for school or jumping straight into a civilian job.\n\nHow should I approach my transition to civilian life?",
+    "assistant_message": "Approach the transition strategically.\n\nEvaluate:\n\nCivilian job opportunities\nGI Bill value\nCareer goals\nFamily considerations\n\nUse the GI Bill only if it clearly improves long-term earning power relative to immediate employment.",
+    "captured": true
+  },
+  {
+    "id": "crs-07",
+    "domain": "Cross-Domain",
+    "topic": "Early retirement / FIRE",
+    "input": "I'm 38 with $900k invested, spending about $55k/yr, and considering leaving full-time work. My spouse would keep working part-time earning $40k.\n\nCan I retire early now, and what would I be risking?",
+    "assistant_message": "You're close enough that careful analysis matters.\n\nPortfolio:\n\n$900k\nSpending $55k\n\nSpouse earning $40k helps substantially.\n\nRisks:\n\nMarket downturns\nHealthcare costs\nInflation\n\nYou may have flexibility to leave full-time work, but I'd run detailed retirement projections first.",
+    "captured": true
+  },
+  {
+    "id": "crs-08",
+    "domain": "Cross-Domain",
+    "topic": "Job loss + family",
+    "input": "I was just laid off. I have $40k saved, a mortgage, a spouse earning $60k, and two kids. My severance covers two months.\n\nWhat should I do first?",
+    "assistant_message": "First priorities:\n\nPreserve cash.\nUnderstand severance.\nFile for unemployment if eligible.\nCut discretionary spending.\nStart networking immediately.\n\nThe goal is extending runway while accelerating reemployment.",
+    "captured": true
+  },
+  {
+    "id": "crs-09",
+    "domain": "Cross-Domain",
+    "topic": "Relocate abroad",
+    "input": "We're considering moving abroad for two years for my partner's job. I'd pause my $100k career, our kids are in elementary school, and we'd keep our US home.\n\nHow should we think about moving abroad for two years?",
+    "assistant_message": "Think about:\n\nCareer interruption\nFamily experience\nChildren's adjustment\nFinancial impact\nReentry opportunities\n\nMany people never regret the experience, but they sometimes underestimate reentry risk.",
+    "captured": true
+  },
+  {
+    "id": "crs-10",
+    "domain": "Cross-Domain",
+    "topic": "Buy a business",
+    "input": "I have the chance to buy a small established business for $350k. I'd use $120k savings and finance the rest. It nets about $90k/yr but I'd leave my $110k salaried job to run it.\n\nShould I buy this business?",
+    "assistant_message": "Not enough information yet.\n\nI'd investigate:\n\nFinancial statements\nCustomer concentration\nOwner dependence\nIndustry trends\nDebt service coverage\n\nA business producing $90k while requiring you to leave a $110k job is not automatically attractive.",
+    "captured": true
+  },
+  {
+    "id": "crs-11",
+    "domain": "Cross-Domain",
+    "topic": "Downsize / lifestyle change",
+    "input": "We're 60, our kids are grown, and we have a $750k house with a $150k mortgage. Downsizing could free up cash for retirement but means leaving the family home.\n\nShould we downsize now that the kids are gone?",
+    "assistant_message": "Downsizing is worth evaluating.\n\nBenefits:\n\nLower housing costs\nIncreased liquidity\nSimplified lifestyle\n\nThe decision should balance financial efficiency against emotional value.",
+    "captured": true
+  },
+  {
+    "id": "crs-12",
+    "domain": "Cross-Domain",
+    "topic": "Medical event financial recovery",
+    "input": "I had a major medical event and now have $30k in medical debt, reduced ability to work full-time, and depleted savings. I earn about $60k when working full-time.\n\nHow do I recover financially after my medical event?",
+    "assistant_message": "Focus on stabilization first.\n\nPriorities:\n\nMedical debt negotiation.\nIncome replacement programs.\nInsurance benefits review.\nEmergency budget.\nCareer adaptation if needed.\n\nRecovery is usually a multi-year process, not a single decision.",
+    "captured": true
+  },
+  {
+    "id": "crs-13",
+    "domain": "Cross-Domain",
+    "topic": "Multi-goal prioritization",
+    "input": "We're 34, earning $175k combined. We want to buy a house, start a family, pay off $30k in student loans, and save for retirement, but we can't do everything at once.\n\nHow should we prioritize our competing goals?",
+    "assistant_message": "I would prioritize in this order:\n\nCapture retirement matches.\nBuild emergency reserves.\nEliminate high-interest debt.\nStart family planning.\nSave for a home.\n\nTrying to maximize every goal simultaneously often slows progress. Prioritized sequencing usually produces better long-term outcomes.",
+    "captured": true
+  }
+]
