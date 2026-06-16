@@ -72,6 +72,16 @@ def build_constraints(base: dict[str, Any], context: Any) -> dict[str, Any]:
     }
 
 
+def _is_repairable(reasons: list[str]) -> bool:
+    """V6: which validator rejections are worth a single targeted repair-retry. Only grounding misses
+    (ungrounded numbers / unsupported relationship claims) — NOT advice/medical/legal/tax overreach, which
+    must fall back rather than be coaxed into a rephrase."""
+    txt = " ".join(reasons).lower()
+    if "advice" in txt or "medical" in txt or "legal" in txt:
+        return False
+    return ("invented numbers" in txt) or ("relationship" in txt)
+
+
 def _compose(safe: dict[str, Any]) -> str:
     """Assemble the human-facing message as the V3 five-section advisor turn, exposing the reasoning the
     model already performs: Decision Frame → Tradeoffs → What We Know → What We Still Need → Best Next
@@ -202,6 +212,26 @@ class AdvisorOrchestrator:
                 return
             ok, safe, reasons = validate(out, context)
             lap("validate")
+            if not ok and _is_repairable(reasons):
+                # V6 graceful degradation: rather than drop a near-complete, high-quality reply to the generic
+                # opener over one ungrounded number, give the model ONE targeted chance to remove the specific
+                # offending items and re-validate. The repaired output passes through the SAME validator — this
+                # is resilience (keep the grounded counsel), not a weaker gate.
+                repair_plan = dict(constraints)
+                repair_plan["repair_note"] = (
+                    "Your previous draft was rejected for: " + "; ".join(reasons) + ". Return the SAME "
+                    "six-section answer but REMOVE every ungrounded number and every relationship claim listed "
+                    "— state those points qualitatively instead (e.g. 'a larger down payment', 'several months "
+                    "of expenses'), or, for a number that computes from the user's OWN figures, put it in "
+                    "derivations. Change nothing else; keep all grounded content.")
+                out2 = await self._llm.generate(context, repair_plan)
+                tr["repair_retry"] = True
+                if out2 is not None:
+                    ok2, safe2, reasons2 = validate(out2, context)
+                    if ok2:
+                        ok, safe, reasons = ok2, safe2, reasons2
+                        tr["validator_result"] = "repaired_retry"
+                lap("repair")
             if not ok:
                 base["llm_status"] = "fallback:" + ("; ".join(reasons))[:140]
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"], tr["validator_reason"] = (
