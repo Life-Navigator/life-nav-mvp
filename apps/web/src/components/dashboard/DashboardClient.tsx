@@ -135,8 +135,8 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
   const quickActions = [
     { name: 'Benefits Discovery', icon: '🎨', href: '/discovery/benefits' },
     { name: 'Create Goal', icon: '🎯', href: '/goals/create' },
-    { name: 'Discovery', icon: '💭', href: '/conversation' },
-    { name: 'Risk Assessment', icon: '📊', href: '/dashboard/goals' },
+    { name: 'Discovery', icon: '💭', href: '/dashboard/advisor' },
+    { name: 'Goals & Assessment', icon: '📊', href: '/dashboard/goals' },
     { name: 'Calculators', icon: '🧮', href: '/dashboard/calculators' },
     { name: 'Family', icon: '👨‍👩‍👧‍👦', href: '/dashboard/family' },
   ];

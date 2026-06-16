@@ -8,6 +8,8 @@
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import AddDataModal from '@/components/dashboard/AddDataModal';
+import AdviceDisclaimer from '@/components/advice/AdviceDisclaimer';
+import { levelFromThemes } from '@/lib/advice/disclosure';
 import {
   ActionCard,
   DOMAIN_ACTIONS,
@@ -362,6 +364,12 @@ export default function AdvisorPage() {
           ))}
           <div ref={endRef} />
         </div>
+        {/* Context-aware advice disclosure: stays silent during early discovery (no domain themes yet)
+            and escalates only once the advisor surfaces finance/health/legal/tax/estate themes. */}
+        <AdviceDisclaimer
+          level={levelFromThemes([...(panel.top_themes || []), ...(panel.top_risks || [])])}
+          className="mt-2"
+        />
         {showConfirmation ? (
           // The life-model review is shown before the dashboard unlocks. The dashboard is reached
           // ONLY via an explicit Confirm (onboarding_completed, confirmed) or explicit Skip.

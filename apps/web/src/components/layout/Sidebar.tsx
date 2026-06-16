@@ -318,24 +318,6 @@ function ChevronRightIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-function ArrowRightIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <line x1="5" y1="12" x2="19" y2="12"></line>
-      <polyline points="12 5 19 12 12 19"></polyline>
-    </svg>
-  );
-}
-
 function ChatIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -1010,28 +992,8 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
           })}
         </nav>
 
-        {/* Bottom section - only show when not collapsed or on mobile */}
-        {(!effectiveCollapsed || isMobile) && (
-          <div className="absolute bottom-0 left-0 right-0 p-4">
-            <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-3">
-              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                Premium Desktop
-              </h3>
-              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                Access advanced features in our desktop app
-              </p>
-              <a
-                href="https://nexlevel-intelligence.com/download"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                Download now
-                <ArrowRightIcon className="ml-1 h-3 w-3" />
-              </a>
-            </div>
-          </div>
-        )}
+        {/* Pilot: removed the off-brand "Premium Desktop" promo that linked to an external
+            third-party domain (no desktop app ships for the beta). */}
       </div>
 
       {/* Mobile toggle button */}

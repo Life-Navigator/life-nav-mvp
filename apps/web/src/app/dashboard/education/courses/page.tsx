@@ -135,11 +135,6 @@ export default function CoursesPage() {
             description="Start your learning journey by enrolling in courses. Connect your learning platforms or manually track courses to monitor your educational progress."
             actionLabel="Connect Learning Platform"
             actionHref="/dashboard/integrations"
-            secondaryActionLabel="Add Course Manually"
-            onSecondaryAction={() => {
-              // TODO: Open modal to add course
-              console.log('Add course modal');
-            }}
           />
         </div>
       ) : (
