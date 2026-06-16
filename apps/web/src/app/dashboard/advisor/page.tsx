@@ -9,6 +9,15 @@ import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import AddDataModal from '@/components/dashboard/AddDataModal';
 import StreamingText from '@/components/ui/StreamingText';
+import ArcanaStatus from '@/components/ui/ArcanaStatus';
+import {
+  type ArcanaStatus as ArcanaStatusKind,
+  ARCANA_STREAMING_ENABLED,
+  ARCANA_DEBUG,
+  ARCANA_ERROR_MESSAGE,
+  statusForFinal,
+  streamDurationMs,
+} from '@/lib/arcana/streaming';
 import {
   ActionCard,
   DOMAIN_ACTIONS,
@@ -50,7 +59,11 @@ interface Msg {
   text: string;
   updates?: string[];
   reveal?: Reveal | null;
-  stream?: boolean; // a fast deterministic ack still awaiting the validated answer
+  // Arcana streaming: render the approved text instantly (safety responses / flag-off) instead of
+  // typing it, the target typing duration, and the pipeline status (debug-only surfacing).
+  instant?: boolean;
+  durationMs?: number;
+  llmStatus?: string;
 }
 
 export default function AdvisorPage() {
@@ -67,6 +80,19 @@ export default function AdvisorPage() {
   const [complete, setComplete] = useState(false);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  // Arcana conversational lifecycle: idle → thinking → checking → responding → approved
+  // (or safety_response / fallback / error). Drives the subtle status line + Stop/Retry controls.
+  const [status, setStatus] = useState<ArcanaStatusKind>('idle');
+  // Last turn we sent, so Retry can replay it after an error.
+  const [lastSent, setLastSent] = useState<{ message: string; pending_key: string | null } | null>(
+    null
+  );
+  // Set true to force any in-progress local typing to jump to the full (already-approved) text on Stop.
+  const [stopTyping, setStopTyping] = useState(false);
+  // Aborts the in-flight request when the user hits Stop.
+  const abortRef = useRef<AbortController | null>(null);
+  // True while the user is actively generating/typing — gates the Stop button.
+  const generating = status === 'thinking' || status === 'checking' || status === 'responding';
   const [finishing, setFinishing] = useState(false);
   const [onboardingMode, setOnboardingMode] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -201,19 +227,41 @@ export default function AdvisorPage() {
     if (t) await send(t, pending);
   };
 
-  const apply = (t: Turn | null) => {
-    if (!t) return;
+  // Apply a VALIDATED/APPROVED final turn: append the message and reconcile panel state. The compliance
+  // gate already ran server-side — this only decides how the approved text is *presented* (typed vs
+  // instant) and what conversational state to enter. Returns false if there was no usable turn (→ error).
+  const applyFinal = (t: (Turn & { llm_status?: string }) | null): boolean => {
+    if (!t || typeof t.assistant_message !== 'string') return false;
+    const st = statusForFinal(t.llm_status);
+    // Safety responses (and flag-off) render immediately — never typed (acceptance criterion 4).
+    const instant = !ARCANA_STREAMING_ENABLED || st === 'safety_response';
     setMsgs((m) => [
       ...m,
-      { role: 'advisor', text: t.assistant_message, updates: t.updates, reveal: t.reveal },
+      {
+        role: 'advisor',
+        text: t.assistant_message,
+        updates: t.updates,
+        reveal: t.reveal,
+        instant,
+        durationMs: streamDurationMs((t.assistant_message || '').length),
+        llmStatus: t.llm_status,
+      },
     ]);
     setPending(t.pending_key);
     setOptions(t.options ?? null);
     setPanel(t.context_panel || {});
     setComplete(t.complete);
+    setStatus(st); // 'responding' | 'fallback' | 'safety_response' — cleared to 'idle' on typing done
+    return true;
   };
-  // Non-streaming fallback (used if the SSE stream is unavailable).
-  const sendBlocking = async (message: string, pending_key: string | null) => {
+
+  // Non-streaming fallback (used when the SSE stream is unavailable or cut off). Still hits the
+  // validated, compliance-gated endpoint — never raw model output.
+  const sendBlocking = async (
+    message: string,
+    pending_key: string | null,
+    signal?: AbortSignal
+  ): Promise<boolean> => {
     const t = await fetch('/api/life/discovery-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -222,14 +270,34 @@ export default function AdvisorPage() {
         pending_key: pending_key ?? '',
         conversation_id: conversationId,
       }),
+      signal,
     })
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null);
-    apply(t);
+    return applyFinal(t);
   };
 
   const send = async (message: string, pending_key: string | null) => {
+    setLastSent({ message, pending_key });
+    setStopTyping(false); // clear any prior Stop latch so this turn can animate
+    const controller = new AbortController();
+    abortRef.current = controller;
     setBusy(true);
+    setStatus('thinking'); // Step 1 — user-visible status only; never raw model output
+
+    // Feature flag OFF → no streaming effect: fetch the validated turn and render it instantly.
+    if (!ARCANA_STREAMING_ENABLED) {
+      try {
+        const ok = await sendBlocking(message, pending_key, controller.signal);
+        if (!ok && !controller.signal.aborted) setStatus('error');
+      } finally {
+        setBusy(false);
+        abortRef.current = null;
+      }
+      return;
+    }
+
+    let sawFinal = false;
     try {
       const resp = await fetch('/api/life/discovery-chat-stream', {
         method: 'POST',
@@ -239,15 +307,16 @@ export default function AdvisorPage() {
           pending_key: pending_key ?? '',
           conversation_id: conversationId,
         }),
+        signal: controller.signal,
       });
       if (!resp.ok || !resp.body) {
-        await sendBlocking(message, pending_key);
+        const ok = await sendBlocking(message, pending_key, controller.signal);
+        if (!ok) setStatus('error');
         return;
       }
       const reader = resp.body.getReader();
       const dec = new TextDecoder();
       let buf = '';
-      let sawFinal = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -258,44 +327,53 @@ export default function AdvisorPage() {
           buf = buf.slice(nl + 2);
           const line = frame.split('\n').find((l) => l.startsWith('data:'));
           if (!line) continue;
-          let evt: Turn & { type: string; assistant_message: string };
+          let evt: Turn & { type: string; assistant_message: string; llm_status?: string };
           try {
             evt = JSON.parse(line.slice(5).trim());
           } catch {
             continue;
           }
           if (evt.type === 'ack') {
-            // Fast first paint — show the deterministic acknowledgment immediately.
-            setMsgs((m) => [...m, { role: 'advisor', text: evt.assistant_message, stream: true }]);
+            // The deterministic ack is compliance-safe, but we do NOT show it as the answer. It only
+            // advances the subtle status to "checking" — no pre-approval content reaches the user.
+            setStatus('checking'); // Step 3 — validation/compliance running
           } else if (evt.type === 'final') {
             sawFinal = true;
-            // Replace the streaming placeholder with the validated answer; apply all state updates.
-            setMsgs((m) => {
-              const copy = [...m];
-              const last = copy[copy.length - 1];
-              const finalMsg: Msg = {
-                role: 'advisor',
-                text: evt.assistant_message,
-                updates: evt.updates,
-                reveal: evt.reveal,
-              };
-              if (last && last.role === 'advisor' && last.stream) copy[copy.length - 1] = finalMsg;
-              else copy.push(finalMsg);
-              return copy;
-            });
-            setPending(evt.pending_key);
-            setOptions(evt.options ?? null);
-            setPanel(evt.context_panel || {});
-            setComplete(evt.complete);
+            applyFinal(evt); // Step 4 — approved text only
           }
         }
       }
-      if (!sawFinal) await sendBlocking(message, pending_key); // stream cut off → safe fallback
+      if (!sawFinal) {
+        const ok = await sendBlocking(message, pending_key, controller.signal); // stream cut off → safe fallback
+        if (!ok) setStatus('error');
+      }
     } catch {
-      await sendBlocking(message, pending_key);
+      if (controller.signal.aborted) {
+        setStatus('idle'); // user pressed Stop — not an error
+      } else {
+        const ok = await sendBlocking(message, pending_key, controller.signal);
+        if (!ok) setStatus('error');
+      }
     } finally {
       setBusy(false);
+      abortRef.current = null;
     }
+  };
+
+  // Stop generation: abort the request and snap any in-progress typing to the full approved text.
+  const cancel = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStopTyping(true);
+    setBusy(false);
+    setStatus('idle');
+  };
+
+  // Retry the last turn after an error.
+  const retry = () => {
+    if (!lastSent) return;
+    setStatus('idle');
+    void send(lastSent.message, lastSent.pending_key);
   };
   useEffect(() => {
     send('', null); /* open the conversation */
@@ -432,11 +510,23 @@ export default function AdvisorPage() {
                   {m.role === 'advisor' ? (
                     <StreamingText
                       text={m.text}
-                      animate={i === msgs.length - 1}
+                      // Only the newest advisor message types; safety/flag-off render instantly.
+                      animate={i === msgs.length - 1 && !m.instant && ARCANA_STREAMING_ENABLED}
+                      instant={m.instant}
+                      durationMs={m.durationMs}
+                      stop={stopTyping}
                       onTick={streamScroll}
+                      onDone={() => {
+                        if (i === msgs.length - 1) setStatus('idle');
+                      }}
                     />
                   ) : (
                     m.text
+                  )}
+                  {ARCANA_DEBUG && m.role === 'advisor' && m.llmStatus && (
+                    <span className="ml-2 align-middle text-[9px] uppercase tracking-wide text-gray-400">
+                      [{m.llmStatus}]
+                    </span>
                   )}
                 </div>
                 {m.updates && m.updates.length > 0 && (
@@ -488,6 +578,21 @@ export default function AdvisorPage() {
                 )}
               </div>
             ))}
+            {/* Subtle pre-answer status — "Arcana is thinking… / checking…". Shown only before the
+                approved answer begins typing; never exposes pipeline internals. */}
+            {(status === 'thinking' || status === 'checking') && <ArcanaStatus status={status} />}
+            {/* Human-friendly error with a Retry — never surfaces rejection reasons or internals. */}
+            {status === 'error' && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
+                <span>{ARCANA_ERROR_MESSAGE}</span>
+                <button
+                  onClick={retry}
+                  className="ml-2 font-semibold text-rose-800 underline hover:text-rose-900"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
             <div ref={endRef} />
           </div>
           {/* Bottom region — pinned below the messages, bounded and independently scrollable so the
@@ -585,13 +690,24 @@ export default function AdvisorPage() {
                     placeholder="Type your answer…  (Enter to send · Shift+Enter for a new line)"
                     className="max-h-32 flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                   />
-                  <button
-                    type="submit"
-                    disabled={busy || !input.trim()}
-                    className="shrink-0 self-end rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:bg-gray-300 disabled:text-gray-500"
-                  >
-                    {busy ? '…' : 'Send'}
-                  </button>
+                  {generating ? (
+                    <button
+                      type="button"
+                      onClick={cancel}
+                      aria-label="Stop generating"
+                      className="shrink-0 self-end rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Stop
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={busy || !input.trim()}
+                      className="shrink-0 self-end rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:bg-gray-300 disabled:text-gray-500"
+                    >
+                      Send
+                    </button>
+                  )}
                 </form>
 
                 {/* Action cards — phase-gated (P0.4): shown only after a few meaningful answers, never
