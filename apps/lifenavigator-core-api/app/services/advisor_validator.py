@@ -14,6 +14,7 @@ import re
 from typing import Any
 
 from .advisor_context import AdvisorContext, _norm
+from .advisor_math import verify_derivations
 
 # Connective phrases that assert a relationship between two goals/objectives. If the LLM uses one, it must
 # cite a supporting edge — otherwise it is inventing graph reasoning and we reject it.
@@ -171,9 +172,14 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     if _ADVICE.search(visible):
         reasons.append("contains advice/recommendation/medical-legal language")
 
-    # 2) No invented financial numbers — any financial-looking number must already be in context.
+    # 2) No invented financial numbers — any financial-looking number must already be in context, OR be a
+    #    deterministically VERIFIED computation from the user's own numbers (V5 grounded math). The verifier
+    #    rejects any derivation with a non-user operand or wrong arithmetic, so a fabricated/incorrect figure
+    #    still never reaches the user — the guarantee widens from "user's own" to "user's own or verified".
+    verified_vals, kept_derivs = verify_derivations(result.get("derivations"), context.allowed_numbers)
+    allowed = context.allowed_numbers | verified_vals
     used = _financial_numbers(visible)
-    invented = {n for n in used if n not in context.allowed_numbers}
+    invented = {n for n in used if n not in allowed}
     if invented:
         reasons.append(f"invented numbers not in context: {sorted(invented)}")
 
@@ -216,6 +222,7 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     safe["candidate_facts"] = [f for f in (safe.get("candidate_facts") or []) if (f or {}).get("source") == "user_message"]
     # Only keep relationship citations that are real graph edges (the accept-path repair).
     safe["relationships_referenced"] = valid_citations
+    safe["derivations"] = kept_derivs  # only the verified-correct computations survive
     safe.setdefault("assumptions", [])
     safe.setdefault("missing_data", [])
     safe.setdefault("warnings", [])

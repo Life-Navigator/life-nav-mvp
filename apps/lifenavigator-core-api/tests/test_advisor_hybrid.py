@@ -540,3 +540,31 @@ async def test_case6_how_much_down_gathers_inputs_not_a_number():
                      _good_llm(next_question="You should put down $90,000, agreed?"), base=base)
     assert out["assistant_message"] == base["assistant_message"]  # fell back — no fabricated figure shown
     assert out["llm_status"].startswith("fallback:")
+
+
+@pytest.mark.asyncio
+async def test_validator_allows_verified_computed_number():
+    # V5: a number COMPUTED from the user's own figures, recorded in derivations, passes the number gate.
+    ctx = await _build_ctx("I have $95k in cash and $40k in a brokerage", _base())
+    out = _good_llm(
+        recommendation="Your liquid assets total about $135,000, which gives you real flexibility.",
+        derivations=[{"label": "liquid assets", "expression": "95000 + 40000", "value": "135000"}],
+    )
+    ok, safe, reasons = validate(out, ctx)
+    assert ok and not reasons
+    assert safe.get("derivations")  # the verified derivation is kept
+
+
+@pytest.mark.asyncio
+async def test_validator_rejects_wrong_or_invented_computed_number():
+    ctx = await _build_ctx("I have $95k in cash and $40k in a brokerage", _base())
+    # wrong arithmetic — value does not match the expression
+    bad = _good_llm(recommendation="Your liquid assets total about $150,000.",
+                    derivations=[{"label": "liquid", "expression": "95000 + 40000", "value": "150000"}])
+    ok, _, reasons = validate(bad, ctx)
+    assert not ok and any("invented numbers" in r for r in reasons)
+    # invented operand (20% the user never gave) on a $620k they never gave either
+    bad2 = _good_llm(recommendation="A 20% down payment would be $124,000.",
+                     derivations=[{"label": "dp", "expression": "620000 * 20/100", "value": "124000"}])
+    ok2, _, reasons2 = validate(bad2, ctx)
+    assert not ok2 and any("invented numbers" in r for r in reasons2)

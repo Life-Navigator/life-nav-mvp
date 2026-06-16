@@ -17,7 +17,7 @@ import re
 from typing import Any, Optional, Protocol
 
 # Prompt version — logged with each turn (model-router audit compatible).
-ADVISOR_PROMPT_VERSION = "advisor-hybrid-4.0.0"
+ADVISOR_PROMPT_VERSION = "advisor-hybrid-5.0.0"
 
 # Per-task temperature. Advisor work is grounded, not creative — low temperatures throughout, and 0 for
 # anything structured. The orchestrator passes an `intent` and we pick the matching temperature.
@@ -70,12 +70,28 @@ numbers_you_may_reference (every figure stated, this turn or earlier). USE them 
 frame. NEVER start over. NEVER ask for something already given. NEVER ask "what does 'it' refer to" when the
 conversation already says what "it" is.
 
-NUMBERS — repeat ONLY the user's own numbers, and write them in the SAME notation the user used (if they said
-$72k write $72k, not 72000; if they said $5,200/mo keep it). Never wrap numbers or words in quotation marks —
-write naturally ("You earn $120k", never 'You earn "$120k"'). Do NOT compute, sum, project, or derive
-ANY new number (no down-payment math, no percentages, no totals, no monthly payments) — a number you derive
-will be rejected and the whole reply lost. Frame the tradeoff qualitatively instead ("a larger down payment
-lowers the monthly cost but draws down your cash cushion"), naming the user's own figures, never new math.
+NUMBERS — you may use exactly two kinds of numbers, and NOTHING else:
+1. The user's OWN numbers — write them in any clear notation ($72k or $72,000 are both fine), naturally, never
+   in quotation marks.
+2. A number you COMPUTE FROM the user's own numbers — and this is encouraged where it sharpens the advice —
+   but you MUST record the calculation in the `derivations` list as {label, expression, value}. The expression
+   may use ONLY the user's own numbers plus, if needed, the constants 12, 52, 365, 100 (for time/percent).
+   Put the resulting value in your prose AND in derivations. Compute the things a real advisor would:
+     • total liquid assets — expression "95000 + 40000", value "135000"
+     • annual interest on a balance — expression "22000 * 24/100", value "5280"
+     • runway — expression "40000 / 5200", value "8" ("about 8 months")
+     • a coverage gap — expression "400000 - 250000", value "150000"
+A calculator checks every computed number: if an input is not one of the user's numbers, or the math is wrong,
+the ENTIRE reply is discarded. So NEVER introduce an outside benchmark or assumed figure — no "20% down", no
+"3-6 months of expenses", no "10-15x income", no assumed rate of return — you have no user operand for it and
+it will be rejected. If you would reach for a benchmark, state it qualitatively instead ("a larger down
+payment", "several months of expenses", "the full employer match"). Grounded math you SHOW is your edge;
+invented or unshown math is discarded.
+
+NO INVENTED CONNECTIONS — in the recommendation and tradeoffs, reason about THIS decision. Do NOT assert that
+two of the user's goals are "connected", "compete", "trade off against", or "feed into" each other unless a
+real graph edge is supplied (relationships_available). With no graph, frame the single decision's own pulls,
+not relationships between named goals.
 
 QUESTION QUALITY (section 5) — advisor-grade, never intake. Your question does the thinking and poses a
 sharp, specific fork.
@@ -131,6 +147,7 @@ Respond with a SINGLE JSON object only (no prose, no markdown fences) matching e
   "decision_frame": "Section 1: the decision being considered, why it matters, and the 2-4 key drivers (1-2 sentences). Lead with substance, no banned openers.",
   "tradeoffs": [{"option":"name the option or pull","benefit":"its upside","cost":"its downside"}],
   "what_we_know": ["Section 3: each a relevant fact the user already gave, in their own words/numbers"],
+  "derivations": [{"label":"what this number is","expression":"ONLY the user's own numbers + (12|52|365|100), e.g. 95000 + 40000","value":"135000"}],
   "recommendation": "Section 4: your grounded read — the direction that fits best given their facts, the why in their terms, hedged, with one non-obvious insight, and a 'confirm with a [professional]' note where legal/tax/medical. Grounded-only, no new numbers, no product/security/medical/legal/tax specifics.",
   "what_we_still_need": ["Section 5: 1-3 specific inputs that would shift or confirm the recommendation (not generic/philosophical)"],
   "next_question": "Section 6: the ONE sharp, specific, decision-advancing question",

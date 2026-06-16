@@ -29,7 +29,7 @@ LIFE = "life"
 
 # Numbers the LLM is allowed to echo = numbers already present in the user's message / known context.
 # Anything else in the LLM output is an invented figure and is rejected by the validator.
-_NUM_RE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?%?")
+_NUM_RE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?\s*[kKmMbB]?%?")
 
 # Node types that are "primary" for relationship reasoning — the things a user calls "my goals".
 # Domain hubs (ids ending in "_hub", e.g. education/career) are primary too so cross-domain links surface.
@@ -47,13 +47,48 @@ _SAFETY = [
 
 
 def numbers_in(*texts: Optional[str]) -> set[str]:
+    """Numbers the user has stated, as strings the validator can match. Captures k/M/B suffixes and emits
+    BOTH the bare digits and the magnitude-expanded form (so '$22k' allows the advisor to write '22' or
+    '22000', and percentages allow the fraction) — this also fixes the k-notation false-positive fallbacks."""
     out: set[str] = set()
     for t in texts:
         if not t:
             continue
         for m in _NUM_RE.findall(str(t)):
-            out.add(m.strip().lstrip("$").rstrip("%").replace(",", ""))
+            raw = m.strip().replace(" ", "")
+            # bare literal (digits as written, suffix/symbols stripped) — preserves existing behavior
+            out.add(raw.lstrip("$").rstrip("%").rstrip("kKmMbB").replace(",", ""))
+            # magnitude/percent-expanded forms (k/M/B → full integer, % → fraction)
+            for v in _expand_money_forms(raw):
+                out.add(v)
     return {n for n in out if n}
+
+
+def _expand_money_forms(token: str) -> set[str]:
+    """Normalized string forms of a money/percent token: '$22k'→{'22000'}, '24%'→{'24','0.24'}."""
+    t = token.lower().lstrip("$").replace(",", "")
+    pct = t.endswith("%")
+    t = t.rstrip("%")
+    mult = 1.0
+    if t[-1:] == "k":
+        mult, t = 1_000.0, t[:-1]
+    elif t[-1:] == "m":
+        mult, t = 1_000_000.0, t[:-1]
+    elif t[-1:] == "b":
+        mult, t = 1_000_000_000.0, t[:-1]
+    if not t:
+        return set()
+    try:
+        base = float(t)
+    except ValueError:
+        return set()
+    forms: set[str] = set()
+    def _fmt(x: float) -> str:
+        return str(int(x)) if abs(x - round(x)) < 1e-9 else (f"{x:.4f}".rstrip("0").rstrip("."))
+    forms.add(_fmt(base * mult))
+    if pct:
+        forms.add(_fmt(base / 100.0))
+    return forms
 
 
 def _norm(s: Any) -> str:
