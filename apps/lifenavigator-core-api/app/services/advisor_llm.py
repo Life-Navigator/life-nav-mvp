@@ -241,3 +241,64 @@ class GeminiAdvisorLLM:
                 return None
         except Exception:  # noqa: BLE001 — the user never sees an LLM error; orchestrator falls back
             return None
+
+
+class VertexClaudeAdvisorLLM:
+    """Claude Control Experiment: the SAME advisor (identical ADVISOR_SYSTEM prompt, identical user-prompt
+    construction, identical JSON parsing) but routed to Claude on Vertex AI instead of Gemini. Nothing else
+    in the pipeline changes — the orchestrator, validator, repair, compose, and the prompt are untouched —
+    so a benchmark delta is attributable to the MODEL alone. Feature-flagged (USE_VERTEX_CLAUDE); the Gemini
+    path remains the default. Never raises → orchestrator falls back exactly as with Gemini.
+
+    Auth for the experiment uses a short-lived VERTEX_ACCESS_TOKEN (gcloud token); a production integration
+    would swap that for a service account without changing this class's contract.
+    """
+
+    prompt_version = ADVISOR_PROMPT_VERSION
+
+    def __init__(self, *, project: str, region: str, model: str, token: str) -> None:
+        self._project, self._region, self._model, self._token = project, region, model, token
+        self.last_usage: dict[str, int] = {}
+        self.last_raw: str = ""
+
+    @property
+    def available(self) -> bool:
+        return bool(self._project and self._model and self._token)
+
+    def _endpoint(self) -> str:
+        host = "aiplatform.googleapis.com" if self._region == "global" else f"{self._region}-aiplatform.googleapis.com"
+        return (f"https://{host}/v1/projects/{self._project}/locations/{self._region}"
+                f"/publishers/anthropic/models/{self._model}:rawPredict")
+
+    async def generate(self, context: Any, plan: dict[str, Any]) -> Optional[dict[str, Any]]:
+        self.last_usage, self.last_raw = {}, ""
+        if not self.available:
+            return None
+        # IDENTICAL prompt construction to GeminiAdvisorLLM — only the transport/model differs.
+        user = json.dumps({"guardrails": context.prompt_dict(), "constraints": plan}, ensure_ascii=False, default=str)
+        prompt = f"GUARDRAILS_AND_CONSTRAINTS:\n{user}\n\nReason within these guardrails and return the JSON object now."
+        import httpx  # local import keeps module import-light and mirrors the gemini client's usage
+        body = {
+            "anthropic_version": "vertex-2023-10-16",
+            "max_tokens": 2048,
+            "temperature": _temperature_for(plan),
+            "system": ADVISOR_SYSTEM,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                r = await client.post(self._endpoint(), json=body,
+                                      headers={"authorization": f"Bearer {self._token}", "content-type": "application/json"})
+                r.raise_for_status()
+                data = r.json()
+            raw = "".join(b.get("text", "") for b in (data.get("content") or []) if b.get("type") == "text")
+            u = data.get("usage") or {}
+            self.last_usage = {
+                "prompt_tokens": int(u.get("input_tokens") or 0),
+                "completion_tokens": int(u.get("output_tokens") or 0),
+                "total_tokens": int((u.get("input_tokens") or 0) + (u.get("output_tokens") or 0)),
+            }
+            self.last_raw = raw or ""
+            return parse_advisor_json(raw)
+        except Exception:  # noqa: BLE001 — same contract as Gemini: any failure → None → deterministic fallback
+            return None

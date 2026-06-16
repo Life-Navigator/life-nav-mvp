@@ -275,9 +275,13 @@ def get_advisor_orchestrator(
     # (default ON); falls back to pure rule-based automatically if Gemini is unavailable or output is
     # rejected. The LLM never writes to the DB — persistence stays in the deterministic engine.
     from .services.advisor_context import AdvisorContextBuilder
-    from .services.advisor_llm import GeminiAdvisorLLM
+    from .services.advisor_llm import GeminiAdvisorLLM, VertexClaudeAdvisorLLM
     from .services.advisor_orchestrator import AdvisorOrchestrator
     enabled = os.environ.get("ADVISOR_LLM_ENABLED", "true").lower() in ("1", "true", "yes")
+    # Claude Control Experiment (feature-flagged; Gemini is the default). When USE_VERTEX_CLAUDE is on, the
+    # SAME advisor pipeline runs with Claude on Vertex as the model — nothing else changes — so any benchmark
+    # delta is attributable to the model alone.
+    use_claude = os.environ.get("USE_VERTEX_CLAUDE", "false").lower() in ("1", "true", "yes")
     # Per-domain discovery scores + the real personal graph feed the LLM's question prioritisation and
     # relationship reasoning. Built inline because get_discovery_coverage is defined later in this module
     # (avoids a forward-ref NameError).
@@ -287,7 +291,16 @@ def get_advisor_orchestrator(
         FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)),
     )
     builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life)
-    return AdvisorOrchestrator(rm, builder, GeminiAdvisorLLM(gemini), enabled=enabled, supabase=supabase)
+    if use_claude:
+        llm: Any = VertexClaudeAdvisorLLM(
+            project=os.environ.get("VERTEX_PROJECT", ""),
+            region=os.environ.get("VERTEX_REGION", "global"),
+            model=os.environ.get("ADVISOR_MODEL", "claude-opus-4-1@20250805"),
+            token=os.environ.get("VERTEX_ACCESS_TOKEN", ""),
+        )
+    else:
+        llm = GeminiAdvisorLLM(gemini)
+    return AdvisorOrchestrator(rm, builder, llm, enabled=enabled, supabase=supabase)
 
 
 def get_recommendation_os(
