@@ -300,7 +300,31 @@ def get_advisor_orchestrator(
         )
     else:
         llm = GeminiAdvisorLLM(gemini)
-    return AdvisorOrchestrator(rm, builder, llm, enabled=enabled, supabase=supabase)
+
+    # Selective orchestration (default OFF via MODEL_ROUTER_ENABLED → the single `llm` above is used,
+    # i.e. unchanged production behavior). The factory builds an AdvisorLLM per registry model key.
+    from .services.model_registry import MODELS
+    from .clients.gemini import GeminiClient
+    from .services.model_router import ModelRouter
+
+    def _llm_factory(model_key: str) -> Any:
+        spec = MODELS.get(model_key)
+        if not spec:
+            return None
+        if spec["provider"] == "google_aistudio":
+            client = GeminiClient(api_key=os.environ.get("GEMINI_API_KEY", "") or "",
+                                  embedding_model="gemini-embedding-001",
+                                  generation_model=spec["model_id"], timeout=float(spec["timeout_s"]))
+            return GeminiAdvisorLLM(client)
+        if spec["provider"] == "vertex_anthropic":
+            return VertexClaudeAdvisorLLM(
+                project=os.environ.get("VERTEX_PROJECT", "gen-lang-client-0849161409"),
+                region=os.environ.get("VERTEX_REGION", "global"), model=spec["model_id"],
+                token=os.environ.get("VERTEX_ACCESS_TOKEN", ""))
+        return None
+
+    router = ModelRouter(_llm_factory)
+    return AdvisorOrchestrator(rm, builder, llm, enabled=enabled, supabase=supabase, router=router)
 
 
 def get_recommendation_os(

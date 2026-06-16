@@ -568,3 +568,60 @@ async def test_validator_rejects_wrong_or_invented_computed_number():
                      derivations=[{"label": "dp", "expression": "620000 * 20/100", "value": "124000"}])
     ok2, _, reasons2 = validate(bad2, ctx)
     assert not ok2 and any("invented numbers" in r for r in reasons2)
+
+
+# --------------------------------------------------------------------------- #
+# Selective orchestration — health safety fallback + routing (default-off)
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_health_urgent_triggers_safety_fallback_and_skips_llm():
+    # A chest-pain message must NEVER reach the LLM or the generic opener — deterministic safety reply.
+    base = _base(assistant="Let's start with your vision...")
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_good_llm()))  # if the LLM ran, status would be "enhanced"
+    out = await orch.converse(_ctx(), "I've had chest pain on and off for a week, what should I do?")
+    assert out["llm_status"] == "safety_fallback"
+    assert "911" in out["assistant_message"] and "emergency" in out["assistant_message"].lower()
+    assert "vision" not in out["assistant_message"].lower()  # not the generic deterministic opener
+
+
+@pytest.mark.asyncio
+async def test_router_off_by_default_uses_di_llm():
+    # No MODEL_ROUTER_ENABLED → the single DI llm is used (unchanged production path).
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_good_llm()))
+    out = await orch.converse(_ctx(), "we want to retire at 60")
+    assert out["llm_status"] == "enhanced"
+
+
+@pytest.mark.asyncio
+async def test_router_on_uses_routed_llm(monkeypatch):
+    from app.services.model_router import ModelRouter
+    monkeypatch.setenv("MODEL_ROUTER_ENABLED", "true")
+    routed = FakeLLM(_good_llm(next_question="Routed model question?"))
+    router = ModelRouter(lambda key: routed)  # factory returns our routed fake for any model
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(None), router=router)  # DI llm is None → only routed llm can enhance
+    out = await orch.converse(_ctx(), "Can I afford a $620k house?")
+    assert out["llm_status"] == "enhanced"
+    assert "Routed model question?" in out["assistant_message"]
+
+
+@pytest.mark.asyncio
+async def test_provider_failure_falls_back_to_fallback_llm(monkeypatch):
+    from app.services.model_router import ModelRouter
+    monkeypatch.setenv("MODEL_ROUTER_ENABLED", "true")
+    good = FakeLLM(_good_llm(next_question="Fallback saved it?"))
+    # factory: primary (gemini_2_5_pro) returns None; everything else returns the good fallback
+    def fac(key):
+        return FakeLLM(None) if key == "gemini_2_5_pro" else good
+    monkeypatch.setenv("GEMINI_PRO_ADVISOR_ENABLED", "true")
+    router = ModelRouter(fac)
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(None), router=router)
+    out = await orch.converse(_ctx(), "Help me think about my goals", )  # general → pro primary (None) → fallback
+    assert out["llm_status"] == "enhanced"
+    assert "Fallback saved it?" in out["assistant_message"]

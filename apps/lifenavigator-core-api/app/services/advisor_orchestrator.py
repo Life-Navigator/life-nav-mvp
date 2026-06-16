@@ -33,6 +33,8 @@ from ..models.common import UserContext
 from .advisor_context import AdvisorContextBuilder
 from .advisor_llm import AdvisorLLM, ADVISOR_PROMPT_VERSION
 from .advisor_validator import validate
+from . import model_registry as reg
+from .model_router import detect_health_urgent, health_safety_response
 
 log = logging.getLogger("core.advisor")
 
@@ -144,13 +146,48 @@ def _compose(safe: dict[str, Any]) -> str:
 
 class AdvisorOrchestrator:
     def __init__(self, relationship_manager: Any, context_builder: AdvisorContextBuilder, llm: AdvisorLLM,
-                 *, enabled: bool = True, supabase: Any = None) -> None:
+                 *, enabled: bool = True, supabase: Any = None, router: Any = None) -> None:
         self._rm = relationship_manager
         self._ctx = context_builder
         self._llm = llm
         self._enabled = enabled
         self._sb = supabase  # best-effort advisor-turn persistence (ops.advisor_turns)
+        self._router = router  # optional ModelRouter; only used when MODEL_ROUTER_ENABLED (default off)
         self.prompt_version = ADVISOR_PROMPT_VERSION
+
+    def _health_safety_check(self, message: str, base: dict[str, Any], tr: dict[str, Any]) -> bool:
+        """Deterministic urgent-care safety net (no LLM). If triggered, overwrite the reply with a safety-first
+        response and return True so the caller skips the LLM entirely. Gated by HEALTH_SAFETY_FALLBACK_ENABLED
+        (default ON). Fixes the observed generic-fallback-on-chest-pain failure."""
+        if not reg.flag("HEALTH_SAFETY_FALLBACK_ENABLED"):
+            return False
+        indicator = detect_health_urgent(message)
+        if not indicator:
+            return False
+        base["assistant_message"] = health_safety_response(indicator)
+        base["llm_status"] = "safety_fallback"
+        base["pending_key"] = base.get("pending_key") or ""
+        tr["safety_flags"] = [indicator]
+        tr["llm_status"] = "safety_fallback"
+        log.info(json.dumps({"event": "advisor_safety_fallback", "turn_id": tr["turn_id"],
+                             "user": tr.get("user_id"), "indicator": indicator}))
+        return True
+
+    def _route(self, ctx: UserContext, message: str, context_obj: Any, tr: dict[str, Any]) -> tuple[Any, Any]:
+        """Select (primary_llm, fallback_llm) for this turn. Default (router off) → the DI-provided single LLM,
+        so production behavior is unchanged. Never raises."""
+        if not (reg.flag("MODEL_ROUTER_ENABLED") and self._router is not None):
+            return self._llm, None
+        try:
+            tier = str(getattr(ctx, "plan_tier", "") or getattr(ctx, "tier", "") or "free")
+            decision = self._router.route(message=message, tier=tier, tenant_id=str(getattr(ctx, "tenant_id", "") or ""),
+                                          user_id=str(ctx.user_id), context=context_obj)
+            tr["routing"] = decision.to_log()
+            log.info(json.dumps({"event": "model_route", "turn_id": tr["turn_id"], **decision.to_log()}))
+            return (decision.primary_llm or self._llm), decision.fallback_llm
+        except Exception as e:  # noqa: BLE001 — routing must never break the turn
+            tr["routing_error"] = type(e).__name__
+            return self._llm, None
 
     def _init_trace(self, message: str, conversation_id: Optional[str], user_id: str) -> dict[str, Any]:
         # Per-turn telemetry (P0.1/P0.4/P0.5) — stage timings + outcome, logged + best-effort persisted.
@@ -184,27 +221,35 @@ class AdvisorOrchestrator:
             return []
 
     async def _enhance(self, base: dict[str, Any], ctx: UserContext, message: str, tr: dict[str, Any], lap,
-                       history: Optional[list[dict[str, str]]] = None) -> None:
+                       history: Optional[list[dict[str, str]]] = None, llm: Any = None,
+                       fallback_llm: Any = None) -> None:
         """LLM enhancement: build context → generate → validate → compose. Mutates base + tr in place.
         Never raises — on any failure, base keeps its deterministic fallback text and llm_status is set.
-        Shared by converse() and converse_stream() so both paths produce identical outcomes/telemetry."""
+        `llm` is the routed model for this turn (defaults to the DI LLM); `fallback_llm` (if provided by the
+        router) is tried once when the primary is unavailable — a provider-failure fallback that is invisible
+        to the user. Shared by converse()/converse_stream() so both paths produce identical outcomes."""
+        active = llm or self._llm
         try:
             context = await self._ctx.build(ctx, message, base, history or [])
             lap("context_build")
             constraints = build_constraints(base, context)
             lap("plan")
-            out = await self._llm.generate(context, constraints)
+            out = await active.generate(context, constraints)
             if out is None:
-                # One retry: transient Gemini failures (502/timeout/truncated JSON) surface as None and
-                # otherwise drop the turn to the generic deterministic opener. The retried output still
-                # passes through validate() below, so this changes resilience, not the trust gate.
-                out = await self._llm.generate(context, constraints)
+                # One retry: transient provider failures (502/timeout/truncated JSON) surface as None.
+                out = await active.generate(context, constraints)
                 tr["llm_retry"] = True
+            if out is None and fallback_llm is not None:
+                # Provider-failure fallback: the routed primary is unavailable — drop to the fallback model
+                # once (still re-validated below). User never sees a provider error.
+                active = fallback_llm
+                out = await active.generate(context, constraints)
+                tr["model_fallback"] = True
             lap("llm_generate")
-            usage = getattr(self._llm, "last_usage", {}) or {}
+            usage = getattr(active, "last_usage", {}) or {}
             tr["prompt_tokens"], tr["completion_tokens"], tr["total_tokens"] = (
                 usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), usage.get("total_tokens", 0))
-            tr["llm_response_raw"] = getattr(self._llm, "last_raw", "") or ""
+            tr["llm_response_raw"] = getattr(active, "last_raw", "") or ""
             tr["graph_edges_available"] = len(getattr(context, "relationship_edges", []) or [])
             if out is None:
                 base["llm_status"] = "fallback:unavailable"
@@ -224,7 +269,7 @@ class AdvisorOrchestrator:
                     "— state those points qualitatively instead (e.g. 'a larger down payment', 'several months "
                     "of expenses'), or, for a number that computes from the user's OWN figures, put it in "
                     "derivations. Change nothing else; keep all grounded content.")
-                out2 = await self._llm.generate(context, repair_plan)
+                out2 = await active.generate(context, repair_plan)
                 tr["repair_retry"] = True
                 if out2 is not None:
                     ok2, safe2, reasons2 = validate(out2, context)
@@ -273,12 +318,16 @@ class AdvisorOrchestrator:
         # 1) Deterministic turn — persistence (candidate/rejected goals), canonical writes, safe fallback text.
         base = await self._rm.converse(ctx, message, pending_key)
         lap("deterministic_turn")
+        # Health urgent-care safety net runs BEFORE any model (deterministic, no LLM).
+        if self._health_safety_check(message, base, tr):
+            return self._finish(ctx, base, tr, t0, trace)
         if not self._enabled:
             tr["llm_status"] = base.get("llm_status") or "disabled"
             return self._finish(ctx, base, tr, t0, trace)
         history = await self._fetch_history(ctx, conversation_id)
         lap("history_fetch")
-        await self._enhance(base, ctx, message, tr, lap, history)
+        primary_llm, fallback_llm = self._route(ctx, message, None, tr)
+        await self._enhance(base, ctx, message, tr, lap, history, primary_llm, fallback_llm)
         return self._finish(ctx, base, tr, t0, trace)
 
     async def converse_stream(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
@@ -299,13 +348,22 @@ class AdvisorOrchestrator:
 
         base = await self._rm.converse(ctx, message, pending_key)
         lap("deterministic_turn")
+        # Health urgent-care safety net runs BEFORE the ack so an urgent message never shows the generic
+        # opener first. If triggered, the safety reply IS the ack and the final.
+        if self._health_safety_check(message, base, tr):
+            yield {"type": "ack", "assistant_message": base["assistant_message"],
+                   "pending_key": base.get("pending_key") or "", "turn_id": tr["turn_id"]}
+            self._finish(ctx, base, tr, t0, trace)
+            yield {"type": "final", **base}
+            return
         # Fast first paint — the deterministic, trust-safe acknowledgment.
         yield {"type": "ack", "assistant_message": base.get("assistant_message") or "",
                "pending_key": base.get("pending_key") or "", "turn_id": tr["turn_id"]}
         if self._enabled:
             history = await self._fetch_history(ctx, conversation_id)
             lap("history_fetch")
-            await self._enhance(base, ctx, message, tr, lap, history)
+            primary_llm, fallback_llm = self._route(ctx, message, None, tr)
+            await self._enhance(base, ctx, message, tr, lap, history, primary_llm, fallback_llm)
         else:
             tr["llm_status"] = base.get("llm_status") or "disabled"
         self._finish(ctx, base, tr, t0, trace)  # log + best-effort persist + (optional) attach _trace
