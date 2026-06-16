@@ -56,16 +56,27 @@ def _asserts_goal_relationship(text: str, goals: list[str]) -> bool:
             return True
     return False
 
-# Phrases that mean the advisor is RECOMMENDING / advising rather than discovering — not allowed here
-# (recommendations come from the recommendation engine; medical/legal/tax advice is never allowed).
-# Note: the "you should <verb>" directive is excluded when preceded by "much " / "whether " — that is the
-# advisor REFLECTING the user's own question ("how much you should put down"), not giving advice. A genuine
-# directive ("You should put 20% down") is not so preceded and is still caught (as is "put down <amount>").
+# V4 (grounded-advice relaxation, signed off): strategic / personal-finance / life-planning recommendations
+# are now ALLOWED ("prioritize the 24% debt", "this looks affordable on your numbers", "lean toward renting").
+# These four categories remain HARD-BLOCKED for liability — the advisor must defer to a licensed professional:
+#   * MEDICAL  — diagnosis, prescription, dosage, naming a treatment/drug
+#   * LEGAL    — specific legal directives (how to title assets, "legally you must…")
+#   * TAX      — specific tax directives (how to file/claim, a specific tax maneuver)
+#   * PRODUCT  — recommending a specific investment product / security / insurer by name
+# The number-grounding gate (invented-numbers, below) is UNCHANGED: still zero fabricated figures, ever.
 _ADVICE = re.compile(
-    r"\b(i recommend|i'?d recommend|i advise|i suggest you|(?<!much )(?<!whether )you should (?:put|invest|buy|sell|borrow|take|withdraw|contribute|refinance)|"
-    r"you must (?:invest|buy|sell|borrow|put|pay)|the best option is|the right (?:amount|choice) is|"
-    r"put down \d|i diagnose|you have (?:a )?(?:condition|disease|disorder)|you should take \w+ ?mg|prescrib|"
-    r"for tax purposes you should|legally you (?:should|must)|you qualify for a tax)\b",
+    r"("
+    # MEDICAL
+    r"\bi diagnose\b|\byou have (?:a )?(?:condition|disease|disorder)\b|\bprescrib\w*|\bdiagnos(?:e|es|ed|is)\b|"
+    r"\byou should (?:take|start)\b[^.?!]{0,25}\b(?:mg|medication|dose|pill|drug)\b|\btake\b[^.?!]{0,15}\bmg\b|"
+    # LEGAL (specific directives)
+    r"\blegally,? you (?:should|must)\b|\byou should sue\b|\byou should file (?:suit|a lawsuit)\b|"
+    r"\btitle (?:the|your) (?:house|home|assets|property)\b|"
+    # TAX (specific directives)
+    r"\bfor tax purposes,? you should\b|\byou qualify for a tax\b|\byou should claim the\b|\bfile your taxes as\b|"
+    # PRODUCT / SECURITY by name
+    r"\binvest in (?:the )?\w+ (?:fund|etf)\b|\bbuy (?:shares of|stock in)\b|\byou should buy [A-Z]{1,5}\b"
+    r")",
     re.IGNORECASE,
 )
 # A financial-looking number = has $ or % or is >= 100. Trivial counts (ages aside, handled by context) ignored.
@@ -153,7 +164,8 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     )
     know = " ".join(str(x) for x in (result.get("what_we_know") or []) if x)
     need = " ".join(str(x) for x in (result.get("what_we_still_need") or []) if x)
-    visible = " ".join([frame, tradeoff_text, know, need, reflection, next_q, why_q, summary])
+    recommendation = str(result.get("recommendation") or "").strip()  # V4: grounded advice, still number-gated
+    visible = " ".join([frame, tradeoff_text, know, recommendation, need, reflection, next_q, why_q, summary])
 
     # 1) No final advice / recommendation / medical-legal-tax overreach.
     if _ADVICE.search(visible):

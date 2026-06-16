@@ -106,9 +106,13 @@ def _compose(safe: dict[str, Any]) -> str:
     if know:
         parts.append("**What we know:**\n" + "\n".join(f"- {k}" for k in know))
 
+    rec = str(safe.get("recommendation") or "").strip()  # V4: grounded, validator-checked recommendation
+    if rec:
+        parts.append("**My read:** " + rec)
+
     need = [str(x).strip() for x in (safe.get("what_we_still_need") or []) if str(x).strip()]
     if need:
-        parts.append("**What would sharpen this:**\n" + "\n".join(f"- {n}" for n in need))
+        parts.append("**What would change this:**\n" + "\n".join(f"- {n}" for n in need))
 
     s = str(safe.get("summary") or "").strip()
     if s:
@@ -120,6 +124,10 @@ def _compose(safe: dict[str, Any]) -> str:
         parts.append(f"**{q}**")
         if why:
             parts.append(f"_{why}_")
+
+    if rec:  # V4: a grounded recommendation carries a light, deterministic scope disclaimer
+        parts.append("_This is general planning guidance based on what you've shared, not personalized "
+                     "financial, legal, or tax advice — confirm specifics with a licensed professional._")
 
     return "\n\n".join(parts).strip()
 

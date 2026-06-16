@@ -220,10 +220,14 @@ async def test_validator_allows_number_present_in_context():
 
 
 @pytest.mark.asyncio
-async def test_validator_rejects_recommendation_language():
-    ctx = await _build_ctx("retire at 60", _base())
-    ok, _, reasons = validate(_good_llm(next_question="I recommend you invest in index funds, agreed?"), ctx)
-    assert not ok and any("advice" in r for r in reasons)
+async def test_validator_allows_grounded_strategic_advice():
+    # V4 (signed-off relaxation): a grounded strategic / personal-finance recommendation is now ALLOWED.
+    ctx = await _build_ctx("pay debt or invest", _base())
+    out = _good_llm(recommendation="Given your situation, prioritizing the high-interest debt before "
+                    "investing makes sense, since that return is hard to beat; this can shift once we know "
+                    "your employer match.")
+    ok, _, reasons = validate(out, ctx)
+    assert ok and not reasons
 
 
 @pytest.mark.asyncio
@@ -266,10 +270,18 @@ async def test_validator_allows_reflecting_users_own_should_question():
 
 
 @pytest.mark.asyncio
-async def test_validator_still_rejects_genuine_directive_advice():
+async def test_validator_still_blocks_legal_tax_product_advice():
+    # V4 keeps MEDICAL / LEGAL / TAX / specific-PRODUCT advice hard-blocked even though strategic advice is now allowed.
     ctx = await _build_ctx("what do I do", _base())
-    ok, _, reasons = validate(_good_llm(next_question="You should invest in index funds, right?"), ctx)
-    assert not ok and any("advice" in r for r in reasons)
+    blocked = [
+        "Legally you must title the house as joint tenants.",   # legal directive
+        "For tax purposes you should claim the home-office deduction.",  # tax directive
+        "You should buy VTSAX with the cash.",                  # specific security/product by name
+        "You should buy shares of your employer.",              # specific security
+    ]
+    for phrase in blocked:
+        ok, _, reasons = validate(_good_llm(recommendation=phrase), ctx)
+        assert not ok and any("advice" in r for r in reasons), f"should block: {phrase}"
 
 
 @pytest.mark.asyncio
