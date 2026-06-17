@@ -25,14 +25,18 @@ Every priority discovery question now proves Arcana understood the user. The liv
 
 Context-referencing 5/5 (≥95% ✅) · goal/conflict/constraint refs 5/5 (≥90% ✅) · generic 0 ✅ · human-advisor 9/10 (≥9 ✅) · understanding 9/10 (≥9 ✅) · none below 8.5 ✅.
 
+## Coverage (v119)
+
+Narrative-rich questions now cover **priority + financial_goal + time_horizon + constraint** (all post-story steps). `vision`/`primary_goal` stay open by design (they precede the story); `risk` keeps its behavioral probe + options.
+
 ## Honest residuals
 
-- Metrics cover the **priority question** (the decisive moment); later FLOW steps (risk/constraint/financial) remain template prompts — next enhancement.
-- Deterministic/heuristic engine (LLM-free discovery); the family tradeoff names raw goal fragments (real, slightly unpolished).
+- `risk` remains an investing-framed probe (kept for the risk-profile mapping); `time_horizon` names a slightly-raw goal label. Minor.
+- Deterministic/heuristic engine (LLM-free discovery).
 - 🔴 Rotate the exposed Supabase PAT + service/anon keys (`docs/cutover/SECURITY_ACTIONS_PENDING.md`).
 
 ## Status
 
 ### QUESTION_EXCELLENCE_READY (deployed)
 
-Core-api v118 live from `main`; 5/5 narratives + 5/5 contextual questions in production; 485 tests pass. Rollback: `flyctl releases rollback` to v117.
+Core-api **v119** live from `main`; 5/5 narratives + 5/5 contextual priority questions in production, with financial/time/constraint steps now contextual too; 485 tests pass. Rollback: `flyctl releases rollback` to v117/v118.

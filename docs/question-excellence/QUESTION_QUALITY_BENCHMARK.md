@@ -25,4 +25,6 @@
 
 ## Honest residual (disclosed, not gaming the metric)
 
-These metrics are for the **priority question** — the decisive discovery moment. Later FLOW steps (financial_goal "anything about money?", time_horizon "what timeline?", risk, constraint) are still template prompts; they're reached only after the priority moment and are not yet narrative-rewritten. Extending the engine to those steps is the next enhancement. The pilot-facing first impression (the priority question) is excellent.
+**UPDATE (v119) — coverage extended to all post-story steps.** `narrative_step_prompt` now makes `financial_goal` ("how does money fit — lever, constraint, or not the worry?"; debt-specifics for crisis), `time_horizon` (anchored to the user's top goal), and `constraint` (time/money/energy; energy-drain for burnout) context-referencing too. `vision`+`primary_goal` stay open by design (they precede the user's story); `risk` keeps its behavioral probe + options (the answer maps to the risk profile). Live v119 full-sequence trace confirms priority/financial_goal/time_horizon/constraint all reference the user's life.
+
+**Remaining honest residual:** `risk` is still investing-framed (kept for the risk-profile mapping); the `time_horizon` prompt names a slightly-raw goal label. Minor — the decisive discovery questions are contextual.
