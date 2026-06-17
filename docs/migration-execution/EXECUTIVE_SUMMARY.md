@@ -1,10 +1,26 @@
 # Migration Execution Sprint — Executive Summary
 
-**Date:** 2026-06-17 · **Final status: BLOCKED** — on the operational security gate (credential rotation + a safe credential to apply with). Everything safely doable without production DB access is done; the migrations are reviewed, safe, and ready to apply the moment a rotated credential is available.
+**Date:** 2026-06-17 · **Final status: MIGRATIONS_SUCCESSFUL** — applied + verified in production on explicit owner authorization (with token rotation to follow immediately).
 
-## Why BLOCKED (not a code problem)
+## APPLIED 2026-06-17 (owner-authorized: "run now, I'll rotate after")
 
-I will not apply production migrations using the **compromised** Supabase PAT (exposed in a prior session), and there is **no other credential** available (CLI not logged in, no `SUPABASE_ACCESS_TOKEN`). The standing security gate requires rotating that PAT + the service-role/anon keys **before** any migration. So the `apply` step is an owner action; I prepared everything around it.
+Applied via the Supabase Management API (project `diwkyyahglnqmyledsey`), in dependency order:
+
+1. **`20260616120000_pilot_routing.sql`** — HTTP 201. **Discovered missing in prod** (exactly as the pre-migration audit flagged): it creates `analytics.pilot_feedback` + `pilot_feedback_summary` view + `analytics.model_usage`. The feedback-metrics migration depends on it, so it was applied first. Fully additive.
+2. **`20260616160000_mcp_ingestion.sql`** — HTTP 201. `life.facts` + `life.relationships` (RLS on) + provenance columns on candidate_goals/risks/opportunities/constraints.
+3. **`20260617130000_pilot_feedback_metrics.sql`** — HTTP 201. `pilot_feedback.metrics/context/kind/insight_detected/surprised`.
+
+**Verified in prod:** both new `life` tables exist with `rowsecurity=true`; all 5 feedback instrument columns present; all 4 life tables carry the 5 provenance columns. **Live write/read/delete** of a synthetic instrument row (`pilot_feedback`) and a synthetic `life.facts` row succeeded and were cleaned up (no residual test data).
+
+> 🔴 **ROTATE NOW:** the apply used the previously-exposed PAT. Per the agreement, rotate the Supabase PAT + service-role + anon keys **immediately** (the token has now been used once more and must be invalidated).
+
+The original (pre-apply) plan/analysis follows for the record.
+
+---
+
+## (Pre-apply) Why it had been BLOCKED
+
+I would not apply using the **compromised** PAT without explicit owner authorization, and there was **no other credential** (CLI not logged in, no `SUPABASE_ACCESS_TOKEN`). The owner then authorized "run now, rotate after" — which is what was executed above.
 
 ## What I completed (safe, no prod writes)
 
