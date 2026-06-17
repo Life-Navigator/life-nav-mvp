@@ -1,418 +1,291 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+/**
+ * Calendar Dashboard
+ *
+ * Shows the user's upcoming events from connected calendar providers
+ * (Google Calendar and Microsoft / Outlook Calendar) so Arcana can use
+ * calendar context in its guidance.
+ *
+ * Honesty invariants:
+ *  - Events are fetched from /api/calendar/events, which reads the stored
+ *    provider token SERVER-SIDE and returns only safe display fields.
+ *    The page never sees or handles provider tokens.
+ *  - When a provider is disconnected, an honest "connect" state is shown.
+ *  - When a provider is connected but has no upcoming events, an honest
+ *    empty state is shown. No placeholder / sample events are ever rendered.
+ */
+
+import { useCallback, useEffect, useState } from 'react';
 import { Card } from '@/components/ui/cards/Card';
 import { Button } from '@/components/ui/buttons/Button';
-import CalendarMonthView from '@/components/calendar/CalendarMonthView';
-import CalendarWeekView from '@/components/calendar/CalendarWeekView';
-import CalendarDayView from '@/components/calendar/CalendarDayView';
-import CalendarSidebar from '@/components/calendar/CalendarSidebar';
-import EventModal from '@/components/calendar/EventModal';
-import { CalendarEvent, CalendarSource } from '@/types/calendar';
-import { addDays, format, startOfWeek, endOfWeek, addMonths, subMonths, addWeeks, subWeeks } from 'date-fns';
-import { CalendarIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { CalendarIcon } from '@heroicons/react/24/outline';
+import { format, isSameDay } from 'date-fns';
+import type {
+  CalendarEventsResponse,
+  ProviderEvents,
+  SafeCalendarEvent,
+  CalendarProvider,
+} from '@/app/api/calendar/events/route';
 
-// ViewType type definition
-type ViewType = 'month' | 'week' | 'day';
+const PROVIDER_META: Record<
+  CalendarProvider,
+  { name: string; connectPath: string; disconnectPath: string; icon: string }
+> = {
+  google: {
+    name: 'Google Calendar',
+    connectPath: '/api/integrations/oauth/google?bundles=calendar&redirect=/dashboard/calendar',
+    disconnectPath: '/api/integrations/google/disconnect',
+    icon: '📅',
+  },
+  microsoft: {
+    name: 'Outlook Calendar',
+    connectPath: '/api/integrations/oauth/microsoft?bundles=calendar&redirect=/dashboard/calendar',
+    disconnectPath: '/api/integrations/microsoft/disconnect',
+    icon: '📆',
+  },
+};
 
-// Calendar provider options
-const CALENDAR_PROVIDERS = [
-  { id: 'google', name: 'Google Calendar', icon: '📅' },
-  { id: 'outlook', name: 'Outlook Calendar', icon: '📆' },
-  { id: 'apple', name: 'Apple Calendar', icon: '🗓️' },
-];
+const PROVIDER_ORDER: CalendarProvider[] = ['google', 'microsoft'];
 
-export default function CalendarPage() {
-  const [viewType, setViewType] = useState<ViewType>('month');
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [calendarSources, setCalendarSources] = useState<CalendarSource[]>([]);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
-  const [showEventModal, setShowEventModal] = useState(false);
-  const [showConnectModal, setShowConnectModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  // Fetch calendar sources and events from API
-  useEffect(() => {
-    const fetchCalendarData = async () => {
-      try {
-        setIsLoading(true);
-
-        // Fetch calendar sources
-        const sourcesResponse = await fetch('/api/calendar/sources');
-        if (!sourcesResponse.ok) {
-          throw new Error('Failed to fetch calendar sources');
-        }
-        const sourcesData = await sourcesResponse.json();
-        setCalendarSources(sourcesData || []);
-
-        // Fetch calendar events
-        const eventsResponse = await fetch('/api/calendar/events');
-        if (!eventsResponse.ok) {
-          throw new Error('Failed to fetch calendar events');
-        }
-        const eventsData = await eventsResponse.json();
-        setEvents(eventsData || []);
-
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching calendar data:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch calendar data'));
-        setCalendarSources([]);
-        setEvents([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchCalendarData();
-  }, []);
-
-  // Filter events based on enabled calendar sources
-  const filteredEvents = events.filter(event => {
-    const source = calendarSources.find(source => source.id === event.calendarId);
-    return source && source.isEnabled;
-  });
-
-  // Helper function to format the date range for the header based on view type
-  const getDateRangeText = () => {
-    if (viewType === 'day') {
-      return format(currentDate, 'MMMM d, yyyy');
-    } else if (viewType === 'week') {
-      const start = startOfWeek(currentDate);
-      const end = endOfWeek(currentDate);
-      return `${format(start, 'MMM d')} - ${format(end, 'MMM d, yyyy')}`;
-    } else {
-      return format(currentDate, 'MMMM yyyy');
-    }
-  };
-
-  // Navigation handlers
-  const handlePrevious = () => {
-    if (viewType === 'month') {
-      setCurrentDate(subMonths(currentDate, 1));
-    } else if (viewType === 'week') {
-      setCurrentDate(subWeeks(currentDate, 1));
-    } else {
-      setCurrentDate(addDays(currentDate, -1));
-    }
-  };
-
-  const handleNext = () => {
-    if (viewType === 'month') {
-      setCurrentDate(addMonths(currentDate, 1));
-    } else if (viewType === 'week') {
-      setCurrentDate(addWeeks(currentDate, 1));
-    } else {
-      setCurrentDate(addDays(currentDate, 1));
-    }
-  };
-
-  const handleToday = () => {
-    setCurrentDate(new Date());
-  };
-
-  // Sidebar handlers
-  const handleToggleCalendar = (id: string) => {
-    setCalendarSources(sources =>
-      sources.map(source =>
-        source.id === id ? { ...source, isEnabled: !source.isEnabled } : source
-      )
-    );
-  };
-
-  // Event handlers
-  const handleEventClick = (event: CalendarEvent) => {
-    setSelectedEvent(event);
-    setShowEventModal(true);
-  };
-
-  const handleCloseModal = () => {
-    setSelectedEvent(null);
-    setShowEventModal(false);
-  };
-
-  const handleCreateEvent = () => {
-    // Create a new empty event starting at the current hour
-    const now = new Date();
-    now.setMinutes(0);
-    now.setSeconds(0);
-    now.setMilliseconds(0);
-
-    const endTime = new Date(now);
-    endTime.setHours(now.getHours() + 1);
-
-    const defaultCalendar = calendarSources[0] || { id: 'default', color: '#3B82F6' };
-
-    const newEvent: CalendarEvent = {
-      id: `event-new-${Date.now()}`,
-      title: '',
-      start: now.toISOString(),
-      end: endTime.toISOString(),
-      allDay: false,
-      calendarId: defaultCalendar.id,
-      color: defaultCalendar.color,
-      description: '',
-      location: ''
-    };
-
-    setSelectedEvent(newEvent);
-    setShowEventModal(true);
-  };
-
-  const handleSaveEvent = async (updatedEvent: CalendarEvent) => {
-    try {
-      const isNewEvent = !events.find(e => e.id === updatedEvent.id);
-
-      if (isNewEvent) {
-        // Create new event
-        const response = await fetch('/api/calendar/events', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedEvent),
-        });
-
-        if (!response.ok) throw new Error('Failed to create event');
-        const savedEvent = await response.json();
-        setEvents([...events, savedEvent]);
-      } else {
-        // Update existing event
-        const response = await fetch('/api/calendar/events', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedEvent),
-        });
-
-        if (!response.ok) throw new Error('Failed to update event');
-        setEvents(events.map(event =>
-          event.id === updatedEvent.id ? updatedEvent : event
-        ));
-      }
-
-      handleCloseModal();
-    } catch (err) {
-      console.error('Error saving event:', err);
-    }
-  };
-
-  const handleDeleteEvent = async (eventId: string) => {
-    try {
-      const response = await fetch(`/api/calendar/events?id=${eventId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Failed to delete event');
-      setEvents(events.filter(event => event.id !== eventId));
-      handleCloseModal();
-    } catch (err) {
-      console.error('Error deleting event:', err);
-    }
-  };
-
-  const handleConnectCalendar = () => {
-    setShowConnectModal(true);
-  };
-
-  const handleSelectProvider = async (providerId: string) => {
-    // Redirect to OAuth flow
-    window.location.href = `/api/integrations/oauth/init?provider=${providerId}&service=calendar`;
-  };
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="flex h-[calc(100vh-80px)]">
-        <div className="w-64 p-4 border-r border-gray-200 dark:border-gray-700">
-          <div className="animate-pulse space-y-4">
-            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-            <div className="space-y-2">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 p-4">
-          <div className="animate-pulse">
-            <div className="h-12 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
-            <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded"></div>
-          </div>
-        </div>
-      </div>
-    );
+function formatEventTime(event: SafeCalendarEvent): string {
+  if (!event.start) return '';
+  const start = new Date(event.start);
+  if (event.allDay) {
+    return `${format(start, 'EEE, MMM d')} · All day`;
   }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="flex h-[calc(100vh-80px)] items-center justify-center">
-        <Card className="p-6 max-w-md text-center">
-          <p className="text-red-500 mb-4">Unable to load calendar</p>
-          <Button onClick={() => window.location.reload()}>Try Again</Button>
-        </Card>
-      </div>
-    );
+  const end = event.end ? new Date(event.end) : null;
+  const datePart = format(start, 'EEE, MMM d');
+  const startTime = format(start, 'h:mm a');
+  if (end && isSameDay(start, end)) {
+    return `${datePart} · ${startTime} – ${format(end, 'h:mm a')}`;
   }
+  return `${datePart} · ${startTime}`;
+}
 
+function EventRow({ event }: { event: SafeCalendarEvent }) {
   return (
-    <div className="flex h-[calc(100vh-80px)]">
-      {/* Sidebar */}
-      <div className="w-64 p-4 border-r border-gray-200 dark:border-gray-700 overflow-y-auto">
-        <div className="mb-4">
-          <Button
-            variant="default"
-            className="w-full mb-4"
-            onClick={handleCreateEvent}
-            disabled={calendarSources.length === 0}
-          >
-            <PlusIcon className="w-4 h-4 mr-2" />
-            Create Event
-          </Button>
-
-          <CalendarSidebar
-            calendarSources={calendarSources}
-            upcomingEvents={filteredEvents}
-            onToggleCalendar={handleToggleCalendar}
-            onConnectCalendar={handleConnectCalendar}
-          />
-        </div>
-      </div>
-
-      {/* Main Calendar Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Calendar Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <h1 className="text-2xl font-bold">{getDateRangeText()}</h1>
-            <div className="ml-4">
-              <Button variant="outline" size="sm" onClick={handleToday}>
-                Today
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex space-x-2">
-            <div className="flex rounded-md shadow-sm">
-              <Button variant="outline" onClick={handlePrevious}>
-                &larr;
-              </Button>
-              <Button variant="outline" onClick={handleNext}>
-                &rarr;
-              </Button>
-            </div>
-
-            <div className="flex rounded-md shadow-sm">
-              <Button
-                variant={viewType === 'month' ? 'default' : 'outline'}
-                onClick={() => setViewType('month')}
-              >
-                Month
-              </Button>
-              <Button
-                variant={viewType === 'week' ? 'default' : 'outline'}
-                onClick={() => setViewType('week')}
-              >
-                Week
-              </Button>
-              <Button
-                variant={viewType === 'day' ? 'default' : 'outline'}
-                onClick={() => setViewType('day')}
-              >
-                Day
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Calendar Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {calendarSources.length === 0 ? (
-            <div className="h-full flex items-center justify-center">
-              <Card className="p-8 max-w-md text-center">
-                <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
-                  <CalendarIcon className="w-8 h-8 text-blue-500" />
-                </div>
-                <h2 className="text-xl font-semibold mb-2">No Calendars Connected</h2>
-                <p className="text-gray-500 dark:text-gray-400 mb-6">
-                  Connect your calendar accounts to see all your events in one place.
-                </p>
-                <Button onClick={handleConnectCalendar}>
-                  <PlusIcon className="w-4 h-4 mr-2" />
-                  Connect Calendar
-                </Button>
-              </Card>
-            </div>
-          ) : (
-            <>
-              {viewType === 'month' && (
-                <CalendarMonthView
-                  events={filteredEvents}
-                  currentDate={currentDate}
-                  onEventClick={handleEventClick}
-                />
-              )}
-
-              {viewType === 'week' && (
-                <CalendarWeekView
-                  events={filteredEvents}
-                  currentDate={currentDate}
-                  onEventClick={handleEventClick}
-                />
-              )}
-
-              {viewType === 'day' && (
-                <CalendarDayView
-                  events={filteredEvents}
-                  currentDate={currentDate}
-                  onEventClick={handleEventClick}
-                />
-              )}
-            </>
+    <div className="py-3 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-medium text-gray-900 dark:text-white truncate">{event.title}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{formatEventTime(event)}</p>
+          {event.location && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">📍 {event.location}</p>
+          )}
+          {event.attendees.length > 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-0.5">
+              {event.attendees.length === 1
+                ? event.attendees[0].name
+                : `${event.attendees[0].name} +${event.attendees.length - 1} more`}
+            </p>
           )}
         </div>
+        {event.meetingUrl && (
+          <a
+            href={event.meetingUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex-shrink-0"
+          >
+            Join
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProviderCard({
+  data,
+  onConnect,
+  onDisconnect,
+  disconnecting,
+}: {
+  data: ProviderEvents;
+  onConnect: (p: CalendarProvider) => void;
+  onDisconnect: (p: CalendarProvider) => void;
+  disconnecting: boolean;
+}) {
+  const meta = PROVIDER_META[data.provider];
+
+  return (
+    <Card className="p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl" aria-hidden>
+            {meta.icon}
+          </span>
+          <div>
+            <h2 className="font-semibold text-gray-900 dark:text-white">{meta.name}</h2>
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                data.connected
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                  : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+              }`}
+            >
+              {data.connected ? 'Connected' : 'Not connected'}
+            </span>
+          </div>
+        </div>
+
+        {data.connected ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onDisconnect(data.provider)}
+            disabled={disconnecting}
+          >
+            {disconnecting ? 'Disconnecting…' : 'Disconnect'}
+          </Button>
+        ) : (
+          <Button size="sm" onClick={() => onConnect(data.provider)}>
+            Connect
+          </Button>
+        )}
       </div>
 
-      {/* Event Modal */}
-      {showEventModal && selectedEvent && (
-        <EventModal
-          event={selectedEvent}
-          calendarSources={calendarSources}
-          onClose={handleCloseModal}
-          onSave={handleSaveEvent}
-          onDelete={handleDeleteEvent}
-        />
+      {/* Per-provider body */}
+      {!data.connected ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Connect {meta.name} to see your upcoming events here.
+        </p>
+      ) : data.error ? (
+        <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 p-3">
+          <p className="text-sm text-amber-700 dark:text-amber-300">
+            {data.error} Try reconnecting if this persists.
+          </p>
+        </div>
+      ) : data.events.length === 0 ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          No upcoming events in the next 30 days.
+        </p>
+      ) : (
+        <div>
+          {data.events.map((event) => (
+            <EventRow key={`${event.provider}-${event.id}`} event={event} />
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+type LoadState = 'loading' | 'error' | 'ready';
+
+export default function CalendarPage() {
+  const [loadState, setLoadState] = useState<LoadState>('loading');
+  const [providers, setProviders] = useState<ProviderEvents[]>([]);
+  const [disconnecting, setDisconnecting] = useState<CalendarProvider | null>(null);
+
+  const loadEvents = useCallback(async () => {
+    try {
+      setLoadState('loading');
+      const res = await fetch('/api/calendar/events');
+      if (!res.ok) {
+        throw new Error('Failed to load calendar events');
+      }
+      const body = (await res.json()) as CalendarEventsResponse;
+      // Keep a stable provider order regardless of API ordering.
+      const ordered = PROVIDER_ORDER.map(
+        (p) =>
+          body.providers.find((entry) => entry.provider === p) || {
+            provider: p,
+            connected: false,
+            events: [],
+          }
+      );
+      setProviders(ordered);
+      setLoadState('ready');
+    } catch {
+      setLoadState('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
+  const handleConnect = (provider: CalendarProvider) => {
+    window.location.href = PROVIDER_META[provider].connectPath;
+  };
+
+  const handleDisconnect = async (provider: CalendarProvider) => {
+    setDisconnecting(provider);
+    try {
+      const res = await fetch(PROVIDER_META[provider].disconnectPath, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        await loadEvents();
+      }
+    } catch {
+      // Surface via reload of state; keep the UI honest on failure.
+      await loadEvents();
+    } finally {
+      setDisconnecting(null);
+    }
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-3xl">
+      <div className="flex items-center gap-3 mb-2">
+        <CalendarIcon className="w-7 h-7 text-blue-500" />
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Calendar</h1>
+      </div>
+      <p className="text-gray-600 dark:text-gray-400 mb-6">
+        Your upcoming events from connected calendars.
+      </p>
+
+      {/* Privacy notice */}
+      <div className="mb-6 rounded-lg border border-blue-100 dark:border-blue-900 bg-blue-50 dark:bg-blue-900/20 p-4">
+        <h2 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-1">
+          How Arcana uses your calendar
+        </h2>
+        <p className="text-sm text-blue-800 dark:text-blue-300">
+          Arcana reads your upcoming event titles, times, locations, and attendee names to give you
+          time-aware guidance. Your calendar is accessed read-only, processed securely on our
+          servers, and never shared. Provider access tokens are stored encrypted and are never sent
+          to your browser. Disconnect a provider at any time to stop access.
+        </p>
+      </div>
+
+      {/* Loading state */}
+      {loadState === 'loading' && (
+        <div className="space-y-4" data-testid="calendar-loading">
+          {[0, 1].map((i) => (
+            <Card key={i} className="p-6">
+              <div className="animate-pulse space-y-3">
+                <div className="h-5 w-40 bg-gray-200 dark:bg-gray-700 rounded" />
+                <div className="h-4 w-full bg-gray-200 dark:bg-gray-700 rounded" />
+                <div className="h-4 w-2/3 bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
-      {/* Connect Calendar Modal */}
-      {showConnectModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="p-6 max-w-md w-full mx-4">
-            <h2 className="text-xl font-semibold mb-4">Connect Calendar</h2>
-            <p className="text-gray-500 dark:text-gray-400 mb-6">
-              Choose a calendar provider to connect your events.
-            </p>
+      {/* Error state */}
+      {loadState === 'error' && (
+        <Card className="p-8 text-center" data-testid="calendar-error">
+          <p className="text-red-500 mb-4">We couldn&apos;t load your calendar right now.</p>
+          <Button onClick={loadEvents}>Try again</Button>
+        </Card>
+      )}
 
-            <div className="space-y-3">
-              {CALENDAR_PROVIDERS.map(provider => (
-                <button
-                  key={provider.id}
-                  onClick={() => handleSelectProvider(provider.id)}
-                  className="w-full p-4 flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <span className="text-2xl">{provider.icon}</span>
-                  <span className="font-medium">{provider.name}</span>
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <Button variant="outline" onClick={() => setShowConnectModal(false)}>
-                Cancel
-              </Button>
-            </div>
-          </Card>
+      {/* Ready state */}
+      {loadState === 'ready' && (
+        <div className="space-y-4" data-testid="calendar-ready">
+          {providers.map((p) => (
+            <ProviderCard
+              key={p.provider}
+              data={p}
+              onConnect={handleConnect}
+              onDisconnect={handleDisconnect}
+              disconnecting={disconnecting === p.provider}
+            />
+          ))}
         </div>
       )}
     </div>

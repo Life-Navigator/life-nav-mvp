@@ -1,0 +1,4 @@
+# LifeNavigator MCP server — installed ON TOP of the core-api requirements (it imports app.*).
+#   pip install -r requirements.txt -r mcp_server/requirements.txt
+mcp>=1.2.0
+PyJWT>=2.8.0
