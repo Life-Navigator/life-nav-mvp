@@ -46,4 +46,8 @@ No-evidence-no-rec (`recommendations_os.py:67-69`); no archetype risks/opps/deps
 
 ## Status after this sprint
 
-D2 (goal filter) and the narrative-lead gap are addressed in code this sprint (see EXECUTIVE_SUMMARY). D1 is low live-risk and is queued as the next backend fix; tracked here so it is never silently shipped.
+The **narrative-lead gap is fixed in code** this sprint (reports now carry `life_brief` + `dominant_narrative`; see EXECUTIVE_SUMMARY). **D1 and D2 are NOT fixed** — both are queued:
+
+- **D2** cannot be safely filtered today: `public.goals` has no `origin`/`confirmed` column, so persona-bridge goals can't be distinguished from user goals at the report query. The correct fix is the goal-store reconciliation (read goals from `snapshot()`, which candidate-protects) — see GOAL_MIGRATION_PLAN.
+- **D1** is low live-risk (nothing currently writes `life.risks`/`life.opportunities`) and is the next backend fix.
+  Both are tracked here so they can never be silently shipped.
