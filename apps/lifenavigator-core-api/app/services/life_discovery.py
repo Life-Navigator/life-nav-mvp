@@ -196,6 +196,59 @@ _INSTRUMENTAL = ("house", "home", "buy", "mortgage", "property", "move", "reloca
 _CONF_THRESHOLD = 0.6  # below this, probe instead of concluding
 
 
+# ── Discovery Intelligence: weighted objective ranking ─────────────────────────────────────────────
+# Confidence is ONE signal, not THE signal. We rank by what the PERSON is actually trying to do:
+# explicit priority > horizon urgency > life-significance > recency > dependency impact > confidence.
+# Significance: terminal LIFE goals (family, home, health, a wedding) are what people want; finance is
+# usually a MEANS, so it does not outrank a stated life goal unless the user says it should.
+_ROOT_SIGNIFICANCE: dict[str, float] = {
+    "family_stability": 1.0, "homeownership": 0.95, "health_longevity": 0.90, "legacy": 0.70,
+    "career_growth": 0.65, "education_advancement": 0.60, "financial_independence": 0.45,
+}
+_URGENCY_MARKERS: tuple[tuple[str, float], ...] = (
+    ("month", 1.0), ("12 month", 1.0), ("this year", 0.9), ("next year", 0.8), ("wedding", 0.9),
+    ("weeks", 1.0), ("soon", 0.8), ("year", 0.5),
+)
+# Score weights (documented in DISCOVERY_PRIORITY_ENGINE.md). Tunable; confidence deliberately lowest.
+_W_PRIORITY, _W_URGENCY, _W_SIGNIF, _W_RECENCY, _W_DEPS, _W_CONF = 3.0, 1.5, 1.2, 1.0, 0.8, 0.6
+_UNCONFIRMED_PENALTY = 0.15  # a candidate (persona-seeded, unconfirmed) can never outrank a confirmed goal
+
+
+def _horizon_urgency(o: dict[str, Any]) -> float:
+    text = (str(o.get("surface_goal") or "") + " " +
+            " ".join(str(w.get("a", "")) for w in (o.get("why_chain") or []) if isinstance(w, dict))).lower()
+    return max((w for kw, w in _URGENCY_MARKERS if kw in text), default=0.0)
+
+
+def score_objective(o: dict[str, Any], *, priority_root: Optional[str] = None, recency: float = 0.0) -> float:
+    """Weighted life-priority score for one objective. `recency` is a 0..1 normalized freshness rank.
+    Unconfirmed (persona-seeded) objectives are heavily penalized so they cannot become primary."""
+    root = o.get("root_objective_key") or ""
+    conf = float(o.get("confidence") or 0)
+    sig = _ROOT_SIGNIFICANCE.get(root, 0.5)
+    urg = _horizon_urgency(o)
+    dep_impact = min(1.0, len(ROOT_OBJECTIVES.get(root, {}).get("dependencies", [])) / 7.0)
+    prio = 1.0 if (priority_root and root == priority_root) else 0.0
+    score = (_W_PRIORITY * prio + _W_URGENCY * urg + _W_SIGNIF * sig +
+             _W_RECENCY * recency + _W_DEPS * dep_impact + _W_CONF * conf)
+    if not o.get("confirmed", True):
+        score *= _UNCONFIRMED_PENALTY
+    return round(score, 4)
+
+
+def rank_objectives(objectives: list[dict[str, Any]], *, priority_root: Optional[str] = None) -> list[dict[str, Any]]:
+    """Return objectives sorted by life-priority score (desc). Recency derived from updated_at ordering."""
+    if not objectives:
+        return []
+    # Recency from ACTUAL timestamps: ties get the SAME value (no position artifact); newer = higher.
+    def _ts(o: dict[str, Any]) -> str:
+        return str(o.get("updated_at") or o.get("created_at") or "")
+    distinct = sorted({_ts(o) for o in objectives})
+    rank_of = {ts: (i / (len(distinct) - 1) if len(distinct) > 1 else 0.5) for i, ts in enumerate(distinct)}
+    return sorted(objectives, key=lambda o: score_objective(o, priority_root=priority_root, recency=rank_of[_ts(o)]),
+                  reverse=True)
+
+
 class LifeDiscoveryService:
     def __init__(self, supabase: Any) -> None:
         self._sb = supabase
@@ -400,9 +453,15 @@ class LifeDiscoveryService:
                                                    "domain": domain or None, "confidence": conf, "status": "active", "updated_at": _now()}, schema=LIFE)
 
     async def discover_goal(self, ctx: UserContext, *, surface_goal: str, why_chain: Optional[list] = None,
-                            root_override: Optional[str] = None) -> dict[str, Any]:
+                            root_override: Optional[str] = None, confirmed: bool = True,
+                            origin: str = "user") -> dict[str, Any]:
         """Discover the objective: reason about it; PROBE if uncertain; else decompose + persist the
-        graph with confidence/themes/alternatives/constraints + supersede stale objectives."""
+        graph with confidence/themes/alternatives/constraints + supersede stale objectives.
+
+        `confirmed`/`origin` (Discovery Intelligence): a user-stated goal is confirmed (origin='user');
+        a persona/bridge-seeded goal is a CANDIDATE (confirmed=False, origin='persona_bridge') and can
+        never become the primary objective until the user confirms it. A persona seed never DOWNGRADES an
+        objective the user already confirmed."""
         vis = await self._rows("life_vision", ctx)
         vision_text = vis[0].get("vision_text", "") if vis else ""
         a = self.analyze(surface_goal=surface_goal, why_chain=why_chain, vision=vision_text)
@@ -418,6 +477,13 @@ class LifeDiscoveryService:
         assert root is not None  # guaranteed by the probe guard above
         spec = ROOT_OBJECTIVES[root]
         obj_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{ctx.user_id}:{root}"))
+        existing = next((o for o in await self._rows("life_objectives", ctx) if o.get("id") == obj_id), None)
+        # Candidate protection: a persona/bridge seed must NEVER downgrade an objective the user already
+        # confirmed. If the user owns this root, leave it confirmed/user-origin untouched.
+        eff_confirmed, eff_origin = confirmed, origin
+        if existing and (existing.get("origin") == "user" or existing.get("confirmed") is True):
+            if origin == "persona_bridge":
+                eff_confirmed, eff_origin = bool(existing.get("confirmed", True)), existing.get("origin") or "user"
         # Lifecycle: supersede any active objective for this SAME surface goal with a different root.
         for o in await self._rows("life_objectives", ctx):
             if (o.get("surface_goal", "").strip().lower() == surface_goal.strip().lower()
@@ -431,6 +497,7 @@ class LifeDiscoveryService:
             "domain": "cross_domain", "importance": "high", "status": "active",
             "confidence": a.get("confidence"), "themes": list(a.get("themes", {}).keys()),
             "alternatives": a.get("alternatives", []), "reasoning": a.get("reasoning"), "updated_at": _now(),
+            "confirmed": eff_confirmed, "origin": eff_origin,
         }, schema=LIFE)
         goal_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:surface"))
         await self._sb.upsert("goals", {"id": goal_id, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
@@ -483,21 +550,37 @@ class LifeDiscoveryService:
         risks = [r for r in await self._rows("risks", ctx) if r.get("objective_id") in active_ids]
         opps = [o for o in await self._rows("opportunities", ctx) if o.get("objective_id") in active_ids]
         cons = [c for c in await self._rows("constraints", ctx) if c.get("objective_id") in active_ids]
-        primary = max(objectives, key=lambda o: float(o.get("confidence") or 0), default=None)
         v0 = vision[0] if vision else None
-        vsource = str((v0.get("prompts") or {}).get("source") or "") if v0 else ""
+        prompts = (v0.get("prompts") or {}) if v0 else {}
+        vsource = str(prompts.get("source") or "")
+        # Discovery Intelligence: rank by life-priority, and CANDIDATE-PROTECT — only a user-CONFIRMED
+        # objective can be primary. Persona-seeded candidates are surfaced separately as "possible goals".
+        confirmed = [o for o in objectives if o.get("confirmed", True)]
+        candidates = [o for o in objectives if not o.get("confirmed", True)]
+        priority_root = prompts.get("user_priority_root") or None
+        ranked = rank_objectives(confirmed, priority_root=priority_root)
+        primary = ranked[0] if ranked else None
         return {
             "life_vision": v0.get("vision_text") if v0 else None,
             # Authored = the user actually stated it (via the advisor). persona_bridge visions are
             # synthesized from onboarding and must NOT be presented as a confirmed north star.
             "vision_source": vsource or None,
             "vision_authored": bool(v0 and v0.get("vision_text") and vsource != "persona_bridge"),
+            # The user's own narrative, kept separate from the ontology objectives (never collapsed to one).
+            "narrative": prompts.get("narrative") or None,
+            "user_priority": prompts.get("user_priority") or None,
             "primary_objective": ({"title": primary["title"], "confidence": primary.get("confidence"),
                                    "reasoning": primary.get("reasoning"), "alternatives": primary.get("alternatives"),
-                                   "themes": primary.get("themes"), "updated_at": primary.get("updated_at")} if primary else None),
+                                   "themes": primary.get("themes"), "updated_at": primary.get("updated_at"),
+                                   "confirmed": True} if primary else None),
+            # Possible (unconfirmed) goals — shown as candidates, NEVER as the confirmed primary.
+            "candidate_objectives": [{"title": o["title"], "root": o.get("root_objective_key"),
+                                      "surface_goal": o.get("surface_goal"), "origin": o.get("origin"),
+                                      "confirmed": False} for o in candidates],
             "objectives": [{"id": o["id"], "title": o["title"], "root": o.get("root_objective_key"),
                             "surface_goal": o.get("surface_goal"), "confidence": o.get("confidence"),
-                            "themes": o.get("themes"), "why_chain": o.get("why_chain")} for o in objectives],
+                            "confirmed": o.get("confirmed", True), "origin": o.get("origin"),
+                            "themes": o.get("themes"), "why_chain": o.get("why_chain")} for o in rank_objectives(objectives, priority_root=priority_root)],
             "top_themes": list(primary.get("themes") or [])[:5] if primary else [],
             "top_risks": [r["label"] for r in risks[:5]],
             "top_opportunities": [o["label"] for o in opps[:5]],
@@ -530,12 +613,24 @@ class LifeDiscoveryService:
         frozenset({"career_growth", "health_longevity"}): ("time", "Career intensity can crowd out the consistency health requires."),
     }
 
+    def classify_priority(self, text: str) -> Optional[str]:
+        """Map a free-text "what matters most" answer to a ROOT objective key (for user-priority capture)."""
+        if not (text or "").strip():
+            return None
+        a = self.analyze(surface_goal=text)
+        root = a.get("primary_objective")
+        return root if root in ROOT_OBJECTIVES else None
+
     async def objectives_plan(self, ctx: UserContext) -> dict[str, Any]:
         """Multi-objective planning (D8/D9): rank active objectives + detect conflicts/tradeoffs."""
         objs = self._active(await self._rows("life_objectives", ctx))
-        ranked = sorted(objs, key=lambda o: float(o.get("confidence") or 0), reverse=True)
+        vision = await self._rows("life_vision", ctx)
+        priority_root = ((vision[0].get("prompts") or {}).get("user_priority_root") if vision else None) or None
+        # Discovery Intelligence: rank by life-priority (not confidence-only); confirmed goals lead.
+        ranked = rank_objectives(objs, priority_root=priority_root)
         plan = [{"objective_id": o["id"], "title": o["title"], "root": o.get("root_objective_key"),
-                 "confidence": o.get("confidence"), "priority_rank": i + 1} for i, o in enumerate(ranked)]
+                 "confidence": o.get("confidence"), "confirmed": o.get("confirmed", True),
+                 "priority_rank": i + 1} for i, o in enumerate(ranked)]
         roots = {o.get("root_objective_key"): o for o in ranked}
         conflicts = []
         keys = [o.get("root_objective_key") for o in ranked]

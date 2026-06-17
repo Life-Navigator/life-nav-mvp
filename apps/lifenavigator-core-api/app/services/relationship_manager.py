@@ -30,7 +30,7 @@ _REJECTED_PHRASE_RE = re.compile(
 )
 
 from ..models.common import UserContext
-from .life_discovery import _now
+from .life_discovery import _now, _goal_domain
 
 LIFE = "life"
 
@@ -199,15 +199,45 @@ class RelationshipManager:
         done = await self._answered_keys(ctx)
         nxt = next((s for s in FLOW if s["key"] not in done), None)
         total = len(FLOW)
+        # Understanding-first selection (Discovery Intelligence): when the user has several competing goals,
+        # the priority step becomes a concrete tradeoff/postpone question — selected from the conflict, not
+        # from the highest-confidence objective. Derived from the user's OWN stated goals (candidate_goals).
+        competing = await self._competing_goal_labels(ctx)
+        nq = None
+        if nxt is not None:
+            prompt = nxt["prompt"]
+            if nxt["key"] == "priority" and len(competing) >= 2:
+                a, b = competing[0], competing[1]
+                prompt = (f"You've got several big goals in motion — {a} and {b} among them. "
+                          "If one needed to move more slowly so the others could succeed, "
+                          "which would be easiest for you to postpone?")
+            nq = {"key": nxt["key"], "prompt": prompt, "why_it_matters": nxt["why"],
+                  "domain": nxt["domain"], "options": nxt.get("options"), "optional": nxt.get("optional", False),
+                  "estimated_time": "~30 seconds"}
         return {
             "complete": nxt is None,
             "progress": {"answered": len(done & {s["key"] for s in FLOW}), "total": total},
-            "next_question": None if nxt is None else {
-                "key": nxt["key"], "prompt": nxt["prompt"], "why_it_matters": nxt["why"],
-                "domain": nxt["domain"], "options": nxt.get("options"), "optional": nxt.get("optional", False),
-                "estimated_time": "~30 seconds"},
+            "next_question": nq,
+            "competing_goals": competing,
             "answered": sorted(done),
         }
+
+    async def _competing_goal_labels(self, ctx: UserContext) -> list[str]:
+        """The user's own distinct stated goals (from candidate_goals), newest-first — used to frame a
+        real tradeoff question instead of anchoring on the highest-confidence objective. Never raises."""
+        try:
+            cands = await self._load_candidate_goals(ctx)
+        except Exception:  # noqa: BLE001
+            return []
+        seen, labels = set(), []
+        for g in cands:
+            text = str(g.get("goal_text") or g.get("goal") or "").strip()
+            dom = _goal_domain(text)
+            key = dom if dom != "core" else text.lower()
+            if text and key not in seen:
+                seen.add(key)
+                labels.append(text)
+        return labels
 
     async def answer(self, ctx: UserContext, key: str, answer_text: str) -> dict[str, Any]:
         """Record one answer → write it to the canonical Life Model immediately, then advance."""
@@ -234,6 +264,31 @@ class RelationshipManager:
             # V3 Sprint 2/8: a single answer may hold several goals — capture ALL candidates (each with
             # confidence + conversation-derived dependencies), never collapsed to one.
             written["candidate_goals"] = self._life.analyze_statement(ans)
+            # Narrative Model: preserve the user's OWN words + a deterministic multi-domain summary,
+            # stored separately from objectives so the story is never collapsed into one objective.
+            if key == "primary_goal":
+                domains = sorted({_goal_domain(g.get("goal") or "") for g in (written["candidate_goals"] or [])} - {"core"})
+                horizon = "the next 1–2 years" if any(m in ans.lower() for m in
+                          ("year", "month", "wedding", "soon", "promotion")) else None
+                summary = ("You're building across " + ", ".join(domains) if domains
+                           else "You're working toward several goals") + (f" over {horizon}" if horizon else "") + "."
+                await self._update_vision(ctx, prompt_updates={"narrative": ans.strip(), "narrative_summary": summary})
+                written["narrative_summary"] = summary
+        elif step["kind"] == "context" and ans:
+            # PRIORITY CAPTURE (was a no-op): record the user's stated priority AND let it lead ranking.
+            priority_root = self._life.classify_priority(ans)
+            await self._update_vision(ctx, prompt_updates={"user_priority": ans.strip(),
+                                                           "user_priority_root": priority_root})
+            # The user explicitly chose what matters most → CONFIRM that objective (a candidate becomes real
+            # and outranks persona seeds). Bumps updated_at so recency + priority both favor it.
+            if priority_root:
+                await self._sb.update("life_objectives",
+                                      {"confirmed": True, "origin": "user", "updated_at": _now()},
+                                      filters={"user_id": f"eq.{ctx.user_id}",
+                                               "root_objective_key": f"eq.{priority_root}", "status": "eq.active"},
+                                      schema=LIFE)
+            written["wrote"] = "life.life_vision.prompts.user_priority"
+            written["priority_root"] = priority_root
         elif step["kind"] == "risk":
             label, tol = next(((lbl, t) for k, (lbl, t) in _RISK_MAP.items() if k in ans.lower()), ("moderate", 60))
             await self._sb.upsert("risk_profiles", {"user_id": ctx.user_id, "tenant_id": ctx.user_id,

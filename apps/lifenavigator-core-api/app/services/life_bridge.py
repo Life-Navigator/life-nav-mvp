@@ -89,8 +89,12 @@ class LifeBridgeService:
             sources.append("user_persona_profile")
         for phrase in dict.fromkeys(goal_phrases):  # dedupe, preserve order
             try:
+                # Candidate protection: persona goals are SEEDS, not confirmed objectives. They stay
+                # unconfirmed (origin='persona_bridge') so they can never auto-become the primary
+                # objective (the "financial independence" bug) — the user must state/confirm a goal to lead.
                 await self._life.discover_goal(ctx, surface_goal=phrase, why_chain=[{"q": "onboarding goal", "a": phrase}],
-                                               root_override=_root_for(phrase))
+                                               root_override=_root_for(phrase),
+                                               confirmed=False, origin="persona_bridge")
                 bridged_goals += 1
             except Exception:  # noqa: BLE001
                 continue
