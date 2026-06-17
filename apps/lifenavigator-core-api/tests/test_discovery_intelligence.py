@@ -315,7 +315,8 @@ async def _next_q(stmt):
 async def test_crisis_gets_warm_stabilization_question_not_tradeoff():
     q = (await _next_q("I have $18,000 in credit card debt, struggling to make payments, worried about "
                        "losing my apartment, my relationship is suffering, I feel overwhelmed.")).lower()
-    assert "stable ground" in q and "postpone" not in q
+    assert ("breathe" in q or "relieve" in q or "pressure" in q) and "postpone" not in q
+    assert "debt" in q  # references the user's actual situation, not a generic prompt
 
 
 @pytest.mark.asyncio

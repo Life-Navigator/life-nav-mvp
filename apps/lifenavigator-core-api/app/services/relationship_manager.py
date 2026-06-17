@@ -30,22 +30,7 @@ _REJECTED_PHRASE_RE = re.compile(
 )
 
 from ..models.common import UserContext
-from .life_discovery import _now, _goal_domain, dominant_narrative
-
-# Narrative-aware openers — used when there is no multi-goal tradeoff to pose, so the next question is
-# framed around the user's life story (warm + specific) instead of a generic "which matters most?".
-_NARRATIVE_OPENERS: dict[str, str] = {
-    "financial_stabilization": "It sounds like the most pressing thing is getting back to stable ground. "
-        "What feels like the most urgent pressure right now — the debt, keeping your housing secure, or something else?",
-    "health_life_balance": "It sounds like your health and time with the people you love matter most right now. "
-        "If we protected one of those first, which would make the biggest difference?",
-    "legacy_entrepreneurship": "It sounds like you're building something meaningful for the long term. "
-        "Of everything in motion, which effort would move the needle most on the legacy you want to build?",
-    "career_acceleration": "It sounds like career momentum is the priority right now. "
-        "Which move feels most likely to accelerate you — the role, the credential, or the network?",
-    "family_foundation": "It sounds like you're building toward a family foundation. "
-        "Of everything you mentioned, which milestone feels most time-sensitive?",
-}
+from .life_discovery import _now, _goal_domain, dominant_narrative, narrative_question
 
 LIFE = "life"
 
@@ -219,26 +204,21 @@ class RelationshipManager:
         # from the highest-confidence objective. Derived from the user's OWN stated goals (candidate_goals).
         competing = await self._competing_goal_labels(ctx)
         nq = None
-        # The "which would you postpone?" tradeoff fits ACTIVE multi-pursuit lives (juggling ambitions);
-        # for burnout / financial-crisis lives it would be tone-deaf ("postpone your children?"), so those
-        # get a warm, narrative-specific opener instead.
-        _ACTIVE_PURSUIT = {"family_foundation", "career_acceleration", "legacy_entrepreneurship"}
         if nxt is not None:
             prompt = nxt["prompt"]
+            # The priority question is the key discovery moment — make it PROVE we understood the user:
+            # a context-rich question built from their narrative + goals + conflict + emotional state,
+            # not a generic "which matters most?". narrative_question handles tradeoff-vs-warm per theme.
             if nxt["key"] == "priority":
                 try:
                     vis = await self._vision_row(ctx)
                     narrative_text = str((vis.get("prompts") or {}).get("narrative") or "")
-                    nar_key = dominant_narrative(await self._load_candidate_goals(ctx), narrative_text).get("key")
+                    nar = dominant_narrative(await self._load_candidate_goals(ctx), narrative_text)
+                    q = narrative_question(nar.get("key"), competing, nar.get("signals"))
+                    if q:
+                        prompt = q
                 except Exception:  # noqa: BLE001
-                    nar_key = None
-                if len(competing) >= 2 and nar_key in _ACTIVE_PURSUIT:
-                    a, b = competing[0], competing[1]
-                    prompt = (f"You've got several big goals in motion — {a} and {b} among them. "
-                              "If one needed to move more slowly so the others could succeed, "
-                              "which would be easiest for you to postpone?")
-                elif nar_key in _NARRATIVE_OPENERS:
-                    prompt = _NARRATIVE_OPENERS[nar_key]
+                    pass
             nq = {"key": nxt["key"], "prompt": prompt, "why_it_matters": nxt["why"],
                   "domain": nxt["domain"], "options": nxt.get("options"), "optional": nxt.get("optional", False),
                   "estimated_time": "~30 seconds"}
@@ -483,7 +463,9 @@ class RelationshipManager:
                 )
             else:
                 reflection = "Thanks — got it. "
-            st = res  # answer() already returns the advanced state
+            # Recompute state AFTER candidate goals are persisted (above) so the next question is
+            # narrative/conflict-aware — answer()'s own state ran before this turn's goals were saved.
+            st = await self.state(ctx)
         else:
             st = await self.state(ctx)
 

@@ -291,6 +291,12 @@ def dominant_narrative(candidate_goals: list[dict[str, Any]], narrative_text: st
     doms = Counter(_goal_domain(str(g.get("goal_text") or g.get("goal") or "")) for g in candidate_goals)
     doms.pop("core", None)
     present = set(doms)
+    # Robustness: also read domains directly from the raw narrative text, so family/career are detected
+    # even before per-goal candidate rows are persisted (avoids a generic fallback on the first turn).
+    nt = (narrative_text or "").lower()
+    for dom, kws in _DOMAIN_KW:
+        if dom not in present and any(kw in nt for kw in kws):
+            present.add(dom)
     if sig["family_deprioritized"]:
         present.discard("family")
 
@@ -331,6 +337,52 @@ def dominant_narrative(candidate_goals: list[dict[str, Any]], narrative_text: st
     if "finance" in present:
         return out("financial_stabilization", "Getting finances onto stable footing.", 0.6)
     return out("exploring", "Still taking shape — exploring what matters most.", 0.3)
+
+
+def _humanize_list(items: list[str]) -> str:
+    items = [str(i).strip() for i in items if str(i).strip()]
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
+def narrative_question(narrative_key: Optional[str], goals: Optional[list[str]] = None,
+                       signals: Optional[list[str]] = None) -> Optional[str]:
+    """Build a discovery question that PROVES Arcana understood the user — it references the user's own
+    goals, the conflict between them, the constraint, or the emotional state. Returns None to let the
+    caller fall back to a FLOW prompt (should be rare). No generic question is produced here."""
+    goals = [g for g in (goals or []) if str(g).strip()][:3]
+    g_join = _humanize_list(goals)
+    if narrative_key == "family_foundation":
+        if len(goals) >= 2:
+            return (f"{g_join} all seem to be converging over the next year or two — and they're competing "
+                    "for the same time, money, and energy. If one had to move more slowly so the others "
+                    "could succeed, which would be easiest for you to postpone?")
+        return ("It sounds like you're building toward a family foundation. Of everything you're planning, "
+                "which milestone would feel least flexible if life didn't go exactly to plan?")
+    if narrative_key == "legacy_entrepreneurship":
+        return ("You're balancing building something meaningful, your family, and several opportunities at "
+                "once. Which of these would feel like the biggest regret ten years from now if it didn't "
+                "happen?")
+    if narrative_key == "career_acceleration":
+        if len(goals) >= 2:
+            return (f"You mentioned a few paths — {g_join}. Which one feels most aligned with the person you "
+                    "ultimately want to become?")
+        return ("It sounds like career momentum is the priority right now. Which move would open the most "
+                "doors over the next two years — the role, the credential, or the network?")
+    if narrative_key == "health_life_balance":
+        return ("You sound less focused on earning more and more on whether your current pace is "
+                "sustainable. What feels most out of balance right now — your health, your time, or your "
+                "energy with the people you love?")
+    if narrative_key == "financial_stabilization":
+        return ("It sounds like easing the pressure matters more right now than chasing growth. If we could "
+                "relieve one thing in the next 90 days — the debt, keeping your housing secure, or the "
+                "strain it's putting on your relationship — which would help you breathe again?")
+    return None
 
 
 class LifeDiscoveryService:
