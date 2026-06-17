@@ -385,6 +385,34 @@ def narrative_question(narrative_key: Optional[str], goals: Optional[list[str]] 
     return None
 
 
+def narrative_step_prompt(step_key: str, narrative_key: Optional[str], goals: Optional[list[str]] = None,
+                          signals: Optional[list[str]] = None) -> Optional[str]:
+    """Narrative-aware wording for the NON-priority discovery steps (financial_goal / time_horizon /
+    constraint), so they reference the user's life instead of a generic template. Returns None to fall
+    back to the FLOW prompt (e.g. the risk step keeps its behavioral probe + options)."""
+    goals = [g for g in (goals or []) if str(g).strip()][:3]
+    top = goals[0] if goals else None
+    sigs = set(signals or [])
+    if step_key == "financial_goal":
+        if narrative_key == "financial_stabilization":
+            return ("To get specific about the relief — roughly how much is the debt, and what's the one "
+                    "bill or payment that worries you most month to month?")
+        return ("How does money fit into all this — is it the main lever, more of a constraint, or honestly "
+                "not the thing you're most worried about right now?")
+    if step_key == "time_horizon":
+        if top:
+            return (f"For {top}, what timeline are you working toward — and does the rest of your plan need "
+                    "to happen around it?")
+        return ("What's the timeline you're picturing for the things that matter most — months, a couple of "
+                "years, or longer?")
+    if step_key == "constraint":
+        if "burnout" in sigs or narrative_key == "health_life_balance":
+            return ("What's the biggest thing draining your time or energy that we'd need to work around?")
+        return ("Looking at everything you're carrying, what's most likely to get in the way — time, money, "
+                "energy, or something else?")
+    return None
+
+
 class LifeDiscoveryService:
     def __init__(self, supabase: Any) -> None:
         self._sb = supabase

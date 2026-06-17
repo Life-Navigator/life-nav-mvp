@@ -30,7 +30,9 @@ _REJECTED_PHRASE_RE = re.compile(
 )
 
 from ..models.common import UserContext
-from .life_discovery import _now, _goal_domain, dominant_narrative, narrative_question
+from .life_discovery import (
+    _now, _goal_domain, dominant_narrative, narrative_question, narrative_step_prompt,
+)
 
 LIFE = "life"
 
@@ -206,15 +208,19 @@ class RelationshipManager:
         nq = None
         if nxt is not None:
             prompt = nxt["prompt"]
-            # The priority question is the key discovery moment — make it PROVE we understood the user:
-            # a context-rich question built from their narrative + goals + conflict + emotional state,
-            # not a generic "which matters most?". narrative_question handles tradeoff-vs-warm per theme.
-            if nxt["key"] == "priority":
+            # Make EVERY question prove we understood the user — a context-rich prompt built from their
+            # narrative + goals + conflict + emotional state, not a generic template. The priority step is
+            # the decisive moment; financial_goal/time_horizon/constraint are reframed around their life
+            # too. (risk keeps its behavioral probe + options.)
+            if nxt["key"] in ("priority", "financial_goal", "time_horizon", "constraint"):
                 try:
                     vis = await self._vision_row(ctx)
                     narrative_text = str((vis.get("prompts") or {}).get("narrative") or "")
                     nar = dominant_narrative(await self._load_candidate_goals(ctx), narrative_text)
-                    q = narrative_question(nar.get("key"), competing, nar.get("signals"))
+                    if nxt["key"] == "priority":
+                        q = narrative_question(nar.get("key"), competing, nar.get("signals"))
+                    else:
+                        q = narrative_step_prompt(nxt["key"], nar.get("key"), competing, nar.get("signals"))
                     if q:
                         prompt = q
                 except Exception:  # noqa: BLE001
