@@ -265,6 +265,7 @@ def emotional_signals(text: str) -> dict[str, bool]:
         "money_fine": has("financially i am doing fine", "financially i'm fine", "financially fine", "doing fine financially", "compensation is good", "comp is good", "money is fine", "financially secure"),
         "ambition": has("director", "extremely hard", "top ai lab", "get promoted", "promotion", "founder", "start a startup", "a startup", "mba", "become a"),
         "family": has("wedding", "married", "marry", "fianc", "kids", "children", "baby", "start a family", "raising", "family"),
+        "legacy": has("legacy", "build something meaningful", "things that matter", "change how people", "change the world", "building a company", "build a company", "multiple businesses", "my businesses", "venture capital", "raise venture"),
         "family_deprioritized": has("don't have children", "do not have children", "no children", "without children", "prioritizing my career", "comfortable prioritizing", "not planning kids"),
         "urgency": has("in a year", "12 month", "this year", "next year", " soon", "right now", "immediately", "weeks"),
     }
@@ -274,6 +275,7 @@ def emotional_signals(text: str) -> dict[str, bool]:
 NARRATIVE_THEMES: dict[str, str] = {
     "financial_stabilization": "Financial stabilization",
     "health_life_balance": "Health & life balance",
+    "legacy_entrepreneurship": "Legacy & entrepreneurship",
     "career_acceleration": "Career acceleration",
     "family_foundation": "Building a family foundation",
     "exploring": "Still taking shape",
@@ -296,15 +298,22 @@ def dominant_narrative(candidate_goals: list[dict[str, Any]], narrative_text: st
         return {"key": key, "label": NARRATIVE_THEMES[key], "summary": summary,
                 "domains": dict(doms), "signals": [k for k, v in sig.items() if v], "confidence": conf}
 
-    # 1) Distress + money trouble → stabilize before optimizing.
-    if sig["money_stress"] and (sig["distress"] or "finance" in present):
+    # 1) Distress + money trouble → stabilize before optimizing. BOTH are required: merely having a
+    #    "pay off my credit card" goal is not a crisis — distress (overwhelmed/worried/losing housing) is.
+    if sig["money_stress"] and sig["distress"]:
         return out("financial_stabilization",
                    "Getting back to stable ground — reducing debt and securing the essentials before anything else.", 0.9)
     # 2) Burnout / overwork (and money is not the worry) → reclaim health, time, family.
     if (sig["burnout"] or (sig["money_fine"] and "health" in present)) and not sig["money_stress"]:
         return out("health_life_balance",
                    "Reclaiming health, time, and presence with family after a stretch of overwork.", 0.85)
-    # 3) Career/education focus with family deprioritized → career acceleration.
+    # 3) Legacy / entrepreneurship — building meaningful companies + a lasting legacy (career & finance
+    #    are means, not ends). Checked before career/family so a founder isn't mislabeled.
+    if sig["legacy"]:
+        return out("legacy_entrepreneurship",
+                   "Building meaningful companies and a lasting legacy for your family — with career and "
+                   "finances as the means, not the destination.", 0.85)
+    # 4) Career/education focus with family deprioritized → career acceleration.
     if (("career" in present) or ("education" in present)) and "family" not in present and sig["ambition"]:
         return out("career_acceleration",
                    "Pushing hard on career advancement and the moves and skills that accelerate it.", 0.85)

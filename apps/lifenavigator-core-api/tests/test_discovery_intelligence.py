@@ -269,3 +269,66 @@ async def test_narrative_validation_with_persona_seed(name):
     snap = await life.snapshot(ctx)
     assert snap["dominant_narrative"]["key"] == expected           # life story wins
     assert snap["dominant_narrative"]["key"] != "financial_stabilization" or expected == "financial_stabilization"
+
+
+# ── Real-user gate: founder/legacy theme + narrative drift ─────────────────────────────────────────
+def test_dominant_narrative_founder_legacy():
+    life = LifeDiscoveryService(FakeSupabase({}))
+    stmt = ("I am building a company that can change how people make life decisions. I want to build "
+            "something meaningful and create a legacy for my family. I'm balancing family, health, law "
+            "school, career, and multiple businesses. Financial independence matters mostly for freedom "
+            "to spend time with family and build things that matter.")
+    assert dominant_narrative(life.analyze_statement(stmt), stmt)["key"] == "legacy_entrepreneurship"
+
+
+def test_narrative_drift_evolves_on_major_life_event():
+    life = LifeDiscoveryService(FakeSupabase({}))
+    career = "I'm 28, I work in AI, I want to become a director before 40, considering an MBA or a top AI lab."
+    before = dominant_narrative(life.analyze_statement(career), career)["key"]
+    after_text = career + " I am getting married next year."
+    after = dominant_narrative(life.analyze_statement(after_text), after_text)["key"]
+    assert before == "career_acceleration"
+    assert after != before  # a major life event (marriage) is NOT ignored — the narrative evolves
+
+
+def test_narrative_not_sticky_legacy_absorbs_vc():
+    life = LifeDiscoveryService(FakeSupabase({}))
+    base = "I'm building a company and creating a legacy for my family with multiple businesses."
+    drift = base + " I may have an opportunity to raise venture capital."
+    assert dominant_narrative(life.analyze_statement(drift), drift)["key"] == "legacy_entrepreneurship"
+
+
+# ── Question quality for the real-user gate (warmth for crisis/burnout; concrete tradeoff otherwise) ──
+async def _next_q(stmt):
+    sb = FakeSupabase({}); life = LifeDiscoveryService(sb); rm = RelationshipManager(sb, life)
+    ctx = UserContext(user_id="qu")
+    cur = await rm.converse(ctx, "", None)
+    for _ in range(4):
+        pk = cur.get("pending_key")
+        if pk == "primary_goal":
+            await rm.converse(ctx, stmt, pk); break
+        cur = await rm.converse(ctx, "a good life" if pk == "vision" else "x", pk)
+    return ((await rm.state(ctx)).get("next_question") or {}).get("prompt", "")
+
+
+@pytest.mark.asyncio
+async def test_crisis_gets_warm_stabilization_question_not_tradeoff():
+    q = (await _next_q("I have $18,000 in credit card debt, struggling to make payments, worried about "
+                       "losing my apartment, my relationship is suffering, I feel overwhelmed.")).lower()
+    assert "stable ground" in q and "postpone" not in q
+
+
+@pytest.mark.asyncio
+async def test_burnout_gets_balance_question_not_postpone_children():
+    q = (await _next_q("I make good money. I have two children. I travel constantly. I am exhausted. I have "
+                       "gained weight. I am missing time with my family.")).lower()
+    assert "postpone" not in q  # never "would you postpone your children?"
+    assert "health" in q or "love" in q  # warm balance framing
+
+
+@pytest.mark.asyncio
+async def test_multipursuit_gets_concrete_tradeoff():
+    q = await _next_q("Pay off my credit card, save for my wedding, buy a house, start a family, get a "
+                      "promotion at NVIDIA, and start a Masters in AI.")
+    assert "postpone" in q.lower()
+    assert "i am " not in q.lower() and "willing to" not in q.lower()  # names goals, not context/feelings
