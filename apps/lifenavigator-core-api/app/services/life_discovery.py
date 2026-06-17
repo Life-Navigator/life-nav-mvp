@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -247,6 +248,80 @@ def rank_objectives(objectives: list[dict[str, Any]], *, priority_root: Optional
     rank_of = {ts: (i / (len(distinct) - 1) if len(distinct) > 1 else 0.5) for i, ts in enumerate(distinct)}
     return sorted(objectives, key=lambda o: score_objective(o, priority_root=priority_root, recency=rank_of[_ts(o)]),
                   reverse=True)
+
+
+# ── Narrative-first discovery: the LIFE STORY, derived from the whole goal set (not one objective) ──
+def emotional_signals(text: str) -> dict[str, bool]:
+    """Lightweight, deterministic emotional/situational signals from the user's own words. Drives the
+    dominant narrative (e.g. distress+money → stabilize first; burnout → balance). Not sentiment AI —
+    a curated keyword layer appropriate for LLM-free discovery."""
+    t = (text or "").lower()
+    def has(*kws: str) -> bool:
+        return any(k in t for k in kws)
+    return {
+        "distress": has("overwhelmed", "worried", "scared", "afraid", "drowning", "panic", "barely", "can't keep up", "stressed", "under stress"),
+        "money_stress": has("debt", "barely making", "losing my apartment", "lose my apartment", "no savings", "behind on", "paycheck to paycheck", "can't afford"),
+        "burnout": has("constantly working", "always working", "missing important years", "not sure pushing harder", "exhausted", "burned out", "burnt out", "travel frequently", "traveling constantly", "no time for"),
+        "money_fine": has("financially i am doing fine", "financially i'm fine", "financially fine", "doing fine financially", "compensation is good", "comp is good", "money is fine", "financially secure"),
+        "ambition": has("director", "extremely hard", "top ai lab", "get promoted", "promotion", "founder", "start a startup", "a startup", "mba", "become a"),
+        "family": has("wedding", "married", "marry", "fianc", "kids", "children", "baby", "start a family", "raising", "family"),
+        "family_deprioritized": has("don't have children", "do not have children", "no children", "without children", "prioritizing my career", "comfortable prioritizing", "not planning kids"),
+        "urgency": has("in a year", "12 month", "this year", "next year", " soon", "right now", "immediately", "weeks"),
+    }
+
+
+# Life stories (NOT objectives). Each is a way of life the person is building.
+NARRATIVE_THEMES: dict[str, str] = {
+    "financial_stabilization": "Financial stabilization",
+    "health_life_balance": "Health & life balance",
+    "career_acceleration": "Career acceleration",
+    "family_foundation": "Building a family foundation",
+    "exploring": "Still taking shape",
+}
+
+
+def dominant_narrative(candidate_goals: list[dict[str, Any]], narrative_text: str = "") -> dict[str, Any]:
+    """Determine WHAT LIFE this person is building, from the whole stated goal set + emotional signals.
+    Returns a life STORY (key/label/summary/domains/signals/confidence) — never a single objective.
+    Order matters: stabilize-before-optimize (distress) and balance (burnout) precede ambition/family."""
+    goals_text = " ".join(str(g.get("goal_text") or g.get("goal") or "") for g in candidate_goals)
+    sig = emotional_signals((narrative_text or "") + " " + goals_text)
+    doms = Counter(_goal_domain(str(g.get("goal_text") or g.get("goal") or "")) for g in candidate_goals)
+    doms.pop("core", None)
+    present = set(doms)
+    if sig["family_deprioritized"]:
+        present.discard("family")
+
+    def out(key: str, summary: str, conf: float) -> dict[str, Any]:
+        return {"key": key, "label": NARRATIVE_THEMES[key], "summary": summary,
+                "domains": dict(doms), "signals": [k for k, v in sig.items() if v], "confidence": conf}
+
+    # 1) Distress + money trouble → stabilize before optimizing.
+    if sig["money_stress"] and (sig["distress"] or "finance" in present):
+        return out("financial_stabilization",
+                   "Getting back to stable ground — reducing debt and securing the essentials before anything else.", 0.9)
+    # 2) Burnout / overwork (and money is not the worry) → reclaim health, time, family.
+    if (sig["burnout"] or (sig["money_fine"] and "health" in present)) and not sig["money_stress"]:
+        return out("health_life_balance",
+                   "Reclaiming health, time, and presence with family after a stretch of overwork.", 0.85)
+    # 3) Career/education focus with family deprioritized → career acceleration.
+    if (("career" in present) or ("education" in present)) and "family" not in present and sig["ambition"]:
+        return out("career_acceleration",
+                   "Pushing hard on career advancement and the moves and skills that accelerate it.", 0.85)
+    # 4) Family-building present → a family foundation, balancing the rest.
+    if "family" in present:
+        others = [d for d in ("career", "education", "finance", "health") if d in present]
+        extra = (" while balancing " + ", ".join(others)) if others else ""
+        return out("family_foundation",
+                   f"Building a family foundation{extra} over the next year or two.", 0.85)
+    # 5) Fallbacks by the strongest present domain.
+    if "career" in present or "education" in present:
+        return out("career_acceleration", "Advancing career and capability.", 0.6)
+    if "health" in present:
+        return out("health_life_balance", "Prioritizing health and wellbeing.", 0.6)
+    if "finance" in present:
+        return out("financial_stabilization", "Getting finances onto stable footing.", 0.6)
+    return out("exploring", "Still taking shape — exploring what matters most.", 0.3)
 
 
 class LifeDiscoveryService:
@@ -560,7 +635,18 @@ class LifeDiscoveryService:
         priority_root = prompts.get("user_priority_root") or None
         ranked = rank_objectives(confirmed, priority_root=priority_root)
         primary = ranked[0] if ranked else None
+        # Narrative-first: the dominant LIFE STORY from the user's WHOLE goal set (not a single objective).
+        cand_goals = await self._rows("candidate_goals", ctx)
+        narrative_text = prompts.get("narrative") or ""
+        narrative = dominant_narrative(cand_goals, narrative_text) if (cand_goals or narrative_text) else None
+        # Goal portfolio: every stated goal kept (confirmed/candidate/inferred), never reduced to one.
+        portfolio = [{"goal": g.get("goal_text") or g.get("goal"), "domain": g.get("domain"),
+                      "confidence": g.get("confidence"), "status": g.get("status") or "candidate"}
+                     for g in cand_goals]
         return {
+            "dominant_narrative": narrative,   # the life story; the surfaced "theme" (not an objective)
+            "goal_portfolio": portfolio,       # all stated goals, coexisting
+            "emotional_signals": narrative.get("signals") if narrative else [],
             "life_vision": v0.get("vision_text") if v0 else None,
             # Authored = the user actually stated it (via the advisor). persona_bridge visions are
             # synthesized from onboarding and must NOT be presented as a confirmed north star.

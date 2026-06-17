@@ -195,3 +195,77 @@ async def test_validation_example_family_not_financial_independence():
     assert st["next_question"]["key"] == "priority"
     assert "postpone" in st["next_question"]["prompt"].lower()
     assert "financial independence" not in st["next_question"]["prompt"].lower()
+
+
+# ── Narrative-first discovery (validation sprint): the LIFE STORY, not a single objective ──────────
+from app.services.life_discovery import dominant_narrative, emotional_signals  # noqa: E402
+from app.services.life_bridge import LifeBridgeService  # noqa: E402
+
+_PERSONAS = {
+    "A_family": ("I want to pay off my credit card and save for a down payment and for my wedding. I'm getting "
+                 "married in a year and want to buy a house then because we want to start a family soon after. "
+                 "I'm also getting in shape for my wedding. I want a promotion as a junior software engineer at "
+                 "NVIDIA, and I'm considering a Masters in AI at UT Austin.", "family_foundation"),
+    "B_burnout": ("Financially I'm fine. My concern is I'm constantly working. I have two children. I travel "
+                  "frequently and feel like I'm missing important years with my family. I'm sleeping poorly and "
+                  "have gained weight. My comp is good but I'm not sure pushing harder is what I want anymore.",
+                  "health_life_balance"),
+    "C_career": ("I'm 28, I work in AI, and I want to become a director before 40. I'm willing to work extremely "
+                 "hard for the next decade. I'm considering an MBA, a startup, or joining a top AI lab. I don't "
+                 "have children and I'm comfortable prioritizing my career.", "career_acceleration"),
+    "D_stress": ("I have about $18,000 in credit card debt and I'm barely making payments. I'm worried about "
+                 "losing my apartment. I don't have savings. My relationship is under stress because of money. "
+                 "I feel overwhelmed.", "financial_stabilization"),
+}
+
+
+@pytest.mark.parametrize("name", list(_PERSONAS))
+def test_dominant_narrative_per_persona(name):
+    stmt, expected = _PERSONAS[name]
+    life = LifeDiscoveryService(FakeSupabase({}))
+    nar = dominant_narrative(life.analyze_statement(stmt), stmt)
+    assert nar["key"] == expected, f"{name}: got {nar['key']}, expected {expected}"
+
+
+def test_emotional_signals_detects_distress_and_burnout():
+    assert emotional_signals("I'm overwhelmed and worried about losing my apartment, $18k in debt")["money_stress"]
+    assert emotional_signals("I am constantly working and missing important years with my family")["burnout"]
+    assert emotional_signals("I don't have children and I'm comfortable prioritizing my career")["family_deprioritized"]
+
+
+@pytest.mark.parametrize("name", list(_PERSONAS))
+@pytest.mark.asyncio
+async def test_narrative_validation_end_to_end_clean(name):
+    """Phase 9 — full pipeline, pure user narrative: the surfaced theme matches the person's life story."""
+    stmt, expected = _PERSONAS[name]
+    sb = FakeSupabase({}); life = LifeDiscoveryService(sb)
+    rm = RelationshipManager(sb, life); ctx = UserContext(user_id="u-" + name)
+    cur = await rm.converse(ctx, "", None)
+    for _ in range(4):
+        pk = cur.get("pending_key")
+        if pk == "primary_goal":
+            await rm.converse(ctx, stmt, pk); break
+        cur = await rm.converse(ctx, "a good life" if pk == "vision" else "x", pk)
+    snap = await life.snapshot(ctx)
+    assert snap["dominant_narrative"]["key"] == expected
+    assert len(snap["goal_portfolio"]) >= 2  # multiple goals coexist (not collapsed to one)
+
+
+@pytest.mark.parametrize("name", list(_PERSONAS))
+@pytest.mark.asyncio
+async def test_narrative_validation_with_persona_seed(name):
+    """Phase 9 — same, WITH a financial persona seed: persona never overrides the user's life story."""
+    stmt, expected = _PERSONAS[name]
+    sb = FakeSupabase({"user_persona_profile": [{"user_id": "u2-" + name,
+        "primary_goals": ["retire comfortably", "build wealth"], "display_name": "Sandbox"}]})
+    life = LifeDiscoveryService(sb)
+    rm = RelationshipManager(sb, life, LifeBridgeService(sb, life)); ctx = UserContext(user_id="u2-" + name)
+    cur = await rm.converse(ctx, "", None)
+    for _ in range(4):
+        pk = cur.get("pending_key")
+        if pk == "primary_goal":
+            await rm.converse(ctx, stmt, pk); break
+        cur = await rm.converse(ctx, "a good life" if pk == "vision" else "x", pk)
+    snap = await life.snapshot(ctx)
+    assert snap["dominant_narrative"]["key"] == expected           # life story wins
+    assert snap["dominant_narrative"]["key"] != "financial_stabilization" or expected == "financial_stabilization"

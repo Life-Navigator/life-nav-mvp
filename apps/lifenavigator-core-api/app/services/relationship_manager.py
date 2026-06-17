@@ -327,9 +327,14 @@ class RelationshipManager:
         except Exception:  # noqa: BLE001
             return {}
         po = snap.get("primary_objective") or {}
+        nar = snap.get("dominant_narrative") or {}
         # P0.2: the confirmation renders THESE accumulated goals (the user's own words), not a stale label.
         cands = await self._load_candidate_goals(ctx)
-        return {"life_vision": snap.get("life_vision"), "primary_objective": po.get("title"),
+        return {"life_vision": snap.get("life_vision"),
+                # Narrative-first: the surfaced THEME is the life story, not a single objective.
+                "dominant_narrative": nar.get("summary"), "narrative_theme": nar.get("label"),
+                "goal_portfolio": snap.get("goal_portfolio"), "emotional_signals": snap.get("emotional_signals"),
+                "primary_objective": po.get("title"),
                 "candidate_goals": cands,
                 "priorities_i_heard": [c["goal"] for c in cands],
                 "domains_touched": sorted({c["domain"] for c in cands if c["domain"] != "core"}),
