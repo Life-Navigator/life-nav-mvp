@@ -2,13 +2,48 @@
  * Google OAuth Callback Handler
  *
  * Handles the OAuth 2.0 callback from Google, exchanges the authorization code
- * for access tokens, and stores the tokens for the user.
+ * for tokens, and persists them the SAME way the Microsoft callback does:
+ * ENCRYPTED in Supabase `core.integration_tokens` via the service-role
+ * `upsert_integration_token` RPC (AES-256 with INTEGRATION_ENCRYPTION_KEY).
+ *
+ * SECURITY INVARIANTS:
+ *  - Tokens are stored encrypted, server-side only, scoped to user_id. They are
+ *    NEVER returned to the browser and NEVER logged.
+ *  - The auth `code` is consumed during the exchange and never persisted; the
+ *    OAuth query params (code/state) are dropped via a clean redirect.
+ *  - The email/calendar routes read this token back through the same
+ *    `get_integration_token` RPC, so connect → status → messages/events works
+ *    end-to-end against Supabase (no dependency on a non-existent core-api
+ *    endpoint).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 import { createGoogleOAuthService } from '@/lib/integrations/google/oauth';
-import { requireEnvUrl, MissingEnvError } from '@/lib/security/env';
+import { getUserIdFromJWT } from '@/lib/jwt';
+import { logIntegrationEvent, classifyError } from '@/lib/integrations/auditLog';
+
+function getSupabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return null;
+  return createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+function parseRedirectPath(state: string): string {
+  try {
+    const stateData = JSON.parse(Buffer.from(state.split('.')[0], 'base64url').toString('utf8'));
+    if (stateData?.redirect && typeof stateData.redirect === 'string') {
+      return stateData.redirect;
+    }
+  } catch {
+    // keep default
+  }
+  return '/settings/integrations';
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -17,9 +52,8 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error');
   const errorDescription = searchParams.get('error_description');
 
-  // Handle OAuth errors
+  // Handle OAuth errors (never echo provider internals beyond the safe code).
   if (error) {
-    console.error('Google OAuth error:', error, errorDescription);
     return NextResponse.redirect(
       new URL(
         `/settings/integrations?error=${encodeURIComponent(error)}&message=${encodeURIComponent(errorDescription || 'OAuth authorization failed')}`,
@@ -36,91 +70,106 @@ export async function GET(request: NextRequest) {
   // Validate state parameter (CSRF protection)
   const cookieStore = await cookies();
   const storedState = cookieStore.get('google_oauth_state')?.value;
-
   if (!state || state !== storedState) {
-    console.error('OAuth state mismatch', { received: state, stored: storedState });
     return NextResponse.redirect(
       new URL('/settings/integrations?error=invalid_state', request.url)
     );
   }
 
+  // Identify the user from the Supabase session (same as the Microsoft path).
+  const userId = await getUserIdFromJWT(request);
+  if (!userId) {
+    return NextResponse.redirect(new URL('/login?redirect=/settings/integrations', request.url));
+  }
+
+  const encryptionKey = process.env.INTEGRATION_ENCRYPTION_KEY;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  // Honest disabled state when OAuth / crypto isn't configured.
+  if (!clientId || !clientSecret || !encryptionKey) {
+    return NextResponse.redirect(
+      new URL('/settings/integrations?error=oauth_not_configured', request.url)
+    );
+  }
+
+  await logIntegrationEvent({
+    userId,
+    provider: 'google',
+    action: 'connect_start',
+    context: { route: 'oauth/callback/google' },
+  });
+
   try {
-    // Exchange authorization code for tokens
+    // Exchange authorization code for tokens (code is consumed here, never stored).
     const oauthService = createGoogleOAuthService();
     const tokens = await oauthService.exchangeCode(code);
 
-    // Get user info to associate with tokens
-    const userInfo = await oauthService.getUserInfo(tokens.accessToken);
-
-    // Get current session token for API authentication
-    const sessionToken = cookieStore.get('session_token')?.value;
-
-    if (!sessionToken) {
-      return NextResponse.redirect(new URL('/login?redirect=/settings/integrations', request.url));
-    }
-
-    // Store tokens in backend
-    let backendUrl: string;
+    // Get provider account info to associate with the stored token.
+    let externalAccountId: string | null = null;
+    let externalEmail: string | null = null;
     try {
-      backendUrl = requireEnvUrl('NEXT_PUBLIC_API_URL');
-    } catch (cfg) {
-      if (cfg instanceof MissingEnvError) {
-        return NextResponse.redirect(
-          new URL('/settings/integrations?error=service_unavailable', request.url)
-        );
-      }
-      throw cfg;
+      const userInfo = await oauthService.getUserInfo(tokens.accessToken);
+      externalAccountId = userInfo.id ?? null;
+      externalEmail = userInfo.email ?? null;
+    } catch {
+      // Non-fatal: we can still persist the token without the profile email.
     }
-    const saveResponse = await fetch(`${backendUrl}/api/v1/integrations/google/tokens`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${sessionToken}`,
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      throw new Error('supabase_admin_unconfigured');
+    }
+
+    // Persist ENCRYPTED via the same RPC Microsoft uses. The RPC encrypts
+    // access + refresh tokens with INTEGRATION_ENCRYPTION_KEY and upserts the
+    // public.integrations status row to 'connected'.
+    const { error: upsertError } = await supabase.rpc('upsert_integration_token', {
+      p_user_id: userId,
+      p_provider: 'google',
+      p_access_token: tokens.accessToken,
+      p_refresh_token: tokens.refreshToken || null,
+      p_expires_at: tokens.expiresAt.toISOString(),
+      p_scope: tokens.scope || null,
+      p_external_account_id: externalAccountId,
+      p_external_email: externalEmail,
+      p_metadata: {
+        provider: 'google',
+        connected_via: 'oauth_callback',
       },
-      body: JSON.stringify({
-        access_token: tokens.accessToken,
-        refresh_token: tokens.refreshToken,
-        expires_at: tokens.expiresAt.toISOString(),
-        scope: tokens.scope,
-        google_user_id: userInfo.id,
-        google_email: userInfo.email,
-      }),
+      p_encryption_key: encryptionKey,
     });
 
-    if (!saveResponse.ok) {
-      const errorData = await saveResponse.json().catch(() => ({}));
-      console.error('Failed to save Google tokens:', errorData);
-      return NextResponse.redirect(
-        new URL(
-          `/settings/integrations?error=save_failed&message=${encodeURIComponent('Failed to save integration')}`,
-          request.url
-        )
-      );
+    if (upsertError) {
+      throw new Error(upsertError.message);
     }
 
-    // Parse the state to get redirect info
-    let redirectPath = '/settings/integrations';
-    try {
-      const stateData = JSON.parse(atob(state.split('.')[0]));
-      if (stateData.redirect) {
-        redirectPath = stateData.redirect;
-      }
-    } catch {
-      // Use default redirect
-    }
+    await logIntegrationEvent({
+      userId,
+      provider: 'google',
+      action: 'connect_success',
+      success: true,
+      context: { route: 'oauth/callback/google', has_refresh_token: Boolean(tokens.refreshToken) },
+    });
 
-    // Clear the state cookie
+    // Clean redirect — drops code/state from the URL so they aren't retained.
+    const redirectPath = parseRedirectPath(state);
     const response = NextResponse.redirect(
       new URL(`${redirectPath}?success=google_connected`, request.url)
     );
-
     response.cookies.delete('google_oauth_state');
-
     return response;
   } catch (err) {
-    console.error('Google OAuth callback error:', err);
-    // Never leak the internal error message into the redirect URL — it
-    // can contain provider tokens, SDK details, or other internals.
+    await logIntegrationEvent({
+      userId,
+      provider: 'google',
+      action: 'connect_failure',
+      success: false,
+      errorClass: classifyError(err),
+      context: { route: 'oauth/callback/google' },
+    });
+    // Never leak the internal error message into the redirect URL — it can
+    // contain provider tokens, SDK details, or other internals.
     return NextResponse.redirect(
       new URL('/settings/integrations?error=exchange_failed', request.url)
     );

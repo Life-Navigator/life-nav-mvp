@@ -22,6 +22,7 @@ import { createHash } from 'crypto';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { createGmailClient } from '@/lib/integrations/google/gmail';
 import { safeApiError } from '@/lib/security/safe-error';
+import { logIntegrationEvent, classifyError } from '@/lib/integrations/auditLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -186,8 +187,26 @@ export async function GET(request: NextRequest) {
         ? await fetchGoogle(accessToken, limit)
         : await fetchMicrosoft(accessToken, limit);
 
+    await logIntegrationEvent({
+      userId: user.id,
+      provider,
+      action: 'email_list',
+      success: true,
+      integrationId: row?.id ?? null,
+      context: { route: 'email/messages', count: messages.length, limit },
+    });
+
     return NextResponse.json({ provider, connected: true, messages });
   } catch (err) {
+    await logIntegrationEvent({
+      userId: user.id,
+      provider,
+      action: 'email_list',
+      success: false,
+      errorClass: classifyError(err),
+      integrationId: row?.id ?? null,
+      context: { route: 'email/messages' },
+    });
     // Likely an expired/revoked token (no web-side refresh yet) or provider 5xx.
     return safeApiError({
       code: 'upstream_unavailable',

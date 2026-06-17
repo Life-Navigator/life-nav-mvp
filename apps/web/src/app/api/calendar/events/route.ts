@@ -13,12 +13,12 @@
  *  - Per-provider failures are isolated: a Google error cannot hide Microsoft
  *    events and vice-versa. Each provider carries its own `error` flag.
  *
- * NOTE: Google tokens written by the OAuth callback are POSTed to the Fly
- * Core API (`/api/v1/integrations/google/tokens`), not to Supabase. If a
- * Google token is not present in `core.integration_tokens` this route reports
- * Google as disconnected (honest empty state) rather than guessing. See
- * docs/integrations-sprint/CALENDAR_INTEGRATION_AUDIT.md for the full gap
- * analysis.
+ * NOTE: Google tokens written by the OAuth callback are persisted ENCRYPTED in
+ * Supabase `core.integration_tokens` (same store as Microsoft) and read back
+ * here via the service-role `get_integration_token` RPC. If a Google token is
+ * not present this route reports Google as disconnected (honest empty state)
+ * rather than guessing. See
+ * docs/integration-completion/GOOGLE_TOKEN_PERSISTENCE_REPORT.md.
  */
 
 import { NextResponse } from 'next/server';
@@ -27,6 +27,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { GoogleCalendarClient } from '@/lib/integrations/google/calendar';
 import { GoogleOAuthService, isTokenExpired } from '@/lib/integrations/google/oauth';
 import { safeApiError } from '@/lib/security/safe-error';
+import { logIntegrationEvent, classifyError } from '@/lib/integrations/auditLog';
 import type { GoogleCalendarEvent } from '@/lib/integrations/google/types';
 
 export const dynamic = 'force-dynamic';
@@ -170,24 +171,45 @@ async function fetchGoogle(
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     if (clientId && clientSecret) {
       const oauth = new GoogleOAuthService(clientId, clientSecret);
-      const refreshed = await oauth.refreshToken(token.refresh_token);
-      accessToken = refreshed.accessToken;
-      // Persist the refreshed token (best-effort; do not fail the request).
-      if (admin) {
-        await admin
-          .rpc('upsert_integration_token', {
-            p_user_id: userId,
-            p_provider: 'google',
-            p_access_token: refreshed.accessToken,
-            p_refresh_token: token.refresh_token,
-            p_expires_at: refreshed.expiresAt.toISOString(),
-            p_scope: refreshed.scope || token.scope,
-            p_external_account_id: null,
-            p_external_email: null,
-            p_metadata: { provider: 'google', refreshed_via: 'calendar_events' },
-            p_encryption_key: encryptionKey,
-          })
-          .then(undefined, () => undefined);
+      try {
+        const refreshed = await oauth.refreshToken(token.refresh_token);
+        accessToken = refreshed.accessToken;
+        // Persist the refreshed token (best-effort; do not fail the request).
+        if (admin) {
+          await admin
+            .rpc('upsert_integration_token', {
+              p_user_id: userId,
+              p_provider: 'google',
+              p_access_token: refreshed.accessToken,
+              p_refresh_token: token.refresh_token,
+              p_expires_at: refreshed.expiresAt.toISOString(),
+              p_scope: refreshed.scope || token.scope,
+              p_external_account_id: null,
+              p_external_email: null,
+              p_metadata: { provider: 'google', refreshed_via: 'calendar_events' },
+              p_encryption_key: encryptionKey,
+            })
+            .then(undefined, () => undefined);
+        }
+        await logIntegrationEvent({
+          userId,
+          provider: 'google',
+          action: 'token_refresh_success',
+          success: true,
+          integrationId: token.id ?? null,
+          context: { route: 'calendar/events' },
+        });
+      } catch (refreshErr) {
+        await logIntegrationEvent({
+          userId,
+          provider: 'google',
+          action: 'token_refresh_failure',
+          success: false,
+          errorClass: classifyError(refreshErr),
+          integrationId: token.id ?? null,
+          context: { route: 'calendar/events' },
+        });
+        throw refreshErr;
       }
     }
   }
@@ -266,7 +288,18 @@ async function refreshMicrosoftToken(
       refresh_token: token.refresh_token,
     }).toString(),
   });
-  if (!res.ok) return token.access_token;
+  if (!res.ok) {
+    await logIntegrationEvent({
+      userId,
+      provider: 'microsoft',
+      action: 'token_refresh_failure',
+      success: false,
+      errorClass: `graph_token_${res.status}`,
+      integrationId: token.id ?? null,
+      context: { route: 'calendar/events', status: res.status },
+    });
+    return token.access_token;
+  }
   const data = (await res.json()) as {
     access_token: string;
     refresh_token?: string;
@@ -289,6 +322,14 @@ async function refreshMicrosoftToken(
       })
       .then(undefined, () => undefined);
   }
+  await logIntegrationEvent({
+    userId,
+    provider: 'microsoft',
+    action: 'token_refresh_success',
+    success: true,
+    integrationId: token.id ?? null,
+    context: { route: 'calendar/events' },
+  });
   return data.access_token;
 }
 
@@ -345,8 +386,24 @@ async function resolveProvider(
       provider === 'google'
         ? await fetchGoogle(token, admin, userId, encryptionKey)
         : await fetchMicrosoft(token, admin, userId, encryptionKey);
+    await logIntegrationEvent({
+      userId,
+      provider,
+      action: 'calendar_list',
+      success: true,
+      integrationId: token.id ?? null,
+      context: { route: 'calendar/events', count: events.length },
+    });
     return { provider, connected: true, events };
-  } catch {
+  } catch (err) {
+    await logIntegrationEvent({
+      userId,
+      provider,
+      action: 'calendar_list',
+      success: false,
+      errorClass: classifyError(err),
+      context: { route: 'calendar/events' },
+    });
     // Connected but failed to sync — honest error state, no fabricated events.
     return {
       provider,

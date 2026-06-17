@@ -22,6 +22,15 @@ class MyLifeService:
         self._sb = supabase
         self._resolver = resolver
 
+    async def canonical_goals(self, ctx: UserContext) -> dict[str, Any]:
+        """One deduped, source-prioritized goal view across all goal stores (read-path join).
+        Honest empty state when nothing is grounded — never backfills fake goals."""
+        from .canonical_goals import CanonicalGoalsService
+        goals = await CanonicalGoalsService(self._life, self._sb).canonical_goals(ctx)
+        return {"goals": goals, "count": len(goals),
+                "empty_message": None if goals else "Arcana is still learning your goals.",
+                "source": "Canonical goal read-path (deduped across stores)"}
+
     async def attention(self, ctx: UserContext) -> dict[str, Any]:
         """The DISCIPLINED dashboard feed: exactly one next best action + up to 3 'needs your
         attention' alerts (urgent recs, missing inputs, incomplete discovery, document issues) — the
@@ -205,8 +214,17 @@ class MyLifeService:
         # already-computed Life Model (snapshot narrative + goals + grounded risk + Recommendation OS action).
         brief = life_brief(snap, next_action=next_action, readiness=readiness)
 
+        # Canonical goals — ONE deduped goal view across all four goal stores (read-path join). The
+        # dashboard/report must read THIS, never a single raw store, so users never see duplicate goals.
+        try:
+            from .canonical_goals import CanonicalGoalsService
+            canonical = await CanonicalGoalsService(self._life, self._sb).canonical_goals(ctx)
+        except Exception:  # noqa: BLE001
+            canonical = []
+
         return {
             "life_brief": brief,
+            "canonical_goals": canonical,
             # "Why Arcana believes this" — explainability for the dominant narrative (None until one exists).
             "narrative_explanation": snap.get("narrative_explanation"),
             "life_vision": vision, "what_matters_most": what_matters, "life_readiness": readiness,

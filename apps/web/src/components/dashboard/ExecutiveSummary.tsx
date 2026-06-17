@@ -64,6 +64,10 @@ interface Goal {
   progress_percent?: number | null;
   target_value?: number | null;
   current_value?: number | null;
+  // canonical goal-view fields (read-path join — deduped across stores)
+  progress?: number | null;
+  domain?: string;
+  confirmation_status?: string;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -154,7 +158,10 @@ export default function ExecutiveSummary() {
     ]).then(([m, g]) => {
       if (!on) return;
       setMl(m || {});
-      setGoals(Array.isArray(g?.goals) ? g.goals : []);
+      // Prefer the CANONICAL goal view (deduped across stores) from the my-life payload so the dashboard
+      // never shows duplicate/conflicting goals. Fall back to /api/goals only if canonical is unavailable.
+      const canonical = Array.isArray(m?.canonical_goals) ? (m.canonical_goals as Goal[]) : null;
+      setGoals(canonical ?? (Array.isArray(g?.goals) ? g.goals : []));
       setLoading(false);
     });
     return () => {
@@ -403,9 +410,10 @@ export default function ExecutiveSummary() {
           {goals.length ? (
             <ul className="space-y-3">
               {goals.slice(0, 5).map((g) => {
+                const rawProgress = g.progress ?? g.progress_percent;
                 const pct =
-                  g.progress_percent != null
-                    ? Math.round(g.progress_percent)
+                  rawProgress != null
+                    ? Math.round(rawProgress)
                     : g.target_value && g.current_value != null
                       ? Math.round((g.current_value / g.target_value) * 100)
                       : null;

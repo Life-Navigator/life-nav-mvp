@@ -136,6 +136,13 @@ async def attention(user: AuthenticatedUser = Depends(authenticated), svc: MyLif
     return await svc.attention(_ctx(user))
 
 
+@router.get("/goals")
+async def canonical_goals(user: AuthenticatedUser = Depends(authenticated), svc: MyLifeService = Depends(get_my_life)):
+    """Canonical goal view — one deduped, source-prioritized goal list across all goal stores. Every goal
+    surface (dashboard, report, recommendations) reads this so users never see duplicate/conflicting goals."""
+    return await svc.canonical_goals(_ctx(user))
+
+
 from ..services.discovery_coverage import DiscoveryCoverageService  # noqa: E402
 
 

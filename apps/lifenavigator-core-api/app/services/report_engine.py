@@ -248,12 +248,16 @@ class UniversalReportEngine:
         except Exception:  # noqa: BLE001
             recs, plan, nba = [], {}, None
 
+        # Goals — read the CANONICAL view (deduped across stores, candidate-protected) so the report shows
+        # the SAME goals as the dashboard and never lists persona/duplicate goals as tracked (Report Truth D2).
         goals: list[dict[str, Any]] = []
         try:
-            rows = await self._sb.select("goals", filters={"user_id": f"eq.{ctx.user_id}"}, limit=20, order="created_at.desc", schema="public")
-            goals = [{"title": g.get("title"), "status": g.get("status"), "progress": g.get("progress_percent"),
-                      "category": g.get("category"), "target_value": g.get("target_value"), "current_value": g.get("current_value")}
-                     for g in (rows or [])]
+            from .canonical_goals import CanonicalGoalsService
+            from .life_discovery import LifeDiscoveryService as _LDS
+            cg = await CanonicalGoalsService(_LDS(self._sb), self._sb).canonical_goals(ctx)
+            goals = [{"title": g.get("title"), "status": g.get("status"), "progress": g.get("progress"),
+                      "category": g.get("domain"), "confirmation_status": g.get("confirmation_status"),
+                      "source_store": g.get("source_store")} for g in cg]
         except Exception:  # noqa: BLE001
             goals = []
 

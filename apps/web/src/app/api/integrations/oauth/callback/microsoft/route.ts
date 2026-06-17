@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@supabase/supabase-js';
 import { getUserIdFromJWT } from '@/lib/jwt';
+import { logIntegrationEvent, classifyError } from '@/lib/integrations/auditLog';
 
 type MicrosoftTokenResponse = {
   token_type: string;
@@ -67,6 +68,13 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  await logIntegrationEvent({
+    userId,
+    provider: 'microsoft',
+    action: 'connect_start',
+    context: { route: 'oauth/callback/microsoft' },
+  });
+
   try {
     const tokenRes = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
       method: 'POST',
@@ -127,6 +135,17 @@ export async function GET(request: NextRequest) {
       throw new Error(upsertError.message);
     }
 
+    await logIntegrationEvent({
+      userId,
+      provider: 'microsoft',
+      action: 'connect_success',
+      success: true,
+      context: {
+        route: 'oauth/callback/microsoft',
+        has_refresh_token: Boolean(tokens.refresh_token),
+      },
+    });
+
     let redirectPath = '/settings/integrations';
     try {
       const stateData = JSON.parse(Buffer.from(state.split('.')[0], 'base64url').toString('utf8'));
@@ -143,6 +162,14 @@ export async function GET(request: NextRequest) {
     response.cookies.delete('microsoft_oauth_state');
     return response;
   } catch (err) {
+    await logIntegrationEvent({
+      userId,
+      provider: 'microsoft',
+      action: 'connect_failure',
+      success: false,
+      errorClass: classifyError(err),
+      context: { route: 'oauth/callback/microsoft' },
+    });
     return NextResponse.redirect(
       new URL(`/settings/integrations?error=exchange_failed`, request.url)
     );

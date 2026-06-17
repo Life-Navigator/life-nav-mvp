@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getUserIdFromJWT } from '@/lib/jwt';
 import { safeApiError } from '@/lib/security/safe-error';
+import { logIntegrationEvent, classifyError } from '@/lib/integrations/auditLog';
 
 function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -30,8 +31,24 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
+      await logIntegrationEvent({
+        userId,
+        provider: 'microsoft',
+        action: 'disconnect_failure',
+        success: false,
+        errorClass: classifyError(error),
+        context: { route: 'integrations/microsoft/disconnect' },
+      });
       return safeApiError({ code: 'db_persistence_error', internal: error });
     }
+
+    await logIntegrationEvent({
+      userId,
+      provider: 'microsoft',
+      action: 'disconnect_success',
+      success: true,
+      context: { route: 'integrations/microsoft/disconnect' },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
