@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..models.common import UserContext
-from .life_discovery import GENERIC_DEPENDENCY_LABELS, GENERIC_RISK_OPP_LABELS
+from .life_discovery import GENERIC_DEPENDENCY_LABELS, GENERIC_RISK_OPP_LABELS, life_brief
 
 
 class MyLifeService:
@@ -199,7 +199,12 @@ class MyLifeService:
         # Section 6 — Recent Intelligence (the platform feels alive)
         recent = await self._recent_intelligence(ctx)
 
+        # Life Brief — the narrative the user reads first ("this understands me"). Pure surfacing of the
+        # already-computed Life Model (snapshot narrative + goals + grounded risk + Recommendation OS action).
+        brief = life_brief(snap, next_action=next_action, readiness=readiness)
+
         return {
+            "life_brief": brief,
             "life_vision": vision, "what_matters_most": what_matters, "life_readiness": readiness,
             "next_best_action": next_action, "constraints": constraints[:6], "recent_intelligence": recent,
             "has_discovery": bool(snap.get("objectives")),

@@ -413,6 +413,92 @@ def narrative_step_prompt(step_key: str, narrative_key: Optional[str], goals: Op
     return None
 
 
+def life_brief(snapshot: dict[str, Any], *, next_action: Optional[dict[str, Any]] = None,
+               readiness: Optional[dict[str, Any]] = None) -> dict[str, Any]:
+    """Compose the Life Brief — the first thing a user reads. It proves 'this understands me' by
+    reflecting their OWN narrative, goals, tension, stakes, and next move back to them in plain language.
+
+    Pure surfacing of the existing Life Model (snapshot.dominant_narrative + goal_portfolio + risks +
+    Recommendation OS next action). No new intelligence, no fabrication: if the model is still forming,
+    the brief says so honestly instead of inventing a story (No mock data — ever)."""
+    narrative = snapshot.get("dominant_narrative") or None
+    portfolio = [g for g in (snapshot.get("goal_portfolio") or []) if g.get("goal")]
+    goals_text = [str(g["goal"]).strip() for g in portfolio if str(g.get("goal") or "").strip()]
+    # Distinct life domains the goals span — the basis for the "you're holding several things at once" tension.
+    domains = list(dict.fromkeys([g.get("domain") for g in portfolio if g.get("domain") and g.get("domain") != "core"]))
+
+    # Not enough signal yet — be honest, don't manufacture a narrative.
+    if not narrative or not goals_text:
+        return {
+            "ready": False,
+            "headline": "Your Life Brief is still forming.",
+            "body": "Tell Arcana a little more about what you're working toward and what's weighing on you, "
+                    "and your Life Brief will appear here — your situation, what's at stake, and your next move, "
+                    "in your own words.",
+            "goals_held": goals_text,
+            "source": "Life Model (discovery in progress)",
+        }
+
+    label = narrative.get("label") or "Your life right now"
+    summary = (narrative.get("summary") or "").strip()
+    conf = narrative.get("confidence") or 0.0
+    sigs = set(narrative.get("signals") or [])
+
+    # Situation — the story in their words: the dominant narrative + the goals they're carrying together.
+    held = _humanize_list(goals_text[:4])
+    situation = summary
+    if held and summary:
+        if len(goals_text) > 1:
+            situation = f"{summary} Right now you're holding several things at once — {held}."
+        else:
+            situation = f"{summary} The center of it is {held}."
+    elif held:
+        situation = f"You're focused on {held}."
+
+    # Tension — only stated when it's real (≥2 distinct life domains competing for the same time/money/energy).
+    tension = None
+    if len(domains) >= 2 and len(goals_text) >= 2:
+        tension = (f"These pull on the same time, money, and energy — the real question is sequence, "
+                   f"not whether any one of them has to be given up.")
+    if "burnout" in sigs:
+        tension = ("The hardest part right now isn't ambition — it's sustaining the pace without it costing "
+                   "your health or the people around you.")
+    elif "distress" in sigs and "money_stress" in sigs:
+        tension = ("Before anything else can move, the financial pressure has to ease enough for you to breathe.")
+
+    # Stakes — the single most important grounded risk, if one exists. Never invented.
+    risks = [str(r).strip() for r in (snapshot.get("top_risks") or []) if str(r).strip()]
+    stakes = f"Biggest thing to protect against: {risks[0]}." if risks else None
+
+    # Next move — the Recommendation OS's top action, surfaced verbatim (already evidence-grounded).
+    next_move = None
+    if next_action and next_action.get("title"):
+        verb = next_action.get("recommended_action") or next_action.get("title")
+        next_move = f"Your next move: {str(verb).strip().rstrip('.')}."
+
+    # Readiness one-liner (optional context, never a score-dump).
+    readiness_line = None
+    if readiness and readiness.get("overall") is not None:
+        readiness_line = f"Overall life readiness: {readiness.get('status') or ''} ({readiness['overall']}%).".strip()
+
+    body = " ".join([p for p in [situation, tension, stakes, next_move] if p])
+
+    return {
+        "ready": True,
+        "headline": label,
+        "narrative_key": narrative.get("key"),
+        "body": body,
+        "situation": situation,
+        "tension": tension,
+        "stakes": stakes,
+        "next_move": next_move,
+        "readiness_line": readiness_line,
+        "goals_held": goals_text[:6],
+        "confidence_pct": round(conf * 100),
+        "source": "Composed from your Life Model — narrative, goals, and recommendations",
+    }
+
+
 class LifeDiscoveryService:
     def __init__(self, supabase: Any) -> None:
         self._sb = supabase

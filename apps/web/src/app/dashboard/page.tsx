@@ -1,5 +1,6 @@
 import DashboardClient from '@/components/dashboard/DashboardClient';
 import ExecutiveSummary from '@/components/dashboard/ExecutiveSummary';
+import LifeBrief from '@/components/dashboard/LifeBrief';
 import LifeIntelligence from '@/components/dashboard/LifeIntelligence';
 import MissionControl from '@/components/dashboard/MissionControl';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
@@ -63,6 +64,12 @@ export default async function DashboardPage() {
   return (
     <>
       <div className="px-6 pt-6 max-w-[1400px] mx-auto w-full">
+        {/* Life Brief (Experience Excellence): the narrative the user reads FIRST — their own life
+            story, goals, tension, and next move in plain language. Leads with meaning, not metrics.
+            100% real data from /api/life/my-life `life_brief`; honest "still forming" empty state. */}
+        <div className="mb-6">
+          <LifeBrief />
+        </div>
         {/* Executive summary (P4): readiness, vision, next best action, priorities, risks,
             opportunities, goal progress — 100% real data from /api/life/my-life + /api/goals,
             honest empty states. The trust-first hero of the dashboard. */}

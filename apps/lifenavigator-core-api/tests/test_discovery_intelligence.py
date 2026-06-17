@@ -333,3 +333,52 @@ async def test_multipursuit_gets_concrete_tradeoff():
                       "promotion at NVIDIA, and start a Masters in AI.")
     assert "postpone" in q.lower()
     assert "i am " not in q.lower() and "willing to" not in q.lower()  # names goals, not context/feelings
+
+
+# --- Life Brief (Experience Excellence) ---------------------------------------
+from app.services.life_discovery import life_brief  # noqa: E402
+
+
+def _snap(cands, narrative_text, risks=None):
+    nar = dominant_narrative(cands, narrative_text)
+    return {"dominant_narrative": nar,
+            "goal_portfolio": [{"goal": c["goal_text"], "domain": c.get("domain")} for c in cands],
+            "top_risks": risks or []}
+
+
+def test_life_brief_reflects_narrative_and_goals():
+    cands = [{"goal_text": "plan our wedding", "domain": "family"},
+             {"goal_text": "buy a home", "domain": "family"},
+             {"goal_text": "pay off the credit card", "domain": "finance"}]
+    b = life_brief(_snap(cands, "We are getting married and starting a family.",
+                         risks=["Retirement savings off track"]),
+                   next_action={"title": "Debt plan", "recommended_action": "Redirect $400/mo to the card"})
+    assert b["ready"] is True
+    assert b["headline"]                                  # a life story, not a single objective
+    assert "wedding" in b["body"] and "home" in b["body"]  # names the user's OWN goals
+    assert "you're while" not in b["body"].lower()         # grammar guard
+    assert "Redirect $400/mo" in b["body"]                 # surfaces the real next move
+    assert "Retirement savings off track" in b["body"]     # surfaces the grounded risk
+    assert b["confidence_pct"] >= 0
+
+
+def test_life_brief_states_tension_only_when_real():
+    multi = [{"goal_text": "wedding", "domain": "family"}, {"goal_text": "promotion", "domain": "career"}]
+    assert life_brief(_snap(multi, "Building a family and a career."))["tension"]
+    single = [{"goal_text": "get promoted", "domain": "career"}]
+    assert life_brief(_snap(single, "I want to advance my career."))["tension"] is None
+
+
+def test_life_brief_honest_when_forming():
+    b = life_brief({"dominant_narrative": None, "goal_portfolio": []})
+    assert b["ready"] is False
+    assert "forming" in b["headline"].lower()
+    assert not b.get("stakes")                              # never fabricates a story
+
+
+def test_life_brief_never_invents_risk_or_next_move():
+    cands = [{"goal_text": "pay off debt", "domain": "finance"},
+             {"goal_text": "keep our apartment", "domain": "family"}]
+    b = life_brief(_snap(cands, "I am overwhelmed and worried we will lose our housing because of debt"))
+    assert b["stakes"] is None and b["next_move"] is None   # no grounded inputs -> no claims
+    assert "breathe" in (b["tension"] or "").lower()        # crisis tension acknowledged
