@@ -57,9 +57,10 @@ export async function GET(request: NextRequest) {
   const clientId = process.env.MICROSOFT_CLIENT_ID;
   const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
   const tenant = process.env.MICROSOFT_TENANT_ID || 'common';
+  // Must match the redirect_uri used in the auth request (see the init route) — canonical clean path.
   const redirectUri =
     process.env.MICROSOFT_REDIRECT_URI ||
-    `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/oauth/callback/microsoft`;
+    `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/microsoft/callback`;
   const encryptionKey = process.env.INTEGRATION_ENCRYPTION_KEY;
 
   if (!clientId || !clientSecret || !encryptionKey) {

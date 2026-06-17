@@ -13,9 +13,11 @@ type ScopeBundleKey = keyof typeof MICROSOFT_SCOPES;
 
 function getMicrosoftAuthUrl(scopes: string[], state: string): string {
   const clientId = process.env.MICROSOFT_CLIENT_ID;
+  // Canonical Microsoft redirect URI — matches the Azure-registered URI at /api/auth/microsoft/callback
+  // (alias route reusing the integrations callback handler). Mirrors the Google scheme for consistency.
   const redirectUri =
     process.env.MICROSOFT_REDIRECT_URI ||
-    `${process.env.NEXT_PUBLIC_APP_URL}/api/integrations/oauth/callback/microsoft`;
+    `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/microsoft/callback`;
   const tenant = process.env.MICROSOFT_TENANT_ID || 'common';
 
   if (!clientId) {
