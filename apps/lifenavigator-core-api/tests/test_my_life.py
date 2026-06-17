@@ -171,3 +171,22 @@ async def test_no_grounded_action_yields_honest_insufficient_state():
     assert nba["kind"] == "insufficient"
     assert "Not enough information" in nba["title"]
     assert "income" in nba["needed_to_act"].lower()
+
+
+@pytest.mark.asyncio
+async def test_attention_surfaces_risk_alerts_regression():
+    """Regression: attention() previously called active().get(...) on a LIST and checked the wrong
+    field name, so the except swallowed an AttributeError and RISK alerts NEVER surfaced. Lock it in."""
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    await life.save_vision(CTX, vision_text="Protect my family")
+    os = RecommendationOS(sb)
+    ev = [{"statement": "Protection gap detected", "source_table": "documents"}]
+    await os.write(CTX, title="Coverage gap leaves family exposed", source_module="family_office",
+                   rec_type="RISK", category="family", finding_key="protection_gap", confidence=0.7, evidence=ev,
+                   impacted_domains=["legacy"])
+    out = await _svc(sb).attention(CTX)
+    risk_alerts = [a for a in out["alerts"] if a.get("severity") == "high"
+                   and a.get("source") == "Recommendation OS"]
+    assert risk_alerts, "RISK recommendation must surface as a high-severity attention alert"
+    assert "Coverage gap" in risk_alerts[0]["title"]

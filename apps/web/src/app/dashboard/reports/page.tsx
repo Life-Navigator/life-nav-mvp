@@ -43,26 +43,34 @@ export default function ReportsPage() {
     <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
       <p className="text-sm text-gray-500 mt-1">
-        Generate a polished, cited report you can download or share with an advisor. Built from your
-        documents and readiness — every figure traces to its source.
+        View a polished, cited report in-app or download it as a PDF. Built from your documents and
+        readiness — every figure traces to its source.
       </p>
       <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
         {REPORTS.map((r) => (
           <div key={r.type} className="bg-white rounded-lg shadow-md p-5 flex flex-col">
             <h2 className="font-semibold text-gray-900">{r.title}</h2>
             <p className="text-sm text-gray-500 mt-1 flex-grow">{r.desc}</p>
-            <a
-              href={`/api/reports/${r.type}/pdf`}
-              className="mt-3 inline-flex w-fit items-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
-            >
-              Generate &amp; download PDF →
-            </a>
+            <div className="mt-3 flex items-center gap-2">
+              <a
+                href={`/dashboard/reports/${r.type}`}
+                className="inline-flex w-fit items-center px-4 py-2 rounded-md bg-[#0f766e] text-white text-sm font-medium hover:bg-[#0c5f59]"
+              >
+                View report →
+              </a>
+              <a
+                href={`/api/reports/${r.type}/pdf`}
+                className="inline-flex w-fit items-center px-3 py-2 rounded-md border border-[#0f766e] text-[#0f766e] text-sm font-medium hover:bg-[#e6f2f0]"
+              >
+                Download PDF
+              </a>
+            </div>
           </div>
         ))}
       </div>
       <p className="mt-6 text-xs text-gray-400">
-        Reports are reproducible — the same inputs always produce the same report. To share a
-        redacted view with an advisor, CPA, or family member, open a report and use Share.
+        Reports are reproducible — the same inputs always produce the same report. View any report
+        in-app or download it as a branded, cited PDF.
       </p>
     </div>
   );

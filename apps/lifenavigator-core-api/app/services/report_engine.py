@@ -259,9 +259,20 @@ class UniversalReportEngine:
 
         confs = [r["confidence"] for r in recs if r.get("confidence") is not None]
         missing = sorted({u for r in recs for u in (r.get("unlocks") or [])})
+        # Narrative LEAD — the report must open with the SAME dominant narrative the dashboard shows
+        # (narrative-consistency fix). Compose the Life Brief from the same snapshot + next best action;
+        # honest empty when discovery is still forming. Pure surfacing, no new data.
+        try:
+            from .life_discovery import life_brief as _life_brief
+            brief = _life_brief(snap, next_action=nba, readiness=readiness or None)
+        except Exception:  # noqa: BLE001
+            brief = None
         payload = {
             "cover": {"readiness": readiness.get("overall"), "objective": po.get("title"),
                       "confidence_pct": round((po.get("confidence") or 0) * 100) if po.get("confidence") is not None else None},
+            "life_brief": brief,
+            "dominant_narrative": snap.get("dominant_narrative"),
+            "narrative_explanation": snap.get("narrative_explanation"),
             "vision": snap.get("life_vision"),
             "primary_objective": {"title": po.get("title"), "reasoning": po.get("reasoning")},
             "readiness": readiness,

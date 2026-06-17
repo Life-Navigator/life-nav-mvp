@@ -30,13 +30,15 @@ class MyLifeService:
         next_action = ml.get("next_best_action")
         alerts: list[dict[str, Any]] = []
 
-        # urgent risk recommendations (severity high)
+        # urgent risk recommendations (severity high). NOTE: active() returns a LIST of rec rows, and the
+        # type field is `rec_type` (not `classification`) — the prior `.get("recommendations")`/`classification`
+        # combo raised AttributeError that the except swallowed, so RISK alerts silently never surfaced.
         try:
             active = await self._os.active(ctx)
-            for r in (active.get("recommendations") or []):
-                if r.get("classification") == "RISK":
+            for r in (active or []):
+                if str(r.get("rec_type") or "").upper() == "RISK" and r.get("title"):
                     alerts.append({"title": r.get("title"), "severity": "high", "source": "Recommendation OS",
-                                   "detail": r.get("why") or r.get("recommended_action"), "cta": "/dashboard/recommendations"})
+                                   "detail": r.get("description") or r.get("recommended_action"), "cta": "/dashboard/recommendations"})
         except Exception:  # noqa: BLE001
             pass
 
