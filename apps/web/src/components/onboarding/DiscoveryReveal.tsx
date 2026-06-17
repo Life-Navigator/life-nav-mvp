@@ -28,6 +28,9 @@ import {
 } from 'lucide-react';
 import StreamingText from '@/components/ui/StreamingText';
 import { ARCANA_STREAMING_ENABLED } from '@/lib/arcana/streaming';
+import NarrativeAccuracyPrompt from '@/components/feedback/NarrativeAccuracyPrompt';
+import InsightPrompt from '@/components/feedback/InsightPrompt';
+import HolyShitPrompt from '@/components/feedback/HolyShitPrompt';
 
 interface LifeBriefData {
   ready?: boolean;
@@ -76,6 +79,9 @@ export default function DiscoveryReveal({ onContinue }: { onContinue: () => void
   const [loading, setLoading] = useState(true);
   // Staged reveal: 0 = advisor "reflecting", 1 = narrative typing, 2 = supporting sections shown.
   const [stage, setStage] = useState(0);
+  // End-of-onboarding pilot feedback ("did this land?"). Skippable; once the user dismisses, the
+  // prompts collapse and never reappear in this session. Never blocks the continue CTA.
+  const [feedbackDismissed, setFeedbackDismissed] = useState(false);
   const advancedRef = useRef(false);
 
   useEffect(() => {
@@ -273,6 +279,18 @@ export default function DiscoveryReveal({ onContinue }: { onContinue: () => void
                 in your real situation, never assumptions.
               </div>
             )}
+          </div>
+        )}
+
+        {/* End-of-onboarding "did this land?" feedback. Appears once the reveal has finished and only
+            when the model actually produced a real narrative. Fully skippable; never blocks continue. */}
+        {stage >= 2 && brief.ready && !feedbackDismissed && (
+          <div className="space-y-3 pt-1">
+            <NarrativeAccuracyPrompt onDismiss={() => setFeedbackDismissed(true)} />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <InsightPrompt onDismiss={() => setFeedbackDismissed(true)} />
+              <HolyShitPrompt onDismiss={() => setFeedbackDismissed(true)} />
+            </div>
           </div>
         )}
 

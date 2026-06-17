@@ -70,3 +70,49 @@ async def test_pilot_analytics_summary_shape():
     assert out["safety"]["safety_fallback_turns"] == 2
     assert out["feedback"]["avg_trust"] == 4.3
     assert out["feedback"]["nps_score"] == round(100 * (7 - 2) / 12, 1)  # NPS computed
+
+
+# --- Pilot Intelligence instruments -------------------------------------------
+@pytest.mark.asyncio
+async def test_feedback_accepts_instruments():
+    sb = FakeSB()
+    res = await FeedbackService(sb).submit("u", {
+        "kind": "narrative_accuracy",
+        "metrics": {"narrative_accuracy": 9, "understanding": 8, "personalization": 7},
+        "insight_detected": "yes", "surprised": True,
+        "context": {"narrative_key": "family_foundation"}, "comment": "spot on"})
+    assert res["ok"] and res["stored"]
+    row = sb.inserted[-1][2]
+    assert row["kind"] == "narrative_accuracy"
+    assert row["metrics"]["narrative_accuracy"] == 9 and row["metrics"]["understanding"] == 8
+    assert row["insight_detected"] is True and row["surprised"] is True
+    assert row["context"]["narrative_key"] == "family_foundation"
+
+
+@pytest.mark.asyncio
+async def test_feedback_metric_validation_drops_bad_keys_and_ranges():
+    sb = FakeSB()
+    await FeedbackService(sb).submit("u", {"metrics": {"narrative_accuracy": 99, "made_up": 5, "trust": 8}})
+    m = sb.inserted[-1][2]["metrics"]
+    assert m == {"trust": 8}                       # 99 out of range dropped; unknown key dropped
+
+
+@pytest.mark.asyncio
+async def test_feedback_instrument_only_signal_saves():
+    sb = FakeSB()
+    res = await FeedbackService(sb).submit("u", {"insight_detected": "no"})  # no legacy signal at all
+    assert res["ok"] and res["stored"]             # an instrument-only response is a real signal
+
+
+def test_aggregate_instruments_computes_rates():
+    rows = [
+        {"metrics": {"narrative_accuracy": 9, "trust": 8}, "insight_detected": True, "surprised": True},
+        {"metrics": {"narrative_accuracy": 7}, "insight_detected": False, "surprised": None},
+        {"metrics": {}, "insight_detected": True, "surprised": False},
+    ]
+    agg = PilotAnalyticsService._aggregate_instruments(rows)
+    assert agg["averages"]["narrative_accuracy"] == 8.0        # (9+7)/2
+    assert agg["averages"]["trust"] == 8.0
+    assert agg["insight_rate"] == round(2 / 3, 3)              # 2 yes of 3
+    assert agg["holy_shit_rate"] == 0.5                        # 1 yes of 2 answered
+    assert agg["total_feedback_rows"] == 3

@@ -16,6 +16,10 @@ import {
   Trophy,
   TrendingUp,
 } from 'lucide-react';
+import TrustPrompt from '@/components/feedback/TrustPrompt';
+import RecommendationQualityPrompt from '@/components/feedback/RecommendationQualityPrompt';
+import ReturnIntentPrompt from '@/components/feedback/ReturnIntentPrompt';
+import NpsPrompt from '@/components/feedback/NpsPrompt';
 
 interface Formula {
   impact: number;
@@ -381,6 +385,47 @@ function Card({
   );
 }
 
+// Pilot feedback for the roadmap. Trust + quality are tied to the lead (Now #1) recommendation; the
+// session-level return-intent + NPS prompts show at most once per browser session (sessionStorage
+// guard) so we never nag. Everything is skippable and nothing is sent unless the user submits.
+function RecommendationsFeedback({ leadId }: { leadId?: string }) {
+  const [recDismissed, setRecDismissed] = useState(false);
+  // Read the per-session "already shown" flag lazily so SSR and the first client render agree.
+  const [showSession, setShowSession] = useState(false);
+  const [sessionDismissed, setSessionDismissed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('ln_session_feedback_shown') !== '1') {
+        sessionStorage.setItem('ln_session_feedback_shown', '1');
+        setShowSession(true);
+      }
+    } catch {
+      // sessionStorage unavailable (private mode / SSR) — just skip the session prompt.
+    }
+  }, []);
+
+  return (
+    <section className="mt-8 space-y-3 border-t border-gray-100 pt-6" aria-label="Pilot feedback">
+      {leadId && !recDismissed && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <TrustPrompt recommendationId={leadId} onDismiss={() => setRecDismissed(true)} />
+          <RecommendationQualityPrompt
+            recommendationId={leadId}
+            onDismiss={() => setRecDismissed(true)}
+          />
+        </div>
+      )}
+      {showSession && !sessionDismissed && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <ReturnIntentPrompt onDismiss={() => setSessionDismissed(true)} />
+          <NpsPrompt onDismiss={() => setSessionDismissed(true)} />
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function RecommendationsPage() {
   const [d, setD] = useState<Roadmap | null>(null);
   const [loading, setLoading] = useState(true);
@@ -502,6 +547,10 @@ export default function RecommendationsPage() {
         </section>
       )}
       <p className="mt-6 text-xs text-gray-400">{d.note}</p>
+
+      {/* Non-blocking pilot feedback — tied to the lead (Now #1) recommendation, plus a once-per-
+          session "how's it going?" return-intent + NPS. Only shown once there is a real roadmap. */}
+      {!empty && <RecommendationsFeedback leadId={d.now[0]?.id} />}
     </div>
   );
 }
