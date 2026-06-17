@@ -483,6 +483,18 @@ def life_brief(snapshot: dict[str, Any], *, next_action: Optional[dict[str, Any]
 
     body = " ".join([p for p in [situation, tension, stakes, next_move] if p])
 
+    # V2 — "What Arcana is watching": the open dependencies + active constraints that gate the plan.
+    # Grounded only (real dependency/constraint rows); never invented.
+    watching = [str(d.get("label")).strip() for d in (snapshot.get("open_dependencies") or []) if str(d.get("label") or "").strip()]
+    watching += [str(c.get("label")).strip() for c in (snapshot.get("active_constraints") or []) if str(c.get("label") or "").strip()]
+    watching = list(dict.fromkeys(watching))[:5]
+
+    # V2 — "What could change the plan": the remaining grounded risks (beyond the one used as stakes) plus
+    # an explicit urgency note when the user signalled time pressure. Honest: only real risks are listed.
+    could_change = [r for r in risks[1:]][:4]
+    if "urgency" in sigs and not could_change:
+        could_change = ["A near-term deadline you mentioned could force the sequence to change."]
+
     return {
         "ready": True,
         "headline": label,
@@ -494,8 +506,69 @@ def life_brief(snapshot: dict[str, Any], *, next_action: Optional[dict[str, Any]
         "next_move": next_move,
         "readiness_line": readiness_line,
         "goals_held": goals_text[:6],
+        "watching": watching,            # V2: what Arcana is keeping an eye on (dependencies + constraints)
+        "could_change": could_change,    # V2: what could change the plan (remaining risks / deadlines)
         "confidence_pct": round(conf * 100),
         "source": "Composed from your Life Model — narrative, goals, and recommendations",
+    }
+
+
+# Human-readable phrasing for the emotional signals used in the narrative explanation.
+_SIGNAL_PHRASES: dict[str, str] = {
+    "distress": "signs of real strain in how you described things",
+    "money_stress": "financial pressure",
+    "burnout": "the toll the current pace is taking",
+    "ambition": "a strong drive to advance",
+    "family": "the weight you put on family",
+    "legacy": "wanting to build something lasting",
+    "urgency": "a near-term deadline",
+    "money_fine": "finances that are stable enough to focus elsewhere",
+}
+
+# Human-readable names for goal domains.
+_DOMAIN_NAMES: dict[str, str] = {
+    "family": "family", "finance": "money", "career": "career", "health": "health",
+    "education": "education", "home": "home",
+}
+
+
+def narrative_explanation(narrative: Optional[dict[str, Any]],
+                          portfolio: Optional[list[dict[str, Any]]] = None) -> Optional[dict[str, Any]]:
+    """Compose the 'Why Arcana believes this' explanation for the dominant narrative.
+
+    Pure surfacing of the narrative dict (label/domains/signals/confidence) + the goal portfolio.
+    Answers: why this narrative, which goals contributed, what evidence supports it, how confident.
+    Returns None when there is no narrative yet (honest — no fabricated rationale)."""
+    if not narrative:
+        return None
+    portfolio = portfolio or []
+    label = narrative.get("label") or "your current focus"
+    domains = narrative.get("domains") or {}
+    signals = [s for s in (narrative.get("signals") or []) if s in _SIGNAL_PHRASES]
+    conf = narrative.get("confidence") or 0.0
+
+    goals = [str(g.get("goal")).strip() for g in portfolio if str(g.get("goal") or "").strip()]
+    # Domains ordered by how many goals fall in each — the cluster the narrative is built on.
+    ordered_domains = [d for d, _ in sorted(domains.items(), key=lambda kv: kv[1], reverse=True) if d in _DOMAIN_NAMES]
+    domain_phrase = _humanize_list([_DOMAIN_NAMES[d] for d in ordered_domains[:3]])
+
+    because: list[str] = []
+    if domain_phrase:
+        because.append(f"your goals cluster around {domain_phrase}")
+    if signals:
+        because.append(_humanize_list([_SIGNAL_PHRASES[s] for s in signals[:3]]))
+    why = (f"Arcana identified “{label}” because " + _humanize_list(because) + ".") if because \
+        else f"Arcana identified “{label}” from the goals you described."
+
+    conf_label = "High" if conf >= 0.8 else ("Medium" if conf >= 0.55 else "Forming")
+    return {
+        "narrative": label,
+        "why": why,
+        "contributing_goals": goals[:6],
+        "evidence_signals": [_SIGNAL_PHRASES[s] for s in signals[:4]],
+        "confidence_pct": round(conf * 100),
+        "confidence_label": conf_label,
+        "source": "Derived from your stated goals and how you described them",
     }
 
 
@@ -820,6 +893,8 @@ class LifeDiscoveryService:
                      for g in cand_goals]
         return {
             "dominant_narrative": narrative,   # the life story; the surfaced "theme" (not an objective)
+            # "Why Arcana believes this" — the explainability behind the narrative (None until one exists).
+            "narrative_explanation": narrative_explanation(narrative, portfolio),
             "goal_portfolio": portfolio,       # all stated goals, coexisting
             "emotional_signals": narrative.get("signals") if narrative else [],
             "life_vision": v0.get("vision_text") if v0 else None,

@@ -382,3 +382,42 @@ def test_life_brief_never_invents_risk_or_next_move():
     b = life_brief(_snap(cands, "I am overwhelmed and worried we will lose our housing because of debt"))
     assert b["stakes"] is None and b["next_move"] is None   # no grounded inputs -> no claims
     assert "breathe" in (b["tension"] or "").lower()        # crisis tension acknowledged
+
+
+# --- Narrative explanation + Life Brief V2 (Pilot Polish) ---------------------
+from app.services.life_discovery import narrative_explanation  # noqa: E402
+
+
+def test_narrative_explanation_grounds_why_in_goals_and_signals():
+    cands = [{"goal_text": "plan our wedding", "domain": "family"},
+             {"goal_text": "buy a home", "domain": "family"},
+             {"goal_text": "pay off the credit card", "domain": "finance"}]
+    nar = dominant_narrative(cands, "We are getting married and starting a family.")
+    exp = narrative_explanation(nar, [{"goal": c["goal_text"], "domain": c["domain"]} for c in cands])
+    assert exp["narrative"]
+    assert exp["why"].lower().startswith("arcana identified")
+    assert "family" in exp["why"].lower()                       # names the real cluster
+    assert "plan our wedding" in exp["contributing_goals"]      # lists the user's own goals
+    assert exp["confidence_label"] in ("High", "Medium", "Forming")
+
+
+def test_narrative_explanation_none_when_no_narrative():
+    assert narrative_explanation(None, []) is None
+
+
+def test_life_brief_v2_watching_and_could_change_are_grounded():
+    cands = [{"goal_text": "wedding", "domain": "family"}, {"goal_text": "promotion", "domain": "career"}]
+    snap = _snap(cands, "Building a family and a career.",
+                 risks=["Retirement savings off track", "Cash flow tight before the wedding"])
+    snap["open_dependencies"] = [{"label": "Confirm wedding budget", "domain": "finance"}]
+    snap["active_constraints"] = [{"label": "Limited monthly savings", "detail": "x"}]
+    b = life_brief(snap)
+    assert "Confirm wedding budget" in b["watching"]            # dependency surfaced
+    assert "Limited monthly savings" in b["watching"]           # constraint surfaced
+    assert "Cash flow tight before the wedding" in b["could_change"]  # 2nd risk -> could change
+    assert "Retirement savings off track" not in b["could_change"]    # 1st risk is the stakes line
+
+
+def test_life_brief_v2_empty_when_no_grounding():
+    b = life_brief(_snap([{"goal_text": "get promoted", "domain": "career"}], "Advance my career."))
+    assert b["watching"] == [] and b["could_change"] == []      # never fabricated

@@ -205,6 +205,8 @@ class MyLifeService:
 
         return {
             "life_brief": brief,
+            # "Why Arcana believes this" — explainability for the dominant narrative (None until one exists).
+            "narrative_explanation": snap.get("narrative_explanation"),
             "life_vision": vision, "what_matters_most": what_matters, "life_readiness": readiness,
             "next_best_action": next_action, "constraints": constraints[:6], "recent_intelligence": recent,
             "has_discovery": bool(snap.get("objectives")),
