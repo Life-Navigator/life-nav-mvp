@@ -84,7 +84,8 @@ export const GOOGLE_SCOPES = {
   fitnessOxygenSaturationRead: 'https://www.googleapis.com/auth/fitness.oxygen_saturation.read',
   fitnessOxygenSaturationWrite: 'https://www.googleapis.com/auth/fitness.oxygen_saturation.write',
   fitnessReproductiveHealthRead: 'https://www.googleapis.com/auth/fitness.reproductive_health.read',
-  fitnessReproductiveHealthWrite: 'https://www.googleapis.com/auth/fitness.reproductive_health.write',
+  fitnessReproductiveHealthWrite:
+    'https://www.googleapis.com/auth/fitness.reproductive_health.write',
   fitnessSleepRead: 'https://www.googleapis.com/auth/fitness.sleep.read',
   fitnessSleepWrite: 'https://www.googleapis.com/auth/fitness.sleep.write',
 
@@ -130,10 +131,7 @@ export const SCOPE_BUNDLES = {
     GOOGLE_SCOPES.fitnessOxygenSaturationRead,
     GOOGLE_SCOPES.fitnessSleepRead,
   ],
-  classroom: [
-    GOOGLE_SCOPES.classroomCoursesReadonly,
-    GOOGLE_SCOPES.classroomCourseworkMe,
-  ],
+  classroom: [GOOGLE_SCOPES.classroomCoursesReadonly, GOOGLE_SCOPES.classroomCourseworkMe],
   vault: [GOOGLE_SCOPES.vault],
   all: Object.values(GOOGLE_SCOPES),
 };
@@ -146,8 +144,11 @@ export class GoogleOAuthService {
   constructor(
     clientId: string = process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: string = process.env.GOOGLE_CLIENT_SECRET || '',
+    // Canonical Google redirect URI. Matches the registered Google Console URIs at
+    // /api/auth/google/callback (served by the alias route that reuses the integrations callback handler).
+    // Prefer GOOGLE_REDIRECT_URI; otherwise derive from the app URL.
     redirectUri: string = process.env.GOOGLE_REDIRECT_URI ||
-      `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL}/api/integrations/oauth/callback/google`
+      `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`
   ) {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
@@ -157,12 +158,16 @@ export class GoogleOAuthService {
   /**
    * Generate OAuth authorization URL
    */
-  getAuthUrl(scopes: string[], state: string, options?: {
-    accessType?: 'online' | 'offline';
-    prompt?: 'none' | 'consent' | 'select_account';
-    loginHint?: string;
-    includeGrantedScopes?: boolean;
-  }): string {
+  getAuthUrl(
+    scopes: string[],
+    state: string,
+    options?: {
+      accessType?: 'online' | 'offline';
+      prompt?: 'none' | 'consent' | 'select_account';
+      loginHint?: string;
+      includeGrantedScopes?: boolean;
+    }
+  ): string {
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
@@ -255,10 +260,9 @@ export class GoogleOAuthService {
    * Revoke access token
    */
   async revokeToken(token: string): Promise<void> {
-    const response = await fetch(
-      `https://oauth2.googleapis.com/revoke?token=${token}`,
-      { method: 'POST' }
-    );
+    const response = await fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, {
+      method: 'POST',
+    });
 
     if (!response.ok) {
       throw new Error('Token revocation failed');
@@ -269,14 +273,11 @@ export class GoogleOAuthService {
    * Get user info
    */
   async getUserInfo(accessToken: string): Promise<GoogleUserInfo> {
-    const response = await fetch(
-      'https://www.googleapis.com/oauth2/v2/userinfo',
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
     if (!response.ok) {
       throw new Error('Failed to get user info');
@@ -300,7 +301,7 @@ export class GoogleOAuthService {
    */
   hasScopes(grantedScopes: string, requiredScopes: string[]): boolean {
     const granted = grantedScopes.split(' ');
-    return requiredScopes.every(scope => granted.includes(scope));
+    return requiredScopes.every((scope) => granted.includes(scope));
   }
 
   /**
@@ -308,7 +309,7 @@ export class GoogleOAuthService {
    */
   getMissingScopes(grantedScopes: string, requiredScopes: string[]): string[] {
     const granted = grantedScopes.split(' ');
-    return requiredScopes.filter(scope => !granted.includes(scope));
+    return requiredScopes.filter((scope) => !granted.includes(scope));
   }
 }
 
