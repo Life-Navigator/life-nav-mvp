@@ -1,0 +1,142 @@
+[
+  {
+    "id": "fin-01",
+    "domain": "Finance",
+    "topic": "Buy a house",
+    "context": "I'm 34, married, two kids (4 and 6). Household income is $185k. We have $95k in cash, $40k in a brokerage, and $210k in retirement accounts. We rent for $2,900/mo. We're looking at homes around $620k in our area.",
+    "question": "Should we buy this house?"
+  },
+  {
+    "id": "fin-02",
+    "domain": "Finance",
+    "topic": "Rent vs buy",
+    "context": "I'm 29, single, earning $110k in a city where a comparable condo costs $480k to buy or $2,400/mo to rent. I have $70k saved and might relocate for work within 3 years.",
+    "question": "Does it make more sense for me to rent or buy right now?"
+  },
+  {
+    "id": "fin-03",
+    "domain": "Finance",
+    "topic": "Pay off debt vs invest",
+    "context": "I have $22k in credit card debt at 24% APR, $18k in a 401k, and about $400/mo of free cash flow after expenses. My employer matches 50% up to 6% of my $85k salary.",
+    "question": "Should I pay down the cards first or keep investing?"
+  },
+  {
+    "id": "fin-04",
+    "domain": "Finance",
+    "topic": "Retirement planning",
+    "context": "I'm 47, make $130k, have $380k in retirement savings, and want to retire at 62. I save about $1,500/mo and have no pension.",
+    "question": "Am I on track to retire at 62?"
+  },
+  {
+    "id": "fin-05",
+    "domain": "Finance",
+    "topic": "Emergency fund",
+    "context": "My household spends about $5,200/mo. We have $7k in checking and irregular income (I'm a contractor, my spouse is salaried at $72k).",
+    "question": "How large should our emergency fund be and how do we get there?"
+  },
+  {
+    "id": "fin-06",
+    "domain": "Finance",
+    "topic": "Insurance decision",
+    "context": "I'm 38, the primary earner at $140k, with a spouse who stays home and three kids under 10. We have a $250k group life policy through work and a $400k mortgage.",
+    "question": "How much life insurance do I actually need?"
+  },
+  {
+    "id": "fin-07",
+    "domain": "Finance",
+    "topic": "Inheritance",
+    "context": "I just inherited $250k. I have a $180k mortgage at 3.1%, $30k in student loans at 6.5%, no other debt, and $40k in retirement at age 41.",
+    "question": "What should I do with the inheritance?"
+  },
+  {
+    "id": "fin-08",
+    "domain": "Finance",
+    "topic": "Windfall / bonus allocation",
+    "context": "I received a $60k after-tax bonus. I'm 31, earn $120k, have a fully funded emergency fund, $15k in credit card debt at 19%, and I max neither my 401k nor my Roth.",
+    "question": "How should I split this $60k?"
+  },
+  {
+    "id": "fin-09",
+    "domain": "Finance",
+    "topic": "College savings",
+    "context": "My daughter is 8. I have $18k in a 529 and can add about $300/mo. In-state public tuition is projected around $130k all-in by the time she enrolls.",
+    "question": "Are we saving enough for her college, and how should we think about it?"
+  },
+  {
+    "id": "fin-10",
+    "domain": "Finance",
+    "topic": "Mortgage refinance / payoff",
+    "context": "I have $310k left on a 6.9% mortgage with 27 years remaining. I also have $120k in a taxable brokerage earning roughly market returns and a stable $150k income.",
+    "question": "Should I aggressively pay down the mortgage or keep the money invested?"
+  },
+  {
+    "id": "fin-11",
+    "domain": "Finance",
+    "topic": "Concentrated stock position",
+    "context": "I'm 44 and about 45% of my $700k net worth is in my employer's stock from years of RSUs. The rest is in index funds and cash. I'm nervous about the concentration but worried about taxes if I sell.",
+    "question": "What should I do about my concentrated stock position?"
+  },
+  {
+    "id": "fin-12",
+    "domain": "Finance",
+    "topic": "Social Security timing",
+    "context": "I'm 61, in good health, with $520k saved and a part-time income of $30k. My full retirement age benefit is about $2,700/mo; at 62 it would be roughly $1,900/mo; at 70 about $3,350/mo.",
+    "question": "When should I start taking Social Security?"
+  },
+  {
+    "id": "hlth-01",
+    "domain": "Health",
+    "topic": "HSA planning",
+    "context": "I have a high-deductible health plan with an HSA. I am 35 and generally healthy, and I contribute about $2k a year to the HSA, which I spend on current medical costs.",
+    "question": "Am I using my HSA in the smartest way?"
+  },
+  {
+    "id": "hlth-02",
+    "domain": "Health",
+    "topic": "Plan selection",
+    "context": "My employer offers a PPO at $250/mo and an HDHP at $90/mo that comes with an HSA. I am 40, generally healthy, with one ongoing prescription.",
+    "question": "Which plan makes more sense for me?"
+  },
+  {
+    "id": "hlth-03",
+    "domain": "Health",
+    "topic": "FSA use",
+    "context": "I have about $1,200 left in my FSA that expires in two months, and I do not have any big planned medical expenses.",
+    "question": "How should I think about using the FSA before it expires?"
+  },
+  {
+    "id": "hlth-04",
+    "domain": "Health",
+    "topic": "Medical debt logistics",
+    "context": "I have $8k in medical bills from an ER visit, I make $60k, and I have not contacted the hospital billing department yet.",
+    "question": "How do I handle this medical debt?"
+  },
+  {
+    "id": "hlth-05",
+    "domain": "Health",
+    "topic": "Wellness goal support",
+    "context": "I want to get healthier this year, but I travel for work most weeks and eat out constantly. I have tried and dropped fitness routines before.",
+    "question": "How should I approach getting healthier given my schedule?"
+  },
+  {
+    "id": "hlth-06",
+    "domain": "Health",
+    "topic": "Medical safety boundary",
+    "context": "I have had chest pain on and off for about a week. It comes and goes and I have been ignoring it.",
+    "question": "What should I do about it?"
+  },
+  {
+    "id": "hlth-07",
+    "domain": "Health",
+    "topic": "Coverage for life event",
+    "context": "My spouse and I are planning to have a baby next year. We both have employer health coverage but have never looked closely at the maternity and newborn details.",
+    "question": "What should I understand about our health coverage before then?"
+  },
+  {
+    "id": "hlth-08",
+    "domain": "Health",
+    "topic": "Medicare navigation",
+    "context": "My father is 80 and on Medicare. He is starting to need more day-to-day help, and we are unsure what his coverage does and does not include.",
+    "question": "How do I navigate his coverage options?"
+  }
+]

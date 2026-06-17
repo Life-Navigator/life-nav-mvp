@@ -154,6 +154,24 @@ class SupabaseClient:
             log.warning("supabase insert %s failed: %s", table, exc)
             return []
 
+    async def rpc(self, fn: str, args: dict[str, Any], *, schema: str = "public") -> Any:
+        """Service-role Postgres function call (PostgREST /rpc/<fn>). Returns the JSON result or None on
+        error. Used for atomic operations (e.g. usage-counter increments)."""
+        if not self.configured:
+            return None
+        headers = self._headers()
+        if schema != "public":
+            headers["Content-Profile"] = schema
+        endpoint = f"{self._url}/rest/v1/rpc/{fn}"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(endpoint, headers=headers, json=args)
+                resp.raise_for_status()
+                return resp.json() if resp.content else None
+        except Exception as exc:  # noqa: BLE001
+            log.warning("supabase rpc %s failed: %s", fn, exc)
+            return None
+
     async def count(self, table: str, *, filters: Optional[dict[str, str]] = None, schema: str = "public") -> int:
         """Exact row count via PostgREST ``Prefer: count=exact`` (Content-Range). Aggregate-only
         — returns 0 on error. Used by the Executive Dashboard (no rows/PII fetched)."""

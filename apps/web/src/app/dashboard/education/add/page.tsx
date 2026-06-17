@@ -52,7 +52,11 @@ export default function AddEducationDataPage() {
         }),
       });
 
-      if (!res.ok) throw new Error('Failed to save record');
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null);
+        const reason = detail?.error || detail?.code || `HTTP ${res.status}`;
+        throw new Error(`Couldn't save your education record (${reason}). Please try again.`);
+      }
       setMessage({ type: 'success', text: 'Education record saved!' });
       setRecord({
         institution: '',

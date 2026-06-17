@@ -36,6 +36,20 @@ class AnalyticsService:
         except Exception:  # noqa: BLE001 — instrumentation must never break the request path
             pass
 
+    async def advisor_metrics(self) -> dict[str, Any]:
+        """Advisor observability rollup (P0.1) — last-30d counts/rates only, no PII. Reads the
+        analytics.advisor_turn_metrics view; returns an honest empty shape if no turns logged yet."""
+        rows = await self._sb.select("advisor_turn_metrics", schema=ANALYTICS, limit=1)
+        empty = {
+            "total_sessions": 0, "total_turns": 0, "fallback_turns": 0, "fallback_rate": None,
+            "validator_rejections": 0, "validation_failure_rate": None, "validator_repairs": 0,
+            "avg_latency_ms": None, "p95_latency_ms": None, "avg_confidence": None,
+            "avg_graph_edges": None, "avg_total_tokens": None,
+        }
+        if not rows:
+            return empty
+        return {**empty, **{k: v for k, v in rows[0].items() if v is not None}}
+
     async def _by_type(self, table: str, schema: str, type_col: str, types: list[str]) -> dict[str, int]:
         return {t: await self._sb.count(table, filters={type_col: f"eq.{t}"}, schema=schema) for t in types}
 

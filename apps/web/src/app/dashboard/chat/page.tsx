@@ -16,6 +16,9 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import StreamingText from '@/components/ui/StreamingText';
+import AdviceDisclaimer from '@/components/advice/AdviceDisclaimer';
+import { levelFromText } from '@/lib/advice/disclosure';
 
 interface ConversationSummary {
   id: string;
@@ -58,6 +61,12 @@ function ChatPageInner() {
   const [composer, setComposer] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Context-aware advice disclosure: tier derived from the latest user message (or what's being
+  // typed). Renders nothing for low-risk topics — only escalates on finance/health/legal/tax/etc.
+  const disclosureLevel = useMemo(() => {
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+    return levelFromText(lastUser?.content ?? composer);
+  }, [messages, composer]);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -276,7 +285,15 @@ function ChatPageInner() {
                     : 'mr-auto bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100',
                 ].join(' ')}
               >
-                {m.content}
+                {m.role === 'assistant' ? (
+                  <StreamingText
+                    text={m.content}
+                    animate={m.id === messages[messages.length - 1]?.id}
+                    onTick={() => messagesEndRef.current?.scrollIntoView({ block: 'end' })}
+                  />
+                ) : (
+                  m.content
+                )}
               </div>
             ))
           )}
@@ -311,6 +328,7 @@ function ChatPageInner() {
             </button>
           </div>
           <p className="mt-2 text-xs text-gray-500">Enter to send · Shift+Enter for newline</p>
+          <AdviceDisclaimer level={disclosureLevel} className="mt-2" />
         </div>
       </section>
     </div>

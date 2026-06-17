@@ -80,17 +80,25 @@ def _rec_refs(recs: list[Any]) -> list[RecommendationReference]:
 
 
 class UniversalReportEngine:
-    def __init__(self, domains: dict[str, DomainService], education: EducationService, supabase: SupabaseClient, trends: Any = None, comp_benefits: Any = None, reco_os: Any = None) -> None:
+    def __init__(self, domains: dict[str, DomainService], education: EducationService, supabase: SupabaseClient, trends: Any = None, comp_benefits: Any = None, reco_os: Any = None, readiness: Any = None) -> None:
         self._domains = domains
         self._edu = education
         self._sb = supabase
         self._trends = trends  # optional TrendAnalyzer — adds a finance progress-over-time section
         self._comp = comp_benefits  # optional CompensationBenefitsEngine — the compensation report
         self._os = reco_os  # the Recommendation OS — reports show the SAME recommendations as the dashboard
+        self._readiness = readiness  # optional LifeReadinessEngine — the advisor-briefing readiness score
 
     # ---- build (generate_report) ----
     async def build(self, ctx: UserContext, report_type: str) -> ReportDefinition:
         definition = await self._build(ctx, report_type)
+        # P4 — advisor-grade reports lead with an executive briefing (readiness, goals, recommendations
+        # + full explainability, risks, opportunities, 90-day plan, appendix). All real; honest empties.
+        if report_type in ("full", "financial"):
+            try:
+                definition.sections.insert(0, await self._advisor_executive_section(ctx, 0))
+            except Exception:  # noqa: BLE001 — the briefing never breaks report generation
+                pass
         # Sprint 36: lead with the user's life model (vision/objective/themes/constraints/tradeoffs).
         life_sec = await self._life_model_section(ctx, 0)
         if life_sec:
@@ -184,6 +192,91 @@ class UniversalReportEngine:
                                       for a in actions]},
             recommendations=[RecommendationReference(id=a["id"], title=a["title"], priority=a.get("priority")) for a in actions],
             evidence=[EvidenceReference(metric_name=a["title"], metric_value="", source_table=a.get("source_module", "recommendation_os")) for a in actions])
+
+    async def _advisor_executive_section(self, ctx: UserContext, ord_n: int) -> ReportSection:
+        """Advisor-grade executive briefing — readiness, goals, recommendations + full explainability,
+        risks, opportunities, 90-day plan, appendix. 100% real data; honest empties where absent."""
+        readiness: dict[str, Any] = {}
+        try:
+            if self._readiness is not None:
+                r = await self._readiness.assess(ctx)
+                readiness = {"overall": r["index"]["score"], "status": r["index"]["status"],
+                             "domains": [{"domain": d["domain"], "progress": d["progress"], "status": d["status"], "gap": d.get("gap")}
+                                         for d in r.get("domains", [])]}
+        except Exception:  # noqa: BLE001
+            readiness = {}
+
+        snap: dict[str, Any] = {}
+        try:
+            from .life_discovery import LifeDiscoveryService
+            snap = await LifeDiscoveryService(self._sb).snapshot(ctx)
+        except Exception:  # noqa: BLE001
+            snap = {}
+        po = snap.get("primary_objective") or {}
+
+        recs: list[dict[str, Any]] = []
+        plan: dict[str, Any] = {}
+        nba: Optional[dict[str, Any]] = None
+        try:
+            rd = await self._os.roadmap(ctx) if self._os is not None else {}
+            actions = (rd.get("now") or []) + (rd.get("next") or []) + (rd.get("later") or [])
+            for a in actions[:8]:
+                qi = a.get("quantified_impact") or {}
+                bits = []
+                if qi.get("financial_impact_annual"):
+                    bits.append(f"+${float(qi['financial_impact_annual']):,.0f}/yr")
+                if qi.get("readiness_before") is not None and qi.get("readiness_after") is not None:
+                    bits.append(f"readiness {qi['readiness_before']} → {qi['readiness_after']}")
+                if a.get("expected_benefit"):
+                    bits.append(str(a["expected_benefit"]))
+                recs.append({
+                    "title": a.get("title"), "priority": a.get("priority"), "rec_type": a.get("rec_type"),
+                    "why": (a.get("narrative") or {}).get("why") or a.get("why"),
+                    "confidence": a.get("confidence"), "expected_impact": " · ".join(bits) or None,
+                    "domains": a.get("impacted_domains") or [],
+                    "evidence": [{"statement": e.get("statement"), "source": e.get("source_table")}
+                                 for e in (a.get("evidence") or []) if e and (e.get("statement") or e.get("source_table"))],
+                    "assumptions": [x for x in (a.get("assumptions") or []) if x and (x.get("label") or x.get("value"))],
+                    "unlocks": qi.get("unlocked_capabilities") or [],
+                    "updated_at": a.get("updated_at"),
+                })
+            nba = next((x for x in recs if x.get("rec_type") in ("ACTION", "OPPORTUNITY")), recs[0] if recs else None)
+            plan = {"now": [a.get("title") for a in (rd.get("now") or [])],
+                    "next": [a.get("title") for a in (rd.get("next") or [])],
+                    "later": [a.get("title") for a in (rd.get("later") or [])],
+                    "blocked": [{"title": b.get("title"), "why": b.get("why")} for b in (rd.get("blocked_by") or [])]}
+        except Exception:  # noqa: BLE001
+            recs, plan, nba = [], {}, None
+
+        goals: list[dict[str, Any]] = []
+        try:
+            rows = await self._sb.select("goals", filters={"user_id": f"eq.{ctx.user_id}"}, limit=20, order="created_at.desc", schema="public")
+            goals = [{"title": g.get("title"), "status": g.get("status"), "progress": g.get("progress_percent"),
+                      "category": g.get("category"), "target_value": g.get("target_value"), "current_value": g.get("current_value")}
+                     for g in (rows or [])]
+        except Exception:  # noqa: BLE001
+            goals = []
+
+        confs = [r["confidence"] for r in recs if r.get("confidence") is not None]
+        missing = sorted({u for r in recs for u in (r.get("unlocks") or [])})
+        payload = {
+            "cover": {"readiness": readiness.get("overall"), "objective": po.get("title"),
+                      "confidence_pct": round((po.get("confidence") or 0) * 100) if po.get("confidence") is not None else None},
+            "vision": snap.get("life_vision"),
+            "primary_objective": {"title": po.get("title"), "reasoning": po.get("reasoning")},
+            "readiness": readiness,
+            "goals": goals,
+            "recommendations": recs,
+            "next_best_action": nba,
+            "risks": snap.get("top_risks") or [],
+            "opportunities": snap.get("top_opportunities") or [],
+            "missing_data": missing,
+            "plan_90": plan,
+            "appendix": {"evidence_count": sum(len(r.get("evidence") or []) for r in recs),
+                         "recommendation_count": len(recs), "goal_count": len(goals),
+                         "avg_confidence_pct": round(sum(confs) / len(confs) * 100) if confs else None},
+        }
+        return ReportSection(key="advisor_executive", title="Executive Briefing", ord=ord_n, body=payload)
 
     async def _compensation_report(self, ctx: UserContext) -> ReportDefinition:
         if self._comp is None:

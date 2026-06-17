@@ -1,0 +1,1018 @@
+[
+  {
+    "id": "fin-01",
+    "domain": "Finance",
+    "topic": "Buy a house",
+    "input": "I'm 34, married, two kids (4 and 6). Household income is $185k. We have $95k in cash, $40k in a brokerage, and $210k in retirement accounts. We rent for $2,900/mo. We're looking at homes around $620k in our area.\n\nShould we buy this house?",
+    "status": 200,
+    "latency_ms": 12608,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is whether to purchase a home around $620k. This choice significantly impacts your family's financial liquidity, long-term savings, and monthly cash flow. Key drivers include your available cash for a down payment, the ongoing costs of homeownership, and how this aligns with your broader financial priorities.\n\n**The tradeoffs:**\n- **Proceeding with the home purchase** — Potentially building equity over time and gaining stability and control over your living environment.; but Committing a significant portion of your cash reserves and increasing your fixed monthly expenses, which could reduce financial flexibility.\n- **Continuing to rent** — Maintaining your current cash liquidity and flexibility, with predictable housing costs.; but Not building equity and potentially facing future rent increases, without the benefits of homeownership.\n\n**What we know:**\n- You are 34, married, with two children aged 4 and 6.\n- Your household income is $185k.\n- You have $95k in cash, $40k in a brokerage account, and $210k in retirement accounts.\n- You currently rent for $2,900/mo.\n- You are looking at homes around $620k in your area.\n\n**What would sharpen this:**\n- Your desired cash reserve for emergencies or other immediate needs.\n- Your comfort level with committing a portion of your current cash to a down payment.\n\n**Of your $95k in cash, how much would you want to keep as an emergency fund or for other immediate needs, separate from a down payment?**\n\n_Understanding your desired cash cushion is critical to assessing the feasible down payment amount and the overall affordability of a $620k home purchase._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "career",
+        "why_it_matters": "Understanding career stability and future income potential can influence major financial commitments like a home purchase."
+      },
+      {
+        "field": "family",
+        "why_it_matters": "Family needs and future plans (e.g., more children, education costs) can impact housing decisions and financial capacity."
+      },
+      {
+        "field": "health",
+        "why_it_matters": "Health considerations can influence financial planning, particularly regarding emergency funds and insurance needs."
+      },
+      {
+        "field": "retirement / financial independence",
+        "why_it_matters": "A home purchase is a significant long-term investment that needs to be balanced against other long-term goals like retirement savings."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-02",
+    "domain": "Finance",
+    "topic": "Rent vs buy",
+    "input": "I'm 29, single, earning $110k in a city where a comparable condo costs $480k to buy or $2,400/mo to rent. I have $70k saved and might relocate for work within 3 years.\n\nDoes it make more sense for me to rent or buy right now?",
+    "status": 200,
+    "latency_ms": 10608,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision to rent or buy a home involves weighing the financial implications of building equity against the need for flexibility, especially given your current savings, income, and potential future plans. Key drivers are your financial capacity, desire for stability versus mobility, and the certainty of your career path.\n\n**The tradeoffs:**\n- **Buying a condo** — Potentially building equity and owning an appreciating asset, offering stability and control over your living space.; but Requires a significant upfront financial commitment and reduces flexibility, which could be a concern if you relocate within 3 years. You would also be responsible for maintenance and other ownership costs.\n- **Renting a condo** — Maintains flexibility, which aligns with your potential need to relocate for work within 3 years, and avoids the large upfront costs and responsibilities of homeownership.; but Does not build equity or contribute to long-term asset ownership, and your monthly payments do not generate a return.\n\n**What we know:**\n- You are 29 and single.\n- You are earning $110k.\n- You have $70k saved.\n- A comparable condo in your city costs $480k to buy.\n- A comparable condo in your city costs $2,400/mo to rent.\n- You might relocate for work within 3 years.\n\n**What would sharpen this:**\n- The likelihood and drivers of your potential relocation.\n- How much of your $70k savings you would be comfortable allocating to a down payment versus maintaining as a cash reserve.\n\n**What would need to happen for you to relocate for work within 3 years?**\n\n_Understanding the certainty and drivers behind your potential relocation is critical for assessing the value of flexibility in your housing decision._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-03",
+    "domain": "Finance",
+    "topic": "Pay off debt vs invest",
+    "input": "I have $22k in credit card debt at 24% APR, $18k in a 401k, and about $400/mo of free cash flow after expenses. My employer matches 50% up to 6% of my $85k salary.\n\nShould I pay down the cards first or keep investing?",
+    "status": 200,
+    "latency_ms": 15109,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Prioritizing the allocation of your available cash flow between high-interest credit card debt repayment and retirement investing is a critical decision that significantly impacts your financial stability and long-term wealth accumulation. The key drivers are the high cost of your credit card interest, the guaranteed return from your employer's 401k match, and your available free cash flow.\n\n**The tradeoffs:**\n- **Aggressively pay down the $22k credit card debt** — You would eliminate debt accruing at a high 24% APR, which is a guaranteed 'return' on your money equal to the interest rate saved, and reduce your monthly financial burden.; but You would forgo contributing to your 401k, potentially missing out on your employer's 50% match up to 6% of your $85k salary, which is a significant and immediate return on investment.\n- **Continue or increase investing in your 401k** — You would secure your employer's 50% match up to 6% of your $85k salary, which is a substantial, guaranteed return, and continue building your tax-deferred retirement savings of $18k.; but Your $22k credit card debt would continue to accrue interest at 24% APR, increasing the total amount you owe and prolonging the period of high-interest payments.\n\n**What we know:**\n- You have $22k in credit card debt at 24% APR.\n- You have $18k in a 401k.\n- You have about $400/mo of free cash flow after expenses.\n- Your employer matches 50% up to 6% of your $85k salary.\n\n**What would sharpen this:**\n- Your current 401k contribution rate.\n- The amount you have set aside for an emergency fund.\n\n**Are you currently contributing enough to your 401k to receive the full employer match of 50% up to 6% of your $85k salary?**\n\n_Understanding your current 401k contribution status is crucial because it clarifies whether you are currently capturing the guaranteed return from your employer match, which is a key factor in comparing it against the cost of your credit card debt._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Current 401k contribution rate",
+        "why_it_matters": "This determines if you are currently receiving the full employer match, which is a guaranteed return to weigh against the credit card interest."
+      },
+      {
+        "field": "Emergency fund amount",
+        "why_it_matters": "Knowing your emergency savings helps assess your financial resilience if you were to aggressively pay down debt, ensuring you don't create new vulnerabilities."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-04",
+    "domain": "Finance",
+    "topic": "Retirement planning",
+    "input": "I'm 47, make $130k, have $380k in retirement savings, and want to retire at 62. I save about $1,500/mo and have no pension.\n\nAm I on track to retire at 62?",
+    "status": 200,
+    "latency_ms": 12003,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "We are assessing the viability of your goal to retire at 62. This matters because it directly impacts your long-term financial security and the lifestyle you can expect, driven by your current savings, future contributions, and desired retirement spending.\n\n**The tradeoffs:**\n- **Increasing your current savings of $1,500/mo** — Potentially allows you to reach your retirement goal at 62 with a more comfortable lifestyle, or even earlier.; but Reduces your current discretionary income and spending capacity.\n- **Adjusting your desired retirement age of 62** — Pushing back your retirement age allows more time for your $380k in savings and future contributions to grow.; but Delays your desired freedom from work and may not align with your personal timeline.\n- **Modifying your anticipated lifestyle in retirement** — A more modest lifestyle in retirement would require a smaller nest egg, making your goal easier to achieve.; but May mean compromising on your vision for what retirement looks like.\n\n**What we know:**\n- You are 47 years old.\n- Your current annual income is $130k.\n- You have $380k in retirement savings.\n- You want to retire at 62.\n- You save about $1,500/mo.\n- You have no pension.\n\n**What would sharpen this:**\n- A clear understanding of your anticipated annual expenses or desired income level in retirement.\n\n**To understand what 'on track' means for you, how much of your current $130k annual income do you anticipate needing to cover your expenses and desired lifestyle each year in retirement?**\n\n_This question is crucial because knowing your desired annual retirement income is the primary target against which all your current savings and future contributions are measured._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Desired Annual Retirement Income",
+        "why_it_matters": "Without a target for annual spending in retirement, it's impossible to assess if current savings and contributions are 'on track' to meet that goal."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-05",
+    "domain": "Finance",
+    "topic": "Emergency fund",
+    "input": "My household spends about $5,200/mo. We have $7k in checking and irregular income (I'm a contractor, my spouse is salaried at $72k).\n\nHow large should our emergency fund be and how do we get there?",
+    "status": 200,
+    "latency_ms": 10895,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Determining the appropriate size for your emergency fund is a critical step in building financial security, especially with irregular income. Key drivers include your monthly spending, the stability of your income sources, and your personal comfort level with financial risk.\n\n**The tradeoffs:**\n- **A larger emergency fund** — Provides a greater cushion against unexpected expenses or periods of income disruption, offering more peace of mind.; but Ties up more capital in a low-growth asset, potentially reducing funds available for investments or other financial goals.\n- **A smaller emergency fund** — Frees up more capital for higher-growth investments or immediate spending on other priorities.; but Increases your vulnerability to financial stress if an unexpected event occurs, potentially leading to debt or liquidating other assets.\n- **Aggressively saving to build the fund quickly** — Achieves financial security sooner, reducing the period of vulnerability.; but May require significant adjustments to current spending or lifestyle in the short term.\n\n**What we know:**\n- Your household spends about \"$5,200/mo\".\n- You currently have \"$7k in checking\".\n- Your income is \"irregular\" as a contractor.\n- Your spouse is \"salaried at $72k\".\n\n**What would sharpen this:**\n- Your desired duration of emergency fund coverage in months.\n- Your comfort level with the variability of your contractor income.\n\n**Given your irregular contractor income, how many months of your \"$5,200/mo\" household spending would you ideally want your emergency fund to cover?**\n\n_Understanding your desired duration of coverage is the most direct way to determine the target size of your emergency fund, especially considering the variability of your income._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "desired_emergency_fund_months_of_expenses",
+        "why_it_matters": "Crucial for determining the target size of the emergency fund, directly addressing the user's question 'how large should our emergency fund be'."
+      },
+      {
+        "field": "contractor_income_stability",
+        "why_it_matters": "Provides context for the risk profile associated with irregular income, influencing the appropriate emergency fund size."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-06",
+    "domain": "Finance",
+    "topic": "Insurance decision",
+    "input": "I'm 38, the primary earner at $140k, with a spouse who stays home and three kids under 10. We have a $250k group life policy through work and a $400k mortgage.\n\nHow much life insurance do I actually need?",
+    "status": 200,
+    "latency_ms": 8065,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Determining an appropriate life insurance coverage amount is crucial for ensuring your family's financial stability should you pass away. Key drivers include your current income, the number and age of your dependents, existing debts, and future financial obligations.\n\n**The tradeoffs:**\n- **Opting for higher life insurance coverage** — Provides a greater financial safety net for your spouse and three children, potentially covering all future needs and liabilities.; but Results in higher premium payments, which reduces your current disposable income.\n- **Opting for lower life insurance coverage** — Leads to lower premium payments, freeing up more of your current income for other uses.; but Could leave your family underinsured, potentially struggling to cover essential living expenses, the mortgage, and future goals without your income.\n\n**What we know:**\n- You are 38 years old.\n- You are the primary earner with an income of \"$140k\".\n- Your spouse stays home.\n- You have three children under \"10\".\n- You have a \"$250k\" group life policy through work.\n- You have a \"$400k\" mortgage.\n\n**What would sharpen this:**\n- Your family's annual living expenses.\n- Any other significant debts beyond the mortgage.\n- Your financial goals for your children's education or your spouse's retirement.\n\n**Beyond your \"$400k\" mortgage, what are your family's approximate annual living expenses?**\n\n_Understanding your family's ongoing expenses is a foundational step in calculating the income replacement component of your life insurance needs._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "family_annual_living_expenses",
+        "why_it_matters": "Crucial for determining the income replacement component of life insurance."
+      },
+      {
+        "field": "other_significant_debts",
+        "why_it_matters": "Impacts the total financial burden your family would face."
+      },
+      {
+        "field": "future_financial_goals",
+        "why_it_matters": "Determines additional funds needed for education, retirement, etc., beyond basic living expenses."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-07",
+    "domain": "Finance",
+    "topic": "Inheritance",
+    "input": "I just inherited $250k. I have a $180k mortgage at 3.1%, $30k in student loans at 6.5%, no other debt, and $40k in retirement at age 41.\n\nWhat should I do with the inheritance?",
+    "status": 200,
+    "latency_ms": 14008,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is how to best allocate your $250k inheritance. This choice significantly impacts your financial security, debt burden, and long-term wealth accumulation, driven by your current debt structure, existing savings, and future financial objectives.\n\n**The tradeoffs:**\n- **Using the inheritance to pay down debt (e.g., student loans)** — Eliminates high-interest debt, reduces monthly obligations, and provides a guaranteed 'return' equal to the interest rate saved (e.g., 6.5% on student loans).; but Reduces the cash available for other opportunities, such as investing for growth or building a larger emergency fund.\n- **Investing the inheritance (e.g., in retirement accounts)** — Offers the potential for long-term growth and compounding returns, significantly boosting your retirement savings over time.; but Exposes the funds to market risk, makes them less accessible for immediate needs, and does not directly address existing debts.\n- **Holding the inheritance as liquid cash** — Provides a substantial safety net for unexpected expenses and offers flexibility for future opportunities or goals that may arise.; but Cash typically earns low returns, meaning its purchasing power can be eroded by inflation over time, and it doesn't actively reduce debt or grow wealth.\n\n**What we know:**\n- You just inherited $250k.\n- You have a $180k mortgage at 3.1%.\n- You have $30k in student loans at 6.5%.\n- You have no other debt.\n- You have $40k in retirement savings.\n- You are age 41.\n\n**What would sharpen this:**\n- Your current liquid savings outside of retirement accounts.\n- Any other significant financial goals or priorities you have in mind.\n\n**Beyond your $40k in retirement savings, what liquid savings do you currently have available for emergencies or other immediate needs?**\n\n_Understanding your current liquid savings is crucial for determining how much of the inheritance can be allocated towards debt or investments without compromising your financial safety net._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "liquid_savings",
+        "why_it_matters": "Crucial for establishing an emergency fund before allocating funds to debt repayment or investments."
+      },
+      {
+        "field": "other_financial_goals",
+        "why_it_matters": "Understanding other goals (e.g., home renovation, education funding) will influence the optimal allocation of the inheritance."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-08",
+    "domain": "Finance",
+    "topic": "Windfall / bonus allocation",
+    "input": "I received a $60k after-tax bonus. I'm 31, earn $120k, have a fully funded emergency fund, $15k in credit card debt at 19%, and I max neither my 401k nor my Roth.\n\nHow should I split this $60k?",
+    "status": 200,
+    "latency_ms": 11776,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Allocating your $60k after-tax bonus involves balancing immediate financial health, like addressing high-interest debt, with long-term goals such as retirement savings. The key drivers are your existing debt burden, current retirement contributions, and your personal financial priorities.\n\n**The tradeoffs:**\n- **Paying down the $15k credit card debt** — Eliminates high-interest debt at 19%, freeing up future cash flow and reducing interest payments.; but Reduces the amount available for other immediate uses or long-term investments.\n- **Increasing contributions to your 401k or Roth** — Accelerates your long-term retirement savings and potentially benefits from tax advantages.; but Leaves the $15k credit card debt accruing interest at 19% and the funds are less accessible.\n- **Holding the bonus for other purposes** — Provides liquidity and flexibility for unforeseen opportunities or future goals beyond debt and retirement.; but Foregoes the immediate financial benefit of eliminating high-interest debt or boosting tax-advantaged retirement savings.\n\n**What we know:**\n- You received a \"$60k after-tax bonus.\"\n- You are \"31.\"\n- You earn \"$120k.\"\n- You have a \"fully funded emergency fund.\"\n- You have \"$15k in credit card debt at 19%.\"\n- You \"max neither [your] 401k nor [your] Roth.\"\n\n**What would sharpen this:**\n- Your comfort level with carrying the existing high-interest debt.\n- Your priority between debt elimination and accelerating retirement savings.\n\n**Given you have a fully funded emergency fund, how do you feel about carrying the $15k in credit card debt at 19% interest versus accelerating your retirement savings?**\n\n_This question helps us understand your immediate financial priorities and comfort level with existing debt, which is crucial for allocating your bonus effectively._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-09",
+    "domain": "Finance",
+    "topic": "College savings",
+    "input": "My daughter is 8. I have $18k in a 529 and can add about $300/mo. In-state public tuition is projected around $130k all-in by the time she enrolls.\n\nAre we saving enough for her college, and how should we think about it?",
+    "status": 200,
+    "latency_ms": 8340,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Evaluating your college savings plan involves assessing if your current contributions align with your funding goals for your daughter's education. Key drivers are the projected cost, your current savings and contributions, and your specific funding objectives.\n\n**The tradeoffs:**\n- **Increasing your monthly contributions** — Potentially covers a larger portion of the projected $130k tuition, reducing future reliance on loans or other funding sources.; but May impact your current cash flow or ability to fund other financial priorities.\n- **Maintaining your current savings pace of $300/mo** — Preserves your current budget and flexibility for other financial needs.; but May result in a larger gap between your savings and the projected $130k tuition, requiring alternative funding later.\n- **Relying on potential scholarships or future income/loans** — Reduces the immediate pressure to save more aggressively.; but Introduces uncertainty regarding the availability and amount of scholarships, or the burden of future debt for your daughter or family.\n\n**What we know:**\n- Your daughter is 8 years old.\n- You have $18k in a 529 plan.\n- You can add about $300/mo to the 529.\n- In-state public tuition is projected around $130k all-in by the time she enrolls.\n\n**What would sharpen this:**\n- Your specific goal for the percentage or amount of the projected $130k tuition you aim to cover.\n- Your comfort level with your daughter potentially taking on student loans, or your family contributing from other sources.\n\n**Of the projected $130k for in-state public tuition, what portion do you ideally envision covering through your 529 and other savings?**\n\n_Understanding your specific funding goal for the $130k projected cost is critical to determine if your current savings trajectory is 'enough' and to frame further planning._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-10",
+    "domain": "Finance",
+    "topic": "Mortgage refinance / payoff",
+    "input": "I have $310k left on a 6.9% mortgage with 27 years remaining. I also have $120k in a taxable brokerage earning roughly market returns and a stable $150k income.\n\nShould I aggressively pay down the mortgage or keep the money invested?",
+    "status": 200,
+    "latency_ms": 11394,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is how to best allocate your $120k in taxable investments, specifically whether to apply it towards accelerating your mortgage payments or to keep it invested. This choice significantly impacts your financial risk profile, liquidity, and long-term wealth accumulation.\n\n**The tradeoffs:**\n- **Aggressively paying down your mortgage** — You secure a guaranteed 'return' equivalent to your mortgage's '6.9%' interest rate, reduce your debt burden, and potentially free up future cash flow.; but This would reduce your liquid assets from the '$120k' brokerage account, potentially foregoing higher long-term investment returns, and limiting flexibility for other opportunities or emergencies.\n- **Keeping the money invested** — You maintain liquidity with your '$120k' brokerage, retain the potential for higher returns than your '6.9%' mortgage rate over the long term, and keep capital accessible for other goals.; but You continue to pay '6.9%' interest on your '$310k' mortgage, and your investments are subject to market volatility.\n\n**What we know:**\n- You have a mortgage balance of '$310k' with a '6.9%' interest rate and '27 years' remaining.\n- You have '$120k' in a taxable brokerage account earning roughly market returns.\n- You have a stable income of '$150k'.\n\n**What would sharpen this:**\n- Your comfort level with carrying debt versus having readily accessible liquid assets.\n- Any specific financial goals you are working towards that this $120k could support.\n- Your overall risk tolerance for market investments compared to the certainty of debt reduction.\n\n**Beyond this immediate decision, what are your broader financial priorities or goals that this $120k could help you achieve?**\n\n_Understanding your overarching financial goals will provide the essential context for evaluating the best use of your capital, aligning this decision with your long-term vision._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-11",
+    "domain": "Finance",
+    "topic": "Concentrated stock position",
+    "input": "I'm 44 and about 45% of my $700k net worth is in my employer's stock from years of RSUs. The rest is in index funds and cash. I'm nervous about the concentration but worried about taxes if I sell.\n\nWhat should I do about my concentrated stock position?",
+    "status": 200,
+    "latency_ms": 12649,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "We are considering how to manage the concentration of your employer's stock within your overall net worth. This decision is critical for balancing potential growth, managing risk, and navigating tax implications, driven by your risk tolerance, financial goals, and current tax situation.\n\n**The tradeoffs:**\n- **Selling a portion of your employer's stock** — Reduces your exposure to a single company, diversifying your portfolio and potentially lowering overall risk.; but Triggers capital gains taxes on the appreciated value, which is a concern you've raised.\n- **Continuing to hold your concentrated employer's stock position** — Defers any capital gains taxes and allows for potential further appreciation if the company performs well.; but Maintains a significant portion of your $700k net worth in a single asset, increasing your overall portfolio risk.\n\n**What we know:**\n- You are 44 years old.\n- Your net worth is $700k.\n- About 45% of your $700k net worth is in your employer's stock from years of RSUs.\n- The remaining portion of your net worth is held in index funds and cash.\n- You are nervous about the concentration of your employer's stock.\n- You are worried about taxes if you sell the stock.\n\n**What would sharpen this:**\n- A clearer understanding of your comfort level with the current level of risk from your concentrated stock position.\n- Your primary financial goals and objectives for your wealth.\n- An understanding of your current income and tax situation.\n\n**You mentioned being nervous about the concentration. If your employer's stock were to drop significantly, how would that impact your sense of financial security or your ability to pursue your goals?**\n\n_This question directly addresses your stated nervousness and helps us understand your personal tolerance for the risk associated with your concentrated position, which is a key driver for any diversification strategy._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Risk Tolerance",
+        "why_it_matters": "Understanding your comfort with potential losses from the concentrated stock is fundamental to determining an appropriate strategy."
+      },
+      {
+        "field": "Financial Goals",
+        "why_it_matters": "Your objectives (e.g., retirement, major purchase) dictate the time horizon and risk capacity for your investments."
+      },
+      {
+        "field": "Tax Situation",
+        "why_it_matters": "Your current income and tax bracket are crucial for evaluating the actual impact of capital gains taxes if you sell."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fin-12",
+    "domain": "Finance",
+    "topic": "Social Security timing",
+    "input": "I'm 61, in good health, with $520k saved and a part-time income of $30k. My full retirement age benefit is about $2,700/mo; at 62 it would be roughly $1,900/mo; at 70 about $3,350/mo.\n\nWhen should I start taking Social Security?",
+    "status": 200,
+    "latency_ms": 8396,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision of when to begin Social Security benefits is about balancing immediate income needs against maximizing your total lifetime benefit, driven by your current cash flow, health expectations, and how long you plan to work.\n\n**The tradeoffs:**\n- **Starting benefits earlier (e.g., at 62)** — Provides immediate income, potentially supplementing your part-time earnings or allowing you to reduce work sooner.; but Results in a permanently reduced monthly benefit amount for the rest of your life.\n- **Delaying benefits until Full Retirement Age (FRA) or later (e.g., at 70)** — Maximizes your monthly benefit, leading to a significantly higher payment for as long as you live.; but Requires you to cover your living expenses from your part-time income and savings for a longer period before benefits begin.\n\n**What we know:**\n- You are 61 years old and in good health.\n- You have $520k saved.\n- You have a part-time income of $30k.\n- Your Social Security benefit at age 62 would be roughly $1,900/mo.\n- Your Full Retirement Age (FRA) benefit is about $2,700/mo.\n- Your Social Security benefit at age 70 would be about $3,350/mo.\n\n**What would sharpen this:**\n- Your approximate monthly living expenses.\n- Your anticipated timeline for continuing part-time work.\n\n**What are your approximate monthly living expenses?**\n\n_Understanding your monthly expenses is critical for evaluating how long you can comfortably defer Social Security, given your current income and savings._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "car-01",
+    "domain": "Career",
+    "topic": "Promotion",
+    "input": "I'm a senior engineer making $165k. I've been offered a promotion to engineering manager with a $15k raise but I'd stop coding and manage 7 people. I've never managed before.\n\nShould I take the manager promotion?",
+    "status": 200,
+    "latency_ms": 10892,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision to accept the engineering manager promotion involves weighing the financial gain against a significant shift in your daily work and career path. Key drivers are your career satisfaction, the financial increase, and your interest in taking on a management role.\n\n**The tradeoffs:**\n- **Taking the manager promotion** — You would receive a $15k raise, increasing your salary from $165k, and open a new career path in leadership.; but You would stop coding, which may be a core part of your current work satisfaction, and take on the new responsibility of managing 7 people without prior experience.\n- **Remaining a senior engineer** — You would continue in a role where you are comfortable with coding and avoid the unknown challenges of managing a team.; but You would forgo the $15k raise and potentially miss out on a new career trajectory and skill development in leadership.\n\n**What we know:**\n- You are currently a senior engineer making $165k.\n- The promotion to engineering manager includes a $15k raise.\n- The new role would mean you stop coding.\n- You would be managing 7 people.\n- You have never managed before.\n\n**What would sharpen this:**\n- Your personal feelings about moving away from hands-on coding.\n- Your interest level or concerns regarding leading a team of 7 people.\n\n**You've mentioned you'd stop coding and manage 7 people. How do you feel about moving away from hands-on coding, and what appeals to you (or concerns you) about leading a team?**\n\n_Understanding your intrinsic motivations and concerns regarding the nature of the work itself is crucial for evaluating long-term career satisfaction beyond the financial component._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "career_satisfaction_with_coding",
+        "why_it_matters": "Understanding how much you enjoy coding helps evaluate the cost of giving it up."
+      },
+      {
+        "field": "interest_in_management",
+        "why_it_matters": "Your interest and concerns about managing people are key to determining potential satisfaction and success in the new role."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "car-02",
+    "domain": "Career",
+    "topic": "Job change",
+    "input": "I'm 36 making $135k at a stable company I've been at for 8 years. I have an offer for $168k at an earlier-stage company with more equity but less security. My spouse is on parental leave.\n\nShould I take the new job?",
+    "status": 200,
+    "latency_ms": 11548,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Evaluating this new job offer involves weighing the potential for increased compensation and equity against the reduced job security, especially in light of your spouse's current parental leave. The key drivers are financial stability, career growth, and family considerations.\n\n**The tradeoffs:**\n- **Taking the new job offer** — You would earn a higher salary of '$168k' and gain 'more equity' at an 'earlier-stage company', potentially accelerating your financial and career growth.; but You would face 'less security' compared to your current 'stable company' where you've been for '8 years', introducing more uncertainty for your family.\n- **Staying at your current company** — You would maintain the stability and security of your current role, which you've held for '8 years' at a 'stable company', providing a predictable income of '$135k' during your spouse's parental leave.; but You would forgo the higher compensation of '$168k' and the additional equity offered by the new role, potentially missing out on a significant career and financial opportunity.\n\n**What we know:**\n- You are 36.\n- You currently make '$135k' at a 'stable company' where you have been for '8 years'.\n- You have an offer for '$168k' at an 'earlier-stage company' with 'more equity but less security'.\n- Your spouse is on parental leave.\n\n**What would sharpen this:**\n- Your family's current financial resilience, particularly concerning essential expenses.\n- Your comfort level with the 'less security' aspect of the new role, given your family situation.\n\n**Considering the new role's 'less security' and your spouse being on parental leave, how many months of your family's essential expenses could you comfortably cover if your income were to temporarily stop?**\n\n_Understanding your family's financial runway is critical for assessing the practical implications of 'less security' and your capacity to absorb that risk, especially with your spouse currently on leave._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "financial_resilience",
+        "why_it_matters": "To understand the family's capacity to manage the 'less security' of the new job offer."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "car-03",
+    "domain": "Career",
+    "topic": "Layoff risk",
+    "input": "There are strong rumors of layoffs at my company within two quarters. I'm a mid-level marketer earning $95k with $20k saved and a family of four.\n\nWhat should I do to prepare?",
+    "status": 200,
+    "latency_ms": 8778,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Preparing for potential job loss involves understanding your current financial resilience and identifying proactive steps to mitigate the impact on your family. Key drivers are your available financial runway, your family's essential needs, and potential career alternatives.\n\n**The tradeoffs:**\n- **Focusing on building your savings aggressively now** — Increases your financial runway and provides a greater cushion if your income stops.; but May require reducing current discretionary spending or delaying other financial goals.\n- **Prioritizing an immediate job search** — Could secure a new role before potential layoffs, minimizing any gap in income.; but Can be time-consuming and stressful, potentially impacting your current work performance or family time.\n\n**What we know:**\n- You are a mid-level marketer.\n- You are earning $95k.\n- You have $20k saved.\n- You have a family of four.\n- There are strong rumors of layoffs at your company within two quarters.\n\n**What would sharpen this:**\n- Your essential monthly expenses for your family of four.\n- The nature of your $20k saved (e.g., emergency fund, investment, etc.).\n\n**To understand your immediate financial runway, could you tell me what your essential monthly expenses are for your family of four?**\n\n_This question directly addresses the most critical immediate concern: how long your existing $20k savings would sustain your family if your $95k income stops, which is fundamental to any preparation strategy._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "essential_monthly_expenses",
+        "why_it_matters": "Understanding essential monthly expenses is crucial for calculating how long current savings would last in the event of job loss, informing the urgency and scale of financial preparation."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "car-04",
+    "domain": "Career",
+    "topic": "Relocation for work",
+    "input": "I've been offered a role in another state with a $25k raise to $150k, but the cost of living is about 30% higher and my partner would have to find a new job (they currently earn $80k).\n\nShould we relocate for this job?",
+    "status": 200,
+    "latency_ms": 10497,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Evaluating the career opportunity against the associated financial and family impacts of a relocation. Key drivers include the net change in household income, your partner's career prospects, and the family's adaptability to a new environment.\n\n**The tradeoffs:**\n- **Relocating for the new role** — You would receive a $25k raise, increasing your salary to $150k.; but The cost of living is about 30% higher, and your partner would lose their current $80k job.\n- **Staying in your current role** — Your partner would retain their $80k job, and you would avoid the disruption of relocation.; but You would forego the $25k raise and the new career opportunity.\n\n**What we know:**\n- You have been offered a new role with a $25k raise, bringing your salary to $150k.\n- The cost of living in the new state is about 30% higher.\n- Your partner currently earns $80k and would need to find a new job if you relocate.\n\n**What would sharpen this:**\n- Your partner's potential earnings and job search timeline in the new state.\n- Your current household expenses to quantify the impact of the 30% higher cost of living.\n- Your primary motivations for considering this new role beyond the salary increase.\n\n**What is your partner's outlook on finding a comparable role in the new state, both in terms of salary and timing?**\n\n_Understanding your partner's earning potential and the likely duration of their job search is critical to assessing the overall financial impact and family implications of a potential move._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "car-05",
+    "domain": "Career",
+    "topic": "Leadership path",
+    "input": "I'm 40, a director earning $190k. I can pursue a VP track that means more politics and travel, or stay as a hands-on director. I have two teenagers at home.\n\nShould I push for the VP path or stay where I am?",
+    "status": 200,
+    "latency_ms": 12207,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is whether to pursue a VP career track or remain in your current director role, which significantly impacts your professional trajectory, work-life balance, and family involvement. Key drivers include career ambition, personal satisfaction with your work, and the implications for your family life.\n\n**The tradeoffs:**\n- **Pursuing the VP track** — Potential for career advancement, increased influence, and likely higher compensation.; but Involves 'more politics' and 'more travel', which could impact job satisfaction and time with family.\n- **Staying as a hands-on director** — Maintaining a 'hands-on' role, potentially offering greater day-to-day satisfaction and a more stable work-life balance.; but Foregoing potential career progression and the associated financial and influence benefits of a VP role.\n\n**What we know:**\n- You are 40 years old.\n- You are currently a director earning $190k.\n- You have two teenagers at home.\n- You are considering a VP track that involves 'more politics and travel'.\n- You are also considering staying in your current role as a 'hands-on director'.\n\n**What would sharpen this:**\n- Your priorities regarding career advancement versus time spent with your family.\n- Your perspective on the 'politics' aspect of the VP role and how it aligns with your professional preferences.\n- Any specific financial aspirations or goals that might be influenced by a change in compensation.\n\n**Considering your two teenagers at home, how would the 'more travel' associated with the VP track align with your desired involvement in their lives?**\n\n_This question directly explores the impact of one of the stated downsides of the VP track ('more travel') on a stated personal circumstance ('two teenagers at home'), which is likely a significant driver in your decision._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "career priorities",
+        "why_it_matters": "Understanding your priorities between career advancement, job satisfaction, and work-life balance is crucial for evaluating the two career paths."
+      },
+      {
+        "field": "family involvement preferences",
+        "why_it_matters": "The impact of increased travel on your desired involvement with your teenagers is a key factor in this decision."
+      },
+      {
+        "field": "financial goals",
+        "why_it_matters": "The potential financial implications of the VP role need to be weighed against any specific financial aspirations you may have."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "car-06",
+    "domain": "Career",
+    "topic": "Counteroffer",
+    "input": "I resigned to take a $20k raise elsewhere and my current employer countered matching it plus a title bump. I have mixed feelings about the team here.\n\nShould I accept the counteroffer or leave as planned?",
+    "status": 200,
+    "latency_ms": 10963,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is whether to accept your current employer's counteroffer or proceed with your planned move to a new role, weighing financial gain, career progression, and your work environment.\n\n**The tradeoffs:**\n- **Accept the counteroffer** — You would receive the '$20k raise' and a 'title bump' while remaining in a familiar environment.; but You would continue working with a team about which you have 'mixed feelings', potentially without addressing the underlying reasons that led you to seek a new role.\n- **Leave for the new role** — You would still receive the '$20k raise' and gain a fresh start with a new team and environment.; but You would forgo the 'title bump' offered by your current employer and face the unknowns of adapting to a new company culture and colleagues.\n\n**What we know:**\n- You resigned from your current employer.\n- The new employer offered a '$20k raise'.\n- Your current employer countered by 'matching it plus a title bump'.\n- You have 'mixed feelings about the team here' at your current employer.\n\n**What would sharpen this:**\n- The specific nature and significance of your 'mixed feelings' about your current team.\n- What initially attracted you to the new role, beyond the '$20k raise'.\n- How the 'title bump' at your current employer compares to the career progression offered by the new role.\n\n**You mentioned 'mixed feelings about the team here.' Can you tell me more about what contributes to those feelings, and how significant they are in your decision?**\n\n_Understanding the nature and weight of your feelings about your current team is critical to evaluating whether the counteroffer truly addresses your motivations for considering a change._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "details of 'mixed feelings'",
+        "why_it_matters": "Crucial for understanding the true cost of staying versus leaving."
+      },
+      {
+        "field": "attraction to new role beyond money",
+        "why_it_matters": "Helps weigh the non-financial benefits of the new opportunity."
+      },
+      {
+        "field": "value of title bump",
+        "why_it_matters": "Impacts long-term career trajectory and perceived value."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "car-07",
+    "domain": "Career",
+    "topic": "Sabbatical",
+    "input": "I'm 38, burned out, earning $145k with $160k saved and no kids. I'm considering a 6-month unpaid sabbatical to travel and reset.\n\nCan I afford to take a 6-month sabbatical, and should I?",
+    "status": 200,
+    "latency_ms": 10582,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision to take a 6-month unpaid sabbatical involves balancing the immediate financial impact of lost income and drawing down savings against the personal benefit of addressing burnout and achieving a reset. Key drivers are your financial capacity to cover expenses during the sabbatical, the potential impact on your career trajectory, and the value you place on this period of travel and renewal.\n\n**The tradeoffs:**\n- **Taking the 6-month unpaid sabbatical** — It directly addresses your feeling of burnout and provides an opportunity to travel and reset, potentially leading to renewed focus and well-being.; but You would forgo your $145k annual income for 6 months and draw down a portion of your $160k in savings to cover living expenses during that time.\n- **Not taking the 6-month unpaid sabbatical** — You would maintain your current income and preserve your $160k in savings, avoiding any immediate financial strain.; but You would continue to experience burnout and miss the opportunity for the travel and personal reset you are considering.\n\n**What we know:**\n- You are 38 years old.\n- You are currently earning $145k.\n- You have $160k saved.\n- You do not have children.\n- You are feeling burned out.\n- You are considering a 6-month unpaid sabbatical to travel and reset.\n\n**What would sharpen this:**\n- Your essential monthly living expenses.\n- Your perspective on the career implications of taking time away.\n- Any specific financial goals or obligations you have in the near future.\n\n**What are your essential monthly living expenses right now?**\n\n_Understanding your essential monthly expenses is the most critical next step to assess how much of your $160k savings would be needed to cover a 6-month period without income._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "essential monthly living expenses",
+        "why_it_matters": "Crucial for determining the financial feasibility of an unpaid sabbatical."
+      },
+      {
+        "field": "career trajectory goals",
+        "why_it_matters": "Understanding how a sabbatical might align with or impact your longer-term professional aspirations."
+      },
+      {
+        "field": "near-term financial obligations/goals",
+        "why_it_matters": "To ensure that drawing down savings for a sabbatical does not jeopardize other important financial commitments or objectives."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "car-08",
+    "domain": "Career",
+    "topic": "Career pivot into new field",
+    "input": "I'm a 33-year-old paralegal earning $68k and want to move into UX design. A bootcamp costs $14k and 6 months; entry UX roles in my city pay around $80k.\n\nIs pivoting into UX design a smart move for me?",
+    "status": 200,
+    "latency_ms": 10309,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision to pivot into UX design involves weighing the investment of time and money against the potential for increased income and career satisfaction. Key drivers are the financial commitment, the time commitment, and the expected return on that investment.\n\n**The tradeoffs:**\n- **Pivoting into UX design** — Potential for a higher salary, moving from $68k to around $80k, and a new career path.; but Requires a $14k investment and 6 months out of your current paralegal role, which could mean a period of no income or reduced income.\n- **Remaining in your current paralegal role** — Maintains your current $68k income and avoids the $14k bootcamp cost and 6-month time commitment.; but Misses the opportunity for potential salary increase and a new career that you are considering.\n\n**What we know:**\n- You are 33 years old.\n- You are currently a paralegal earning $68k.\n- You want to move into UX design.\n- A bootcamp for UX design costs $14k and takes 6 months.\n- Entry-level UX roles in your city pay around $80k.\n\n**What would sharpen this:**\n- Your financial capacity to cover living expenses during the 6-month bootcamp without your current income.\n- Your primary motivation for this career change beyond the potential salary increase.\n- Your understanding of the job market for entry-level UX designers in your city.\n\n**If you were to commit to the 6-month bootcamp, how would you plan to cover your living expenses during that period?**\n\n_Understanding your financial plan for the 6-month period without your current income is critical to assessing the feasibility and immediate financial risk of this career pivot._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Emergency Fund / Savings",
+        "why_it_matters": "To understand the financial buffer available to cover living expenses during the bootcamp period."
+      },
+      {
+        "field": "Career Satisfaction (Current Role)",
+        "why_it_matters": "To understand the non-financial drivers for wanting to change careers."
+      },
+      {
+        "field": "Job Market Outlook (UX Design)",
+        "why_it_matters": "To assess the likelihood of securing an entry-level UX role after the bootcamp."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "car-09",
+    "domain": "Career",
+    "topic": "Equity vs salary offer",
+    "input": "A startup offered me $130k salary plus 0.4% equity (current 409A values it around $40k vesting over 4 years). My current job pays $155k all cash.\n\nHow should I weigh the equity offer against my current salary?",
+    "status": 200,
+    "latency_ms": 12840,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Evaluating a new job offer with a lower cash salary but equity upside against your current higher-paying, all-cash role. This decision impacts your immediate income, long-term wealth potential, and career trajectory, driven by the value and risk of the equity, the cash compensation difference, and your personal financial situation.\n\n**The tradeoffs:**\n- **Accepting the startup offer** — Potential for significant long-term wealth creation if the equity grows, opportunity for new career experiences in a startup environment.; but Lower immediate cash compensation of $130k, the equity value is speculative and illiquid, carrying inherent risk.\n- **Staying in your current role** — Higher guaranteed cash compensation of $155k, stability, and a known work environment.; but Potentially missing out on a high-growth opportunity and exposure to new career dynamics.\n\n**What we know:**\n- Your current job pays \"$155k all cash.\"\n- The startup offer is \"$130k salary plus 0.4% equity.\"\n- The equity is currently valued at \"around $40k\" (409A valuation).\n- The equity vests \"over 4 years.\"\n\n**What would sharpen this:**\n- Your current financial capacity to absorb a lower cash salary.\n- Your personal comfort level with the risk and illiquidity of startup equity.\n\n**To understand your financial capacity to absorb a lower cash salary, how many months of essential living expenses do you currently have saved?**\n\n_This question directly addresses your financial runway, which is a critical factor in evaluating the feasibility and risk of accepting a lower cash compensation._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "edu-01",
+    "domain": "Education",
+    "topic": "MBA",
+    "input": "I'm 28, make $82k in operations, and am weighing a full-time MBA that costs $140k plus two years of forgone income. Post-MBA roles in my target field pay around $130k.\n\nIs the MBA worth it for me?",
+    "status": 200,
+    "latency_ms": 12482,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision to pursue a full-time MBA involves a significant financial investment and a career pivot. Key drivers are the $140k program cost, the two years of forgone income at your current $82k salary, and the potential post-MBA salary of $130k.\n\n**The tradeoffs:**\n- **Pursuing the MBA** — Potential for a higher post-MBA salary of around $130k and a transition into your target field.; but A direct financial cost of $140k for tuition and two years of lost income from your current $82k salary.\n- **Not pursuing the MBA** — You would avoid the $140k program cost and continue earning your current $82k salary without interruption.; but You might limit your ability to advance into your target field or achieve the potential $130k post-MBA salary.\n\n**What we know:**\n- You are 28 years old.\n- Your current salary is $82k in operations.\n- A full-time MBA costs $140k.\n- The MBA program would require two years of forgone income.\n- Post-MBA roles in your target field pay around $130k.\n\n**What would sharpen this:**\n- Your current financial resources (savings, investments) available to fund the MBA.\n- Your plan for covering living expenses during the two years of forgone income.\n- Your specific career motivations for pursuing the MBA beyond salary.\n\n**To understand the financial feasibility, how do you envision funding the $140k MBA cost and covering your living expenses for the two years you would not be earning your $82k salary?**\n\n_Understanding your current financial capacity and funding strategy is critical to evaluating the practical implications of the MBA investment._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "liquid_savings_or_investments",
+        "why_it_matters": "Crucial for understanding the financial feasibility of the $140k MBA cost and covering living expenses during two years of forgone income."
+      },
+      {
+        "field": "career_motivations_beyond_salary",
+        "why_it_matters": "Understanding deeper career goals helps evaluate the non-financial returns and overall fit of an MBA."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "edu-02",
+    "domain": "Education",
+    "topic": "Degree choice",
+    "input": "My son is choosing between a $0 in-state engineering program and a $55k/yr private school with a stronger network for his intended finance career.\n\nHow should he think about this choice?",
+    "status": 200,
+    "latency_ms": 10939,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is how to evaluate the long-term value of two distinct educational paths for your son's intended finance career. The key drivers are the immediate financial investment, the perceived strength of the network, and the son's career aspirations.\n\n**The tradeoffs:**\n- **The $0 in-state engineering program** — Avoids any direct financial cost, preventing student loan debt or drawing down family savings.; but May offer a less robust network for a finance career compared to the private school.\n- **The $55k/yr private school** — Provides a stronger network for his intended finance career.; but Involves a significant annual financial investment of $55k, which could lead to debt or impact family finances.\n\n**What we know:**\n- Your son is choosing between two college programs.\n- One option is an in-state engineering program with a cost of $0.\n- The other option is a private school costing $55k/yr.\n- The private school is perceived to have a 'stronger network for his intended finance career.'\n\n**What would sharpen this:**\n- The planned funding source for the $55k/yr private school.\n- Your son's perspective on the value of the stronger network versus the financial cost.\n\n**Regarding the $55k/yr private school, how is your son or your family planning to cover that annual cost?**\n\n_Understanding the funding source for the private school is critical to evaluating the true financial impact of the decision, which is a primary driver in this choice._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "funding_source_private_school",
+        "why_it_matters": "Understanding how the $55k/yr cost would be covered is essential for assessing the financial burden and long-term implications for the family or son."
+      },
+      {
+        "field": "son_perspective_value_vs_cost",
+        "why_it_matters": "The son's own valuation of the network advantage against the financial cost is crucial for aligning the decision with his personal commitment and future satisfaction."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "edu-03",
+    "domain": "Education",
+    "topic": "Certification",
+    "input": "I'm a project coordinator earning $72k. A PMP certification costs about $1,500 and ~120 hours of study; certified PMs in my org earn roughly $90k+.\n\nIs the PMP certification worth pursuing?",
+    "status": 200,
+    "latency_ms": 16875,
+    "llm_status": "fallback:invented numbers not in context: ['18']",
+    "prompt_version": "",
+    "assistant_message": "Let's build your plan together — I'll ask a few quick questions. Let's start with the big picture — what would you most like your life to look like over the next few years?\n\n_Why I ask: Your vision anchors every recommendation we make._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "edu-04",
+    "domain": "Education",
+    "topic": "Student loans",
+    "input": "I have $65k in student loans: $40k federal at 5.5% and $25k private at 8.2%. I earn $78k and have $12k saved beyond my emergency fund.\n\nWhat's the smartest way to tackle my student loans?",
+    "status": 200,
+    "latency_ms": 10837,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The immediate decision is how to best allocate your available $12k savings towards your student loans, which impacts your overall debt repayment strategy and financial flexibility. Key drivers include the interest rates of your loans, their type (federal vs. private), and your comfort level with reducing your cash reserves.\n\n**The tradeoffs:**\n- **Prioritizing the private loan (8.2%)** — Paying down the loan with the highest interest rate first can minimize the total interest paid over the life of your loans.; but This approach might mean less focus on the federal loan, which could offer different repayment protections or options.\n- **Prioritizing the federal loan (5.5%)** — Focusing on federal loans first could allow you to retain potential benefits like income-driven repayment plans, deferment, or forbearance options.; but More interest would accrue on your higher-rate private loan, potentially increasing your overall cost of borrowing.\n- **Using a significant portion of your $12k savings for a lump-sum payment** — A larger lump sum payment immediately reduces your principal balance, leading to lower interest accrual and potentially a faster payoff.; but Reducing your cash savings beyond your emergency fund could limit your financial flexibility for other goals or unexpected expenses.\n\n**What we know:**\n- You have $65k in student loans.\n- This includes $40k federal loans at 5.5%.\n- You also have $25k private loans at 8.2%.\n- Your annual income is $78k.\n- You have $12k saved beyond your emergency fund.\n\n**What would sharpen this:**\n- Your comfort level with deploying your current savings towards debt.\n- Any other immediate financial priorities or goals you have.\n\n**Of your $12k saved beyond your emergency fund, how much would you be comfortable allocating directly to your student loans at this time?**\n\n_Understanding your comfort level with using your available cash is crucial for determining the most suitable repayment strategy for your loans._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "edu-05",
+    "domain": "Education",
+    "topic": "Part-time vs full-time grad school",
+    "input": "I'm 31, earning $98k. I can do a part-time master's over 3 years while working, or quit and finish full-time in 1 year. Tuition is $48k either way.\n\nShould I go part-time while working or full-time?",
+    "status": 200,
+    "latency_ms": 12669,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "You are weighing the structure for pursuing a master's degree, which significantly impacts your career trajectory, immediate income stability, and financial planning. The key drivers are the financial implications of lost income versus tuition, the time commitment, and the career benefits of each path.\n\n**The tradeoffs:**\n- **Pursuing the master's part-time while working (3 years)** — You would maintain your current $98k income and continue gaining work experience, providing financial stability.; but The degree would take 3 years to complete, potentially delaying career advancement or leading to burnout from balancing work and studies.\n- **Pursuing the master's full-time (1 year)** — You would complete the degree in 1 year, potentially accelerating career advancement and allowing for deeper immersion in your studies.; but You would lose your $98k income for that year, requiring you to cover living expenses and the $48k tuition from other financial resources.\n\n**What we know:**\n- You are 31 years old.\n- Your current earning is $98k.\n- The part-time master's option would take 3 years to complete while you continue working.\n- The full-time master's option would take 1 year to complete, requiring you to quit your job.\n- The tuition for the master's degree is $48k, regardless of whether you pursue it part-time or full-time.\n\n**What would sharpen this:**\n- Your current financial resources to cover living expenses and tuition if you pursue the full-time option.\n- Your primary career objectives for pursuing the master's degree.\n\n**If you were to pursue the master's full-time, losing your $98k income for that year, what financial resources would you draw upon to cover your living expenses and the $48k tuition?**\n\n_Understanding your financial capacity to support yourself during a year without income is critical to assessing the feasibility and impact of the full-time master's option._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "financial_resources_for_full_time_study",
+        "why_it_matters": "This data is crucial for evaluating the financial viability of the full-time master's option, including ability to cover living expenses and tuition without current income."
+      },
+      {
+        "field": "career_goals_for_master's",
+        "why_it_matters": "Understanding the career objectives for the master's degree will help weigh the value of faster completion versus continued work experience and income."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "edu-06",
+    "domain": "Education",
+    "topic": "Coding bootcamp for career switch",
+    "input": "I'm 27, earning $52k in retail management with $9k saved. A 4-month coding bootcamp costs $17k; junior dev roles in my area start around $75k.\n\nShould I take out a loan for a coding bootcamp to switch careers?",
+    "status": 200,
+    "latency_ms": 9729,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is whether to pursue a career change into a junior developer role via a 4-month coding bootcamp, which involves taking on a $17k loan. Key drivers are the financial investment, potential salary increase, and the period of reduced or no income during the bootcamp.\n\n**The tradeoffs:**\n- **Taking the $17k loan for the 4-month coding bootcamp** — Potential to increase your annual earnings from $52k to around $75k, and switch into a new career field.; but Incurring $17k in debt and needing to cover living expenses for 4 months while potentially not earning your current $52k income.\n- **Not taking the loan and continuing in your current retail management role** — Avoiding new debt and maintaining your current $52k income and $9k savings.; but Missing the opportunity for a potential salary increase to $75k and remaining in a career you may wish to change.\n\n**What we know:**\n- You are 27 years old.\n- You currently earn $52k in retail management.\n- You have $9k saved.\n- A 4-month coding bootcamp costs $17k.\n- Junior dev roles in your area start around $75k.\n\n**What would sharpen this:**\n- Your plan for covering living expenses during the 4-month bootcamp.\n- Your comfort level with using your existing $9k savings for living expenses or the bootcamp itself.\n- Your comfort level with taking on a $17k loan.\n\n**If you were to pursue the 4-month bootcamp, how much of your $9k saved would you be comfortable allocating towards living expenses or the bootcamp cost itself, versus keeping as an emergency fund?**\n\n_Understanding your allocation of current savings is crucial for assessing the financial feasibility and personal risk tolerance for the bootcamp period._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "edu-07",
+    "domain": "Education",
+    "topic": "Funding kids' college vs own retirement",
+    "input": "I'm 49 with two kids entering college in 2 and 4 years. I have $210k in retirement and $35k saved for college across both kids. I earn $128k.\n\nShould I prioritize my retirement or fully funding their college?",
+    "status": 200,
+    "latency_ms": 13295,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision is how to allocate your financial resources between your retirement savings and funding your children's college education. This choice significantly impacts your long-term financial security and your children's educational opportunities, driven by the specific needs and timelines for both goals.\n\n**The tradeoffs:**\n- **Prioritizing your retirement** — Potentially strengthens your financial independence later in life, allowing more time for investments to grow.; but May mean less immediate funding available for your children's college expenses, potentially increasing their reliance on loans or other sources.\n- **Prioritizing fully funding your children's college** — Directly supports their education and may reduce their need for student loans.; but Could reduce the amount you save for your own retirement, potentially impacting your future financial flexibility or requiring you to work longer.\n\n**What we know:**\n- You are 49 years old.\n- You have two children, with college entry dates in 2 years and 4 years.\n- You have \"$210k in retirement\".\n- You have \"$35k saved for college across both kids\".\n- You earn \"$128k\" annually.\n\n**What would sharpen this:**\n- Your specific financial goal or target for college funding for your children.\n- Your desired retirement age or the lifestyle you envision for retirement.\n- A clearer understanding of your current monthly expenses and discretionary income.\n\n**Beyond the $35k you've saved for college, what additional amount do you envision contributing to their education?**\n\n_Understanding your target contribution for college will help quantify one side of the prioritization decision you're facing._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "college_funding_goal",
+        "why_it_matters": "Quantifies the target for one side of the prioritization decision."
+      },
+      {
+        "field": "desired_retirement_age",
+        "why_it_matters": "Impacts the timeline and required savings for retirement."
+      },
+      {
+        "field": "monthly_expenses",
+        "why_it_matters": "Determines available cash flow for additional savings towards either goal."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fam-01",
+    "domain": "Family",
+    "topic": "New child",
+    "input": "We're expecting our first baby in four months. Combined income $150k, $25k saved, renting at $2,100/mo, both of us work full-time with limited parental leave.\n\nWhat should we get in order before the baby arrives?",
+    "status": 200,
+    "latency_ms": 12924,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The immediate decision is how to prioritize preparations for your first baby's arrival, especially concerning financial stability and managing the transition with limited parental leave. Key drivers are financial readiness, parental leave logistics, and immediate practical needs.\n\n**The tradeoffs:**\n- **Prioritizing building up your financial reserves** — Provides a stronger buffer for unexpected baby-related costs or potential income fluctuations during leave.; but May delay other important practical preparations or investments for the baby's arrival.\n- **Focusing on parental leave logistics and maximizing time off** — Ensures a smoother transition for both parents and the baby, potentially optimizing the use of your limited leave.; but Might divert immediate attention or resources from building up a larger financial cushion.\n- **Concentrating on immediate baby-related purchases and setting up your home** — Ensures practical needs are met and the environment is ready before the baby arrives.; but Could deplete your current savings of \"$25k\" that might otherwise serve as a critical cash cushion, especially with limited leave.\n\n**What we know:**\n- You are expecting your first baby in four months.\n- Your combined income is \"$150k\".\n- You have \"$25k\" saved.\n- You are currently renting at \"$2,100/mo\".\n- Both of you work full-time with limited parental leave.\n\n**What would sharpen this:**\n- Your preliminary thoughts on managing income and expenses during the period of limited parental leave.\n- Any specific financial concerns related to the baby's arrival and your limited leave.\n\n**With limited parental leave for both of you, how are you thinking about managing your income and expenses during that time?**\n\n_Understanding your preliminary plan for managing finances during parental leave is crucial for identifying the most impactful preparations and prioritizing financial readiness._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "parental_leave_financial_plan",
+        "why_it_matters": "Understanding how income and expenses will be managed during limited parental leave is crucial for financial readiness and prioritizing preparations."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fam-02",
+    "domain": "Family",
+    "topic": "Divorce",
+    "input": "I'm going through a divorce at 43. I'll keep my $90k salary, we're splitting $300k in assets, and I'll have the kids half the time. I haven't managed the finances before.\n\nWhat should I prioritize as I rebuild financially?",
+    "status": 200,
+    "latency_ms": 10432,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Establishing immediate financial priorities post-divorce is critical for building a stable foundation, especially given your new role in managing finances. The key drivers are understanding your available resources, securing basic needs, and identifying any immediate financial vulnerabilities.\n\n**The tradeoffs:**\n- **Prioritizing immediate financial stability (e.g., emergency fund, budgeting)** — Provides a sense of security and reduces stress during a significant life transition, while building confidence in managing your finances.; but May delay focusing on longer-term financial growth or investment opportunities.\n- **Focusing on longer-term financial planning (e.g., retirement, investment strategy)** — Positions you for future wealth accumulation and financial independence.; but Could leave immediate needs vulnerable if not adequately addressed first, potentially adding stress during an already challenging time.\n\n**What we know:**\n- You are 43 years old and going through a divorce.\n- You will keep your $90k salary.\n- You are splitting $300k in assets.\n- You will have the kids half the time.\n- You have not managed finances before.\n\n**What would sharpen this:**\n- The specific amount of the $300k in assets you anticipate receiving.\n- The form your share of the assets will primarily take (e.g., cash, investments, home equity).\n\n**Regarding the $300k in assets you're splitting, what is the anticipated division, and what form will your share primarily take (e.g., cash, investments, home equity)?**\n\n_Understanding the nature and amount of the assets you will receive is fundamental to assessing your starting financial position and advising on priorities for rebuilding._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Details of asset split",
+        "why_it_matters": "Crucial for understanding available capital for immediate needs and future planning."
+      },
+      {
+        "field": "Current/projected living expenses",
+        "why_it_matters": "Essential for budgeting and cash flow management post-divorce."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fam-03",
+    "domain": "Family",
+    "topic": "Aging parent",
+    "input": "My mother is 79 and showing early signs she may need care within a year or two. I have two siblings, we live in different states, and none of us has discussed money or responsibilities.\n\nHow should I start thinking about my mother's care?",
+    "status": 200,
+    "latency_ms": 10139,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The immediate decision is how to initiate planning for your mother's potential care needs. This matters because proactive discussions can help clarify preferences, distribute responsibilities, and manage financial implications, while avoiding potential crises. Key drivers include understanding your mother's wishes, assessing her current living situation, and coordinating with your siblings.\n\n**The tradeoffs:**\n- **Initiating proactive discussions now** — Allows for thoughtful planning, shared understanding among siblings, and potentially more choices for your mother's care.; but Can be an emotionally challenging conversation and may surface differing opinions or financial concerns among family members.\n- **Delaying discussions until care is immediately needed** — Avoids immediate discomfort or difficult conversations.; but Risks making decisions under pressure, potentially limiting options, and increasing stress or conflict among siblings due to urgency and lack of prior agreement.\n\n**What we know:**\n- Your mother is 79 years old.\n- She is showing early signs she may need care within a year or two.\n- You have two siblings.\n- Your siblings live in different states.\n- None of you have discussed money or responsibilities regarding your mother's care.\n\n**What would sharpen this:**\n- Your mother's current living situation and her preferences regarding future care.\n- An understanding of your mother's financial resources for care.\n\n**Where does your mother currently live, and has she expressed any preferences about her future living arrangements or care?**\n\n_Understanding your mother's current situation and her own wishes is a foundational step, as it will shape the scope and nature of any care planning discussions._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "mother_living_situation",
+        "why_it_matters": "Her current living situation impacts the type and urgency of care planning needed."
+      },
+      {
+        "field": "mother_care_preferences",
+        "why_it_matters": "Her preferences are crucial for respecting her autonomy and guiding family decisions."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fam-04",
+    "domain": "Family",
+    "topic": "Guardianship",
+    "input": "We have two young children and no will or named guardian. We're both 35, with a $500k mortgage and modest savings.\n\nHow do we set up guardianship and what else are we missing?",
+    "status": 200,
+    "latency_ms": 13304,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Establishing a foundational family protection plan, starting with guardianship, and identifying other critical areas for financial and family well-being. This matters because it directly addresses the security and care of their young children and provides peace of mind for the family. The key drivers are the user's stated lack of a will/guardian, their family situation (two young children), and their desire to understand 'what else they are missing.'\n\n**The tradeoffs:**\n- **Prioritizing the immediate step of identifying potential guardians** — Directly addresses the explicit concern about 'setting up guardianship' and begins the concrete planning process for their children's care.; but Delays a broader exploration of their financial situation and other 'missing' planning areas.\n- **First taking a comprehensive inventory of all financial and family planning gaps** — Provides a holistic view of their current situation, potentially uncovering other urgent needs beyond guardianship.; but May feel overwhelming and could delay making progress on the immediate and critical guardianship decision.\n\n**What we know:**\n- You have two young children.\n- You currently do not have a will.\n- You have not named a guardian for your children.\n- You are both 35 years old.\n- You have a $500k mortgage.\n- You describe your savings as 'modest.'\n\n**What would sharpen this:**\n- Your initial thoughts or preferences regarding who you might consider as guardians for your children.\n- A clearer understanding of what 'modest savings' means to you.\n\n**Regarding guardianship, have you and your partner discussed who you might consider to care for your children, should the need arise?**\n\n_This question directly addresses your primary concern about 'setting up guardianship' by exploring your initial thoughts, which is a crucial first step in any such planning._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fam-05",
+    "domain": "Family",
+    "topic": "Estate planning",
+    "input": "I'm 58 with a $1.8M net worth spread across a home, retirement accounts, and a brokerage. I have three adult children and want to avoid family conflict and unnecessary taxes.\n\nHow should I approach estate planning?",
+    "status": 200,
+    "latency_ms": 12009,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Approaching estate planning involves structuring your assets and wishes to ensure they are carried out effectively, minimizing family conflict and tax burdens, which are key drivers for you.\n\n**The tradeoffs:**\n- **Prioritizing tax minimization** — Potentially preserves more of your $1.8M net worth for your adult children.; but May involve more complex structures that require careful communication to avoid family misunderstandings.\n- **Prioritizing family harmony and simplicity** — Clear, straightforward distribution of assets, reducing potential for conflict among your three adult children.; but Might not always be the most tax-efficient approach.\n\n**What we know:**\n- You are 58 years old.\n- You have a $1.8M net worth.\n- Your net worth is spread across a home, retirement accounts, and a brokerage.\n- You have three adult children.\n- You want to avoid family conflict and unnecessary taxes.\n\n**What would sharpen this:**\n- Your initial thoughts on how you envision your $1.8M net worth being distributed among your three adult children.\n\n**Given your desire to avoid family conflict and unnecessary taxes, have you considered how you might want your $1.8M net worth to be distributed among your three adult children?**\n\n_Understanding your initial thoughts on asset distribution is fundamental to designing an estate plan that aligns with your goals of minimizing conflict and taxes._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fam-06",
+    "domain": "Family",
+    "topic": "Blended family finances",
+    "input": "I'm remarrying at 46. I have two kids from my first marriage and my fiancée has one. We both own homes and have separate retirement accounts.\n\nHow should we structure our finances as a blended family?",
+    "status": 200,
+    "latency_ms": 13944,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is how to structure your finances as you form a blended family. This matters because it impacts financial security, fairness, and the long-term well-being of all family members. Key drivers include individual assets, income, existing financial obligations, and shared financial goals.\n\n**The tradeoffs:**\n- **Fully Blended Finances** — Simplifies management and fosters a strong sense of shared financial responsibility for family goals.; but Can lead to conflicts over differing spending habits and may complicate asset division if the marriage ends.\n- **Mostly Separate Finances** — Maintains individual financial autonomy and protects pre-marital assets and existing financial commitments.; but Can create complexity in managing shared household expenses and may lead to a feeling of 'yours' versus 'mine' rather than 'ours'.\n- **Hybrid Approach (e.g., joint account for shared expenses, separate for individual)** — Balances individual autonomy with shared responsibility, allowing flexibility to tailor to specific needs.; but Requires clear communication and ongoing agreement on what constitutes 'shared' versus 'individual' expenses.\n\n**What we know:**\n- You are 46 and remarrying.\n- You have two children from your first marriage, and your fiancée has one child.\n- You both own homes.\n- You both have separate retirement accounts.\n\n**What would sharpen this:**\n- Your and your fiancée's current individual incomes.\n- Any ongoing financial obligations for either of you, such as child support or alimony.\n\n**To understand how best to structure your finances, what are your and your fiancée's current individual incomes and any ongoing financial obligations, such as child support or alimony, that you each manage?**\n\n_This information is foundational for evaluating different financial structures, as it clarifies the resources and commitments each partner brings to the marriage._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "individual_incomes",
+        "why_it_matters": "Understanding each partner's income is crucial for assessing financial capacity and designing a sustainable financial structure for the blended family."
+      },
+      {
+        "field": "ongoing_financial_obligations",
+        "why_it_matters": "Existing obligations like child support or alimony significantly impact disposable income and must be factored into any financial structuring plan for the blended family."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fam-07",
+    "domain": "Family",
+    "topic": "Special needs planning",
+    "input": "Our 6-year-old has a developmental disability and will likely need lifelong support. We earn $160k combined and have $50k saved but no special needs plan.\n\nHow do we plan financially for our child's lifelong needs?",
+    "status": 200,
+    "latency_ms": 11609,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The core decision is establishing a financial plan for your 6-year-old child's lifelong support, which will significantly impact your family's financial future and well-being. Key drivers include the specific nature of the anticipated support, the duration of those needs, and the optimal funding mechanisms.\n\n**The tradeoffs:**\n- **Prioritizing immediate family financial needs and general savings** — Maintains flexibility for unforeseen expenses or other family goals.; but May delay establishing dedicated funding structures for your child's long-term care, potentially increasing future costs or limiting options.\n- **Focusing on establishing specific financial structures for lifelong support** — Provides clarity and a dedicated pathway for your child's future needs, potentially leveraging specific legal and financial tools.; but May require allocating a significant portion of current savings or income, potentially impacting other immediate financial priorities or liquidity.\n\n**What we know:**\n- Your 6-year-old has a developmental disability and will likely need lifelong support.\n- Your combined earnings are $160k.\n- You have $50k saved.\n- You currently have no special needs plan in place.\n\n**What would sharpen this:**\n- A clearer understanding of the specific types of support anticipated for your child.\n- Your current thoughts on how the $50k in savings might be allocated or preserved.\n\n**What specific types of support do you anticipate your child will need throughout their life, such as medical care, residential arrangements, daily living assistance, or educational resources?**\n\n_Understanding the specific nature of your child's anticipated needs is the most critical next step, as it directly informs the scope and cost of the financial planning required._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "specific types of support needed",
+        "why_it_matters": "The nature of support (medical, residential, daily care, educational) directly impacts the financial resources required and the planning strategies."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fam-08",
+    "domain": "Family",
+    "topic": "Single parent financial security",
+    "input": "I'm a single parent, 37, earning $74k with one child. I have $8k saved, no life insurance, and no will.\n\nWhat are the most important things I should do to protect my child?",
+    "status": 200,
+    "latency_ms": 9844,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Establishing a foundational safety net for your child involves prioritizing immediate financial stability and long-term legal and financial protections. The key drivers are ensuring immediate liquidity, securing future financial provision, and legally designating guardianship.\n\n**The tradeoffs:**\n- **Prioritizing building a larger cash emergency fund** — Provides immediate flexibility for unexpected expenses or income disruptions, covering essential needs for a period.; but May delay establishing other long-term protections like life insurance or a will, which address different types of risks.\n- **Focusing on establishing a will and life insurance first** — Legally designates guardianship for your child and provides a substantial financial safety net for their future in the event of your passing.; but May draw resources or attention away from building up immediate cash reserves for more common, short-term emergencies.\n\n**What we know:**\n- You are a single parent, 37, earning $74k.\n- You have one child.\n- You have $8k saved.\n- You do not have life insurance.\n- You do not have a will.\n\n**What would sharpen this:**\n- Clarity on how much of your $8k saved is allocated for immediate emergencies.\n- An understanding of your typical monthly living expenses.\n\n**Of your $8k saved, how much do you consider to be your emergency fund for immediate needs?**\n\n_Understanding your current emergency savings helps us assess your immediate financial resilience and prioritize next steps for your child's protection._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "fam-09",
+    "domain": "Family",
+    "topic": "Supporting adult child",
+    "input": "My 24-year-old recently moved back home with student debt and an unstable income. I'm 55, planning to retire in 8 years, and want to help without derailing my own plans.\n\nHow much should I help my adult child financially?",
+    "status": 200,
+    "latency_ms": 9413,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is how to balance providing financial support to your 24-year-old child with student debt and unstable income, against safeguarding your own retirement plans at age 55, aiming to retire in 8 years. Key drivers are your available financial capacity, the specific needs of your child, and the potential impact on your retirement timeline.\n\n**The tradeoffs:**\n- **Providing more financial support to your child** — Could directly alleviate your child's immediate financial pressures from student debt and unstable income, potentially helping them establish financial stability sooner.; but May draw down your own savings or require adjustments to your retirement timeline or planned lifestyle, potentially derailing your goal to retire in 8 years.\n- **Prioritizing your retirement savings and timeline** — Ensures you remain on track for your planned retirement in 8 years at age 55, securing your own financial independence.; but May mean your 24-year-old child faces greater financial challenges independently, potentially prolonging their struggle with student debt and unstable income.\n\n**What we know:**\n- You are 55 years old.\n- You plan to retire in 8 years.\n- Your 24-year-old child recently moved back home.\n- Your child has student debt.\n- Your child has an unstable income.\n- You want to help your adult child financially.\n- You want to help without derailing your own plans.\n\n**What would sharpen this:**\n- Your current total amount saved for retirement.\n- The specific amount of your child's student debt.\n- An understanding of your child's current income stability and expenses.\n\n**To understand the flexibility you have to help your child while protecting your own retirement timeline, how much have you currently saved towards your retirement goal?**\n\n_Understanding your current retirement savings is the most critical first step to assess your capacity to provide financial support without jeopardizing your stated goal of retiring in 8 years._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-01",
+    "domain": "Cross-Domain",
+    "topic": "Move states",
+    "input": "We're considering moving from California to Texas. I'd keep my remote job at $140k, we'd save on state taxes, but we'd leave family and our kids' schools behind.\n\nDoes moving to Texas make sense for our family?",
+    "status": 200,
+    "latency_ms": 14053,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is whether to relocate your family from California to Texas, which requires weighing the potential financial advantages against significant family and lifestyle considerations. Key drivers include the specific financial impact of state tax savings and the personal value you place on current family proximity and your children's established school environment.\n\n**The tradeoffs:**\n- **Moving to Texas for financial benefits** — You would save on state taxes, potentially increasing your disposable income.; but You would leave behind your family support network and your children's current schools and community.\n- **Staying in California for family and community ties** — Your family would remain close to your extended family and your children would continue in their current schools.; but You would continue to pay California state taxes, foregoing potential savings.\n\n**What we know:**\n- You are considering moving from California to Texas.\n- You would keep your remote job, earning a salary of \"$140k\".\n- Moving to Texas would mean saving on state taxes.\n- Moving to Texas would mean leaving family behind.\n- Moving to Texas would mean leaving your kids' schools behind.\n\n**What would sharpen this:**\n- The specific amount you currently pay in state taxes to quantify the financial benefit.\n- More detail on the importance of your current family ties and children's school environments to your family's well-being.\n\n**To help understand the financial implications of saving on state taxes, what do you currently pay in state taxes each year in California?**\n\n_This question directly addresses a stated financial driver for the potential move, providing a concrete figure to weigh against other factors._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Current annual state tax payment",
+        "why_it_matters": "Quantifies the financial benefit of 'saving on state taxes' to inform the relocation decision."
+      },
+      {
+        "field": "Importance of current family ties and children's school environments",
+        "why_it_matters": "Provides context for the personal cost of 'leaving family and kids' schools behind' to inform the relocation decision."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-02",
+    "domain": "Cross-Domain",
+    "topic": "Start a business",
+    "input": "I want to leave my $135k corporate job to start a consulting business. I have $90k in savings, a spouse earning $70k, two kids, and a few interested potential clients.\n\nCan I make the leap to start my business?",
+    "status": 200,
+    "latency_ms": 12876,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The core decision is whether to transition from your $135k corporate role to launch a consulting business, which significantly impacts your family's financial stability and your career path. Key drivers include your current savings, your spouse's income, your family's living expenses, and the projected income from your new venture.\n\n**The tradeoffs:**\n- **Making the leap now to start your consulting business** — You can immediately pursue your entrepreneurial ambition and potential for greater professional autonomy.; but You would forgo your stable $135k corporate income, relying on your $90k savings and your spouse's $70k income while the business establishes itself.\n- **Delaying the transition to start your consulting business** — You would maintain your $135k corporate income, providing continued financial stability and potentially allowing more time to build your savings or refine your business plan.; but You would postpone your entrepreneurial goals, potentially extending your time in a role you wish to leave.\n\n**What we know:**\n- You want to leave your $135k corporate job.\n- You plan to start a consulting business.\n- You have $90k in savings.\n- Your spouse earns $70k.\n- You have two kids.\n- You have a few interested potential clients for your business.\n\n**What would sharpen this:**\n- Your family's essential monthly living expenses.\n- How much of your $90k savings you are comfortable allocating as a financial runway for the business.\n- Your anticipated income from the consulting business, and the expected timeline to achieve it.\n\n**To understand how long your $90k in savings could support your family, what are your family's essential monthly living expenses?**\n\n_Understanding your family's monthly expenses is critical for assessing the financial runway provided by your $90k in savings, which is a key factor in the feasibility of leaving your corporate job._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "family_monthly_expenses",
+        "why_it_matters": "Crucial for determining financial runway and assessing the impact of reduced income."
+      },
+      {
+        "field": "savings_allocation_for_business",
+        "why_it_matters": "Helps understand the user's risk tolerance and how much capital they are willing to commit to the transition."
+      },
+      {
+        "field": "anticipated_business_income_and_timeline",
+        "why_it_matters": "Essential for projecting future cash flow and assessing the long-term viability of the business."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-03",
+    "domain": "Cross-Domain",
+    "topic": "Leave a stable job",
+    "input": "I'm 42 with a secure $160k government job and a pension vesting in 3 years. I have an opportunity in the private sector at $200k but no pension and less stability.\n\nShould I leave my stable job before the pension vests?",
+    "status": 200,
+    "latency_ms": 17077,
+    "llm_status": "fallback:invented numbers not in context: ['40']",
+    "prompt_version": "",
+    "assistant_message": "Let's build your plan together — I'll ask a few quick questions. Let's start with the big picture — what would you most like your life to look like over the next few years?\n\n_Why I ask: Your vision anchors every recommendation we make._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-04",
+    "domain": "Cross-Domain",
+    "topic": "Care for a parent",
+    "input": "My father needs increasing care. I'm considering reducing my work to part-time (cutting my $120k income roughly in half) to care for him, or paying $5k/mo for professional care.\n\nShould I cut back work to care for my father or pay for care?",
+    "status": 200,
+    "latency_ms": 16702,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Choosing between reducing your $120k income by half to provide personal care for your father, or maintaining your income and paying $5k/mo for professional care, requires understanding the financial feasibility of each option, the personal capacity and desire for caregiving, and the long-term career implications.\n\n**The tradeoffs:**\n- **Reducing work to part-time** — Providing direct personal care for your father, which can offer a unique level of comfort and connection.; but A significant reduction in your $120k income, impacting your financial stability and potentially your long-term career trajectory.\n- **Paying $5k/mo for professional care** — Maintaining your full $120k income and career momentum, while ensuring your father receives professional support.; but A substantial ongoing $5k/mo expense that will draw from your current income or savings, and you would not be providing direct personal care.\n\n**What we know:**\n- Your father needs increasing care.\n- You are considering reducing your work to part-time, which would cut your $120k income roughly in half.\n- You are also considering paying $5k/mo for professional care.\n\n**What would sharpen this:**\n- Your current level of liquid savings or emergency fund to understand your financial resilience.\n- The specific nature of your father's care needs and your personal willingness or capacity to provide that care.\n- Your long-term career goals and how a reduction in work might align or conflict with them.\n\n**To understand the financial implications of reducing your $120k income or incurring a $5k/mo care cost, what is your current level of liquid savings or emergency fund?**\n\n_Understanding your available financial cushion is critical to assessing the feasibility and impact of either reducing your income or taking on a new significant expense._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-05",
+    "domain": "Cross-Domain",
+    "topic": "Disability / income protection",
+    "input": "I have a chronic health condition that may eventually limit my ability to work. I'm 40, earn $95k, am the primary earner, and have only employer short-term disability coverage.\n\nHow do I protect my income against my health risk?",
+    "status": 200,
+    "latency_ms": 12053,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Considering how to protect your income against the potential impact of your chronic health condition is crucial, as you are the primary earner. The key drivers are understanding the potential duration and severity of the work limitation, your current income, and the adequacy of your existing coverage.\n\n**The tradeoffs:**\n- **Relying solely on your employer's short-term disability coverage** — Requires no additional out-of-pocket cost for premiums.; but Provides only short-term income replacement and may not cover the full extent or duration of a chronic condition's impact on your ability to work.\n- **Securing additional long-term income protection** — Offers more comprehensive and extended income replacement, potentially covering a significant portion of your $95k income for a longer period if your condition limits your work.; but Involves an ongoing premium expense, which would impact your current cash flow.\n\n**What we know:**\n- You have a chronic health condition that may eventually limit your ability to work.\n- You are 40.\n- You earn $95k.\n- You are the primary earner.\n- You have only employer short-term disability coverage.\n\n**What would sharpen this:**\n- The financial impact of a potential loss of your income on your family's essential needs.\n- The duration and percentage of income replacement provided by your current employer short-term disability coverage.\n\n**As the primary earner, what percentage of your current $95k income would be critical to replace to maintain your family's essential lifestyle if you couldn't work?**\n\n_Understanding the minimum income required for your family's essential lifestyle will help quantify the financial exposure and determine the necessary level of income protection._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-06",
+    "domain": "Cross-Domain",
+    "topic": "Military transition",
+    "input": "I'm transitioning out of the military after 12 years. I'll have a partial pension, GI Bill benefits, and need to choose between using the GI Bill for school or jumping straight into a civilian job.\n\nHow should I approach my transition to civilian life?",
+    "status": 200,
+    "latency_ms": 9388,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The immediate decision is whether to prioritize further education using your GI Bill benefits or to enter the civilian workforce directly. This choice will significantly shape your career trajectory, immediate income, and long-term financial stability, driven by your career aspirations, the urgency of income, and the long-term financial impact of each path.\n\n**The tradeoffs:**\n- **Using your GI Bill for school** — Potential for higher long-term earning potential, access to new career fields, and personal development in a structured environment.; but Delayed entry into the civilian workforce, which means delayed income and potentially drawing down savings, or incurring debt if the GI Bill doesn't cover all expenses.\n- **Jumping straight into a civilian job** — Immediate income, faster accumulation of civilian work experience, and potentially quicker financial independence.; but May limit long-term career options without further education, potentially lower initial earning ceiling, and less dedicated time for personal development or re-skilling.\n\n**What we know:**\n- You are transitioning out of the military after 12 years of service.\n- You will have a partial pension.\n- You have GI Bill benefits available.\n- You are considering using the GI Bill for school or going straight into a civilian job.\n\n**What would sharpen this:**\n- Your desired civilian career path or fields of study.\n- Your immediate financial needs and desired income level.\n\n**What kind of civilian career path are you considering, or what fields of study are you interested in pursuing with your GI Bill benefits?**\n\n_Understanding your career aspirations is crucial for evaluating whether further education or immediate employment better aligns with your long-term goals._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "career_aspirations",
+        "why_it_matters": "To evaluate the best path (education vs. job) for long-term career success."
+      },
+      {
+        "field": "immediate_financial_needs",
+        "why_it_matters": "To understand the urgency of immediate income versus investing in education."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-07",
+    "domain": "Cross-Domain",
+    "topic": "Early retirement / FIRE",
+    "input": "I'm 38 with $900k invested, spending about $55k/yr, and considering leaving full-time work. My spouse would keep working part-time earning $40k.\n\nCan I retire early now, and what would I be risking?",
+    "status": 200,
+    "latency_ms": 15029,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision at hand is whether to transition from full-time work to early retirement, which significantly impacts your financial longevity and lifestyle. Key drivers include the sustainable withdrawal rate from your investments, the reliability and duration of your spouse's part-time income, and your anticipated expenses in early retirement.\n\n**The tradeoffs:**\n- **Leaving full-time work now** — You gain immediate freedom from your current full-time role and more personal time.; but This reduces your opportunity to further grow your invested capital and increases your reliance on your existing $900k, potentially exposing you to greater financial risk if market returns are lower than expected or expenses rise.\n- **Continuing full-time work** — You would continue to generate income, allowing your $900k investment to grow further and reducing the pressure on it to cover your living expenses.; but This would delay your desired lifestyle change and the personal opportunities that early retirement could offer.\n\n**What we know:**\n- You are 38.\n- You have $900k invested.\n- Your current spending is about $55k/yr.\n- You are considering leaving full-time work to retire early.\n- Your spouse would keep working part-time, earning $40k.\n\n**What would sharpen this:**\n- Your anticipated annual spending needs in early retirement, which may differ from your current $55k/yr.\n- An understanding of how healthcare costs would be covered before Medicare eligibility.\n- The planned duration or stability of your spouse's $40k part-time income.\n\n**If you were to leave full-time work, what annual income would you anticipate needing to cover your household expenses and desired lifestyle?**\n\n_Understanding your anticipated annual spending in early retirement is critical for assessing the sustainability of your $900k investment and your spouse's $40k income._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "anticipated_retirement_spending",
+        "why_it_matters": "This directly impacts the feasibility and sustainability of early retirement."
+      },
+      {
+        "field": "healthcare_plan_early_retirement",
+        "why_it_matters": "Healthcare costs are a significant and often underestimated expense in early retirement, especially before Medicare eligibility."
+      },
+      {
+        "field": "spouse_income_duration",
+        "why_it_matters": "The duration of your spouse's part-time income is crucial for projecting your household's cash flow in early retirement."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-08",
+    "domain": "Cross-Domain",
+    "topic": "Job loss + family",
+    "input": "I was just laid off. I have $40k saved, a mortgage, a spouse earning $60k, and two kids. My severance covers two months.\n\nWhat should I do first?",
+    "status": 200,
+    "latency_ms": 8965,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The immediate decision is how to best manage your family's financial stability in the wake of your layoff. Key drivers are understanding your current expenses, the duration of your financial runway, and how to preserve your savings while you seek new employment.\n\n**The tradeoffs:**\n- **Prioritizing immediate cash flow from savings** — Provides immediate stability and covers essential expenses without delay.; but Quickly depletes your '$40k saved' emergency fund, potentially shortening your financial runway.\n- **Aggressively cutting expenses to preserve savings** — Extends the life of your '$40k saved' and your spouse's '$60k' income, buying more time for your job search.; but May require significant and immediate lifestyle adjustments for your family with 'two kids'.\n\n**What we know:**\n- You were just laid off.\n- You have '$40k saved'.\n- You have a spouse earning '$60k'.\n- You have 'two kids'.\n- Your severance covers 'two months'.\n- You have 'a mortgage'.\n\n**What would sharpen this:**\n- Your family's essential monthly expenses.\n- The specific amount of your mortgage payment.\n\n**What are your family's essential monthly expenses, including your mortgage payment, utilities, and groceries?**\n\n_Understanding your essential monthly expenses is crucial for determining how long your '$40k saved' and your spouse's '$60k' income can sustain your family after your 'two months' of severance._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "essential_monthly_expenses",
+        "why_it_matters": "To understand the financial burn rate and how long current savings and spouse's income can cover needs."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-09",
+    "domain": "Cross-Domain",
+    "topic": "Relocate abroad",
+    "input": "We're considering moving abroad for two years for my partner's job. I'd pause my $100k career, our kids are in elementary school, and we'd keep our US home.\n\nHow should we think about moving abroad for two years?",
+    "status": 200,
+    "latency_ms": 14921,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The core decision is whether to move abroad for two years, driven by the impact on your career, your children's well-being and education, and the financial implications of the move.\n\n**The tradeoffs:**\n- **Moving abroad for two years** — Pursuing your partner's job opportunity and potentially gaining new international experiences for your family.; but Pausing your $100k career, potentially disrupting your children's schooling and social lives, and incurring the financial complexities of maintaining two homes.\n- **Staying in the US** — Maintaining continuity in your $100k career and your children's current schooling and social environment, while avoiding the costs of dual housing.; but Missing your partner's international job opportunity and the potential for a unique family experience abroad.\n\n**What we know:**\n- You are considering moving abroad for two years for your partner's job.\n- You would pause your $100k career.\n- Your kids are in elementary school.\n- You would keep your US home.\n\n**What would sharpen this:**\n- Your plan for managing household finances during the period your $100k career is paused.\n- Details on the financial implications of maintaining your US home while living abroad.\n- Your partner's compensation and relocation package details for the international role.\n\n**If you pause your $100k career for two years, how do you envision covering your family's expenses during that time?**\n\n_Understanding your financial strategy for managing the income gap from pausing your $100k career is a critical first step in evaluating the feasibility of moving abroad._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "financial_plan_for_income_gap",
+        "why_it_matters": "Understanding how you plan to cover expenses without your $100k income is crucial for assessing financial stability during the move."
+      },
+      {
+        "field": "us_home_financial_implications",
+        "why_it_matters": "Knowing the costs or potential income from your US home will clarify the overall financial picture of maintaining two residences."
+      },
+      {
+        "field": "partner_job_offer_details",
+        "why_it_matters": "The compensation and benefits from your partner's job are essential to understand the financial resources available for the move."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-10",
+    "domain": "Cross-Domain",
+    "topic": "Buy a business",
+    "input": "I have the chance to buy a small established business for $350k. I'd use $120k savings and finance the rest. It nets about $90k/yr but I'd leave my $110k salaried job to run it.\n\nShould I buy this business?",
+    "status": 200,
+    "latency_ms": 16366,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision to buy this business involves a significant reallocation of your financial resources and a change in your career path. Key drivers include your financial stability, your tolerance for business risk, and your personal and professional objectives.\n\n**The tradeoffs:**\n- **Buying the business** — You would gain business ownership and control, with a potential net income of about $90k/yr.; but You would use $120k of your savings, take on additional financing, and leave your $110k salaried job, introducing new financial and career risks.\n- **Not buying the business** — You would maintain your current $110k salaried income and preserve your $120k savings, avoiding the financial commitment and risks associated with business ownership.; but You would miss the opportunity to own and operate this established business.\n\n**What we know:**\n- You have the opportunity to buy a small established business for $350k.\n- You plan to use $120k of your savings for the purchase and finance the rest.\n- The business nets about $90k/yr.\n- You would leave your current $110k salaried job to run the business.\n\n**What would sharpen this:**\n- Your comfort level with depleting your savings for the business purchase.\n- Your current financial cushion or emergency fund needs.\n- Your motivations for considering this career change and business ownership.\n\n**Of your $120k savings, how much would you want to keep as an emergency fund or for other immediate needs, rather than put toward the business purchase?**\n\n_Understanding your comfort with the immediate financial impact on your savings is a critical first step in evaluating the feasibility and personal risk of this business acquisition._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "Emergency Fund Needs",
+        "why_it_matters": "Knowing how much savings the user needs to retain for emergencies helps assess the true financial impact and risk of using $120k for the business purchase."
+      },
+      {
+        "field": "Motivation for Business Ownership",
+        "why_it_matters": "Understanding the user's underlying reasons for wanting to buy a business and leave their current job is crucial for aligning the decision with their broader life vision and career aspirations."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-11",
+    "domain": "Cross-Domain",
+    "topic": "Downsize / lifestyle change",
+    "input": "We're 60, our kids are grown, and we have a $750k house with a $150k mortgage. Downsizing could free up cash for retirement but means leaving the family home.\n\nShould we downsize now that the kids are gone?",
+    "status": 200,
+    "latency_ms": 15704,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "The decision to downsize your home involves balancing the financial opportunity to enhance your retirement funding against the emotional and lifestyle implications of leaving your current family home.\n\n**The tradeoffs:**\n- **Downsize now** — Could free up cash for retirement.; but Means leaving the family home.\n- **Remain in your current home** — Maintain your connection to the family home.; but Potentially less cash available to fund your retirement.\n\n**What we know:**\n- You are 60 years old.\n- Your kids are grown.\n- You have a house valued at $750k with a $150k mortgage.\n- You believe downsizing could free up cash for retirement.\n- You recognize that downsizing means leaving the family home.\n\n**What would sharpen this:**\n- A clearer understanding of your retirement aspirations and how additional cash might support them.\n- The specific emotional or practical reasons for your attachment to the 'family home'.\n\n**If you were to free up cash by downsizing, what would be the primary purpose or goal for those funds in your retirement?**\n\n_This question directly probes your underlying motivation for considering downsizing, connecting the financial outcome to your desired future._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "retirement / financial independence",
+        "why_it_matters": "Understanding your retirement vision is crucial to evaluate the financial benefit of downsizing."
+      },
+      {
+        "field": "family",
+        "why_it_matters": "Understanding the emotional and practical significance of the 'family home' is key to weighing the costs of downsizing."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-12",
+    "domain": "Cross-Domain",
+    "topic": "Medical event financial recovery",
+    "input": "I had a major medical event and now have $30k in medical debt, reduced ability to work full-time, and depleted savings. I earn about $60k when working full-time.\n\nHow do I recover financially after my medical event?",
+    "status": 200,
+    "latency_ms": 11934,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Navigating financial recovery after a major medical event involves understanding your current financial capacity to manage new debt and rebuild a secure foundation. The key drivers are your current income, the specifics of your $30k medical debt, and your ability to rebuild savings.\n\n**The tradeoffs:**\n- **Prioritizing aggressive repayment of your $30k medical debt** — Reduces the total interest paid and removes a significant financial burden more quickly.; but May leave you with little to no cash reserves, increasing vulnerability to future unexpected expenses.\n- **Prioritizing rebuilding your savings cushion** — Provides a safety net for future emergencies and helps restore financial stability.; but Delays addressing the $30k medical debt, potentially incurring more interest over time and prolonging the debt burden.\n\n**What we know:**\n- You had a major medical event.\n- You now have $30k in medical debt.\n- You have reduced ability to work full-time.\n- Your savings are depleted.\n- You earn about $60k when working full-time.\n\n**What would sharpen this:**\n- Your current or anticipated income given your reduced ability to work.\n- Any remaining liquid assets or cash reserves, even if small.\n- The terms and structure of your $30k medical debt.\n\n**Given your reduced ability to work full-time, what is your current income, or what do you anticipate your income will be in the near term?**\n\n_Understanding your current income is critical to assess your cash flow and capacity to address both debt repayment and savings goals._",
+    "candidate_goals": [],
+    "missing_data": [
+      {
+        "field": "current_income",
+        "why_it_matters": "Crucial for understanding cash flow and capacity to address debt and savings."
+      },
+      {
+        "field": "liquid_assets",
+        "why_it_matters": "Determines the immediate financial cushion available."
+      },
+      {
+        "field": "medical_debt_terms",
+        "why_it_matters": "Affects repayment strategies and interest costs."
+      }
+    ],
+    "relationships_referenced": []
+  },
+  {
+    "id": "crs-13",
+    "domain": "Cross-Domain",
+    "topic": "Multi-goal prioritization",
+    "input": "We're 34, earning $175k combined. We want to buy a house, start a family, pay off $30k in student loans, and save for retirement, but we can't do everything at once.\n\nHow should we prioritize our competing goals?",
+    "status": 200,
+    "latency_ms": 10279,
+    "llm_status": "enhanced",
+    "prompt_version": "advisor-hybrid-3.0.0",
+    "assistant_message": "Prioritizing significant life goals (buying a house, starting a family, paying off student loans, saving for retirement) given finite resources. This matters because it dictates where your combined $175k income and current savings will be directed, impacting your financial security and life satisfaction over the coming years. Key drivers are the financial demands of each goal, your desired timelines, and your personal urgency for each.\n\n**The tradeoffs:**\n- **Focusing on debt repayment ($30k student loans)** — Reduces financial obligations, potentially freeing up cash flow and improving credit for a future home purchase.; but Delays progress on other goals like saving for a down payment or retirement.\n- **Prioritizing a home purchase** — Establishes a primary residence, potentially building equity and providing stability for a family.; but Requires a significant upfront investment (down payment, closing costs) and ongoing expenses, potentially diverting funds from debt repayment or retirement savings.\n- **Starting a family** — Fulfills a personal life goal, bringing joy and purpose.; but Introduces new, significant ongoing expenses (childcare, healthcare, education) that will impact the budget available for other financial goals.\n- **Saving for retirement** — Leverages compounding interest over a longer period, securing long-term financial independence.; but Requires consistent contributions, potentially reducing funds available for immediate needs like a down payment or debt repayment.\n\n**What we know:**\n- You are 34 years old.\n- Your combined income is $175k.\n- You want to buy a house.\n- You want to start a family.\n- You have $30k in student loans you wish to pay off.\n- You want to save for retirement.\n- You recognize that you \"can't do everything at once\" and need to prioritize.\n\n**What would sharpen this:**\n- Your current savings available for a down payment.\n- Your desired timeline for purchasing a home.\n- Your desired timeline for starting a family.\n\n**Regarding your goal to buy a house, what amount have you currently saved or set aside that you might consider for a down payment?**\n\n_Understanding your current savings for a down payment is a critical financial input that will help us assess the immediate feasibility and timeline of a home purchase relative to your other goals._",
+    "candidate_goals": [],
+    "missing_data": [],
+    "relationships_referenced": []
+  }
+]

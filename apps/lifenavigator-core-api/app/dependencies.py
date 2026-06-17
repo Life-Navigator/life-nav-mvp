@@ -6,6 +6,8 @@ test ever touches a real downstream service.
 """
 from __future__ import annotations
 
+import os
+
 from fastapi import Depends
 
 from .agents.memory import MemoryAgent
@@ -162,7 +164,8 @@ def get_report_engine(
     education: EducationService = Depends(get_education_service),
     supabase: SupabaseClient = Depends(get_supabase),
 ) -> UniversalReportEngine:
-    return UniversalReportEngine(domains=domains, education=education, supabase=supabase, trends=TrendAnalyzer(supabase), comp_benefits=CompensationBenefitsEngine(supabase), reco_os=RecommendationOS(supabase))
+    readiness = LifeReadinessEngine(domains=domains, education=education, supabase=supabase, planning=FinancialPlanningEngine(supabase, CompensationBenefitsEngine(supabase)))
+    return UniversalReportEngine(domains=domains, education=education, supabase=supabase, trends=TrendAnalyzer(supabase), comp_benefits=CompensationBenefitsEngine(supabase), reco_os=RecommendationOS(supabase), readiness=readiness)
 
 
 def get_readiness_engine(
@@ -260,6 +263,68 @@ def get_life_bridge(supabase: SupabaseClient = Depends(get_supabase)) -> LifeBri
 
 def get_relationship_manager(supabase: SupabaseClient = Depends(get_supabase)) -> RelationshipManager:
     return RelationshipManager(supabase, LifeDiscoveryService(supabase), LifeBridgeService(supabase, LifeDiscoveryService(supabase)))
+
+
+def get_advisor_orchestrator(
+    supabase: SupabaseClient = Depends(get_supabase),
+    rm: RelationshipManager = Depends(get_relationship_manager),
+    gemini: GeminiClient = Depends(get_gemini),
+) -> "AdvisorOrchestrator":
+    # Hybrid advisor: rules supply guardrails (classified facts, discovery scores, domain priorities,
+    # safety), the LLM leads the conversation within them, a validator gates the output. Env-flagged
+    # (default ON); falls back to pure rule-based automatically if Gemini is unavailable or output is
+    # rejected. The LLM never writes to the DB — persistence stays in the deterministic engine.
+    from .services.advisor_context import AdvisorContextBuilder
+    from .services.advisor_llm import GeminiAdvisorLLM, VertexClaudeAdvisorLLM
+    from .services.advisor_orchestrator import AdvisorOrchestrator
+    enabled = os.environ.get("ADVISOR_LLM_ENABLED", "true").lower() in ("1", "true", "yes")
+    # Claude Control Experiment (feature-flagged; Gemini is the default). When USE_VERTEX_CLAUDE is on, the
+    # SAME advisor pipeline runs with Claude on Vertex as the model — nothing else changes — so any benchmark
+    # delta is attributable to the model alone.
+    use_claude = os.environ.get("USE_VERTEX_CLAUDE", "false").lower() in ("1", "true", "yes")
+    # Per-domain discovery scores + the real personal graph feed the LLM's question prioritisation and
+    # relationship reasoning. Built inline because get_discovery_coverage is defined later in this module
+    # (avoids a forward-ref NameError).
+    life = LifeDiscoveryService(supabase)
+    coverage = DiscoveryCoverageService(
+        life, supabase,
+        FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)),
+    )
+    builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life)
+    if use_claude:
+        llm: Any = VertexClaudeAdvisorLLM(
+            project=os.environ.get("VERTEX_PROJECT", ""),
+            region=os.environ.get("VERTEX_REGION", "global"),
+            model=os.environ.get("ADVISOR_MODEL", "claude-opus-4-1@20250805"),
+            token=os.environ.get("VERTEX_ACCESS_TOKEN", ""),
+        )
+    else:
+        llm = GeminiAdvisorLLM(gemini)
+
+    # Selective orchestration (default OFF via MODEL_ROUTER_ENABLED → the single `llm` above is used,
+    # i.e. unchanged production behavior). The factory builds an AdvisorLLM per registry model key.
+    from .services.model_registry import MODELS
+    from .clients.gemini import GeminiClient
+    from .services.model_router import ModelRouter
+
+    def _llm_factory(model_key: str) -> Any:
+        spec = MODELS.get(model_key)
+        if not spec:
+            return None
+        if spec["provider"] == "google_aistudio":
+            client = GeminiClient(api_key=os.environ.get("GEMINI_API_KEY", "") or "",
+                                  embedding_model="gemini-embedding-001",
+                                  generation_model=spec["model_id"], timeout=float(spec["timeout_s"]))
+            return GeminiAdvisorLLM(client)
+        if spec["provider"] == "vertex_anthropic":
+            return VertexClaudeAdvisorLLM(
+                project=os.environ.get("VERTEX_PROJECT", "gen-lang-client-0849161409"),
+                region=os.environ.get("VERTEX_REGION", "global"), model=spec["model_id"],
+                token=os.environ.get("VERTEX_ACCESS_TOKEN", ""))
+        return None
+
+    router = ModelRouter(_llm_factory)
+    return AdvisorOrchestrator(rm, builder, llm, enabled=enabled, supabase=supabase, router=router)
 
 
 def get_recommendation_os(

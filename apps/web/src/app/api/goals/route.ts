@@ -3,20 +3,18 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 import { safeApiError } from '@/lib/security/safe-error';
 import { recordUserEvent } from '@/lib/analytics/events';
+import { createGoal } from '@/lib/services/goalsService';
 
 export const dynamic = 'force-dynamic';
 
-const createGoalSchema = z.object({
-  title: z.string().min(1).max(200),
-  description: z.string().optional().default(''),
-  category: z.string().default('personal'),
-  priority: z.string().default('medium'),
-  status: z.string().default('draft'),
-  target_date: z.string().optional(),
-  target_amount: z.number().optional(),
-  current_amount: z.number().optional(),
-  progress_percent: z.number().min(0).max(100).optional().default(0),
-});
+// The form submits a rich client-side Goal object (friendly camelCase + UI-only enums). We only
+// require a title here; goalsService.toGoalRow() aliases + whitelists + maps it onto real columns
+// and DB CHECK values. priority/status/category accept either friendly strings or numbers.
+const createGoalSchema = z
+  .object({
+    title: z.string().min(1, 'A goal title is required').max(200),
+  })
+  .passthrough();
 
 export async function GET(request: NextRequest) {
   try {
@@ -68,23 +66,31 @@ export async function POST(request: NextRequest) {
     const parsed = createGoalSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Invalid input', details: parsed.error.flatten() },
+        {
+          error: 'validation_failed',
+          message: parsed.error.errors[0]?.message ?? 'A goal title is required.',
+          details: parsed.error.flatten(),
+        },
         { status: 400 }
       );
     }
 
-    const { data: goal, error } = await (supabase as any)
-      .from('goals')
-      .insert({ user_id: user.id, ...parsed.data })
-      .select()
-      .single();
-
-    if (error) return safeApiError({ code: 'validation_failed', internal: error });
+    let goal;
+    try {
+      goal = await createGoal(supabase, user.id, parsed.data);
+    } catch (dbErr: any) {
+      // table=public.goals — log full detail server-side, return a stable, non-leaking code.
+      return safeApiError({
+        code: 'db_persistence_error',
+        internal: dbErr,
+        context: { route: 'POST /api/goals', table: 'public.goals' },
+      });
+    }
 
     await recordUserEvent(supabase, {
       user_id: user.id,
       event_type: 'goal_created',
-      event_metadata: { category: parsed.data.category, priority: parsed.data.priority },
+      event_metadata: { category: goal?.category, priority: goal?.priority },
       subject_kind: 'goal',
       subject_id: goal?.id,
     });

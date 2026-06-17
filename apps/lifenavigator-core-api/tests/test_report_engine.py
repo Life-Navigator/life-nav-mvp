@@ -78,8 +78,9 @@ async def test_decision_report_renders_scenarios():
 async def test_full_report_spans_domains():
     d = await _engine(ROWS).build(CTX, "full")
     assert d.report_type == "full"
-    assert d.sections[0].key == "executive_summary"
-    # spans multiple domains
+    # P4: advisor-grade reports lead with the executive briefing, then span domains.
+    assert any(s.key == "advisor_executive" for s in d.sections)
+    assert any(s.key == "executive_summary" for s in d.sections)
     assert len(d.sections) > 4
 
 

@@ -43,6 +43,10 @@ interface DashboardData {
     lifeObjective?: string | null;
     hasData: boolean;
   };
+  family?: {
+    lifeObjective?: string | null;
+    hasData: boolean;
+  };
   hasAnyData: boolean;
 }
 
@@ -132,11 +136,78 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
       .catch(() => {});
   }, []);
 
+  // Canonical domain summaries — the SAME source the domain pages use, so the dashboard card never
+  // disagrees with the domain page ("the system forgot" trust smell). eslint-disable for the VM shapes.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [careerSummary, setCareerSummary] = useState<any | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [familySummary, setFamilySummary] = useState<any | null>(null);
+  const [familyCounts, setFamilyCounts] = useState<{
+    members: number | null;
+    pets: number | null;
+    dependents: number;
+    beneficiaries: number;
+    emergency: number;
+    advisors: number;
+    enabledUnknown: boolean;
+  } | null>(null);
+  useEffect(() => {
+    fetch('/api/career/summary', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setCareerSummary(d))
+      .catch(() => {});
+    fetch('/api/family/summary', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setFamilySummary(d))
+      .catch(() => {});
+    // Real family entity counts (same tables the Family domain reads). members/pets live behind a
+    // migration — a fetch FAILURE (table missing) is recorded as null = "not enabled yet", NOT zero.
+    (async () => {
+      const countOf = async (slug: string): Promise<{ n: number; ok: boolean }> => {
+        try {
+          const r = await fetch(`/api/family/${slug}`, { cache: 'no-store' });
+          if (!r.ok) return { n: 0, ok: false };
+          const d = await r.json();
+          const arr = Array.isArray(d?.items)
+            ? d.items
+            : Array.isArray(d?.dependents)
+              ? d.dependents
+              : [];
+          return { n: arr.length, ok: true };
+        } catch {
+          return { n: 0, ok: false };
+        }
+      };
+      const [members, pets, dependents, beneficiaries, emergency, advisors] = await Promise.all([
+        countOf('members'),
+        countOf('pets'),
+        countOf('dependents'),
+        countOf('beneficiaries'),
+        countOf('emergency-contacts'),
+        countOf('trusted-advisors'),
+      ]);
+      setFamilyCounts({
+        members: members.ok ? members.n : null,
+        pets: pets.ok ? pets.n : null,
+        dependents: dependents.n,
+        beneficiaries: beneficiaries.n,
+        emergency: emergency.n,
+        advisors: advisors.n,
+        enabledUnknown: !members.ok || !pets.ok,
+      });
+    })();
+  }, []);
+
+  // Derived: real saved career profile (canonical), used to render the Career card honestly.
+  const careerCS = careerSummary?.data?.current_state ?? null;
+  const careerProfileSaved = !!(careerCS && (careerCS.title || careerCS.employer));
+  const careerHasGoal = !!careerSummary?.data?.target_state?.role;
+
   const quickActions = [
     { name: 'Benefits Discovery', icon: '🎨', href: '/discovery/benefits' },
     { name: 'Create Goal', icon: '🎯', href: '/goals/create' },
-    { name: 'Discovery', icon: '💭', href: '/conversation' },
-    { name: 'Risk Assessment', icon: '📊', href: '/dashboard/goals' },
+    { name: 'Discovery', icon: '💭', href: '/dashboard/advisor' },
+    { name: 'Goals & Assessment', icon: '📊', href: '/dashboard/goals' },
     { name: 'Calculators', icon: '🧮', href: '/dashboard/calculators' },
     { name: 'Family', icon: '👨‍👩‍👧‍👦', href: '/dashboard/family' },
   ];
@@ -649,7 +720,35 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                 </h3>
               </Link>
               <WorkingToward objective={dashboardData?.career.lifeObjective} />
-              {dashboardData?.career.hasData ? (
+              {careerProfileSaved ? (
+                // Canonical career profile (same source as the Career domain page) — never "Not started".
+                <>
+                  <div className="mb-3">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">
+                      {careerCS.title || 'Your role'}
+                      {careerCS.employer ? (
+                        <span className="font-normal text-gray-500 dark:text-gray-400">
+                          {' '}
+                          @ {careerCS.employer}
+                        </span>
+                      ) : null}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      {careerCS.years_experience != null && (
+                        <span>{careerCS.years_experience} yrs experience</span>
+                      )}
+                      {careerSummary?.data?.current_state?.industry && (
+                        <span>{careerSummary.data.current_state.industry}</span>
+                      )}
+                    </div>
+                  </div>
+                  {!careerHasGoal && (
+                    <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-purple-800 dark:bg-purple-900/20 dark:text-purple-300">
+                      Career profile saved. Add a career goal to unlock recommendations.
+                    </p>
+                  )}
+                </>
+              ) : dashboardData?.career.hasData ? (
                 <>
                   {(dashboardData.career.title || dashboardData.career.company) && (
                     <div className="mb-4">
@@ -714,6 +813,55 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                 </div>
               ) : (
                 <DomainCoverage data={coverage['education']} fallbackHref="/dashboard/education" />
+              )}
+            </div>
+          </div>
+
+          {/* Family Overview Card — real counts from the same tables the Family domain reads. members/pets
+              live behind a migration; if that table is unavailable we say so honestly (never imply zero). */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden border-t-4 border-amber-500 dark:border-amber-500 shadow-md">
+            <div className="p-6">
+              <Link href="/dashboard/family">
+                <h3 className="text-base font-bold mb-4 hover:underline cursor-pointer text-gray-900 dark:text-white">
+                  Family Overview
+                </h3>
+              </Link>
+              <WorkingToward objective={dashboardData?.family?.lifeObjective} />
+              {familyCounts &&
+              familyCounts.dependents +
+                familyCounts.beneficiaries +
+                familyCounts.emergency +
+                familyCounts.advisors +
+                (familyCounts.members ?? 0) +
+                (familyCounts.pets ?? 0) >
+                0 ? (
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  {[
+                    ['Members', familyCounts.members],
+                    ['Pets', familyCounts.pets],
+                    ['Dependents', familyCounts.dependents],
+                    ['Beneficiaries', familyCounts.beneficiaries],
+                    ['Emergency', familyCounts.emergency],
+                    ['Advisors', familyCounts.advisors],
+                  ].map(([label, n]) => (
+                    <div key={label as string}>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">{label}</p>
+                      <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                        {n == null ? '—' : (n as number)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : familyCounts ? (
+                <DomainCoverage data={coverage['family']} fallbackHref="/dashboard/family" />
+              ) : (
+                <p className="text-sm text-gray-400">Loading your family…</p>
+              )}
+              {familyCounts?.enabledUnknown && (
+                <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                  Family members and pets aren&apos;t enabled yet (pending a database update). Your
+                  dependents, beneficiaries, contacts, and advisors are shown above.
+                </p>
               )}
             </div>
           </div>

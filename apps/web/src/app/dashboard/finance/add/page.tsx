@@ -7,7 +7,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth, getAuthHeaders } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useAuth';
 
 type DataType = 'account' | 'transaction' | 'investment' | 'debt';
 
@@ -62,90 +62,35 @@ export default function AddFinancialDataPage() {
     setError(null);
 
     try {
-      const headers = getAuthHeaders();
-      let endpoint = '';
-      let body = {};
+      // The friendly form fields for the active type; the API/service maps them to the real
+      // finance.* columns + writes under the user session (RLS). No external backend URL needed.
+      const dataByType: Record<DataType, Record<string, unknown>> = {
+        account: accountData,
+        transaction: transactionData,
+        investment: investmentData,
+        debt: debtData,
+      };
 
-      const env = (await import('@/lib/security/env-client')).clientEnvUrl(
-        'NEXT_PUBLIC_API_URL',
-        'http://localhost:8000'
-      );
-      if (env.ok === false) {
-        setError(
-          env.kind === 'loopback'
-            ? 'The backend API is not configured for this environment.'
-            : 'NEXT_PUBLIC_API_URL is not set.'
-        );
-        setLoading(false);
-        return;
-      }
-      const apiUrl = env.value;
-
-      switch (dataType) {
-        case 'account':
-          endpoint = `${apiUrl}/api/v1/finance/accounts`;
-          body = {
-            name: accountData.name,
-            account_type: accountData.type,
-            institution: accountData.institution,
-            balance: parseFloat(accountData.balance),
-            currency: accountData.currency,
-            is_active: true,
-          };
-          break;
-        case 'transaction':
-          endpoint = `${apiUrl}/api/v1/finance/transactions`;
-          body = {
-            description: transactionData.description,
-            amount: parseFloat(transactionData.amount),
-            category: transactionData.category,
-            transaction_date: transactionData.date,
-            account_id: transactionData.accountId || null,
-          };
-          break;
-        case 'investment':
-          endpoint = `${apiUrl}/api/v1/finance/investments`;
-          body = {
-            symbol: investmentData.symbol,
-            name: investmentData.name,
-            shares: parseFloat(investmentData.shares),
-            purchase_price: parseFloat(investmentData.purchasePrice),
-            current_price: parseFloat(investmentData.currentPrice),
-            purchase_date: investmentData.purchaseDate,
-          };
-          break;
-        case 'debt':
-          endpoint = `${apiUrl}/api/v1/finance/debts`;
-          body = {
-            name: debtData.name,
-            debt_type: debtData.type,
-            balance: parseFloat(debtData.balance),
-            interest_rate: parseFloat(debtData.interestRate),
-            minimum_payment: parseFloat(debtData.minimumPayment),
-            due_date: debtData.dueDate,
-          };
-          break;
-      }
-
-      const response = await fetch(endpoint, {
+      const response = await fetch('/api/finance/manual-entry', {
         method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: dataType, data: dataByType[dataType] }),
       });
 
       if (response.ok) {
         // Success - redirect back to finance dashboard
         router.push('/dashboard/finance');
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to add financial data');
+        const errorData = await response.json().catch(() => null);
+        const reason =
+          errorData?.message || errorData?.error || errorData?.code || `HTTP ${response.status}`;
+        setError(
+          `We couldn't save this yet. Please check required fields and try again. (${reason})`
+        );
       }
     } catch (err) {
       console.error('Error adding financial data:', err);
-      setError('Failed to add financial data. Please try again.');
+      setError("We couldn't save this yet. Please check required fields and try again.");
     } finally {
       setLoading(false);
     }
@@ -341,22 +286,163 @@ export default function AddFinancialDataPage() {
               </>
             )}
 
-            {/* Add similar forms for investment and debt */}
             {dataType === 'investment' && (
-              <div className="text-center py-8">
-                <p className="text-gray-600 dark:text-gray-400">
-                  Investment entry form coming soon. For now, use the integrations to connect your
-                  brokerage account.
-                </p>
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Symbol / Ticker
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={investmentData.symbol}
+                      onChange={(e) =>
+                        setInvestmentData({ ...investmentData, symbol: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="e.g., AAPL"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={investmentData.name}
+                      onChange={(e) =>
+                        setInvestmentData({ ...investmentData, name: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="e.g., Apple Inc"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Shares
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      required
+                      value={investmentData.shares}
+                      onChange={(e) =>
+                        setInvestmentData({ ...investmentData, shares: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Cost / Share
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={investmentData.purchasePrice}
+                      onChange={(e) =>
+                        setInvestmentData({ ...investmentData, purchasePrice: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Current Price
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={investmentData.currentPrice}
+                      onChange={(e) =>
+                        setInvestmentData({ ...investmentData, currentPrice: e.target.value })
+                      }
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Purchase Date
+                  </label>
+                  <input
+                    type="date"
+                    value={investmentData.purchaseDate}
+                    onChange={(e) =>
+                      setInvestmentData({ ...investmentData, purchaseDate: e.target.value })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                  />
+                </div>
+              </>
             )}
 
             {dataType === 'debt' && (
-              <div className="text-center py-8">
-                <p className="text-gray-600 dark:text-gray-400">
-                  Debt entry form coming soon. For now, add debts as credit card or loan accounts.
-                </p>
-              </div>
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Debt Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={debtData.name}
+                    onChange={(e) => setDebtData({ ...debtData, name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="e.g., Visa Credit Card"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Debt Type
+                  </label>
+                  <select
+                    value={debtData.type}
+                    onChange={(e) => setDebtData({ ...debtData, type: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                  >
+                    <option value="credit_card">Credit Card</option>
+                    <option value="loan">Loan</option>
+                    <option value="mortgage">Mortgage</option>
+                    <option value="student_loan">Student Loan</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Current Balance
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={debtData.balance}
+                      onChange={(e) => setDebtData({ ...debtData, balance: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Interest Rate (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={debtData.interestRate}
+                      onChange={(e) => setDebtData({ ...debtData, interestRate: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
             {/* Submit Button */}
@@ -370,7 +456,7 @@ export default function AddFinancialDataPage() {
               </button>
               <button
                 type="submit"
-                disabled={loading || dataType === 'investment' || dataType === 'debt'}
+                disabled={loading}
                 className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Adding...' : 'Add Data'}

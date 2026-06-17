@@ -209,12 +209,14 @@ function AddAssetModal({
     description: '',
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
       await onSubmit({
         name: formData.name,
@@ -235,6 +237,12 @@ function AddAssetModal({
         location: '',
         description: '',
       });
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "We couldn't save this yet. Please check required fields and try again."
+      );
     } finally {
       setLoading(false);
     }
@@ -251,6 +259,11 @@ function AddAssetModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-3 text-sm text-red-800 dark:text-red-200">
+              {error}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
               Asset Name *
@@ -622,7 +635,11 @@ export default function AssetsPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create asset');
+        const body = await response.json().catch(() => null);
+        const reason = body?.message || body?.error || `HTTP ${response.status}`;
+        throw new Error(
+          `We couldn't save this yet. Please check required fields and try again. (${reason})`
+        );
       }
 
       await fetchAssets();

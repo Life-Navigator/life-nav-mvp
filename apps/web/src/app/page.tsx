@@ -526,7 +526,7 @@ export default function LandingPage() {
               </p>
             </div>
             <Link
-              href="/auth?mode=magic"
+              href="/auth?mode=create"
               className="btn-primary shrink-0 rounded-xl px-6 py-3 font-medium"
             >
               Request Beta Invite

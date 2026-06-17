@@ -40,14 +40,23 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
+    if (!body?.title || String(body.title).trim() === '') {
+      return NextResponse.json(
+        { error: 'A certification title is required.', code: 'missing_title' },
+        { status: 400 }
+      );
+    }
+    // Friendly names — createCourse()/toCourseRow() aliases them to the real columns
+    // (title→course_name, certificateUrl→certificate_url, certificateDate→completion_date,
+    // skills→skills_learned) and drops anything unknown (e.g. platform, credentialId).
     const courseData = {
       title: body.title,
       provider: body.provider,
-      platform: body.platform || null,
-      certificate_url: body.certificateUrl || null,
+      certificateUrl: body.certificateUrl ?? null,
       status: 'completed',
-      completed_at: body.certificateDate || new Date().toISOString(),
-      skills_learned: body.skills || [],
+      // a cert without an explicit date is treated as earned today
+      certificateDate: body.certificateDate || new Date().toISOString().slice(0, 10),
+      skills: body.skills || [],
     };
     const course = await createCourse(supabase, user.id, courseData);
     return NextResponse.json({ certification: mapCourseToCertification(course) }, { status: 201 });

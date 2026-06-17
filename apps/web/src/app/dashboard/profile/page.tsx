@@ -175,7 +175,9 @@ export default function ProfilePage() {
               state: profileData.profile.state || '',
               zipCode: profileData.profile.zipCode || '',
               country: profileData.profile.country || 'US',
-              dateOfBirth: profileData.profile.dateOfBirth ? new Date(profileData.profile.dateOfBirth).toISOString().split('T')[0] : '',
+              dateOfBirth: profileData.profile.dateOfBirth
+                ? new Date(profileData.profile.dateOfBirth).toISOString().split('T')[0]
+                : '',
               gender: profileData.profile.gender || '',
               maritalStatus: profileData.profile.maritalStatus || '',
               dependents: profileData.profile.dependents || 0,
@@ -216,9 +218,11 @@ export default function ProfilePage() {
     }
   }, [isAuthenticated]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
     const { name, value, type } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       [name]: type === 'number' ? parseInt(value) || 0 : value,
     }));
@@ -250,7 +254,7 @@ export default function ProfilePage() {
       const response = await fetch('/api/user/profile/upload', {
         method: 'POST',
         headers: {
-          'Authorization': headers['Authorization'] || '',
+          Authorization: headers['Authorization'] || '',
         },
         body: formData,
       });
@@ -318,7 +322,17 @@ export default function ProfilePage() {
         body: JSON.stringify(formData),
       });
 
-      if (!response.ok) throw new Error('Failed to update profile');
+      if (!response.ok) {
+        let reason = "We couldn't save this yet. Please check required fields and try again.";
+        try {
+          const err = await response.json();
+          if (err?.message) reason = err.message;
+          else if (err?.error) reason = err.error;
+        } catch {
+          /* keep default reason */
+        }
+        throw new Error(reason);
+      }
 
       const updatedProfile = await response.json();
       setProfile(updatedProfile);
@@ -334,7 +348,11 @@ export default function ProfilePage() {
       setActiveTab('overview');
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('Failed to update profile');
+      alert(
+        error instanceof Error
+          ? error.message
+          : "We couldn't save this yet. Please check required fields and try again."
+      );
     } finally {
       setIsSaving(false);
     }
@@ -369,7 +387,9 @@ export default function ProfilePage() {
                 />
               ) : (
                 <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-3xl font-bold border-4 border-white dark:border-gray-700 shadow-lg">
-                  {profile.name ? profile.name.charAt(0).toUpperCase() : profile.email.charAt(0).toUpperCase()}
+                  {profile.name
+                    ? profile.name.charAt(0).toUpperCase()
+                    : profile.email.charAt(0).toUpperCase()}
                 </div>
               )}
               <div className="absolute inset-0 rounded-full bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -475,240 +495,254 @@ export default function ProfilePage() {
           {/* Stats Grid */}
           {statsLoading ? (
             <div className="text-center py-8 text-gray-500">Loading statistics...</div>
-          ) : stats && (
-            <>
-              {/* Key Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard
-                  icon={<CalendarIcon className="w-6 h-6" />}
-                  label="Days Active"
-                  value={stats.overview.daysSinceJoining.toString()}
-                  color="blue"
-                />
-                <StatCard
-                  icon={<TrophyIcon className="w-6 h-6" />}
-                  label="Achievements"
-                  value={stats.overview.totalAchievements.toString()}
-                  color="yellow"
-                />
-                <StatCard
-                  icon={<ChartBarIcon className="w-6 h-6" />}
-                  label="Active Goals"
-                  value={stats.goals.active.toString()}
-                  color="green"
-                />
-                <StatCard
-                  icon={<AcademicCapIcon className="w-6 h-6" />}
-                  label="Study Streak"
-                  value={`${stats.education.studyStreak} days`}
-                  color="purple"
-                />
-              </div>
+          ) : (
+            stats && (
+              <>
+                {/* Key Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <StatCard
+                    icon={<CalendarIcon className="w-6 h-6" />}
+                    label="Days Active"
+                    value={stats.overview.daysSinceJoining.toString()}
+                    color="blue"
+                  />
+                  <StatCard
+                    icon={<TrophyIcon className="w-6 h-6" />}
+                    label="Achievements"
+                    value={stats.overview.totalAchievements.toString()}
+                    color="yellow"
+                  />
+                  <StatCard
+                    icon={<ChartBarIcon className="w-6 h-6" />}
+                    label="Active Goals"
+                    value={stats.goals.active.toString()}
+                    color="green"
+                  />
+                  <StatCard
+                    icon={<AcademicCapIcon className="w-6 h-6" />}
+                    label="Study Streak"
+                    value={`${stats.education.studyStreak} days`}
+                    color="purple"
+                  />
+                </div>
 
-              {/* Detailed Sections */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Finance Section */}
-                <SectionCard
-                  title="Finance"
-                  icon={<CurrencyDollarIcon className="w-5 h-5" />}
-                  iconColor="green"
-                >
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Connected Accounts</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {stats.finance.connectedAccounts}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Investments</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {stats.finance.totalInvestments}
-                      </span>
-                    </div>
-                    {profile.profile?.incomeRange && (
+                {/* Detailed Sections */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Finance Section */}
+                  <SectionCard
+                    title="Finance"
+                    icon={<CurrencyDollarIcon className="w-5 h-5" />}
+                    iconColor="green"
+                  >
+                    <div className="space-y-3">
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Income Range</span>
+                        <span className="text-gray-600 dark:text-gray-400">Connected Accounts</span>
                         <span className="font-semibold text-gray-900 dark:text-white">
-                          {formatIncomeRange(profile.profile.incomeRange)}
+                          {stats.finance.connectedAccounts}
                         </span>
                       </div>
-                    )}
-                  </div>
-                </SectionCard>
-
-                {/* Career Section */}
-                <SectionCard
-                  title="Career"
-                  icon={<BriefcaseIcon className="w-5 h-5" />}
-                  iconColor="blue"
-                >
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Network Size</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {stats.career.connections}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Skills</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {stats.career.skills}
-                      </span>
-                    </div>
-                    {profile.profile?.yearsOfExperience && (
                       <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Experience</span>
+                        <span className="text-gray-600 dark:text-gray-400">Investments</span>
                         <span className="font-semibold text-gray-900 dark:text-white">
-                          {profile.profile.yearsOfExperience} years
+                          {stats.finance.totalInvestments}
                         </span>
                       </div>
-                    )}
-                  </div>
-                </SectionCard>
-
-                {/* Education Section */}
-                <SectionCard
-                  title="Education"
-                  icon={<AcademicCapIcon className="w-5 h-5" />}
-                  iconColor="purple"
-                >
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Study Streak</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {stats.education.studyStreak} days
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Monthly Study Hours</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {stats.education.totalStudyHours}h
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Certifications</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {stats.education.certifications}
-                      </span>
-                    </div>
-                  </div>
-                </SectionCard>
-
-                {/* Health Section */}
-                <SectionCard
-                  title="Health & Wellness"
-                  icon={<HeartIcon className="w-5 h-5" />}
-                  iconColor="red"
-                >
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-400">Connected Devices</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">
-                        {stats.health.connectedDevices}
-                      </span>
-                    </div>
-                    {stats.health.avgSteps > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Avg. Daily Steps</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          {stats.health.avgSteps.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                    {stats.health.avgHeartRate && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-400">Avg. Heart Rate</span>
-                        <span className="font-semibold text-gray-900 dark:text-white">
-                          {stats.health.avgHeartRate} bpm
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </SectionCard>
-              </div>
-
-              {/* Achievements */}
-              {stats.achievements.length > 0 && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <TrophyIcon className="w-5 h-5 text-yellow-500" />
-                    Achievements
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {stats.achievements.map((achievement) => (
-                      <div
-                        key={achievement.id}
-                        className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-800"
-                      >
-                        <span className="text-3xl">{achievement.icon}</span>
-                        <div>
-                          <h4 className="font-semibold text-gray-900 dark:text-white">
-                            {achievement.name}
-                          </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {achievement.description}
-                          </p>
+                      {profile.profile?.incomeRange && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Income Range</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {formatIncomeRange(profile.profile.incomeRange)}
+                          </span>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Personal Information */}
-              {profile.profile && (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <UserCircleIcon className="w-5 h-5 text-blue-500" />
-                    Personal Information
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {profile.profile.phoneNumber && (
-                      <InfoItem
-                        icon={<PhoneIcon className="w-4 h-4" />}
-                        label="Phone"
-                        value={profile.profile.phoneNumber}
-                      />
-                    )}
-                    {(profile.profile.city || profile.profile.state) && (
-                      <InfoItem
-                        icon={<MapPinIcon className="w-4 h-4" />}
-                        label="Location"
-                        value={`${profile.profile.city || ''}${profile.profile.city && profile.profile.state ? ', ' : ''}${profile.profile.state || ''}`}
-                      />
-                    )}
-                    {profile.profile.linkedInUrl && (
-                      <InfoItem
-                        icon={<GlobeAltIcon className="w-4 h-4" />}
-                        label="LinkedIn"
-                        value={
-                          <a href={profile.profile.linkedInUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                            View Profile
-                          </a>
-                        }
-                      />
-                    )}
-                    {profile.profile.websiteUrl && (
-                      <InfoItem
-                        icon={<GlobeAltIcon className="w-4 h-4" />}
-                        label="Website"
-                        value={
-                          <a href={profile.profile.websiteUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                            Visit Website
-                          </a>
-                        }
-                      />
-                    )}
-                  </div>
-                  {profile.profile.bio && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                      <p className="text-gray-700 dark:text-gray-300">{profile.profile.bio}</p>
+                      )}
                     </div>
-                  )}
+                  </SectionCard>
+
+                  {/* Career Section */}
+                  <SectionCard
+                    title="Career"
+                    icon={<BriefcaseIcon className="w-5 h-5" />}
+                    iconColor="blue"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Network Size</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {stats.career.connections}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Skills</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {stats.career.skills}
+                        </span>
+                      </div>
+                      {profile.profile?.yearsOfExperience && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Experience</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {profile.profile.yearsOfExperience} years
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </SectionCard>
+
+                  {/* Education Section */}
+                  <SectionCard
+                    title="Education"
+                    icon={<AcademicCapIcon className="w-5 h-5" />}
+                    iconColor="purple"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Study Streak</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {stats.education.studyStreak} days
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">
+                          Monthly Study Hours
+                        </span>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {stats.education.totalStudyHours}h
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Certifications</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {stats.education.certifications}
+                        </span>
+                      </div>
+                    </div>
+                  </SectionCard>
+
+                  {/* Health Section */}
+                  <SectionCard
+                    title="Health & Wellness"
+                    icon={<HeartIcon className="w-5 h-5" />}
+                    iconColor="red"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Connected Devices</span>
+                        <span className="font-semibold text-gray-900 dark:text-white">
+                          {stats.health.connectedDevices}
+                        </span>
+                      </div>
+                      {stats.health.avgSteps > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Avg. Daily Steps</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {stats.health.avgSteps.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                      {stats.health.avgHeartRate && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600 dark:text-gray-400">Avg. Heart Rate</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">
+                            {stats.health.avgHeartRate} bpm
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </SectionCard>
                 </div>
-              )}
-            </>
+
+                {/* Achievements */}
+                {stats.achievements.length > 0 && (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <TrophyIcon className="w-5 h-5 text-yellow-500" />
+                      Achievements
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {stats.achievements.map((achievement) => (
+                        <div
+                          key={achievement.id}
+                          className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border border-yellow-200 dark:border-yellow-800"
+                        >
+                          <span className="text-3xl">{achievement.icon}</span>
+                          <div>
+                            <h4 className="font-semibold text-gray-900 dark:text-white">
+                              {achievement.name}
+                            </h4>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {achievement.description}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Personal Information */}
+                {profile.profile && (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <UserCircleIcon className="w-5 h-5 text-blue-500" />
+                      Personal Information
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {profile.profile.phoneNumber && (
+                        <InfoItem
+                          icon={<PhoneIcon className="w-4 h-4" />}
+                          label="Phone"
+                          value={profile.profile.phoneNumber}
+                        />
+                      )}
+                      {(profile.profile.city || profile.profile.state) && (
+                        <InfoItem
+                          icon={<MapPinIcon className="w-4 h-4" />}
+                          label="Location"
+                          value={`${profile.profile.city || ''}${profile.profile.city && profile.profile.state ? ', ' : ''}${profile.profile.state || ''}`}
+                        />
+                      )}
+                      {profile.profile.linkedInUrl && (
+                        <InfoItem
+                          icon={<GlobeAltIcon className="w-4 h-4" />}
+                          label="LinkedIn"
+                          value={
+                            <a
+                              href={profile.profile.linkedInUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              View Profile
+                            </a>
+                          }
+                        />
+                      )}
+                      {profile.profile.websiteUrl && (
+                        <InfoItem
+                          icon={<GlobeAltIcon className="w-4 h-4" />}
+                          label="Website"
+                          value={
+                            <a
+                              href={profile.profile.websiteUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              Visit Website
+                            </a>
+                          }
+                        />
+                      )}
+                    </div>
+                    {profile.profile.bio && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <p className="text-gray-700 dark:text-gray-300">{profile.profile.bio}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )
           )}
         </div>
       )}
@@ -824,9 +858,7 @@ export default function ProfilePage() {
 
             {/* Location */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Location
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Location</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -1162,9 +1194,12 @@ interface StatCardProps {
 function StatCard({ icon, label, value, color }: StatCardProps) {
   const colorClasses = {
     blue: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400',
-    green: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400',
-    yellow: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400',
-    purple: 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400',
+    green:
+      'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400',
+    yellow:
+      'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-400',
+    purple:
+      'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400',
     red: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400',
   };
 
@@ -1191,7 +1226,9 @@ interface SectionCardProps {
 function SectionCard({ title, icon, iconColor, children }: SectionCardProps) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <h3 className={`text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2 text-${iconColor}-600`}>
+      <h3
+        className={`text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2 text-${iconColor}-600`}
+      >
         {icon}
         {title}
       </h3>

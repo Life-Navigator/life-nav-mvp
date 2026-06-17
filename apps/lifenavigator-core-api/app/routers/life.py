@@ -1,10 +1,13 @@
 """Life Discovery router (`/v1/life`) — vision, goal discovery (need behind the need), snapshot, graph."""
 from __future__ import annotations
 
+import json as _json
+
 from fastapi import APIRouter, Body, Depends
+from fastapi.responses import StreamingResponse
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_discovery_coverage, get_life_bridge, get_life_discovery, get_my_life, get_relationship_manager
+from ..dependencies import authenticated, get_advisor_orchestrator, get_discovery_coverage, get_life_bridge, get_life_discovery, get_my_life, get_relationship_manager
 from ..models.common import UserContext
 from ..services.life_discovery import LifeDiscoveryService
 
@@ -79,11 +82,43 @@ async def discovery_answer(user: AuthenticatedUser = Depends(authenticated), svc
 
 
 @router.post("/discovery/chat")
-async def discovery_chat(user: AuthenticatedUser = Depends(authenticated), svc: RelationshipManager = Depends(get_relationship_manager),
-                         message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True)):
-    """Chat-native Relationship Manager: one advisor turn — answer the pending question (if any),
-    show what updated, reflect, and ask the next. The advisor IS the onboarding."""
-    return await svc.converse(_ctx(user), message, pending_key or None)
+async def discovery_chat(user: AuthenticatedUser = Depends(authenticated), svc=Depends(get_advisor_orchestrator),
+                         message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True),
+                         conversation_id: str = Body(default="", embed=True), trace: bool = Body(default=False, embed=True)):
+    """Chat-native onboarding — runs in DISCOVERY mode: the conversational RelationshipManager leads
+    (one warm reflection + one natural question), persisting to the canonical life model. Discovery mode
+    deliberately SKIPS the advisor LLM enhancement / six-section template / advice disclaimer so onboarding
+    never reads like a consultant report. The deterministic health-safety net still wins first. (Advisor
+    mode — the LLM-led six-section decision turn — remains available via the orchestrator for advisor/
+    decision surfaces; it is simply not used on this onboarding route.)
+
+    `trace=true` returns the full per-turn diagnostic trace, but ONLY when ADVISOR_TRACE_ENABLED is set
+    (developer-only — never exposed to end users in production)."""
+    import os
+    trace_ok = trace and os.environ.get("ADVISOR_TRACE_ENABLED", "").lower() in ("1", "true", "yes")
+    return await svc.converse(_ctx(user), message, pending_key or None,
+                              conversation_id=conversation_id or None, trace=trace_ok, mode="discovery")
+
+
+@router.post("/discovery/chat/stream")
+async def discovery_chat_stream(user: AuthenticatedUser = Depends(authenticated), svc=Depends(get_advisor_orchestrator),
+                                message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True),
+                                conversation_id: str = Body(default="", embed=True), trace: bool = Body(default=False, embed=True)):
+    """Progressive (SSE) variant of the advisor turn — emits a fast deterministic `ack` event (~1s) so the
+    user sees useful text immediately, then the fully validated `final` event when the LLM-enhanced answer
+    is ready. Same trust gates and telemetry as the non-streaming endpoint. Each SSE frame is
+    `data: <json>\\n\\n` with an `{"type": "ack"|"final"}` payload."""
+    import os
+    trace_ok = trace and os.environ.get("ADVISOR_TRACE_ENABLED", "").lower() in ("1", "true", "yes")
+
+    async def event_stream():
+        async for evt in svc.converse_stream(_ctx(user), message, pending_key or None,
+                                             conversation_id=conversation_id or None, trace=trace_ok,
+                                             mode="discovery"):
+            yield f"data: {_json.dumps(evt, default=str)}\n\n"
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 from ..services.my_life import MyLifeService  # noqa: E402

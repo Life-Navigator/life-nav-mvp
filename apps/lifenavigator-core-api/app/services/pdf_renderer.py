@@ -86,7 +86,195 @@ def render_report_pdf(definition: dict[str, Any], report_type: str = "full") -> 
 
     if report_type == "education":
         return HTML(string=_education_html(definition)).write_pdf()
+    # P4 — advisor-grade briefing for the full/financial life report.
+    if report_type in ("full", "financial"):
+        adv = next((s.get("body") for s in definition.get("sections", []) if s.get("key") == "advisor_executive"), None)
+        if adv:
+            return HTML(string=_full_html(adv, definition, report_type)).write_pdf()
     return HTML(string=_generic_html(definition, report_type)).write_pdf()
+
+
+# ── Advisor-grade "Life Briefing" renderer (P4) ──────────────────────────────
+_STATUS = {"green": ("#047857", "#ecfdf5", "On track"), "yellow": ("#b45309", "#fffbeb", "Caution"),
+           "orange": ("#b45309", "#fff7ed", "Attention"), "red": ("#be123c", "#fff1f2", "Attention needed")}
+
+
+def _risk_text(x: Any) -> str:
+    if isinstance(x, dict):
+        return str(x.get("label") or x.get("title") or x.get("risk") or x)
+    return str(x)
+
+
+def _full_css() -> str:
+    return f"""
+    @page {{ size: A4; margin: 1.6cm 1.6cm 1.8cm; @bottom-center {{ content: "LifeNavigator · Life Briefing · " counter(page); font-size: 8pt; color: {MUTED}; }} }}
+    @page :first {{ margin: 0; }}
+    body {{ font-family: 'DejaVu Sans', sans-serif; color: {INK}; font-size: 10pt; line-height: 1.5; }}
+    .cover {{ height: 100vh; background: linear-gradient(150deg, {BRAND} 0%, #312e81 60%, #1e1b4b 100%); color: #fff; padding: 3.4cm 2.2cm; position: relative; }}
+    .cover .brand {{ font-size: 11pt; letter-spacing: 4px; opacity: .65; }}
+    .cover h1 {{ font-size: 32pt; margin: 2.4cm 0 .2cm; font-weight: 700; }}
+    .cover .tag {{ font-size: 12.5pt; opacity: .82; }}
+    .cover .score {{ margin-top: 1.6cm; display: flex; gap: 1.2cm; align-items: flex-end; }}
+    .cover .score .big {{ font-size: 56pt; font-weight: 800; line-height: 1; }}
+    .cover .score .lbl {{ font-size: 9pt; letter-spacing: 2px; opacity: .7; text-transform: uppercase; }}
+    .cover .obj {{ margin-top: 1cm; font-size: 13pt; opacity: .92; max-width: 13cm; }}
+    .cover .meta {{ position: absolute; bottom: 2.4cm; font-size: 9.5pt; opacity: .75; }}
+    .sec {{ page-break-inside: avoid; margin: 0 0 14px; }}
+    h2 {{ color: {BRAND}; font-size: 14pt; margin: 22px 0 8px; padding-bottom: 3px; border-bottom: 2px solid #e0e7ff; page-break-after: avoid; }}
+    h2 .n {{ color: #c7d2fe; font-weight: 700; margin-right: 8px; }}
+    .lead {{ background: #eef2ff; border-left: 4px solid {BRAND}; padding: 10px 14px; border-radius: 6px; }}
+    .grid {{ display: flex; flex-wrap: wrap; gap: 10px; }}
+    .pill {{ display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 8.5pt; font-weight: 600; }}
+    .chip {{ flex: 1 1 30%; min-width: 4cm; border: 1px solid #eef2ff; border-radius: 8px; padding: 9px 11px; }}
+    .chip .d {{ font-size: 9pt; color: {MUTED}; text-transform: capitalize; }}
+    .chip .v {{ font-size: 16pt; font-weight: 700; }}
+    .bar {{ height: 6px; border-radius: 4px; background: #eef2ff; margin-top: 5px; overflow: hidden; }}
+    .bar > i {{ display: block; height: 100%; border-radius: 4px; }}
+    .rec {{ border: 1px solid #e5e7eb; border-radius: 8px; padding: 11px 13px; margin: 8px 0; page-break-inside: avoid; }}
+    .rec .t {{ font-weight: 700; font-size: 11pt; }}
+    .rec .why {{ color: #374151; margin: 3px 0; }}
+    .rec .meta {{ font-size: 8.5pt; color: {MUTED}; }}
+    .rec .ev {{ background: #f9fafb; border-radius: 6px; padding: 7px 10px; margin-top: 6px; font-size: 8.5pt; }}
+    .src {{ font-family: 'DejaVu Sans Mono', monospace; font-size: 7.5pt; color: {MUTED}; background:#fff; border:1px solid #e5e7eb; border-radius:3px; padding:0 4px; }}
+    .col2 {{ display: flex; gap: 16px; }} .col2 > div {{ flex: 1; }}
+    ul.tight {{ margin: 4px 0; padding-left: 16px; }} ul.tight li {{ margin: 2px 0; }}
+    .empty {{ color: #9ca3af; font-style: italic; font-size: 9pt; }}
+    table.appx {{ width: 100%; border-collapse: collapse; font-size: 9pt; }}
+    table.appx td {{ padding: 4px 8px; border-bottom: 1px solid #eef2ff; }} table.appx td:first-child {{ color: {MUTED}; }}
+    .boundary {{ background: #fffbeb; border: 1px solid #fde68a; padding: 8px 12px; border-radius: 6px; font-size: 8.5pt; color: #92400e; margin-top: 18px; }}
+    .pb {{ page-break-before: always; }}
+    """
+
+
+def _bar(pct: Any, status: str) -> str:
+    p = max(0, min(100, int(pct or 0)))
+    col = _STATUS.get(status, ("#6366f1", "", ""))[0]
+    return f'<div class="bar"><i style="width:{p}%;background:{col}"></i></div>'
+
+
+def _full_html(adv: dict[str, Any], d: dict[str, Any], report_type: str) -> str:
+    now = datetime.now(timezone.utc).strftime("%B %d, %Y")
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    cov = adv.get("cover") or {}
+    readiness = adv.get("readiness") or {}
+    recs = adv.get("recommendations") or []
+    goals = adv.get("goals") or []
+    risks = adv.get("risks") or []
+    opps = adv.get("opportunities") or []
+    nba = adv.get("next_best_action")
+    plan = adv.get("plan_90") or {}
+    appx = adv.get("appendix") or {}
+    score = cov.get("readiness")
+
+    # 1 — Cover
+    cover = f"""<div class="cover">
+      <div class="brand">LIFENAVIGATOR</div>
+      <h1>Life Briefing</h1>
+      <div class="tag">An advisor-grade summary of your situation, goals, risks &amp; recommended actions</div>
+      <div class="score">
+        <div><div class="big">{_esc(score) if score is not None else '—'}</div><div class="lbl">Life Readiness</div></div>
+        {f'<div><div class="big" style="font-size:30pt">{_esc(cov.get("confidence_pct"))}%</div><div class="lbl">Objective confidence</div></div>' if cov.get("confidence_pct") is not None else ''}
+      </div>
+      <div class="obj">{('“' + _esc(adv.get('vision')) + '”') if adv.get('vision') else (_esc(cov.get('objective')) if cov.get('objective') else 'Your life model is still forming — talk to your advisor to complete it.')}</div>
+      <div class="meta">Generated {now} · {ts} · v{_esc(d.get('version', 1))} · 100% evidence-grounded</div>
+    </div>"""
+
+    # 2 — Executive summary
+    def _li(items, fmt=_esc, empty="None recorded yet."):
+        items = [x for x in (items or []) if x]
+        if not items:
+            return f'<p class="empty">{empty}</p>'
+        return '<ul class="tight">' + "".join(f"<li>{fmt(x)}</li>" for x in items[:5]) + "</ul>"
+
+    nba_html = (f'<div class="lead"><b>Next best action:</b> {_esc(nba.get("title"))}'
+                f'{(" — " + _esc(nba.get("why"))) if nba.get("why") else ""}'
+                f'{(" · " + str(round((nba.get("confidence") or 0)*100)) + "% confidence") if nba.get("confidence") is not None else ""}</div>'
+                ) if nba else '<p class="empty">No recommended action yet — add data so we can compute one.</p>'
+    exec_s = f"""<div class="pb"></div><h2><span class="n">1</span>Executive Summary</h2>
+      {nba_html}
+      <div class="col2" style="margin-top:10px">
+        <div><h3 style="font-size:10pt;color:{MUTED}">Top priorities</h3>{_li([r.get('title') for r in recs[:4]], empty='No prioritized actions yet.')}</div>
+        <div><h3 style="font-size:10pt;color:{MUTED}">Top risks</h3>{_li(risks, _risk_text, 'No risks identified yet.')}</div>
+      </div>
+      <div class="col2">
+        <div><h3 style="font-size:10pt;color:{MUTED}">Top opportunities</h3>{_li(opps, _risk_text, 'No opportunities identified yet.')}</div>
+        <div><h3 style="font-size:10pt;color:{MUTED}">Goals tracked</h3>{_li([g.get('title') for g in goals], empty='No goals set yet.')}</div>
+      </div>"""
+
+    # 3 — Readiness overview
+    if readiness.get("domains"):
+        chips = "".join(
+            f'<div class="chip"><div class="d">{_esc(dn.get("domain"))}</div>'
+            f'<div class="v" style="color:{_STATUS.get(dn.get("status"), ("#111827","",""))[0]}">{_esc(dn.get("progress"))}%</div>'
+            f'<span class="pill" style="background:{_STATUS.get(dn.get("status"),("#eef2ff","#eef2ff",""))[1]};color:{_STATUS.get(dn.get("status"),("#6366f1","",""))[0]}">{_STATUS.get(dn.get("status"),("","","—"))[2]}</span>'
+            f'{_bar(dn.get("progress"), dn.get("status"))}</div>'
+            for dn in readiness["domains"])
+        readi = f'<h2><span class="n">2</span>Life Readiness</h2><div class="grid">{chips}</div>'
+    else:
+        readi = '<h2><span class="n">2</span>Life Readiness</h2><p class="empty">Readiness fills in as you connect data across your domains.</p>'
+
+    # 4 — Goal progress
+    if goals:
+        grows = ""
+        for g in goals[:8]:
+            pct = g.get("progress")
+            if pct is None and g.get("target_value") and g.get("current_value") is not None:
+                pct = round((g["current_value"] / g["target_value"]) * 100)
+            grows += (f'<div style="margin:6px 0"><div style="display:flex;justify-content:space-between;font-size:9.5pt">'
+                      f'<b>{_esc(g.get("title") or "Goal")}</b><span style="color:{MUTED}">{(str(int(pct))+"%") if pct is not None else _esc(g.get("status") or "")}</span></div>'
+                      f'{_bar(pct, "green")}</div>')
+        goalsec = f'<h2><span class="n">3</span>Goal Progress</h2>{grows}'
+    else:
+        goalsec = '<h2><span class="n">3</span>Goal Progress</h2><p class="empty">No goals yet — set goals to track real progress here.</p>'
+
+    # 5/6/7/8 — Recommendations with explainability + evidence + assumptions + missing data
+    if recs:
+        rblocks = ""
+        for r in recs:
+            ev = r.get("evidence") or []
+            asm = r.get("assumptions") or []
+            dom = " ".join(f'<span class="pill" style="background:#eef2ff;color:{BRAND}">{_esc(x)}</span>' for x in (r.get("domains") or []))
+            ev_html = ("<div class='ev'><b>Data used &amp; sources</b>" + "".join(
+                f'<div>• {_esc(e.get("statement") or "datapoint")} <span class="src">{_esc(e.get("source"))}</span></div>' for e in ev) + "</div>") if ev else '<div class="empty" style="margin-top:5px">No evidence attached yet.</div>'
+            asm_html = ("<div style='margin-top:5px;font-size:8.5pt'><b>Assumptions:</b> " + " · ".join(f"{_esc(a.get('label'))}: {_esc(a.get('value'))}" for a in asm) + "</div>") if asm else "<div class='empty' style='margin-top:5px'>No assumptions recorded.</div>"
+            rblocks += (f'<div class="rec"><div class="t">{_esc(r.get("title"))}</div>'
+                        f'<div class="why">{_esc(r.get("why") or "")}</div>'
+                        f'<div class="meta">priority {_esc(r.get("priority") or "—")} · '
+                        f'{(str(round((r.get("confidence") or 0)*100)) + "% confidence") if r.get("confidence") is not None else "confidence n/a"}'
+                        f'{(" · " + _esc(r.get("expected_impact"))) if r.get("expected_impact") else ""}</div>'
+                        f'<div style="margin-top:5px">{dom}</div>{ev_html}{asm_html}</div>')
+        recsec = f'<div class="pb"></div><h2><span class="n">4</span>Recommendations &amp; Evidence</h2>{rblocks}'
+    else:
+        recsec = '<div class="pb"></div><h2><span class="n">4</span>Recommendations &amp; Evidence</h2><p class="empty">No recommendations yet — add documents or connect accounts and they appear here, each with its evidence.</p>'
+
+    # 9 — Missing data
+    missing = adv.get("missing_data") or []
+    missec = (f'<h2><span class="n">5</span>Missing Data</h2><p>Adding the following would unlock stronger, more precise recommendations:</p><ul class="tight">'
+              + "".join(f"<li>{_esc(m)}</li>" for m in missing[:8]) + "</ul>") if missing else '<h2><span class="n">5</span>Missing Data</h2><p class="empty">No missing-data analysis recorded.</p>'
+
+    # 11 — 90-day action plan
+    def _plan_block(label, items):
+        items = [x for x in (items or []) if x]
+        return f'<h3 style="font-size:10pt">{label}</h3>' + (('<ul class="tight">' + "".join(f"<li>{_esc(x)}</li>" for x in items[:4]) + "</ul>") if items else '<p class="empty">—</p>')
+    blocked = plan.get("blocked") or []
+    blk = ('<h3 style="font-size:10pt">Blocked / needs data</h3><ul class="tight">' + "".join(f'<li>{_esc(b.get("title"))} <span style="color:#b45309">— {_esc(b.get("why"))}</span></li>' for b in blocked[:4]) + "</ul>") if blocked else ""
+    plansec = (f'<div class="pb"></div><h2><span class="n">6</span>Your 90-Day Action Plan</h2>'
+               f'{_plan_block("Now", plan.get("now"))}{_plan_block("Next", plan.get("next"))}{_plan_block("Later", plan.get("later"))}{blk}') if plan else ''
+
+    # 12 — Appendix
+    appxsec = (f'<h2><span class="n">7</span>Appendix</h2><table class="appx">'
+               f'<tr><td>Report version</td><td>v{_esc(d.get("version", 1))}</td></tr>'
+               f'<tr><td>Generated</td><td>{ts}</td></tr>'
+               f'<tr><td>Recommendations</td><td>{_esc(appx.get("recommendation_count", 0))}</td></tr>'
+               f'<tr><td>Evidence items</td><td>{_esc(appx.get("evidence_count", 0))}</td></tr>'
+               f'<tr><td>Goals tracked</td><td>{_esc(appx.get("goal_count", 0))}</td></tr>'
+               f'<tr><td>Average confidence</td><td>{(str(appx.get("avg_confidence_pct")) + "%") if appx.get("avg_confidence_pct") is not None else "—"}</td></tr>'
+               f'</table>')
+
+    boundary = (d.get("governance") or {}).get("disclaimer_text") or "Decision support — not financial, medical, legal, or tax advice. Every figure traces to your real data."
+    foot = f'<div class="boundary">{_esc(boundary)}</div>'
+    return (f"<!doctype html><html><head><meta charset='utf-8'><style>{_full_css()}</style></head><body>"
+            f"{cover}{exec_s}{readi}{goalsec}{recsec}{missec}{plansec}{appxsec}{foot}</body></html>")
 
 
 def _human(key: str) -> str:

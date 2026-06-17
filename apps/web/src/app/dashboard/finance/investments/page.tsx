@@ -640,12 +640,16 @@ export default function InvestmentPage() {
         });
         fetchAnalyticsData(); // Refresh data
       } else {
-        const data = await response.json();
-        setError(data.error || 'Failed to add holding');
+        const data = await response.json().catch(() => null);
+        setError(
+          data?.message ||
+            data?.error ||
+            "We couldn't save this yet. Please check required fields and try again."
+        );
       }
     } catch (err) {
       console.error('Error adding holding:', err);
-      setError('Failed to add holding');
+      setError("We couldn't save this yet. Please check required fields and try again.");
     } finally {
       setIsSubmitting(false);
     }

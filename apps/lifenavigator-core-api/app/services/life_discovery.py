@@ -84,6 +84,36 @@ ROOT_OBJECTIVES: dict[str, dict[str, Any]] = {
     },
 }
 
+# Generic, archetype-level risk/opportunity labels attached to ROOT_OBJECTIVES. These are concept
+# TEMPLATES for an objective, NOT grounded in a user's real data. The dashboard must never surface them as
+# personalized risks/opportunities unless a real engine/evidence grounds them (gated in my_life). The Life
+# Graph still renders them as relationship nodes — this set only gates DASHBOARD display.
+def _generic_risk_opp_labels() -> frozenset:
+    out: set[str] = set()
+    for spec in ROOT_OBJECTIVES.values():
+        for coll in ("risks", "opportunities"):
+            for label, _domain in spec.get(coll, []):
+                out.add(str(label).strip().lower())
+    return frozenset(out)
+
+
+GENERIC_RISK_OPP_LABELS = _generic_risk_opp_labels()
+
+
+def _generic_dependency_labels() -> frozenset:
+    # Archetype dependency labels (e.g. "Healthcare plan for retirement", "A withdrawal plan"). New
+    # objectives no longer create these; this set gates DISPLAY of any legacy rows still persisted for
+    # existing users until the cleanup migration removes them.
+    out: set[str] = set()
+    for spec in ROOT_OBJECTIVES.values():
+        for label, _domain in spec.get("dependencies", []):
+            out.add(str(label).strip().lower())
+    return frozenset(out)
+
+
+GENERIC_DEPENDENCY_LABELS = _generic_dependency_labels()
+
+
 # ── Life Theme layer (Sprint 34): statements -> weighted themes -> objectives (not keyword routing) ──
 THEMES: dict[str, list[str]] = {
     "freedom": ["freedom", "free", "depend on anyone", "don't want to depend", "not depend", "independent", "independence", "on my own", "not rely", "autonomy", "self-sufficient", "self sufficient"],
@@ -107,6 +137,52 @@ THEME_OBJECTIVE: dict[str, str] = {
     "achievement": "financial_independence",
     "legacy": "legacy", "purpose": "legacy", "adventure": "financial_independence",
 }
+# P0.3 — every candidate goal carries a real life DOMAIN (not "core"), so domain coverage reflects what the
+# user actually said. Checked in priority order; the FIRST domain whose keywords appear wins. Education/Health
+# are most specific (checked first); explicit money terms map to finance before the ambiguous "house" → family.
+_DOMAIN_KW: list[tuple[str, tuple[str, ...]]] = [
+    ("education", ("school", "college", "university", "degree", "mba", "study", "studies", "classes",
+                   "certification", "go back to school", "education", "phd", "master")),
+    ("health", ("fitness", "shape", "gym", "workout", "exercise", "lose weight", "weight", "healthy",
+                "health", "wellness", "energy", "sleep", "stronger", "in better shape", "get fit")),
+    ("finance", ("credit card", "revolving", "debt", "loan", "pay off", "pay down", "payoff", "paying down",
+                 "down payment", "mortgage", "savings", "saving", "emergency fund", "invest", "retire",
+                 "retirement", "401", "income", "wealth", "rewards", "budget", "financ", "money")),
+    ("family", ("family", "fiance", "fiancé", "fiancée", "wedding", "marriage", "marry", "married", "kids",
+                "children", "child", "baby", "spouse", "wife", "husband", "partner", "raise", "dependents",
+                "house", "home", "household")),
+    ("career", ("career", "promotion", "my job", "new job", "boss", "salary", "professional", "employer",
+                "business", "founder", "startup")),
+]
+
+
+def _goal_domain(text: str) -> str:
+    """Classify a goal clause to a life domain by evidence. Never invents career (needs explicit job terms)."""
+    t = (text or "").lower()
+    for domain, kws in _DOMAIN_KW:
+        if any(kw in t for kw in kws):
+            return domain
+    return "core"
+
+
+# P0.5 — a goal framed as later ("a few years out") is a future_goal, never dropped.
+_FUTURE_MARKERS = ("few years", "down the road", "later", "someday", "eventually", "in the future",
+                   "years away", "years from now", "one day", "not right now", "not yet", "down the line")
+
+
+def _is_future(text: str) -> bool:
+    return any(m in (text or "").lower() for m in _FUTURE_MARKERS)
+
+
+# Meta/system statements that mention a domain word but are NOT goals (the user talking about the app /
+# correcting us). Kept out of the goal list so the confirmation never shows "you already have…" as a goal.
+_META_RE = re.compile(
+    r"\b(you already have|you have my|through plaid|that confirmation|is blank|you made up|"
+    r"i didn'?t say|i never said|you'?re wrong|that'?s wrong)\b",
+    re.IGNORECASE,
+)
+
+
 # TERMINAL goals: the goal's own domain IS the objective (the why is motivation, not the objective).
 # (surface signal -> objective, base confidence). Checked before instrumental routing.
 _TERMINAL: list[tuple[tuple[str, ...], str, float]] = [
@@ -273,8 +349,19 @@ class LifeDiscoveryService:
             obj_key = a.get("primary_objective")
             label = ROOT_OBJECTIVES.get(obj_key, {}).get("label") if obj_key else None
             deps = self._derive_deps(clause.lower())
-            if not label and not deps:
-                continue  # pure connector clause with no signal
+            clause_domain = _goal_domain(clause)
+            # A domain-only clause (a clear life signal but no canonical objective/deps) is kept ONLY if it
+            # reads like a goal: ≥3 words and not a meta/system statement ("you already have…through plaid").
+            domain_only = (not label and not deps) and clause_domain != "core"
+            looks_like_goal = len(clause.split()) >= 3 and not _META_RE.search(clause)
+            if (not label and not deps and clause_domain == "core") or (domain_only and not looks_like_goal):
+                # P0.5: a dropped pure-qualifier clause ("a few years in the future") still carries timing —
+                # propagate it onto the goal it qualifies so the goal isn't silently de-scoped.
+                if _is_future(clause) and candidates:
+                    candidates[-1]["status"] = "future_goal"
+                continue  # pure connector / fragment / meta statement — no real goal
+            # P0.5: a clause with a clear life-domain signal ("getting in better shape" → health) is a real
+            # goal even when it maps to no canonical objective yet — keep it, don't silently discard.
             # P0.5: the goal text is the user's OWN words; the label is secondary.
             key = clause.lower()
             if key in seen:
@@ -285,11 +372,13 @@ class LifeDiscoveryService:
                 "objective": label or clause,
                 "objective_key": obj_key,
                 "confidence": round(a.get("confidence") or 0.5, 2),
+                "status": "future_goal" if _is_future(clause) else "active",
                 # P0.6: every goal carries its supporting quote (evidence) — no quote, no goal.
                 "supporting_quotes": [clause],
                 "supporting_statements": [clause],
                 "dependencies": deps,
-                "domain": ROOT_OBJECTIVES.get(obj_key, {}).get("domain", "core") if obj_key else "core",
+                # P0.3: domain from the user's own words (evidence) so coverage is never falsely 0%.
+                "domain": clause_domain,
             })
         return candidates
 
@@ -347,6 +436,13 @@ class LifeDiscoveryService:
         await self._sb.upsert("goals", {"id": goal_id, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
                                         "objective_id": obj_id, "title": surface_goal, "domain": "cross_domain", "status": "open"}, schema=LIFE)
         await self._edge(ctx, goal_id, obj_id, "advances", "cross_domain", a.get("confidence", 0.7))
+        # TRUST RULE (data → evidence → risks): an objective MUST NOT auto-create RISKS or OPPORTUNITIES from
+        # the ROOT_OBJECTIVES archetype — those are generic claims, not grounded in the user's real data
+        # ("Outliving your assets", "Sequence-of-returns risk", "Full employer 401(k) match", …). Risks and
+        # opportunities now come ONLY from evidence (Recommendation OS, real domain data, user statements).
+        # Dependencies are KEPT: they are honest open requirements/unknowns ("Confirm or upload evidence for
+        # X"), used by the decision brain's missing-information view + document-upload roadmap — NOT claims.
+        # They are gated OUT of the dashboard's "priorities" (my_life) so they never read as established facts.
         deps = []
         for label, domain in spec["dependencies"]:
             did = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:dep:{label}"))
@@ -355,17 +451,8 @@ class LifeDiscoveryService:
                                                    "satisfied": None, "prompt": f"Confirm or upload evidence for: {label}"}, schema=LIFE)
             await self._edge(ctx, obj_id, did, "requires", domain)
             deps.append({"label": label, "domain": domain})
-        for label, domain in spec.get("risks", []):
-            rid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:risk:{label}"))
-            await self._sb.upsert("risks", {"id": rid, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
-                                            "objective_id": obj_id, "label": label, "domain": domain, "severity": "medium"}, schema=LIFE)
-            await self._edge(ctx, obj_id, rid, "threatened_by", domain)
-        for label, domain in spec.get("opportunities", []):
-            oid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:opp:{label}"))
-            await self._sb.upsert("opportunities", {"id": oid, "user_id": ctx.user_id, "tenant_id": ctx.user_id,
-                                                    "objective_id": obj_id, "label": label, "domain": domain}, schema=LIFE)
-            await self._edge(ctx, obj_id, oid, "accelerated_by", domain)
-        # Constraint intelligence — conflicts become first-class nodes, not optimistic recommendations.
+        # Constraint intelligence — these come from the USER's own statement (analyze()), not the archetype,
+        # so they are grounded ("explicitly provided by the user").
         constraints = a.get("constraints", [])
         for c in constraints:
             cid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{obj_id}:con:{c['label']}"))
@@ -377,8 +464,8 @@ class LifeDiscoveryService:
                 "surface_goal": surface_goal, "the_need_behind_the_need": spec["label"],
                 "confidence": a.get("confidence"), "themes": a.get("themes", {}), "reasoning": a.get("reasoning"),
                 "alternatives": a.get("alternatives", []), "needs_followup": False,
-                "dependencies": deps, "risks": [r[0] for r in spec.get("risks", [])],
-                "opportunities": [o[0] for o in spec.get("opportunities", [])],
+                # No archetype-derived risks/opportunities/dependencies — these are not grounded in user data.
+                "dependencies": deps, "risks": [], "opportunities": [],
                 "constraints": [{"label": c["label"], "detail": c.get("detail")} for c in constraints]}
 
     async def _rows(self, table: str, ctx: UserContext) -> list[dict]:
@@ -397,11 +484,17 @@ class LifeDiscoveryService:
         opps = [o for o in await self._rows("opportunities", ctx) if o.get("objective_id") in active_ids]
         cons = [c for c in await self._rows("constraints", ctx) if c.get("objective_id") in active_ids]
         primary = max(objectives, key=lambda o: float(o.get("confidence") or 0), default=None)
+        v0 = vision[0] if vision else None
+        vsource = str((v0.get("prompts") or {}).get("source") or "") if v0 else ""
         return {
-            "life_vision": vision[0].get("vision_text") if vision else None,
+            "life_vision": v0.get("vision_text") if v0 else None,
+            # Authored = the user actually stated it (via the advisor). persona_bridge visions are
+            # synthesized from onboarding and must NOT be presented as a confirmed north star.
+            "vision_source": vsource or None,
+            "vision_authored": bool(v0 and v0.get("vision_text") and vsource != "persona_bridge"),
             "primary_objective": ({"title": primary["title"], "confidence": primary.get("confidence"),
                                    "reasoning": primary.get("reasoning"), "alternatives": primary.get("alternatives"),
-                                   "themes": primary.get("themes")} if primary else None),
+                                   "themes": primary.get("themes"), "updated_at": primary.get("updated_at")} if primary else None),
             "objectives": [{"id": o["id"], "title": o["title"], "root": o.get("root_objective_key"),
                             "surface_goal": o.get("surface_goal"), "confidence": o.get("confidence"),
                             "themes": o.get("themes"), "why_chain": o.get("why_chain")} for o in objectives],

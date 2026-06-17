@@ -8,6 +8,18 @@
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import AddDataModal from '@/components/dashboard/AddDataModal';
+import StreamingText from '@/components/ui/StreamingText';
+import ArcanaStatus from '@/components/ui/ArcanaStatus';
+import {
+  type ArcanaStatus as ArcanaStatusKind,
+  ARCANA_STREAMING_ENABLED,
+  ARCANA_DEBUG,
+  ARCANA_ERROR_MESSAGE,
+  statusForFinal,
+  streamDurationMs,
+} from '@/lib/arcana/streaming';
+import AdviceDisclaimer from '@/components/advice/AdviceDisclaimer';
+import { levelFromThemes } from '@/lib/advice/disclosure';
 import {
   ActionCard,
   DOMAIN_ACTIONS,
@@ -49,19 +61,56 @@ interface Msg {
   text: string;
   updates?: string[];
   reveal?: Reveal | null;
+  // Arcana streaming: render the approved text instantly (safety responses / flag-off) instead of
+  // typing it, the target typing duration, and the pipeline status (debug-only surfacing).
+  instant?: boolean;
+  durationMs?: number;
+  llmStatus?: string;
 }
 
 export default function AdvisorPage() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  // Stable id for this chat session so the backend can thread cross-turn context (P0.1). Generated once.
+  const [conversationId] = useState<string>(() =>
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `conv-${Date.now()}`
+  );
   const [pending, setPending] = useState<string | null>(null);
   const [options, setOptions] = useState<string[] | null>(null);
   const [panel, setPanel] = useState<Panel>({});
   const [complete, setComplete] = useState(false);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  // Arcana conversational lifecycle: idle → thinking → checking → responding → approved
+  // (or safety_response / fallback / error). Drives the subtle status line + Stop/Retry controls.
+  const [status, setStatus] = useState<ArcanaStatusKind>('idle');
+  // Last turn we sent, so Retry can replay it after an error.
+  const [lastSent, setLastSent] = useState<{ message: string; pending_key: string | null } | null>(
+    null
+  );
+  // Set true to force any in-progress local typing to jump to the full (already-approved) text on Stop.
+  const [stopTyping, setStopTyping] = useState(false);
+  // Aborts the in-flight request when the user hits Stop.
+  const abortRef = useRef<AbortController | null>(null);
+  // True while the user is actively generating/typing — gates the Stop button.
+  const generating = status === 'thinking' || status === 'checking' || status === 'responding';
   const [finishing, setFinishing] = useState(false);
   const [onboardingMode, setOnboardingMode] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Auto-scroll to the newest message ONLY when the user is already near the bottom — never yank them
+  // down while they're scrolled up reviewing earlier messages.
+  const stickRef = useRef(true);
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (el) stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
+  // Keep the latest text in view while it streams in (only if the user hasn't scrolled up).
+  const streamScroll = () => {
+    const el = scrollRef.current;
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
+  };
   const router = useRouter();
   // Onboarding completion: discovery coverage (for action cards + confirmation), the manual-entry
   // modal domain, and whether the user is on the life-model review screen.
@@ -88,11 +137,18 @@ export default function AdvisorPage() {
     loadCoverage();
   }, []);
 
-  // Derive the action cards (Step 1/2) from whatever signal we have: prefer the coverage endpoint's
-  // incomplete domains; fall back to the advisor panel's missing_areas. One card per missing domain.
-  const missingDomainKeys: string[] = coverage.length
-    ? coverage.filter((c) => c.coverage_pct < 100).map((c) => c.domain)
-    : panel.missing_areas || [];
+  // Derive the action cards (Step 1/2). P0.4: recommend data ONLY for domains the user actually
+  // engaged with (a stated goal → coverage > 0 but < 100). A domain at 0% (e.g. career the user
+  // never mentioned) must NOT surface a "do this" card — we don't push career data at someone who
+  // didn't raise career. Fall back to all-incomplete only if nothing is engaged yet.
+  const engagedKeys = coverage
+    .filter((c) => c.coverage_pct > 0 && c.coverage_pct < 100)
+    .map((c) => c.domain);
+  const missingDomainKeys: string[] = engagedKeys.length
+    ? engagedKeys
+    : coverage.length
+      ? coverage.filter((c) => c.coverage_pct < 100).map((c) => c.domain)
+      : panel.missing_areas || [];
   // Show up to 2 actions for the top 2 missing domains so BOTH an upload and a manual-entry
   // (quick form) path are always reachable — never an upload-only set with no way to type data in.
   const advisorActions: AdvisorAction[] = missingDomainKeys
@@ -173,34 +229,160 @@ export default function AdvisorPage() {
     if (t) await send(t, pending);
   };
 
-  const apply = (t: Turn | null) => {
-    if (!t) return;
+  // Apply a VALIDATED/APPROVED final turn: append the message and reconcile panel state. The compliance
+  // gate already ran server-side — this only decides how the approved text is *presented* (typed vs
+  // instant) and what conversational state to enter. Returns false if there was no usable turn (→ error).
+  const applyFinal = (t: (Turn & { llm_status?: string }) | null): boolean => {
+    if (!t || typeof t.assistant_message !== 'string') return false;
+    const st = statusForFinal(t.llm_status);
+    // Safety responses (and flag-off) render immediately — never typed (acceptance criterion 4).
+    const instant = !ARCANA_STREAMING_ENABLED || st === 'safety_response';
     setMsgs((m) => [
       ...m,
-      { role: 'advisor', text: t.assistant_message, updates: t.updates, reveal: t.reveal },
+      {
+        role: 'advisor',
+        text: t.assistant_message,
+        updates: t.updates,
+        reveal: t.reveal,
+        instant,
+        durationMs: streamDurationMs((t.assistant_message || '').length),
+        llmStatus: t.llm_status,
+      },
     ]);
     setPending(t.pending_key);
     setOptions(t.options ?? null);
     setPanel(t.context_panel || {});
     setComplete(t.complete);
+    setStatus(st); // 'responding' | 'fallback' | 'safety_response' — cleared to 'idle' on typing done
+    return true;
   };
-  const send = async (message: string, pending_key: string | null) => {
-    setBusy(true);
+
+  // Non-streaming fallback (used when the SSE stream is unavailable or cut off). Still hits the
+  // validated, compliance-gated endpoint — never raw model output.
+  const sendBlocking = async (
+    message: string,
+    pending_key: string | null,
+    signal?: AbortSignal
+  ): Promise<boolean> => {
     const t = await fetch('/api/life/discovery-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, pending_key: pending_key ?? '' }),
+      body: JSON.stringify({
+        message,
+        pending_key: pending_key ?? '',
+        conversation_id: conversationId,
+      }),
+      signal,
     })
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null);
-    apply(t);
+    return applyFinal(t);
+  };
+
+  const send = async (message: string, pending_key: string | null) => {
+    setLastSent({ message, pending_key });
+    setStopTyping(false); // clear any prior Stop latch so this turn can animate
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setBusy(true);
+    setStatus('thinking'); // Step 1 — user-visible status only; never raw model output
+
+    // Feature flag OFF → no streaming effect: fetch the validated turn and render it instantly.
+    if (!ARCANA_STREAMING_ENABLED) {
+      try {
+        const ok = await sendBlocking(message, pending_key, controller.signal);
+        if (!ok && !controller.signal.aborted) setStatus('error');
+      } finally {
+        setBusy(false);
+        abortRef.current = null;
+      }
+      return;
+    }
+
+    let sawFinal = false;
+    try {
+      const resp = await fetch('/api/life/discovery-chat-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          pending_key: pending_key ?? '',
+          conversation_id: conversationId,
+        }),
+        signal: controller.signal,
+      });
+      if (!resp.ok || !resp.body) {
+        const ok = await sendBlocking(message, pending_key, controller.signal);
+        if (!ok) setStatus('error');
+        return;
+      }
+      const reader = resp.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf('\n\n')) >= 0) {
+          const frame = buf.slice(0, nl);
+          buf = buf.slice(nl + 2);
+          const line = frame.split('\n').find((l) => l.startsWith('data:'));
+          if (!line) continue;
+          let evt: Turn & { type: string; assistant_message: string; llm_status?: string };
+          try {
+            evt = JSON.parse(line.slice(5).trim());
+          } catch {
+            continue;
+          }
+          if (evt.type === 'ack') {
+            // The deterministic ack is compliance-safe, but we do NOT show it as the answer. It only
+            // advances the subtle status to "checking" — no pre-approval content reaches the user.
+            setStatus('checking'); // Step 3 — validation/compliance running
+          } else if (evt.type === 'final') {
+            sawFinal = true;
+            applyFinal(evt); // Step 4 — approved text only
+          }
+        }
+      }
+      if (!sawFinal) {
+        const ok = await sendBlocking(message, pending_key, controller.signal); // stream cut off → safe fallback
+        if (!ok) setStatus('error');
+      }
+    } catch {
+      if (controller.signal.aborted) {
+        setStatus('idle'); // user pressed Stop — not an error
+      } else {
+        const ok = await sendBlocking(message, pending_key, controller.signal);
+        if (!ok) setStatus('error');
+      }
+    } finally {
+      setBusy(false);
+      abortRef.current = null;
+    }
+  };
+
+  // Stop generation: abort the request and snap any in-progress typing to the full approved text.
+  const cancel = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setStopTyping(true);
     setBusy(false);
+    setStatus('idle');
+  };
+
+  // Retry the last turn after an error.
+  const retry = () => {
+    if (!lastSent) return;
+    setStatus('idle');
+    void send(lastSent.message, lastSent.pending_key);
   };
   useEffect(() => {
     send('', null); /* open the conversation */
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = scrollRef.current;
+    if (el && stickRef.current) el.scrollTop = el.scrollHeight;
   }, [msgs]);
 
   const submit = async (text: string) => {
@@ -216,6 +398,11 @@ export default function AdvisorPage() {
   // P0.5/0.6: the life-model review is shown after the final open-ended question is asked.
   const showConfirmation = (complete && finalAsked) || reviewing;
   const showFinalQuestion = complete && !finalAsked && !reviewing;
+  // When the review or final-question screen appears, reveal it (and its CTA) in the bottom region.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && (showConfirmation || showFinalQuestion)) el.scrollTop = el.scrollHeight;
+  }, [showConfirmation, showFinalQuestion]);
 
   // P0.7: intentional transition into the dashboard.
   if (transitioning) {
@@ -226,7 +413,7 @@ export default function AdvisorPage() {
     const opps = (panel.top_opportunities || []).slice(0, 3);
     const Col = ({ title, items, dot }: { title: string; items: string[]; dot: string }) => (
       <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">
           {title}
         </div>
         {items.length ? (
@@ -239,7 +426,7 @@ export default function AdvisorPage() {
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-400">Builds as you add more.</p>
+          <p className="text-sm text-gray-600">Builds as you add more.</p>
         )}
       </div>
     );
@@ -255,331 +442,408 @@ export default function AdvisorPage() {
           <Col title="Top risks" items={risks} dot="text-red-500" />
           <Col title="Top opportunities" items={opps} dot="text-emerald-500" />
         </div>
-        <p className="mt-5 text-sm text-gray-400">Taking you to your dashboard…</p>
+        <p className="mt-5 text-sm text-gray-600">Taking you to your dashboard…</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Conversation */}
-      <div className="lg:col-span-2 flex flex-col">
-        <h1 className="text-xl font-bold text-gray-900">Your Advisor</h1>
-        {!complete &&
-          (coverage.length > 0 ? (
-            // Rule 5: confidence-by-domain, not a question count.
-            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
-              <span className="uppercase tracking-wide text-gray-400 font-semibold">
-                Understanding
-              </span>
-              {coverage.map((c) => (
-                <span key={c.domain}>
-                  {c.label}:{' '}
-                  <span className="font-medium text-gray-700">
-                    {c.confidence_pct ?? c.coverage_pct}%
+    <div className="flex h-full w-full overflow-hidden bg-gray-50">
+      <div className="mx-auto flex h-full w-full max-w-6xl gap-6 px-4 py-4">
+        {/* Conversation — full-height flex shell: fixed header · scrollable messages · pinned input.
+            This is what makes the immersive (overflow-hidden) page scroll internally instead of
+            clipping the input/CTA below the fold. */}
+        <div className="flex min-h-0 flex-1 flex-col">
+          {/* Header (never scrolls away) */}
+          <div className="shrink-0">
+            <h1 className="text-xl font-bold text-gray-900">Your Advisor</h1>
+            {!complete &&
+              (coverage.length > 0 ? (
+                // Rule 5: confidence-by-domain, not a question count.
+                <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-gray-500">
+                  <span className="uppercase tracking-wide text-gray-600 font-semibold">
+                    Understanding
                   </span>
-                </span>
-              ))}
-              {typeof panel.discovery_completion_pct === 'number' && (
-                <span className="text-indigo-600 font-semibold">
-                  Overall {panel.discovery_completion_pct}%
-                </span>
-              )}
-            </div>
-          ) : (
-            <div className="mt-1 text-xs text-gray-500">Getting to know you…</div>
-          ))}
-        {uploadNotice !== null && (
-          <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 flex items-center justify-between gap-2">
-            <span>
-              Got it — your{uploadNotice ? ` ${uploadNotice}` : ''} document was added. I&apos;ve
-              refreshed what I know.
-            </span>
-            <button
-              onClick={() => setUploadNotice(null)}
-              className="text-xs underline text-emerald-700 shrink-0"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-        <div className="mt-3 flex-1 space-y-3 overflow-y-auto" style={{ minHeight: 360 }}>
-          {msgs.map((m, i) => (
-            <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
-              <div
-                className={`inline-block max-w-[85%] rounded-2xl px-4 py-2 text-sm ${m.role === 'advisor' ? 'bg-indigo-50 text-gray-800' : 'bg-gray-900 text-white'}`}
-              >
-                {m.text}
-              </div>
-              {m.updates && m.updates.length > 0 && (
-                <div className="mt-1 flex flex-wrap gap-1">
-                  {m.updates.map((u, j) => (
-                    <span
-                      key={j}
-                      className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100"
-                    >
-                      {u}
+                  {coverage.map((c) => (
+                    <span key={c.domain}>
+                      {c.label}:{' '}
+                      <span className="font-medium text-gray-700">
+                        {c.confidence_pct ?? c.coverage_pct}%
+                      </span>
                     </span>
                   ))}
-                </div>
-              )}
-              {m.reveal && (
-                <div className="mt-2 max-w-[95%] rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4">
-                  <div className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">
-                    ✨ Here&apos;s what I just learned
-                  </div>
-                  <div className="mt-1 text-sm text-gray-600">
-                    You said: <span className="text-gray-900">“{m.reveal.you_said}”</span>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    What I&apos;m hearing (does this sound right?):{' '}
-                    <span className="text-lg font-bold text-gray-900">
-                      {m.reveal.we_discovered}
+                  {typeof panel.discovery_completion_pct === 'number' && (
+                    <span className="text-indigo-600 font-semibold">
+                      Overall {panel.discovery_completion_pct}%
                     </span>
-                  </div>
-                  <div className="mt-2 text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
-                    What it depends on
-                  </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-1 text-xs text-gray-500">Getting to know you…</div>
+              ))}
+            {uploadNotice !== null && (
+              <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 flex items-center justify-between gap-2">
+                <span>
+                  Got it — your{uploadNotice ? ` ${uploadNotice}` : ''} document was added.
+                  I&apos;ve refreshed what I know.
+                </span>
+                <button
+                  onClick={() => setUploadNotice(null)}
+                  className="text-xs underline text-emerald-700 shrink-0"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+          </div>
+          {/* The ONLY vertical scroll. min-h-0 lets this flex child shrink and scroll instead of
+              growing and pushing the input off-screen. Auto-sticks to newest unless scrolled up. */}
+          <div
+            ref={scrollRef}
+            onScroll={onScroll}
+            data-testid="chat-scroll"
+            className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
+          >
+            {msgs.map((m, i) => (
+              <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
+                <div
+                  className={`inline-block max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${m.role === 'advisor' ? 'bg-indigo-50 text-gray-800' : 'bg-gray-900 text-white'}`}
+                >
+                  {m.role === 'advisor' ? (
+                    <StreamingText
+                      text={m.text}
+                      // Only the newest advisor message types; safety/flag-off render instantly.
+                      animate={i === msgs.length - 1 && !m.instant && ARCANA_STREAMING_ENABLED}
+                      instant={m.instant}
+                      durationMs={m.durationMs}
+                      stop={stopTyping}
+                      onTick={streamScroll}
+                      onDone={() => {
+                        if (i === msgs.length - 1) setStatus('idle');
+                      }}
+                    />
+                  ) : (
+                    m.text
+                  )}
+                  {ARCANA_DEBUG && m.role === 'advisor' && m.llmStatus && (
+                    <span className="ml-2 align-middle text-[9px] uppercase tracking-wide text-gray-400">
+                      [{m.llmStatus}]
+                    </span>
+                  )}
+                </div>
+                {m.updates && m.updates.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {m.reveal.dependencies.map((d) => (
+                    {m.updates.map((u, j) => (
                       <span
-                        key={d}
-                        className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-indigo-100 text-gray-700"
+                        key={j}
+                        className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100"
                       >
-                        {d}
+                        {u}
                       </span>
                     ))}
                   </div>
-                  <div className="mt-2 flex gap-4 text-sm">
-                    <span className="text-emerald-700 font-semibold">
-                      {m.reveal.recommendations_unlocked} actions unlocked
-                    </span>
-                    <span className="text-gray-500">Confidence {m.reveal.confidence_pct}%</span>
+                )}
+                {m.reveal && (
+                  <div className="mt-2 max-w-[95%] rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-4">
+                    <div className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">
+                      ✨ Here&apos;s what I just learned
+                    </div>
+                    <div className="mt-1 text-sm text-gray-600">
+                      You said: <span className="text-gray-900">“{m.reveal.you_said}”</span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      What I&apos;m hearing (does this sound right?):{' '}
+                      <span className="text-lg font-bold text-gray-900">
+                        {m.reveal.we_discovered}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-[11px] uppercase tracking-wide text-gray-600 font-semibold">
+                      What it depends on
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {m.reveal.dependencies.map((d) => (
+                        <span
+                          key={d}
+                          className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-indigo-100 text-gray-700"
+                        >
+                          {d}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex gap-4 text-sm">
+                      <span className="text-emerald-700 font-semibold">
+                        {m.reveal.recommendations_unlocked} actions unlocked
+                      </span>
+                      <span className="text-gray-500">Confidence {m.reveal.confidence_pct}%</span>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
-          <div ref={endRef} />
-        </div>
-        {showConfirmation ? (
-          // The life-model review is shown before the dashboard unlocks. The dashboard is reached
-          // ONLY via an explicit Confirm (onboarding_completed, confirmed) or explicit Skip.
-          <div className="mt-3">
-            <LifeModelConfirmation
-              panel={panel}
-              coverage={coverage}
-              actions={advisorActions}
-              finishing={finishing}
-              onConfirm={() => finishOnboarding(false)}
-              onSkip={() => finishOnboarding(true, 'explicit_skip_after_minimum')}
-              onEdit={() => {
-                setReviewing(false);
-                setFinalAsked(false);
-              }}
-              onManualEntry={(d) => setActiveDomain(d)}
-            />
+                )}
+              </div>
+            ))}
+            {/* Subtle pre-answer status — "Arcana is thinking… / checking…". Shown only before the
+                approved answer begins typing; never exposes pipeline internals. */}
+            {(status === 'thinking' || status === 'checking') && <ArcanaStatus status={status} />}
+            {/* Human-friendly error with a Retry — never surfaces rejection reasons or internals. */}
+            {status === 'error' && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
+                <span>{ARCANA_ERROR_MESSAGE}</span>
+                <button
+                  onClick={retry}
+                  className="ml-2 font-semibold text-rose-800 underline hover:text-rose-900"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+            <div ref={endRef} />
           </div>
-        ) : showFinalQuestion ? (
-          // P0.6: the final open-ended question, asked once before the review.
-          <div className="mt-3">
-            <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50 p-4">
-              <p className="text-sm text-gray-800">{FINAL_Q}</p>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const v = input;
-                  setInput('');
-                  submitFinal(v);
-                }}
-                className="mt-3 flex gap-2"
-              >
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  disabled={busy}
-                  placeholder="Anything else that matters to you…"
-                  className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          {/* Context-aware advice disclosure: silent during early discovery (no domain themes yet);
+              escalates only once the advisor surfaces finance/health/legal/tax/estate themes. */}
+          <AdviceDisclaimer
+            level={levelFromThemes([...(panel.top_themes || []), ...(panel.top_risks || [])])}
+            className="mt-2"
+          />
+          {/* Bottom region — pinned below the messages, bounded and independently scrollable so the
+              input and EVERY CTA (review, "enter dashboard") stay reachable, never clipped. */}
+          <div className="shrink-0 max-h-[60vh] overflow-y-auto border-t border-gray-200 bg-gray-50 pt-3">
+            {showConfirmation ? (
+              // The life-model review is shown before the dashboard unlocks. The dashboard is reached
+              // ONLY via an explicit Confirm (onboarding_completed, confirmed) or explicit Skip.
+              <div className="mt-3">
+                <LifeModelConfirmation
+                  panel={panel}
+                  coverage={coverage}
+                  actions={advisorActions}
+                  finishing={finishing}
+                  onConfirm={() => finishOnboarding(false)}
+                  onSkip={() => finishOnboarding(true, 'explicit_skip_after_minimum')}
+                  onEdit={() => {
+                    setReviewing(false);
+                    setFinalAsked(false);
+                  }}
+                  onManualEntry={(d) => setActiveDomain(d)}
                 />
-                <button
-                  type="submit"
-                  disabled={busy || !input.trim()}
-                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium disabled:opacity-40"
-                >
-                  Send
-                </button>
-              </form>
-              <button
-                onClick={() => submitFinal('')}
-                className="mt-2 text-xs text-gray-400 underline hover:text-gray-600"
-              >
-                Nothing else — show me what you understand →
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="mt-3">
-            {options && options.length > 0 && (
-              <div className="mb-2 flex flex-wrap gap-2">
-                {options.map((o) => (
-                  <button
-                    key={o}
-                    disabled={busy}
-                    onClick={() => submit(o)}
-                    className="text-sm px-3 py-1.5 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              </div>
+            ) : showFinalQuestion ? (
+              // P0.6: the final open-ended question, asked once before the review.
+              <div className="mt-3">
+                <div className="rounded-2xl border-2 border-indigo-200 bg-indigo-50 p-4">
+                  <p className="text-sm text-gray-800">{FINAL_Q}</p>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const v = input;
+                      setInput('');
+                      submitFinal(v);
+                    }}
+                    className="mt-3 flex gap-2"
                   >
-                    {o}
+                    <input
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      disabled={busy}
+                      placeholder="Anything else that matters to you…"
+                      className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                    />
+                    <button
+                      type="submit"
+                      disabled={busy || !input.trim()}
+                      className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium disabled:bg-gray-300 disabled:text-gray-500"
+                    >
+                      Send
+                    </button>
+                  </form>
+                  <button
+                    onClick={() => submitFinal('')}
+                    className="mt-2 text-xs text-gray-600 underline hover:text-gray-600"
+                  >
+                    Nothing else — show me what you understand →
                   </button>
-                ))}
+                </div>
               </div>
-            )}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                submit(input);
-              }}
-              className="flex gap-2"
-            >
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                disabled={busy}
-                placeholder="Type your answer…"
-                className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
-              <button
-                type="submit"
-                disabled={busy || !input.trim()}
-                className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium disabled:opacity-40"
-              >
-                Send
-              </button>
-            </form>
+            ) : (
+              <div className="mt-3">
+                {options && options.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {options.map((o) => (
+                      <button
+                        key={o}
+                        disabled={busy}
+                        onClick={() => submit(o)}
+                        className="text-sm px-3 py-1.5 rounded-full border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                      >
+                        {o}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    submit(input);
+                  }}
+                  className="flex gap-2"
+                >
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      // Enter submits; Shift+Enter inserts a newline.
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        submit(input);
+                      }
+                    }}
+                    rows={1}
+                    placeholder="Type your answer…  (Enter to send · Shift+Enter for a new line)"
+                    className="max-h-32 flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                  {generating ? (
+                    <button
+                      type="button"
+                      onClick={cancel}
+                      aria-label="Stop generating"
+                      className="shrink-0 self-end rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      Stop
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={busy || !input.trim()}
+                      className="shrink-0 self-end rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:bg-gray-300 disabled:text-gray-500"
+                    >
+                      Send
+                    </button>
+                  )}
+                </form>
 
-            {/* Action cards — phase-gated (P0.4): shown only after a few meaningful answers, never
+                {/* Action cards — phase-gated (P0.4): shown only after a few meaningful answers, never
                 during the first discovery exchanges. Upload → /dashboard/documents; entry → AddDataModal. */}
-            {showActions && (
-              <div className="mt-4">
-                <div className="text-[11px] uppercase text-gray-400 font-semibold mb-2">
-                  Strengthen your plan
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  {advisorActions.map((a, i) => (
-                    <ActionCard key={i} action={a} onManualEntry={(d) => setActiveDomain(d)} />
-                  ))}
-                </div>
+                {showActions && (
+                  <div className="mt-4">
+                    <div className="text-[11px] uppercase text-gray-600 font-semibold mb-2">
+                      Strengthen your plan
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {advisorActions.map((a, i) => (
+                        <ActionCard key={i} action={a} onManualEntry={(d) => setActiveDomain(d)} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {onboardingMode && (
+                  <div className="mt-3 flex flex-col items-center gap-1">
+                    <p className="text-xs text-gray-500">
+                      Your Life Model is {panel.discovery_completion_pct ?? 0}% complete
+                      {coverage.filter((c) => c.coverage_pct < 100).length > 0
+                        ? ` · ${coverage.filter((c) => c.coverage_pct < 100).length} areas still need context`
+                        : ''}
+                    </p>
+                    <button
+                      onClick={() => setReviewing(true)}
+                      className="text-xs text-indigo-600 underline hover:text-indigo-800"
+                    >
+                      Review what I understand about you →
+                    </button>
+                    <button
+                      onClick={requestSkip}
+                      disabled={finishing}
+                      className="text-xs text-gray-600 underline hover:text-gray-600 disabled:opacity-50"
+                    >
+                      Continue with limited dashboard
+                    </button>
+                  </div>
+                )}
               </div>
             )}
+          </div>
+        </div>
 
-            {onboardingMode && (
-              <div className="mt-3 flex flex-col items-center gap-1">
-                <p className="text-xs text-gray-500">
-                  Your Life Model is {panel.discovery_completion_pct ?? 0}% complete
-                  {coverage.filter((c) => c.coverage_pct < 100).length > 0
-                    ? ` · ${coverage.filter((c) => c.coverage_pct < 100).length} areas still need context`
-                    : ''}
-                </p>
+        {/* Manual-entry quick forms (Step 4) — persist to canonical tables; refresh coverage on close. */}
+        {activeDomain && (
+          <AddDataModal
+            isOpen={!!activeDomain}
+            domain={activeDomain}
+            onClose={() => {
+              setActiveDomain(null);
+              loadCoverage();
+            }}
+          />
+        )}
+
+        {/* Skip-policy warning — a skip is intentional + warned, never a one-click bypass. */}
+        {showSkipWarning && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                Your dashboard will be limited
+              </h3>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                LifeNavigator works best after advisor discovery. If you continue now, your
+                dashboard may be incomplete, recommendations may be less useful, and your Life Graph
+                may be sparse.
+              </p>
+              <div className="mt-5 flex flex-col gap-2">
                 <button
-                  onClick={() => setReviewing(true)}
-                  className="text-xs text-indigo-600 underline hover:text-indigo-800"
+                  onClick={() => setShowSkipWarning(false)}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
                 >
-                  Review what I understand about you →
+                  Continue Advisor Discovery
                 </button>
                 <button
-                  onClick={requestSkip}
+                  onClick={confirmLimitedSkip}
                   disabled={finishing}
-                  className="text-xs text-gray-400 underline hover:text-gray-600 disabled:opacity-50"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300"
                 >
-                  Continue with limited dashboard
+                  Continue with Limited Dashboard
                 </button>
               </div>
-            )}
+            </div>
           </div>
         )}
+
+        {/* Live context panel (D8) — the advisor always knows the current life model */}
+        <aside className="hidden w-80 shrink-0 self-stretch min-h-0 overflow-y-auto rounded-xl border border-gray-100 bg-white p-5 shadow-sm lg:block">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500">
+              What I know so far
+            </h2>
+            <span className="text-xs text-indigo-600 font-semibold">
+              {panel.discovery_completion_pct ?? 0}%
+            </span>
+          </div>
+          {panel.life_vision && (
+            <p className="mt-2 text-sm text-gray-700 italic">“{panel.life_vision}”</p>
+          )}
+          {panel.primary_objective && (
+            <div className="mt-3">
+              <div className="text-[11px] uppercase text-gray-600 font-semibold">
+                Primary objective
+              </div>
+              <div className="text-sm font-semibold text-gray-900">{panel.primary_objective}</div>
+            </div>
+          )}
+          {panel.top_constraints && panel.top_constraints.length > 0 && (
+            <div className="mt-3">
+              <div className="text-[11px] uppercase text-rose-600 font-semibold">Constraints</div>
+              <div className="text-sm text-gray-700">{panel.top_constraints.join(', ')}</div>
+            </div>
+          )}
+          {panel.top_risks && panel.top_risks.length > 0 && (
+            <div className="mt-3">
+              <div className="text-[11px] uppercase text-amber-600 font-semibold">Risks</div>
+              <div className="text-sm text-gray-700">{panel.top_risks.slice(0, 3).join(', ')}</div>
+            </div>
+          )}
+          {panel.missing_areas && panel.missing_areas.length > 0 && (
+            <div className="mt-3 text-xs text-gray-600">
+              Still to cover: {panel.missing_areas.join(', ')}
+            </div>
+          )}
+        </aside>
       </div>
-
-      {/* Manual-entry quick forms (Step 4) — persist to canonical tables; refresh coverage on close. */}
-      {activeDomain && (
-        <AddDataModal
-          isOpen={!!activeDomain}
-          domain={activeDomain}
-          onClose={() => {
-            setActiveDomain(null);
-            loadCoverage();
-          }}
-        />
-      )}
-
-      {/* Skip-policy warning — a skip is intentional + warned, never a one-click bypass. */}
-      {showSkipWarning && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-gray-800">
-            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              Your dashboard will be limited
-            </h3>
-            <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              LifeNavigator works best after advisor discovery. If you continue now, your dashboard
-              may be incomplete, recommendations may be less useful, and your Life Graph may be
-              sparse.
-            </p>
-            <div className="mt-5 flex flex-col gap-2">
-              <button
-                onClick={() => setShowSkipWarning(false)}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-              >
-                Continue Advisor Discovery
-              </button>
-              <button
-                onClick={confirmLimitedSkip}
-                disabled={finishing}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300"
-              >
-                Continue with Limited Dashboard
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Live context panel (D8) — the advisor always knows the current life model */}
-      <aside className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 h-fit">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold uppercase tracking-wide text-gray-500">
-            What I know so far
-          </h2>
-          <span className="text-xs text-indigo-600 font-semibold">
-            {panel.discovery_completion_pct ?? 0}%
-          </span>
-        </div>
-        {panel.life_vision && (
-          <p className="mt-2 text-sm text-gray-700 italic">“{panel.life_vision}”</p>
-        )}
-        {panel.primary_objective && (
-          <div className="mt-3">
-            <div className="text-[11px] uppercase text-gray-400 font-semibold">
-              Primary objective
-            </div>
-            <div className="text-sm font-semibold text-gray-900">{panel.primary_objective}</div>
-          </div>
-        )}
-        {panel.top_constraints && panel.top_constraints.length > 0 && (
-          <div className="mt-3">
-            <div className="text-[11px] uppercase text-rose-600 font-semibold">Constraints</div>
-            <div className="text-sm text-gray-700">{panel.top_constraints.join(', ')}</div>
-          </div>
-        )}
-        {panel.top_risks && panel.top_risks.length > 0 && (
-          <div className="mt-3">
-            <div className="text-[11px] uppercase text-amber-600 font-semibold">Risks</div>
-            <div className="text-sm text-gray-700">{panel.top_risks.slice(0, 3).join(', ')}</div>
-          </div>
-        )}
-        {panel.missing_areas && panel.missing_areas.length > 0 && (
-          <div className="mt-3 text-xs text-gray-400">
-            Still to cover: {panel.missing_areas.join(', ')}
-          </div>
-        )}
-      </aside>
     </div>
   );
 }

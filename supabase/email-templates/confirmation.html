@@ -1,50 +1,278 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html dir="ltr" lang="en">
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Confirm your email · LifeNavigator</title>
+    <link
+      rel="preload"
+      as="image"
+      href="https://lifenavigator.tech/LifeNavigator.png" />
+    <meta content="text/html; charset=UTF-8" http-equiv="Content-Type" />
+    <meta name="x-apple-disable-message-reformatting" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="supported-color-schemes" content="dark" />
+    <!--$-->
+    <style>
+      @font-face {
+        font-family: 'Newsreader';
+        font-style: normal;
+        font-weight: 500;
+        mso-font-alt: 'Georgia';
+        src: url(https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&display=swap) format('woff2');
+      }
+
+      * {
+        font-family: 'Newsreader', Georgia;
+      }
+    </style>
   </head>
-  <body style="margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;padding:32px 12px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border:1px solid #e7e6e2;border-radius:16px;overflow:hidden;">
-            <tr>
-              <td style="background:#0b0b0f;padding:24px 32px;">
-                <span style="color:#ffffff;font-size:19px;font-weight:700;letter-spacing:-0.02em;">LifeNavigator</span><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#2dd4bf;margin-left:3px;"></span>
-                <div style="color:#9a9aa6;font-size:11px;margin-top:5px;letter-spacing:0.16em;">DECISION INTELLIGENCE FOR LIFE</div>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:36px 32px 28px;">
-                <h1 style="margin:0 0 12px;font-size:22px;color:#0b0b0f;font-weight:600;letter-spacing:-0.01em;">Confirm your email</h1>
-                <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#44454f;">
-                  Welcome to LifeNavigator. Confirm your email to activate your account and start making decisions grounded in your own data.
-                </p>
-                <table role="presentation" cellpadding="0" cellspacing="0">
-                  <tr>
-                    <td style="border-radius:10px;background:#0f766e;">
-                      <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup&next=/onboarding" style="display:inline-block;padding:13px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:10px;">Confirm email &rarr;</a>
-                    </td>
-                  </tr>
-                </table>
-                <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#6b6b76;">
-                  Or paste this link into your browser:<br />
-                  <a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup&next=/onboarding" style="color:#0f766e;word-break:break-all;">{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup</a>
-                </p>
-                <p style="margin:20px 0 0;font-size:13px;color:#9a9aa6;">This link expires in 24 hours. If you didn't create a LifeNavigator account, you can safely ignore this email.</p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:20px 32px 30px;border-top:1px solid #f0efec;">
-                <p style="margin:0 0 4px;font-size:12px;color:#9a9aa6;">Need help? <a href="mailto:support@lifenavigator.tech" style="color:#6b6b76;text-decoration:none;">support@lifenavigator.tech</a></p>
-                <p style="margin:0;font-size:12px;color:#9a9aa6;">© 2026 LifeNavigator · <a href="https://lifenavigator.tech/legal/privacy" style="color:#6b6b76;text-decoration:none;">Privacy</a> · <a href="https://lifenavigator.tech" style="color:#6b6b76;text-decoration:none;">lifenavigator.tech</a></p>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
+  <div
+    style="display:none;overflow:hidden;line-height:1px;opacity:0;max-height:0;max-width:0"
+    data-skip-in-text="true">
+    Verify your email to activate LifeNavigator — your personal decision
+    intelligence platform.
+    <div>
+       ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿ ‌​‍‎‏﻿
+    </div>
+  </div>
+  <body style="background-color:#060c16;margin:0;padding:0">
+    <table
+      border="0"
+      width="100%"
+      cellpadding="0"
+      cellspacing="0"
+      role="presentation"
+      align="center">
+      <tbody>
+        <tr>
+          <td
+            style="margin:0;padding:32px 12px;background-color:#060c16;font-family:-apple-system, BlinkMacSystemFont, &#x27;Segoe UI&#x27;, Roboto, &#x27;Helvetica Neue&#x27;, Arial, sans-serif">
+            <table
+              align="center"
+              width="100%"
+              border="0"
+              cellpadding="0"
+              cellspacing="0"
+              role="presentation"
+              style="max-width:600px;width:100%;border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,0.10);background-color:#0c1c33;background-image:linear-gradient(160deg, #122b49 0%, #0c1c33 42%, #081320 100%)">
+              <tbody>
+                <tr style="width:100%">
+                  <td>
+                    <table
+                      align="center"
+                      width="100%"
+                      border="0"
+                      cellpadding="0"
+                      cellspacing="0"
+                      role="presentation">
+                      <tbody>
+                        <tr>
+                          <td>
+                            <table
+                              align="center"
+                              width="100%"
+                              border="0"
+                              cellpadding="0"
+                              cellspacing="0"
+                              role="presentation"
+                              style="background-color:#081627;padding:30px 32px 26px;border-bottom:1px solid rgba(255,255,255,0.08);text-align:center">
+                              <tbody>
+                                <tr>
+                                  <td>
+                                    <img
+                                      alt="LifeNavigator"
+                                      height="128"
+                                      src="https://lifenavigator.tech/LifeNavigator.png"
+                                      style="display:block;outline:none;border:none;text-decoration:none;margin:0 auto;width:128px;height:auto"
+                                      width="128" />
+                                    <p
+                                      style="font-size:11px;line-height:24px;margin:14px 0 0;color:#2dd4bf;font-weight:700;letter-spacing:0.18em;margin-top:14px;margin-right:0;margin-bottom:0;margin-left:0">
+                                      DECISION INTELLIGENCE FOR LIFE
+                                    </p>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                            <table
+                              align="center"
+                              width="100%"
+                              border="0"
+                              cellpadding="0"
+                              cellspacing="0"
+                              role="presentation"
+                              style="padding:36px 36px 8px">
+                              <tbody>
+                                <tr>
+                                  <td>
+                                    <p
+                                      style="font-size:12px;line-height:24px;margin:0 0 14px;color:#2dd4bf;font-weight:700;letter-spacing:0.16em;margin-top:0;margin-right:0;margin-bottom:14px;margin-left:0">
+                                      PRIVATE BETA ACCESS
+                                    </p>
+                                    <h1
+                                      style="margin:0 0 16px;color:#eaf1fb;font-family:&#x27;Newsreader&#x27;, Georgia, &#x27;Times New Roman&#x27;, ui-serif, serif;font-size:34px;line-height:1.12;font-weight:500;letter-spacing:-0.02em">
+                                      Your Personal Decision Intelligence
+                                      Platform
+                                    </h1>
+                                    <p
+                                      style="font-size:16px;line-height:1.65;margin:0 0 26px;color:#c2d2e6;margin-top:0;margin-right:0;margin-bottom:26px;margin-left:0">
+                                      A single place to understand how your
+                                      finances, family, career, education,
+                                      health, and major life decisions work
+                                      together. Verify your email to activate
+                                      your account.
+                                    </p>
+                                    <table
+                                      role="presentation"
+                                      width="100%"
+                                      cellpadding="0"
+                                      cellspacing="0"
+                                      style="margin:4px 0 28px">
+                                      <tbody>
+                                        <tr>
+                                          <td
+                                            style="width:50%;padding:6px;vertical-align:top">
+                                            <div
+                                              style="border:1px solid rgba(45,212,191,0.34);background-color:rgba(45,212,191,0.10);border-radius:12px;padding:13px 15px;color:#eaf1fb;font-size:14px;font-weight:600">
+                                              Financial Health
+                                            </div>
+                                          </td>
+                                          <td
+                                            style="width:50%;padding:6px;vertical-align:top">
+                                            <div
+                                              style="border:1px solid rgba(45,212,191,0.34);background-color:rgba(45,212,191,0.10);border-radius:12px;padding:13px 15px;color:#eaf1fb;font-size:14px;font-weight:600">
+                                              Family Protection
+                                            </div>
+                                          </td>
+                                        </tr>
+                                        <tr>
+                                          <td
+                                            style="width:50%;padding:6px;vertical-align:top">
+                                            <div
+                                              style="border:1px solid rgba(45,212,191,0.34);background-color:rgba(45,212,191,0.10);border-radius:12px;padding:13px 15px;color:#eaf1fb;font-size:14px;font-weight:600">
+                                              Career Growth
+                                            </div>
+                                          </td>
+                                          <td
+                                            style="width:50%;padding:6px;vertical-align:top">
+                                            <div
+                                              style="border:1px solid rgba(45,212,191,0.34);background-color:rgba(45,212,191,0.10);border-radius:12px;padding:13px 15px;color:#eaf1fb;font-size:14px;font-weight:600">
+                                              Education Planning
+                                            </div>
+                                          </td>
+                                        </tr>
+                                        <tr>
+                                          <td
+                                            style="width:50%;padding:6px;vertical-align:top">
+                                            <div
+                                              style="border:1px solid rgba(45,212,191,0.34);background-color:rgba(45,212,191,0.10);border-radius:12px;padding:13px 15px;color:#eaf1fb;font-size:14px;font-weight:600">
+                                              Health Readiness
+                                            </div>
+                                          </td>
+                                          <td
+                                            style="width:50%;padding:6px;vertical-align:top">
+                                            <div
+                                              style="border:1px solid rgba(45,212,191,0.34);background-color:rgba(45,212,191,0.10);border-radius:12px;padding:13px 15px;color:#eaf1fb;font-size:14px;font-weight:600">
+                                              Decision Intelligence
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      </tbody>
+                                    </table>
+                                    <a
+                                      href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup&amp;next=/onboarding"
+                                      style="line-height:100%;text-decoration:none;display:inline-block;max-width:100%;mso-padding-alt:0px;background-color:#0d9488;background-image:linear-gradient(135deg, #0d9488 0%, #2dd4bf 100%);color:#04201c;font-size:15px;font-weight:700;letter-spacing:0.01em;padding:15px 30px;border-radius:12px;padding-top:15px;padding-right:30px;padding-bottom:15px;padding-left:30px"
+                                      target="_blank"
+                                      ><span
+                                        ><!--[if mso]><i style="mso-font-width:500%;mso-text-raise:22.5" hidden>&#8202;&#8202;&#8202;</i><![endif]--></span
+                                      ><span
+                                        style="max-width:100%;display:inline-block;line-height:120%;mso-padding-alt:0px;mso-text-raise:11.25px"
+                                        >Verify My Email</span
+                                      ><span
+                                        ><!--[if mso]><i style="mso-font-width:500%" hidden>&#8202;&#8202;&#8202;&#8203;</i><![endif]--></span
+                                      ></a
+                                    >
+                                    <p
+                                      style="font-size:13px;line-height:1.6;margin:24px 0 0;color:#8fa3bd;margin-top:24px;margin-right:0;margin-bottom:0;margin-left:0">
+                                      Or paste this link into your browser:<br /><a
+                                        href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&amp;type=signup&amp;next=/onboarding"
+                                        style="color:#2dd4bf;word-break:break-all"
+                                        >{{ .SiteURL
+                                        }}/auth/confirm?token_hash={{ .TokenHash
+                                        }}&amp;type=signup&amp;next=/onboarding</a
+                                      >
+                                    </p>
+                                    <p
+                                      style="font-size:12px;line-height:24px;margin:18px 0 0;color:#62758e;margin-top:18px;margin-right:0;margin-bottom:0;margin-left:0">
+                                      This link expires in 24 hours. If you
+                                      didn’t create a LifeNavigator account, you
+                                      can safely ignore this email.
+                                    </p>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                            <table
+                              align="center"
+                              width="100%"
+                              border="0"
+                              cellpadding="0"
+                              cellspacing="0"
+                              role="presentation"
+                              style="padding:8px 32px 30px">
+                              <tbody>
+                                <tr>
+                                  <td>
+                                    <hr
+                                      style="width:100%;border:none;border-top:1px solid #eaeaea;border-color:rgba(255,255,255,0.08);margin:0 0 18px" />
+                                    <p
+                                      style="font-size:12px;line-height:24px;margin:0 0 12px;color:#2dd4bf;font-weight:700;letter-spacing:0.04em;margin-top:0;margin-right:0;margin-bottom:12px;margin-left:0">
+                                      PRIVATE BETA MEMBER · Your feedback will
+                                      directly shape the future of
+                                      LifeNavigator.
+                                    </p>
+                                    <p
+                                      style="font-size:12px;line-height:24px;margin:0 0 4px;color:#62758e;margin-top:0;margin-right:0;margin-bottom:4px;margin-left:0">
+                                      Need help?<!-- -->
+                                      <a
+                                        href="mailto:support@lifenavigator.tech"
+                                        style="color:#8fa3bd;text-decoration-line:none;text-decoration:none"
+                                        target="_blank"
+                                        >support@lifenavigator.tech</a
+                                      >
+                                    </p>
+                                    <p
+                                      style="font-size:12px;line-height:24px;margin:0;color:#62758e;margin-top:0;margin-bottom:0;margin-left:0;margin-right:0">
+                                      © 2026
+                                      <!-- -->LifeNavigator<!-- -->
+                                      ·<!-- -->
+                                      <a
+                                        href="https://lifenavigator.tech/legal/privacy"
+                                        style="color:#8fa3bd;text-decoration-line:none;text-decoration:none"
+                                        target="_blank"
+                                        >Privacy</a
+                                      >
+                                      <!-- -->·<!-- -->
+                                      <a
+                                        href="https://lifenavigator.tech"
+                                        style="color:#8fa3bd;text-decoration-line:none;text-decoration:none"
+                                        target="_blank"
+                                        >lifenavigator.tech</a
+                                      >
+                                    </p>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      </tbody>
     </table>
+    <!--/$-->
   </body>
 </html>

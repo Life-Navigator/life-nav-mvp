@@ -13,6 +13,7 @@
  */
 import { NextResponse, NextRequest } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { safeApiError } from '@/lib/security/safe-error';
 
 export const dynamic = 'force-dynamic';
 
@@ -124,8 +125,14 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
-  if (!body?.name || body?.value == null) {
-    return NextResponse.json({ error: 'name and value are required' }, { status: 400 });
+  // The Add-Asset form sends `currentValue` (and `name`); accept the legacy `value` alias too.
+  const rawValue = body?.value ?? body?.currentValue;
+  if (!body?.name || rawValue == null || rawValue === '') {
+    return safeApiError({
+      code: 'validation_failed',
+      publicMessage: 'Asset name and current value are required.',
+      context: { route: '/api/assets', field: 'name|currentValue' },
+    });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -134,13 +141,14 @@ export async function POST(req: NextRequest) {
     user_id: user.id,
     asset_name: String(body.name),
     asset_type: classify(body.type), // store the normalized class
-    current_value: Number(body.value ?? body.currentValue ?? 0),
-    purchase_price: body.purchasePrice != null ? Number(body.purchasePrice) : null,
+    current_value: Number(rawValue) || 0,
+    purchase_price:
+      body.purchasePrice != null && body.purchasePrice !== '' ? Number(body.purchasePrice) : null,
     purchase_date: body.purchaseDate
       ? new Date(body.purchaseDate).toISOString().slice(0, 10)
       : null,
-    description: body.description ?? null,
-    location: body.location ?? null,
+    description: body.description || null,
+    location: body.location || null,
     metadata: { source: 'user_entered' },
   };
   const { data, error } = await sb
@@ -149,7 +157,12 @@ export async function POST(req: NextRequest) {
     .insert(row)
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error)
+    return safeApiError({
+      code: 'db_persistence_error',
+      internal: error,
+      context: { route: '/api/assets', table: 'finance.assets', code: error.code },
+    });
 
   return NextResponse.json({
     asset: {

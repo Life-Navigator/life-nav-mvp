@@ -26,26 +26,35 @@ def test_house_for_equity_is_wealth_not_homeownership():
 
 
 @pytest.mark.asyncio
-async def test_discover_goal_decomposes_into_dependencies():
-    svc = LifeDiscoveryService(FakeSupabase({}))
+async def test_discover_goal_does_not_auto_create_archetype_risks_or_opps():
+    # TRUST RULE: an objective must NOT auto-create archetype RISKS or OPPORTUNITIES (those are claims,
+    # not grounded in user data). Dependencies (honest "to confirm" requirements) are still created.
+    sb = FakeSupabase({})
+    svc = LifeDiscoveryService(sb)
     res = await svc.discover_goal(CTX, surface_goal="buy a house", why_chain=[{"q": "why", "a": "we want to start a family"}])
-    assert res["root_objective"] == "family_stability"
-    labels = [d["label"] for d in res["dependencies"]]
-    assert any("life insurance" in label.lower() for label in labels)  # cross-domain dependency
-    assert any("emergency fund" in label.lower() for label in labels)
-    assert res["risks"] and res["opportunities"]
+    assert res["root_objective"] == "family_stability"  # objective still inferred
+    assert res["risks"] == [] and res["opportunities"] == []  # no fabricated risk/opportunity claims
+    assert await svc._rows("risks", CTX) == []
+    assert await svc._rows("opportunities", CTX) == []
+    snap = await svc.snapshot(CTX)
+    assert snap["top_risks"] == [] and snap["top_opportunities"] == []
+    # dependencies remain (used by decision-brain missing-info + upload roadmap), gated off the dashboard
+    assert res["dependencies"] and await svc._rows("dependencies", CTX)
 
 
 @pytest.mark.asyncio
-async def test_personal_graph_has_objective_and_dependency_nodes():
+async def test_personal_graph_has_objective_no_archetype_risk_opp_nodes():
     sb = FakeSupabase({})
     svc = LifeDiscoveryService(sb)
     await svc.save_vision(CTX, vision_text="Raise a healthy, secure family and retire by 60")
     await svc.discover_goal(CTX, surface_goal="buy a house", why_chain=[{"a": "start a family"}])
     g = await svc.personal_graph(CTX)
     types = {n["type"] for n in g["nodes"]}
-    assert {"Life Vision", "Life Objective", "Dependency"} <= types
-    assert any(e["rel"] == "requires" for e in g["edges"])  # objective -> dependency edge
+    assert {"Life Vision", "Life Objective", "Goal", "Dependency"} <= types  # objective/goal/deps present
+    assert "Risk" not in types and "Opportunity" not in types  # NO archetype risk/opportunity nodes
+    rels = {e["rel"] for e in g["edges"]}
+    assert "advances" in rels and "requires" in rels
+    assert not ({"threatened_by", "accelerated_by"} & rels)  # no archetype risk/opportunity edges
 
 
 @pytest.mark.asyncio

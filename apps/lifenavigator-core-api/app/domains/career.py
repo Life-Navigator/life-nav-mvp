@@ -84,15 +84,17 @@ class CareerService(DomainService):
         self._comp = comp
         self._market = market
 
-    async def _rows(self, table: str, ctx: UserContext, *, limit: int = 200, order: Optional[str] = None) -> list[dict]:
+    async def _rows(self, table: str, ctx: UserContext, *, schema: str = CAREER, limit: int = 200, order: Optional[str] = None) -> list[dict]:
         return await self._sb.select(
             table, columns="*", filters={"user_id": f"eq.{ctx.user_id}"},
-            limit=limit, order=order, schema=CAREER,
+            limit=limit, order=order, schema=schema,
         )
 
     # ----------------------------------------------------------------- reads
     async def _profile(self, ctx: UserContext) -> Optional[dict]:
-        rows = await self._rows("career_profiles", ctx, limit=1, order="updated_at.desc")
+        # career_profiles lives in the PUBLIC schema (migration 032), NOT the career schema — reading it
+        # from `career` returned nothing, so a saved current role never rendered (showed "input again").
+        rows = await self._rows("career_profiles", ctx, schema="public", limit=1, order="updated_at.desc")
         return rows[0] if rows else None
 
     async def _primary_goal(self, ctx: UserContext) -> Optional[dict]:
@@ -135,9 +137,11 @@ class CareerService(DomainService):
 
         data: dict[str, Any] = {
             "current_state": {
-                "title": current_role, "employer": (profile or {}).get("current_employer"),
+                # Real public.career_profiles columns: current_company (not current_employer),
+                # years_of_experience (not years_experience).
+                "title": current_role, "employer": (profile or {}).get("current_company"),
                 "industry": (profile or {}).get("industry"), "seniority": seniority,
-                "years_experience": (profile or {}).get("years_experience"),
+                "years_experience": (profile or {}).get("years_of_experience"),
             } if profile else None,
             "target_state": {
                 "role": target_role, "target_comp_median": (target or {}).get("target_comp_median"),
@@ -298,7 +302,7 @@ class CareerService(DomainService):
                     affected=["career", "finance"]))
 
         # 4. promotion_readiness — advancement goal + sufficient tenure
-        years = _num((profile or {}).get("years_experience"))
+        years = _num((profile or {}).get("years_of_experience"))
         if goal and (goal.get("goal_type") == "advancement") and years is not None and years >= 3:
             rows.append(self._crow(
                 ctx, slug="promotion-readiness", rtype="promotion_readiness", priority="medium", confidence=0.6,

@@ -1,0 +1,2952 @@
+[
+  {
+    "id": "fin-01",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 7,
+        "executive_presence": 7,
+        "actionability": 6,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 9,
+        "decision_framing": 9,
+        "question_quality": 8,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 9,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers; restates user facts only, defers the payment math."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Estimates ($70k reserves after 20% down, ~$4,800-5,200/mo all-in at 6.5%) are reasonable arithmetic/benchmark from $95k cash and $620k price; framed as estimates."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "$124k upfront (20% of $620k) correct arithmetic; ranges framed as guidance."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Claude actually quantified the ~$2k/mo cash-flow hit and named opportunity cost, leaving the user smarter; ChatGPT was tight and accurate; LifeNavigator framed the tradeoff well but did the least math and ended only with a question."
+  },
+  {
+    "id": "fin-02",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 7,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 9,
+        "decision_framing": 9,
+        "question_quality": 7,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 4,
+        "personalization": 7,
+        "executive_presence": 8,
+        "actionability": 7,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Cites generic 3-5yr break-even rule as guidance; no invented user numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "8-10% transaction cost (~$40-48k), ~$3,400-3,600/mo estimate, 14.5% down all derived/benchmark; sound."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No invented numbers; qualitative cost comparison."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "All three correctly land on rent given the 3-year horizon, but Claude quantified transaction costs and added the rental-property/optionality angle; LifeNavigator gave a clean, well-reasoned recommendation with a sharp follow-up; ChatGPT was correct but thinnest."
+  },
+  {
+    "id": "fin-03",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 7,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 7,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 6,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 7
+      },
+      "chatgpt": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 4,
+        "personalization": 7,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Match/APR restated accurately; asks whether user is already contributing 6%."
+      },
+      "claude": {
+        "fabricated": true,
+        "note": "Says 6% of $85k = '$425/month' ($5,100/yr is 6%, =$425/mo — correct) but '~$440/month just in interest' on $22k at 24% (=$440/mo — correct); however '6-7 years to pay off' with $400/mo extra is materially wrong — $22k at 24% with ~$400-825/mo pays in ~3-4 yrs, overstates timeline."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "Match-then-debt order stated without invented numbers."
+      }
+    },
+    "winner": "lifenavigator",
+    "runner_up": "chatgpt",
+    "third": "claude",
+    "justification": "All three correctly say capture the match then kill the 24% cards, but Claude's payoff-timeline math is wrong (overstated to 6-7 years), denting trust; LifeNavigator and ChatGPT gave the same correct ordering without the math error, and LN added the useful clarifying question about current contribution rate."
+  },
+  {
+    "id": "fin-04",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 7,
+        "question_quality": 8,
+        "personalization": 7,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 9,
+        "question_quality": 7,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 7
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 9,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 8,
+        "question_quality": 6,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Refuses to project without spending target; the 'longevity insurance' framing is generic. No invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$1.3-1.6M projection and 4% rule ($56k), SS $25-35k are reasonable estimates from $380k+$18k/yr over 15yr at 6-7%; labeled assumptions. Defensible, slightly optimistic but framed."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "$900k-$1.3M projection is a conservative, well-bounded estimate; flags spending dependency."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "The user asked 'am I on track' — Claude and ChatGPT both ran a projection (Claude with full SS + 4%-rule income picture) so the user leaves with an answer; LifeNavigator gave only a question and no estimate, which is trustworthy but underserves a directly answerable quant question."
+  },
+  {
+    "id": "fin-05",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 7,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 8,
+        "question_quality": 7,
+        "personalization": 9,
+        "executive_presence": 8,
+        "actionability": 9,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 6,
+        "decision_framing": 8,
+        "question_quality": 4,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 8,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Gives 6-9mo guidance without committing a dollar target; no invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$20,800-$31,200 = correct 4-6x of $5,200; how-to plan grounded."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "$31k-$62k = correct 6-12x of $5,200; adds 3-account structure."
+      }
+    },
+    "winner": "chatgpt",
+    "runner_up": "claude",
+    "third": "lifenavigator",
+    "justification": "ChatGPT's contractor-specific guidance (9-12 months, separate operating/tax/emergency accounts) is the most insightful for irregular income; Claude is nearly as strong with a concrete dollar target and savings plan; LifeNavigator gives the right range but no committed number and ends on a question."
+  },
+  {
+    "id": "fin-06",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 6,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 9,
+        "question_quality": 7,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 5,
+        "decision_framing": 7,
+        "question_quality": 4,
+        "personalization": 7,
+        "executive_presence": 8,
+        "actionability": 7,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Notes group policy portability gap; no invented coverage number, defers to a needs question."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Builds $1.5-2.1M bottoms-up (income replacement, $400k mortgage, education, final expenses) — transparent components; premium estimate framed as range. Sound."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "10-15x income is stated as 'common range' guidance, not user's number — not fabrication."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude built a transparent needs-based number ($1.5-2.1M) component by component and gave the actionable 'get individual portable term' step; LifeNavigator correctly flags the portability risk and the coverage gap but stops at a question; ChatGPT lands the same range via a rule-of-thumb with the least structure."
+  },
+  {
+    "id": "fin-07",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 2,
+        "context_usage": 1,
+        "insight": 1,
+        "tradeoff_discovery": 1,
+        "decision_framing": 1,
+        "question_quality": 2,
+        "personalization": 1,
+        "executive_presence": 2,
+        "actionability": 1,
+        "trust": 6
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 6,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 4,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Fallback generic reply; the '220' in llm_status is the suppression trigger, not surfaced to user. No fabrication in output, but no substance either."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$220k remaining after $30k loan payoff = correct arithmetic; keep-the-3.1%-mortgage reasoning sound."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "Correct ordering (6.5% loans before 3.1% mortgage); no invented numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "LifeNavigator fell back to a generic intake question and delivered no advice; Claude gave a complete, correctly-reasoned allocation (kill 6.5% loans, keep 3.1% mortgage, fund the retirement gap) and ChatGPT the same logic more tersely."
+  },
+  {
+    "id": "fin-08",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 2,
+        "context_usage": 1,
+        "insight": 1,
+        "tradeoff_discovery": 1,
+        "decision_framing": 1,
+        "question_quality": 2,
+        "personalization": 1,
+        "executive_presence": 2,
+        "actionability": 1,
+        "trust": 6
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 9,
+        "question_quality": 5,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 8,
+        "question_quality": 4,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Fallback generic reply; '45' in llm_status is the suppression trigger, not user-facing. No substance."
+      },
+      "claude": {
+        "fabricated": true,
+        "note": "Assumes user 'has contributed ~$6,000 so far' to 401k and computes remaining ~$17,000 — that contribution figure was not stated by the user and is presented as their situation; an unstated assumption driving the math."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "$15k cards + ~$7k Roth + 401k increase; no invented user numbers, ranges framed as a possible split."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "LifeNavigator fell back to generic intake; Claude gave the strongest sequenced allocation (kill 19% cards, max tax-advantaged, brokerage) despite an unsupported $6k prior-contribution assumption; ChatGPT delivered the same correct priority order cleanly without that assumption."
+  },
+  {
+    "id": "fin-09",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 8,
+        "personalization": 7,
+        "executive_presence": 8,
+        "actionability": 6,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 9,
+        "question_quality": 5,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 6,
+        "decision_framing": 8,
+        "question_quality": 4,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Says a gap likely remains without committing a projection; retirement-before-college insight is sound guidance."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$85-90k projection from $18k + $300/mo over 10yr at ~6% is reasonable arithmetic; ~65-70% coverage of $130k correct."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "$70k-$100k projection conservative and well-bounded."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Both Claude and ChatGPT ran the projection (~$85-90k / ~65-70% coverage) and added the retirement-priority and gap-filling levers; Claude is richest on actionable adjustments; LifeNavigator gives the right framing and the 'loans for college not retirement' insight but no projection."
+  },
+  {
+    "id": "fin-10",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 7,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 9,
+        "decision_framing": 9,
+        "question_quality": 7,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 5,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Frames 6.9% as guaranteed return correctly; asks about cash reserves before deploying. Leans paydown but acknowledges market upside."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Both-sides framing accurate; the '4% invest / 8%+ pay off' heuristic is reasonable guidance; no invented user numbers."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "Calls 6.9% 'after-tax' loosely (mortgage interest is the cost, deductibility varies) but minor; split approach sound."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude gave the most balanced, decision-ready answer — explicit math-vs-paydown cases, the emergency-fund-first guardrail, the rate-band heuristic, and a split recommendation; LifeNavigator argued the guaranteed-6.9% case well and asked the right reserves question; ChatGPT reached the same split conclusion more briefly."
+  },
+  {
+    "id": "fin-11",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 5,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 8,
+        "personalization": 7,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 6,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 5,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No numbers invented; asks for cost basis rather than assuming it."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "~$315k (45% of $700k) and $95-125k loss figures are simple arithmetic on stated values."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No fabricated figures; uses framing only."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Claude gives concrete diversification mechanics (gradual sale, target concentration band, highest-basis-first, DAF/exchange funds) plus quantified risk-vs-tax math. ChatGPT's 'would you buy it today' reframe is sharp but thin; LifeNavigator structures the tradeoff well but stalls on a question instead of advising."
+  },
+  {
+    "id": "fin-12",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 9,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 7,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 6,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 7
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 5,
+        "insight": 6,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 4,
+        "personalization": 4,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Only restates the user's three benefit figures; no invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Break-even ages (78-83) and 7-8%/yr delay credit are standard SS benchmarks, not user-specific fabrication; '$22,800/year' = $1,900x12 correct arithmetic. '42% increase 62 to 67' is roughly correct ($1,900 to $2,700 = 42%)."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numeric claims beyond general guidance."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude provides the decision-critical break-even analysis and survivor-benefit point that this decision actually turns on, with a clear lean toward FRA given the assets. LifeNavigator is well-grounded and uses the user's numbers but defers to a question; ChatGPT is generic and ignores the part-time-income earnings-test angle."
+  },
+  {
+    "id": "car-01",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 8,
+        "personalization": 7,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 6,
+        "personalization": 5,
+        "executive_presence": 8,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "9% raise is correct arithmetic ($15k on $165k)."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numeric claims."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Claude names the IC-vs-management identity shift, flags the modest 9% raise, raises reversibility, and offers a concrete negotiable third path (tech-lead-manager / trial period). ChatGPT's 'these are different careers, $15k wouldn't convince me' is punchy and correct; LifeNavigator frames it cleanly but ends on a question rather than a recommendation."
+  },
+  {
+    "id": "car-02",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 2,
+        "context_usage": 1,
+        "insight": 1,
+        "tradeoff_discovery": 1,
+        "decision_framing": 1,
+        "question_quality": 2,
+        "personalization": 1,
+        "executive_presence": 2,
+        "actionability": 1,
+        "trust": 5
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 6,
+        "personalization": 7,
+        "executive_presence": 8,
+        "actionability": 6,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Fallback generic reply; status notes invented '33' was suppressed, so output contains no numbers at all."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$33k/24% increase is correct arithmetic ($168k-$135k)."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numeric claims."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Claude addresses the parental-leave/runway risk, health-insurance gap, equity-quality and counteroffer angles with sharp diagnostic questions. ChatGPT reaches the same stay-for-now lean concisely. LifeNavigator returned a generic fallback that ignores the question entirely."
+  },
+  {
+    "id": "car-03",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 5,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 8,
+        "question_quality": 5,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 5,
+        "insight": 6,
+        "tradeoff_discovery": 5,
+        "decision_framing": 6,
+        "question_quality": 3,
+        "personalization": 4,
+        "executive_presence": 7,
+        "actionability": 7,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "COBRA/'$80k vs unemployment' are general examples, not user figures."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numeric claims."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Claude gives a sequenced, time-boxed prep plan (cash runway, COBRA, documented wins, network, certs, income diversification, severance negotiation) that a marketer can execute immediately. ChatGPT covers the essentials tersely; LifeNavigator frames the runway insight but defers on a question with only $20k saved against a family of four."
+  },
+  {
+    "id": "car-04",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 7,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 4,
+        "personalization": 6,
+        "executive_presence": 8,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Uses only stated $25k/$150k/$80k/30% figures."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "'$150k feels like ~$115k' and 'partner needs ~$60k' are approximate COL-adjusted arithmetic on stated 30%; reasonable, not fabricated."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No fabricated figures."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude does the COL-adjusted purchasing-power math (the $150k feels like ~$115k; partner needs ~$60k to break even) that makes the tradeoff concrete, plus negotiation levers. LifeNavigator reaches the same lean-against conclusion with strong grounding but no purchasing-power figure; ChatGPT is correct but the most generic."
+  },
+  {
+    "id": "car-05",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 8,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 8,
+        "executive_presence": 7,
+        "actionability": 4,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 9,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 9,
+        "personalization": 9,
+        "executive_presence": 8,
+        "actionability": 7,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 6,
+        "question_quality": 4,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 4,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "No numeric claims."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numeric claims."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude reads the subtext brilliantly ('if you're framing it with the teenagers prominent, your gut may already know'), surfaces the 'what would the extra money change' and 'ask the teens' angles, and the negotiable modified-VP option. LifeNavigator's finite-window insight is genuinely good but it ends on a question; ChatGPT is a thin pro/con list."
+  },
+  {
+    "id": "car-06",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 8,
+        "personalization": 7,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 7
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 6,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "'50-80% who accept counteroffers leave within a year' is a commonly cited general benchmark, not user fabrication; flagged as unsourced but not docked as fabricated."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numeric claims."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude adds the non-obvious risks (employer now knows you were looking; could have paid earlier; counteroffer-acceptance attrition stat) plus a trust-of-employer question that frames the real decision. LifeNavigator's 'money won't fix team feelings' point is sound but less developed; ChatGPT is the briefest version of the same lean."
+  },
+  {
+    "id": "car-07",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 7,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 6,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 4,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers; asks for monthly expenses."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$30-50k travel, $35-70k reserve, $65-120k safety net are clearly labeled estimates/ranges from stated $160k, not presented as the user's actual figures."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numeric claims."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude converts $160k into a usable budget (travel/emergency/re-entry buckets), names the leave-of-absence-with-return-rights lever and a phased 3-4 month alternative, and reframes burnout as an investment. LifeNavigator's post-sabbatical-cushion insight is good but it defers on a question; ChatGPT is correct but minimal."
+  },
+  {
+    "id": "car-08",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 8,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 5,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 7,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Uses only stated $68k/$80k/$14k figures; correctly notes the 6-month forgone-income hidden cost."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$12k increase and 2-3yr breakeven are correct arithmetic; mid/senior UX ranges are general benchmarks, not user fabrication."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No fabricated figures."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude reframes the weak short-term ROI against the stronger long-term UX trajectory, names transferable paralegal skills, and gives a de-risking 'test free resources + build portfolio first' plan plus placement-rate due diligence. LifeNavigator correctly surfaces the hidden 6-month forgone-income cost but ends on a question; ChatGPT gives the same validate-first advice more briefly."
+  },
+  {
+    "id": "car-09",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 2,
+        "context_usage": 1,
+        "insight": 1,
+        "tradeoff_discovery": 1,
+        "decision_framing": 1,
+        "question_quality": 1,
+        "personalization": 1,
+        "executive_presence": 2,
+        "actionability": 1,
+        "trust": 4
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 7,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 5,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 4,
+        "personalization": 5,
+        "executive_presence": 6,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Generic fallback, no numbers used; trustworthy but offers nothing."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$25k gap, $100k/4yr, $10k/yr equity all correct arithmetic; 2.5x break-even and dilution ranges are general benchmarks."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "Accurately restates $155k vs $130k; no invented figures."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Claude quantifies the cash gap, gives concrete break-even/upside thresholds and a negotiation ask. LifeNavigator's fallback delivers no analysis at all."
+  },
+  {
+    "id": "edu-01",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 7,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 8,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 6,
+        "decision_framing": 7,
+        "question_quality": 3,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Omits forgone-income calc but invents nothing."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$164k forgone income (~2x $82k) and ~$304k total are sound arithmetic; payback estimate reasonable."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "$164k lost income and ~$48k uplift correct; no fabrication."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Only Claude builds the full cost picture (tuition + forgone income + payback period) and names the conditions under which the MBA pays off, plus concrete alternatives. LN frames the tradeoff well but never computes the all-in cost."
+  },
+  {
+    "id": "edu-02",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 9,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 8,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 6,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 3,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "$55k/yr restated; no invented figures."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$220k total and $2,000-2,500/mo loan payments are reasonable arithmetic/benchmarks."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "$220k figure correct (4x $55k); no fabrication."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude surfaces the non-obvious finance-specific nuance (IB/PE/HF care about prestige, corporate finance does not), offers a transfer strategy and the engineering-to-quant path. LN frames cost well but is generic on the finance-career mechanics."
+  },
+  {
+    "id": "edu-03",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 6,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 6,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 7,
+        "context_usage": 7,
+        "insight": 4,
+        "tradeoff_discovery": 4,
+        "decision_framing": 5,
+        "question_quality": 2,
+        "personalization": 4,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "$18k uplift correct; no invented data."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "120hrs x ~$35/hr=$4,200 opportunity cost is sound; ~60% pass rate and eligibility rules are general facts, not fabrication."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "$18k+ uplift correct; no fabrication."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude adds the practical gating factors (eligibility, ~60% pass rate, employer reimbursement) and quantifies opportunity cost, making the clear ROI actionable. LN gives a solid read; ChatGPT is correct but thin."
+  },
+  {
+    "id": "edu-04",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 6,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 9,
+        "question_quality": 7,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 5,
+        "tradeoff_discovery": 5,
+        "decision_framing": 7,
+        "question_quality": 2,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 6,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Avalanche logic correct; no invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "8.2% of $25k=~$2,050/yr interest correct; payment/timeline are clearly labeled estimates."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No invented figures."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude gives the same correct avalanche call but adds a concrete deployment plan ($10k now, payoff timeline) and a PSLF/forgiveness caveat. LN covers avalanche vs snowball plus private-loan protections well."
+  },
+  {
+    "id": "edu-05",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 7,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 5,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 3,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "$98k income and $48k tuition restated correctly."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "~$294k over 3yrs (3x $98k) and ~$130k break-even are sound arithmetic."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No invented numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude quantifies the income preserved part-time and the salary uplift needed to justify quitting, plus names the cases where full-time wins. LN reaches the same conclusion with a good retirement-savings continuity insight but no numbers."
+  },
+  {
+    "id": "edu-06",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 7,
+        "executive_presence": 7,
+        "actionability": 6,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 6,
+        "tradeoff_discovery": 4,
+        "decision_framing": 5,
+        "question_quality": 3,
+        "personalization": 4,
+        "executive_presence": 7,
+        "actionability": 6,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Numbers restated accurately; no fabrication."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$23k uplift and ~$8k net loan (after $9k savings) are correct arithmetic."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No invented figures."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude's strongest move is risk-reduction before debt (test interest via free resources, vet placement rates, market reality) plus the loan/uplift math. LN's living-expenses-during-bootcamp insight is genuinely useful; ChatGPT echoes the validate-first point tersely."
+  },
+  {
+    "id": "edu-07",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 6,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 8,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 5,
+        "tradeoff_discovery": 5,
+        "decision_framing": 6,
+        "question_quality": 2,
+        "personalization": 4,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Restates figures; 'borrow for college not retirement' is a maxim, not fabrication."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "4-6x salary target and 15%/~$19k contribution are general benchmarks; $35k coverage examples are reasonable."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No invented numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude gives the same correct 'retirement first' call but operationalizes it: a contribution target, a continue-modest-college split, and concrete cost-reduction levers. LN frames the tradeoff and the maxim well but stays high-level."
+  },
+  {
+    "id": "fam-01",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 6,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 8,
+        "tradeoff_discovery": 6,
+        "decision_framing": 9,
+        "question_quality": 6,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 6,
+        "tradeoff_discovery": 4,
+        "decision_framing": 7,
+        "question_quality": 2,
+        "personalization": 4,
+        "executive_presence": 7,
+        "actionability": 6,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Diaper/formula/childcare cost ranges are general benchmarks, not presented as the user's figures."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No invented figures."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude delivers a prioritized, time-phased checklist with the non-obvious must-dos (childcare waitlists now, 30-day insurance window, guardianship/will). LN rightly centers the parental-leave income gap but stays in question mode; ChatGPT lists the right five areas but no specifics."
+  },
+  {
+    "id": "fam-02",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 7,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 8,
+        "tradeoff_discovery": 6,
+        "decision_framing": 9,
+        "question_quality": 6,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 5,
+        "tradeoff_discovery": 4,
+        "decision_framing": 7,
+        "question_quality": 2,
+        "personalization": 4,
+        "executive_presence": 7,
+        "actionability": 6,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$10-15k emergency-fund target is a labeled estimate; no fabricated user figures."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No invented figures."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude gives a concrete, sequenced rebuild plan tuned to a first-time finance manager (separate accounts, passwords, beneficiaries, two-household budget). LN's 'gain control of cash flow first' read is genuinely apt but remains a question rather than a plan."
+  },
+  {
+    "id": "fam-03",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 7,
+        "context_usage": 6,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 5,
+        "executive_presence": 6,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 8,
+        "question_quality": 6,
+        "personalization": 6,
+        "executive_presence": 8,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 6,
+        "context_usage": 3,
+        "insight": 3,
+        "tradeoff_discovery": 2,
+        "decision_framing": 4,
+        "question_quality": 1,
+        "personalization": 2,
+        "executive_presence": 4,
+        "actionability": 5,
+        "trust": 7
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No numbers; abstains appropriately and asks about her finances."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Cost figures ($25-30/hr home care, $4,500-6,000/mo assisted living) are general benchmarks, not presented as user's. Eldercare Locator number is real."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude delivers a complete, executable elder-care starting kit (documents, family-meeting framing, concrete cost benchmarks, the Eldercare Locator) that a family advisor would endorse. LifeNavigator frames the tradeoffs and asks the right financial first question but is lighter on concrete next steps; ChatGPT is a bare checklist."
+  },
+  {
+    "id": "fam-04",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 7,
+        "context_usage": 6,
+        "insight": 6,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 5,
+        "personalization": 5,
+        "executive_presence": 6,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 8,
+        "question_quality": 5,
+        "personalization": 6,
+        "executive_presence": 8,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 6,
+        "context_usage": 3,
+        "insight": 3,
+        "tradeoff_discovery": 2,
+        "decision_framing": 4,
+        "question_quality": 1,
+        "personalization": 2,
+        "executive_presence": 4,
+        "actionability": 5,
+        "trust": 7
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No numbers invented; references user's $500k mortgage and modest savings."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Attorney fee range ($1,500-3,000), 10x income rule are general benchmarks."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude surfaces the non-obvious gaps (disability insurance, beneficiary review, trust option, the must-have life-insurance given the $500k mortgage) with cost expectations and concrete steps. LifeNavigator correctly flags the guardian-funding insight and the life-insurance gap but stays higher-level; ChatGPT is a five-line list."
+  },
+  {
+    "id": "fam-05",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 7,
+        "context_usage": 7,
+        "insight": 6,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 4,
+        "personalization": 6,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 6,
+        "context_usage": 3,
+        "insight": 3,
+        "tradeoff_discovery": 2,
+        "decision_framing": 4,
+        "question_quality": 1,
+        "personalization": 2,
+        "executive_presence": 4,
+        "actionability": 4,
+        "trust": 7
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers; asks for the asset breakdown."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Annual gift exclusion ($18k 2024), 10-year inherited IRA rule, step-up basis are correct general tax facts, not user's numbers."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude is genuinely expert here: revocable trust to avoid probate, no-contest clauses, step-up basis vs. gifting, the 10-year inherited-IRA rule, and a letter-of-intent to defuse conflict — exactly the toolkit at $1.8M with three heirs. LifeNavigator correctly hinges on the asset-type/tax insight and asks the pivotal allocation question but defers most substance; ChatGPT is generic."
+  },
+  {
+    "id": "fam-06",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 8,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 5,
+        "personalization": 6,
+        "executive_presence": 8,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 6,
+        "context_usage": 4,
+        "insight": 4,
+        "tradeoff_discovery": 4,
+        "decision_framing": 4,
+        "question_quality": 1,
+        "personalization": 2,
+        "executive_presence": 4,
+        "actionability": 5,
+        "trust": 7
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "No numbers presented as user's."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Very close: LifeNavigator's three-way tradeoff (full integration / separate / hybrid) and the pre-marriage-boundaries insight are arguably the cleanest framing, but Claude edges it with concrete account structure, proportional contribution, prenup rationale, housing/deed handling, and beneficiary/life-insurance steps protecting both sets of kids. ChatGPT is a thin outline."
+  },
+  {
+    "id": "fam-07",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 8,
+        "tradeoff_discovery": 6,
+        "decision_framing": 7,
+        "question_quality": 6,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 7,
+        "insight": 9,
+        "tradeoff_discovery": 6,
+        "decision_framing": 8,
+        "question_quality": 5,
+        "personalization": 6,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 7,
+        "context_usage": 3,
+        "insight": 5,
+        "tradeoff_discovery": 2,
+        "decision_framing": 4,
+        "question_quality": 1,
+        "personalization": 2,
+        "executive_presence": 5,
+        "actionability": 5,
+        "trust": 7
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers; flags SNT/benefits-disqualification risk correctly."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "ABLE limit ($18k/yr), SNT setup cost ($2-5k), 10x income are general facts. Caveat: minor risk of overstating permanent-vs-term as definitive."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Both correctly identify the critical insight — naive savings can disqualify the child from means-tested benefits — but Claude operationalizes it (ABLE account now, third-party SNT, life insurance funding the trust, Medicaid waivers, CSNC-credentialed planners). LifeNavigator nails the same SNT insight conceptually but stops short of steps; ChatGPT is a checklist."
+  },
+  {
+    "id": "fam-08",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 7,
+        "context_usage": 7,
+        "insight": 6,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 6,
+        "personalization": 6,
+        "executive_presence": 6,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 5,
+        "decision_framing": 8,
+        "question_quality": 4,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 7,
+        "context_usage": 4,
+        "insight": 4,
+        "tradeoff_discovery": 2,
+        "decision_framing": 5,
+        "question_quality": 1,
+        "personalization": 3,
+        "executive_presence": 5,
+        "actionability": 6,
+        "trust": 7
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$740k = 10x stated $74k income (simple arithmetic); $50-80/mo premium and online-will cost are general benchmarks."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Claude gives a sequenced, single-parent-specific action plan with concrete figures (10x income = $740k term, ~$50-80/mo, custodian/trust rather than naming the minor directly) and correct prioritization. ChatGPT lists the same right priorities tersely; LifeNavigator frames a will-vs-insurance tradeoff and asks an allocation question but is the least actionable of the three here."
+  },
+  {
+    "id": "fam-09",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 8,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 4,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 4,
+        "personalization": 7,
+        "executive_presence": 8,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 7,
+        "context_usage": 4,
+        "insight": 4,
+        "tradeoff_discovery": 4,
+        "decision_framing": 5,
+        "question_quality": 1,
+        "personalization": 3,
+        "executive_presence": 5,
+        "actionability": 5,
+        "trust": 7
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers; opportunity-cost-of-compounding insight is sound."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$200-300/mo example is illustrative, not presented as user's. Note: keep-on-insurance-until-26 applies to under-26 dependents, child is 24 so valid."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude converts 'how much should I help' into concrete guardrails (non-cash help, conditional support, don't raid retirement/cosign, keep on insurance to 26) with the can't-borrow-for-retirement frame. LifeNavigator's opportunity-cost-of-compounding insight and 'secure your own trajectory first' framing are excellent but it defers the action; ChatGPT is brief."
+  },
+  {
+    "id": "crs-01",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 8,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 6,
+        "context_usage": 3,
+        "insight": 4,
+        "tradeoff_discovery": 4,
+        "decision_framing": 5,
+        "question_quality": 1,
+        "personalization": 2,
+        "executive_presence": 4,
+        "actionability": 4,
+        "trust": 7
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers; flags cost-of-living/housing beyond income tax."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$9-12k CA income-tax savings estimate and TX property-tax rates (2-3% vs ~1%) are reasonable general benchmarks at $140k, not presented as exact user figures."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude best exposes the hidden cost that flips the math — TX property taxes and travel-back costs can erode the tax savings — and asks sharp questions (childcare reliance, remote-job permanence). LifeNavigator surfaces the same net-of-cost-of-living insight and asks the right expense question but quantifies less; ChatGPT is generic."
+  },
+  {
+    "id": "crs-02",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 8
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 6,
+        "personalization": 7,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 7,
+        "context_usage": 5,
+        "insight": 5,
+        "tradeoff_discovery": 4,
+        "decision_framing": 5,
+        "question_quality": 2,
+        "personalization": 4,
+        "executive_presence": 5,
+        "actionability": 6,
+        "trust": 7
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No invented numbers; reframes savings as a runway fund."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$205k = $135k + $70k stated (arithmetic); healthcare $1,500-2,500/mo is a general benchmark; 12-18mo runway is illustrative."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude quantifies the household income cliff ($205k to $70k), flags the often-missed family-healthcare cost, and offers de-risking paths (side-hustle first, go part-time, signed LOIs) plus a go/no-go checklist. LifeNavigator's runway-fund reframing and the right expense question are strong but less concrete; ChatGPT covers the essentials briefly."
+  },
+  {
+    "id": "crs-03",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 2,
+        "context_usage": 1,
+        "insight": 1,
+        "tradeoff_discovery": 1,
+        "decision_framing": 1,
+        "question_quality": 2,
+        "personalization": 1,
+        "executive_presence": 2,
+        "actionability": 1,
+        "trust": 6
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 7,
+        "personalization": 7,
+        "executive_presence": 9,
+        "actionability": 8,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 5,
+        "insight": 6,
+        "tradeoff_discovery": 5,
+        "decision_framing": 6,
+        "question_quality": 2,
+        "personalization": 4,
+        "executive_presence": 6,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Generic fallback reply ('build your plan together'); ignores the question entirely but invents nothing."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$40k x 3 = $120k uses the stated $200k-$160k salary delta (simple arithmetic); pension value estimates ($50-65k/yr, $1M+) are explicitly hedged general illustrations."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers; correctly says to value the pension before deciding."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Claude nails the crux — the 3-year salary gain (~$120k) versus the forfeited lifetime pension (potentially $1M+) — and asks whether the start date can be deferred 3 years; ChatGPT reaches the same conclusion tersely. LifeNavigator returns a generic fallback that never engages the decision."
+  },
+  {
+    "id": "crs-04",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 1,
+        "context_usage": 1,
+        "insight": 1,
+        "tradeoff_discovery": 1,
+        "decision_framing": 1,
+        "question_quality": 3,
+        "personalization": 1,
+        "executive_presence": 2,
+        "actionability": 1,
+        "trust": 6
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 8,
+        "tradeoff_discovery": 9,
+        "decision_framing": 9,
+        "question_quality": 8,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 8,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 7,
+        "context_usage": 4,
+        "insight": 6,
+        "tradeoff_discovery": 6,
+        "decision_framing": 5,
+        "question_quality": 2,
+        "personalization": 3,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Fallback generic reply; no numbers used."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Income loss ~$60k and care cost $60k are correct arithmetic ($120k/2, $5k*12); after-tax estimate is general."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No specific numbers asserted."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Claude named the dual cost (lost income AND care cost), surfaced burnout, duration and trial-leave options. LifeNavigator gave a generic vision question with zero engagement with the actual dilemma."
+  },
+  {
+    "id": "crs-05",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 7,
+        "question_quality": 6,
+        "personalization": 7,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 9,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 5,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 7,
+        "context_usage": 5,
+        "insight": 5,
+        "tradeoff_discovery": 4,
+        "decision_framing": 5,
+        "question_quality": 2,
+        "personalization": 4,
+        "executive_presence": 6,
+        "actionability": 5,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No fabricated figures; flagged definition-of-disability nuance correctly."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "60-70% replacement = $57-66k is correct arithmetic of $95k; carrier behavior is general."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No specific numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude gave the load-bearing tactical edge: apply NOW before diagnosis, 'own occupation' coverage, apply to multiple carriers — exactly the time-sensitive moves that matter with a chronic condition. LifeNavigator correctly flagged the disability definition but stayed at framing level."
+  },
+  {
+    "id": "crs-06",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 4,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 7,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 6,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 6,
+        "context_usage": 4,
+        "insight": 4,
+        "tradeoff_discovery": 5,
+        "decision_framing": 5,
+        "question_quality": 2,
+        "personalization": 3,
+        "executive_presence": 5,
+        "actionability": 4,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No numbers asserted."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Named real programs (TAP, SkillBridge, Yellow Ribbon, Hiring Our Heroes) accurately; no fabricated user numbers."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude delivered a veteran-specific decision framework (GI Bill vs work criteria, SkillBridge for paid civilian work, VA claims timing) — concrete and well-informed. LifeNavigator's career-clarity framing is sound but light on actionable veteran resources."
+  },
+  {
+    "id": "crs-07",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 1,
+        "context_usage": 1,
+        "insight": 1,
+        "tradeoff_discovery": 1,
+        "decision_framing": 1,
+        "question_quality": 3,
+        "personalization": 1,
+        "executive_presence": 2,
+        "actionability": 1,
+        "trust": 6
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 4,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 6,
+        "tradeoff_discovery": 5,
+        "decision_framing": 6,
+        "question_quality": 1,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 6,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Fallback; the 'invented 220' was suppressed and reply contains no numbers."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$15k net spend from $55k-$40k is correct arithmetic; wait — that's crs-07: 'Remaining $220k' = $250k-$30k, correct arithmetic."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No fabricated figures."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "Both Claude and ChatGPT correctly identified the key move (pay 6.5% loans, keep the 3.1% mortgage, address the retirement gap); Claude added concrete allocation and account-maxing detail. LifeNavigator failed to engage entirely."
+  },
+  {
+    "id": "crs-08",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 5,
+        "tradeoff_discovery": 6,
+        "decision_framing": 6,
+        "question_quality": 6,
+        "personalization": 7,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 9,
+        "question_quality": 5,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 10,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 7,
+        "context_usage": 4,
+        "insight": 5,
+        "tradeoff_discovery": 4,
+        "decision_framing": 6,
+        "question_quality": 1,
+        "personalization": 3,
+        "executive_presence": 6,
+        "actionability": 6,
+        "trust": 8
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No numbers asserted; asked for burn rate."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "'6-8 months runway' is a reasonable estimate given $40k + 2mo severance + spouse income, not asserted as user's stated fact."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude gave a triaged, time-boxed action list (file unemployment this week, COBRA/insurance, runway reassurance) — exactly what a just-laid-off person needs. LifeNavigator's burn-rate-first framing is correct but defers all action to a question."
+  },
+  {
+    "id": "crs-09",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 6,
+        "decision_framing": 7,
+        "question_quality": 6,
+        "personalization": 7,
+        "executive_presence": 7,
+        "actionability": 4,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 8,
+        "question_quality": 4,
+        "personalization": 8,
+        "executive_presence": 8,
+        "actionability": 8,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 7,
+        "insight": 6,
+        "tradeoff_discovery": 5,
+        "decision_framing": 6,
+        "question_quality": 1,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No projection numbers asserted as fact."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "'$85-90k / covers ~65-70%' is a labeled projection from stated inputs at a disclosed rate, not fabrication."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "'$70-100k' is a disclosed range estimate."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "chatgpt",
+    "third": "lifenavigator",
+    "justification": "All three correctly invoke the retirement-before-college principle; Claude and ChatGPT both ran the projection (~65-77% funded) and reframed 'good enough,' while Claude added concrete gap-fillers. LifeNavigator framed the gap well but skipped the math."
+  },
+  {
+    "id": "crs-10",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 8,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 6,
+        "personalization": 7,
+        "executive_presence": 8,
+        "actionability": 5,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 9,
+        "tradeoff_discovery": 8,
+        "decision_framing": 9,
+        "question_quality": 6,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 6,
+        "insight": 7,
+        "tradeoff_discovery": 5,
+        "decision_framing": 6,
+        "question_quality": 2,
+        "personalization": 5,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Correctly noted net income vs salary non-comparability; no fabricated figures."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "3.9x multiple, $25-35k debt service, take-home $55-65k are correct arithmetic/reasonable estimates from stated $230k financed and $90k net."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No fabricated figures."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude nailed the load-bearing insight — debt service drops real take-home to ~half salary, plus the valuation multiple and the critical 'does $90k assume 60hr weeks / why selling' due-diligence questions. LifeNavigator strongly flagged net-income-isn't-salary but offered less actionable diligence."
+  },
+  {
+    "id": "crs-11",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 6,
+        "personalization": 7,
+        "executive_presence": 7,
+        "actionability": 4,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 9,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 8,
+        "question_quality": 6,
+        "personalization": 9,
+        "executive_presence": 9,
+        "actionability": 8,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 7,
+        "context_usage": 5,
+        "insight": 5,
+        "tradeoff_discovery": 5,
+        "decision_framing": 5,
+        "question_quality": 2,
+        "personalization": 4,
+        "executive_presence": 6,
+        "actionability": 4,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "Correctly flagged carrying costs; no fabricated figures."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "$600k equity = $750k-$150k correct; 4-5% rule income range is a disclosed general estimate."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude quantified the freed equity into retirement income, weighed emotion vs finance, and offered concrete middle-ground options (rent space, downsize in-area, snowbird). LifeNavigator's silent-drain carrying-cost insight was strong but it deferred to a question instead of giving options."
+  },
+  {
+    "id": "crs-12",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 6,
+        "tradeoff_discovery": 7,
+        "decision_framing": 7,
+        "question_quality": 6,
+        "personalization": 6,
+        "executive_presence": 7,
+        "actionability": 4,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 9,
+        "tradeoff_discovery": 6,
+        "decision_framing": 8,
+        "question_quality": 5,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 10,
+        "trust": 9
+      },
+      "chatgpt": {
+        "understanding": 7,
+        "context_usage": 5,
+        "insight": 6,
+        "tradeoff_discovery": 4,
+        "decision_framing": 6,
+        "question_quality": 1,
+        "personalization": 4,
+        "executive_presence": 6,
+        "actionability": 6,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No numbers; flagged medical-debt negotiability."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "No fabricated user figures; charity-care/itemized-bill/payment-plan claims are accurate general facts."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude surfaced the highest-leverage, lesser-known moves — hospital charity care, itemized-bill error review, never-let-it-hit-collections, manufacturer drug assistance — plus assistance programs. LifeNavigator correctly named medical-debt negotiability but stayed at framing and asked for income first."
+  },
+  {
+    "id": "crs-13",
+    "scores": {
+      "lifenavigator": {
+        "understanding": 8,
+        "context_usage": 8,
+        "insight": 7,
+        "tradeoff_discovery": 9,
+        "decision_framing": 7,
+        "question_quality": 7,
+        "personalization": 7,
+        "executive_presence": 7,
+        "actionability": 5,
+        "trust": 9
+      },
+      "claude": {
+        "understanding": 9,
+        "context_usage": 8,
+        "insight": 8,
+        "tradeoff_discovery": 8,
+        "decision_framing": 10,
+        "question_quality": 6,
+        "personalization": 8,
+        "executive_presence": 9,
+        "actionability": 9,
+        "trust": 8
+      },
+      "chatgpt": {
+        "understanding": 8,
+        "context_usage": 5,
+        "insight": 6,
+        "tradeoff_discovery": 5,
+        "decision_framing": 8,
+        "question_quality": 1,
+        "personalization": 4,
+        "executive_presence": 7,
+        "actionability": 6,
+        "trust": 9
+      }
+    },
+    "fabrication": {
+      "lifenavigator": {
+        "fabricated": false,
+        "note": "No numbers asserted; asked for loan rate."
+      },
+      "claude": {
+        "fabricated": false,
+        "note": "Child first-year cost and rule-of-thumb thresholds are general benchmarks, not user figures."
+      },
+      "chatgpt": {
+        "fabricated": false,
+        "note": "No numbers."
+      }
+    },
+    "winner": "claude",
+    "runner_up": "lifenavigator",
+    "third": "chatgpt",
+    "justification": "Claude gave the clearest tiered priority waterfall (emergency fund, match, high-rate debt, then simultaneous goals) with smart sequencing tips like house-before-kids. LifeNavigator had the richest explicit tradeoff map of all four goals but withheld a recommendation pending the loan rate."
+  }
+]

@@ -5,6 +5,15 @@
 // the visible priority formula + lifecycle actions. Same OS the dashboard/chat/reports/graph read.
 
 import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ChevronDown,
+  Database,
+  GitBranch,
+  HelpCircle,
+  ShieldCheck,
+  Gauge,
+  FileWarning,
+} from 'lucide-react';
 
 interface Formula {
   impact: number;
@@ -31,6 +40,19 @@ interface Action {
   formula?: Formula;
   merged_from?: string[];
   impacted_domains?: string[];
+  priority?: string;
+  category?: string;
+  // Explainability (real, persisted via recommendations_os; honest empties when absent)
+  evidence?: { statement?: string; source_table?: string }[] | null;
+  assumptions?: { label?: string; value?: string }[] | null;
+  narrative?: {
+    current?: string | null;
+    target?: string | null;
+    delta?: string | null;
+    why?: string | null;
+    expected_impact?: Record<string, unknown> | null;
+  } | null;
+  updated_at?: string | null;
 }
 interface Conflict {
   type: string;
@@ -56,6 +78,178 @@ const TYPE: Record<string, string> = {
   INFORMATION: 'bg-gray-100 text-gray-600',
 };
 
+function Sec({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: React.ElementType;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+        <Icon className="h-3.5 w-3.5" /> {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+const Muted = ({ text }: { text: string }) => (
+  <p className="text-xs italic text-gray-400">{text}</p>
+);
+
+// Recommendation explainability — surfaces ONLY the real persisted fields. Honest empties; never fabricates.
+function Explainability({ a }: { a: Action }) {
+  const qi = a.quantified_impact || {};
+  const evidence = (a.evidence || []).filter((e) => e && (e.statement || e.source_table));
+  const assumptions = (a.assumptions || []).filter((x) => x && (x.label || x.value));
+  const unlocks = (qi.unlocked_capabilities as string[] | undefined) || [];
+  const domains = a.impacted_domains || [];
+  const impactBits: string[] = [];
+  if (qi.financial_impact_annual)
+    impactBits.push(`+$${Number(qi.financial_impact_annual).toLocaleString()}/yr`);
+  if (qi.readiness_before != null && qi.readiness_after != null)
+    impactBits.push(`readiness ${qi.readiness_before} → ${qi.readiness_after}`);
+  if (qi.coverage_gap) impactBits.push(`coverage gap $${Number(qi.coverage_gap).toLocaleString()}`);
+  if (a.expected_benefit) impactBits.push(a.expected_benefit);
+
+  return (
+    <div className="mt-3 grid gap-4 rounded-lg border border-gray-100 bg-gray-50/70 p-4 sm:grid-cols-2">
+      {/* Why this matters */}
+      <div className="sm:col-span-2">
+        <Sec icon={HelpCircle} title="Why this matters">
+          <p className="text-sm leading-relaxed text-gray-700">
+            {a.narrative?.why || a.why || 'No explanation recorded yet.'}
+          </p>
+        </Sec>
+      </div>
+
+      {/* Data used */}
+      <Sec icon={Database} title="Data used">
+        {evidence.length ? (
+          <ul className="space-y-1">
+            {evidence.map((e, i) => (
+              <li key={i} className="text-xs text-gray-700">
+                • {e.statement || '(datapoint)'}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Muted text="No evidence attached yet." />
+        )}
+      </Sec>
+
+      {/* Sources / evidence lineage */}
+      <Sec icon={GitBranch} title="Source / evidence lineage">
+        {evidence.some((e) => e.source_table) ? (
+          <ul className="space-y-1">
+            {evidence
+              .filter((e) => e.source_table)
+              .map((e, i) => (
+                <li key={i} className="flex items-center gap-1 text-xs text-gray-600">
+                  <span className="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-gray-500 ring-1 ring-gray-200">
+                    {e.source_table}
+                  </span>
+                  <span className="text-gray-400">→ this recommendation</span>
+                </li>
+              ))}
+          </ul>
+        ) : (
+          <Muted text="No source lineage recorded yet." />
+        )}
+      </Sec>
+
+      {/* Missing data */}
+      <Sec icon={FileWarning} title="Missing data">
+        {unlocks.length ? (
+          <div>
+            <p className="text-xs text-gray-600">Add the underlying data to unlock:</p>
+            <ul className="mt-0.5 space-y-0.5">
+              {unlocks.slice(0, 4).map((u, i) => (
+                <li key={i} className="text-xs text-amber-700">
+                  • {u}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <Muted text="No missing-data analysis available yet." />
+        )}
+      </Sec>
+
+      {/* Assumptions */}
+      <Sec icon={ShieldCheck} title="Assumptions">
+        {assumptions.length ? (
+          <ul className="space-y-1">
+            {assumptions.map((x, i) => (
+              <li key={i} className="text-xs text-gray-700">
+                <span className="font-medium">{x.label || 'Assumption'}:</span> {x.value}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Muted text="No assumptions recorded yet." />
+        )}
+      </Sec>
+
+      {/* Confidence + formula */}
+      <Sec icon={Gauge} title="Confidence">
+        <div className="text-xs text-gray-700">
+          {a.confidence != null
+            ? `${Math.round(a.confidence * 100)}% confidence`
+            : 'Confidence not scored'}
+        </div>
+        {a.formula && (
+          <div className="mt-1 font-mono text-[10px] text-gray-400">
+            priority {a.formula.priority_score} = impact {a.formula.impact} × conf{' '}
+            {a.formula.confidence} × urgency {a.formula.urgency} × evidence{' '}
+            {a.formula.evidence_strength} ÷ effort {a.formula.effort}
+          </div>
+        )}
+      </Sec>
+
+      {/* Expected impact */}
+      <Sec icon={GitBranch} title="Expected impact">
+        {impactBits.length || a.narrative?.delta ? (
+          <ul className="space-y-0.5">
+            {impactBits.map((b, i) => (
+              <li key={i} className="text-xs font-medium text-emerald-700">
+                {b}
+              </li>
+            ))}
+            {a.narrative?.delta && <li className="text-xs text-gray-600">{a.narrative.delta}</li>}
+          </ul>
+        ) : (
+          <Muted text="No quantified impact recorded yet." />
+        )}
+      </Sec>
+
+      {/* Affected domains + goals + last updated */}
+      <div className="sm:col-span-2 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-gray-100 pt-2 text-[11px] text-gray-500">
+        <span>
+          Affected domains:{' '}
+          {domains.length ? (
+            domains.map((dn) => (
+              <span
+                key={dn}
+                className="mr-1 rounded-full bg-white px-2 py-0.5 capitalize text-gray-600 ring-1 ring-gray-200"
+              >
+                {dn}
+              </span>
+            ))
+          ) : (
+            <span className="italic text-gray-400">none recorded</span>
+          )}
+        </span>
+        <span className="italic text-gray-400">Affected goals: none linked yet</span>
+        {a.updated_at && <span>Updated {new Date(a.updated_at).toLocaleDateString()}</span>}
+      </div>
+    </div>
+  );
+}
+
 function Card({
   a,
   lead,
@@ -68,6 +262,7 @@ function Card({
   busy: string;
 }) {
   const qi = a.quantified_impact || {};
+  const [open, setOpen] = useState(false);
   return (
     <div
       className={`bg-white rounded-xl border p-5 ${lead ? 'border-indigo-300 shadow-md' : 'border-gray-100 shadow-sm'}`}
@@ -115,6 +310,15 @@ function Card({
           ? ` · priority ${a.formula.priority_score} = I${a.formula.impact}×C${a.formula.confidence}×U${a.formula.urgency}×E${a.formula.evidence_strength}÷${a.formula.effort}`
           : ''}
       </div>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
+      >
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+        {open ? 'Hide' : 'Why & evidence'}
+      </button>
+      {open && <Explainability a={a} />}
       <div className="mt-3 flex gap-2 flex-wrap">
         {[
           ['accepted', 'Accept'],

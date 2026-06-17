@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, Fragment } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { classNames } from '@/lib/utils/classNames';
+import { getSupabaseClient } from '@/lib/supabase/client';
 
 // Icon components
 function HomeIcon(props: React.SVGProps<SVGSVGElement>) {
@@ -318,24 +319,6 @@ function ChevronRightIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-function ArrowRightIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...props}
-    >
-      <line x1="5" y1="12" x2="19" y2="12"></line>
-      <polyline points="12 5 19 12 12 19"></polyline>
-    </svg>
-  );
-}
-
 function ChatIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -371,6 +354,63 @@ function EmailIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function UsersIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+      <circle cx="9" cy="7" r="4"></circle>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+    </svg>
+  );
+}
+
+function CompassIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <circle cx="12" cy="12" r="10"></circle>
+      <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+    </svg>
+  );
+}
+
+function LogoutIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+      <polyline points="16 17 21 12 16 7"></polyline>
+      <line x1="21" y1="12" x2="9" y2="12"></line>
+    </svg>
+  );
+}
+
 // Email accounts will be fetched from API
 // For now, empty array - will be populated when email integration is connected
 const emailAccounts: Array<{
@@ -380,134 +420,46 @@ const emailAccounts: Array<{
   unread: number;
 }> = [];
 
-// Navigation items with sections and child items
-// Items marked comingSoon: true are hidden in beta to keep users on the working path.
+// Primary navigation — the main LifeNavigator operating areas only (≤12 items + Settings).
+// Sub-features (Accounts, Transactions, Investments, Scenario Lab, Decision Brain, Roadmap, Goals,
+// Integrations, Calendar, etc.) live INSIDE their domain tabs or are reachable by direct URL — they are
+// intentionally NOT primary nav. See SIDEBAR_NAVIGATION_AUDIT.md for the full route map. The `section`
+// field on the first item of each group renders the group eyebrow (Core / Domains / Intelligence / Account).
 const navigation = [
-  // ── Core: the outcome journey ──
-  { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, current: false, section: 'Core' },
-  { name: 'Life Readiness', href: '/dashboard/readiness', icon: TargetIcon, current: false },
-  { name: 'Life Graph', href: '/dashboard/life-graph', icon: PuzzlePieceIcon, current: false },
-  { name: 'Recommendations', href: '/dashboard/recommendations', icon: TargetIcon, current: false },
-  {
-    name: 'Decision Brain',
-    href: '/dashboard/decision-brain',
-    icon: PuzzlePieceIcon,
-    current: false,
-  },
-  { name: 'Documents', href: '/dashboard/documents', icon: DocumentIcon, current: false },
-  {
-    name: 'Life Decisions',
-    href: '/dashboard/life-decisions/workspace',
-    icon: TargetIcon,
-    current: false,
-  },
-  { name: 'Reports', href: '/dashboard/reports', icon: DocumentIcon, current: false },
-  // ── Financial ──
+  // ── Core: the operating system ──
+  { name: 'Home', href: '/dashboard', icon: HomeIcon, current: false, section: 'Core' },
+  { name: 'My Life', href: '/dashboard/my-life', icon: CompassIcon, current: false },
+  { name: 'Advisor', href: '/dashboard/advisor', icon: ChatIcon, current: false },
+  { name: 'Life Graph', href: '/life-graph', icon: PuzzlePieceIcon, current: false },
+  // ── Domains ──
   {
     name: 'Finance',
     href: '/dashboard/finance',
     icon: CurrencyDollarIcon,
     current: false,
-    section: 'Financial',
-    children: [{ name: 'Overview', href: '/dashboard/finance/overview' }],
+    section: 'Domains',
   },
   { name: 'Career', href: '/dashboard/career', icon: BriefcaseIcon, current: false },
+  { name: 'Health', href: '/dashboard/wellness', icon: HeartIcon, current: false },
+  { name: 'Education', href: '/dashboard/education', icon: AcademicCapIcon, current: false },
+  { name: 'Family', href: '/dashboard/family', icon: UsersIcon, current: false },
+  // ── Intelligence ──
   {
-    name: 'Comp & Benefits',
-    href: '/dashboard/benefits',
-    moduleId: 'comp_benefits',
-    icon: CurrencyDollarIcon,
+    name: 'Recommendations',
+    href: '/dashboard/recommendations',
+    icon: TargetIcon,
     current: false,
+    section: 'Intelligence',
   },
-  {
-    name: 'Financial Plan',
-    href: '/dashboard/planning',
-    moduleId: 'financial_plan',
-    icon: ChartBarIcon,
-    current: false,
-  },
-  // ── Family ──
-  { name: 'Family', href: '/dashboard/family', icon: HeartIcon, current: false, section: 'Family' },
-  {
-    name: 'Family Office',
-    href: '/dashboard/family-office',
-    moduleId: 'family_office',
-    icon: HeartIcon,
-    current: false,
-  },
-  // ── Health ──
-  {
-    name: 'Health & Wellness',
-    href: '/dashboard/wellness',
-    icon: HeartIcon,
-    current: false,
-    section: 'Health',
-  },
-  {
-    name: 'Health Intelligence',
-    href: '/dashboard/health-intelligence',
-    moduleId: 'health_intelligence',
-    icon: HeartIcon,
-    current: false,
-  },
-  {
-    name: 'Education',
-    href: '/dashboard/education',
-    icon: AcademicCapIcon,
-    current: false,
-    comingSoon: true,
-  },
-  // ── Military (gated; section hides with the item for civilians) ──
-  {
-    name: 'SquaredAway',
-    href: '/dashboard/military',
-    moduleId: 'military',
-    icon: AcademicCapIcon,
-    current: false,
-    section: 'Military',
-  },
-  // ── More ──
-  { name: 'Chat', href: '/dashboard/chat', icon: ChatIcon, current: false, section: 'More' },
-  { name: 'Goals & Assessment', href: '/dashboard/goals', icon: TargetIcon, current: false },
-  { name: 'Scenario Lab', href: '/dashboard/scenario-lab', icon: ChartBarIcon, current: false },
-  {
-    name: 'Decision Graph',
-    href: '/dashboard/life-decisions/graph',
-    moduleId: 'decision_graph',
-    icon: PuzzlePieceIcon,
-    current: false,
-  },
-  {
-    name: 'Compare Futures',
-    href: '/dashboard/life-decisions/scenarios',
-    moduleId: 'scenarios',
-    icon: MapIcon,
-    current: false,
-  },
-  {
-    name: 'Calendar',
-    href: '/dashboard/calendar',
-    icon: CalendarNavIcon,
-    current: false,
-    comingSoon: true,
-  },
-  { name: 'Roadmap', href: '/dashboard/roadmap', icon: MapIcon, current: false, comingSoon: true },
-  {
-    name: 'Executive Dashboard',
-    href: '/dashboard/metrics',
-    moduleId: 'metrics',
-    icon: ChartBarIcon,
-    current: false,
-  },
+  { name: 'Reports', href: '/dashboard/reports', icon: ChartBarIcon, current: false },
+  { name: 'Documents', href: '/dashboard/documents', icon: DocumentIcon, current: false },
+  // ── Account ──
   {
     name: 'Settings',
     href: '/dashboard/settings',
     icon: CogIcon,
     current: false,
-    children: [
-      { name: 'Profile', href: '/dashboard/profile' },
-      { name: 'Preferences', href: '/dashboard/settings/preferences' },
-    ],
+    section: 'Account',
   },
 ];
 
@@ -571,6 +523,35 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
     setAskMilitary(false);
     await fetch('/api/platform/military', { method: 'POST' }).catch(() => {});
   };
+
+  // Account footer: who am I, which persona is active, and a real sign-out.
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+  const [persona, setPersona] = useState<string | null>(null);
+  useEffect(() => {
+    let on = true;
+    getSupabaseClient()
+      ?.auth.getUser()
+      .then(({ data }) => {
+        if (on) setEmail(data.user?.email ?? null);
+      })
+      .catch(() => {});
+    fetch('/api/onboarding/active-persona')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (on) setPersona(d?.persona?.display_name ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, []);
+  const signOut = async () => {
+    await getSupabaseClient()
+      ?.auth.signOut()
+      .catch(() => {});
+    router.push('/auth?mode=signin');
+  };
   const dropdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const parentSection = getParentSection(pathname);
@@ -618,7 +599,7 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
     const newExpandedSections: Record<string, boolean> = {};
 
     navigation.forEach((item) => {
-      if (item.children) {
+      if ((item as any).children) {
         // Check if the pathname matches this section or any child
         const isActive = pathname.startsWith(item.href);
         if (isActive) {
@@ -682,13 +663,13 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
       {/* Sidebar */}
       <div
         className={classNames(
-          'fixed lg:sticky lg:top-0 top-0 left-0 z-30 h-screen transform transition-all duration-300 ease-in-out bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0 overflow-y-auto overflow-x-hidden',
+          'fixed lg:sticky lg:top-0 top-0 left-0 z-30 h-screen transform transition-all duration-300 ease-in-out bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex-shrink-0 flex flex-col overflow-x-hidden',
           isOpen || !isMobile ? 'translate-x-0' : '-translate-x-full',
           isCollapsed && !isMobile ? 'w-16' : 'w-64'
         )}
       >
         {/* Logo and collapse button */}
-        <div className="flex h-16 items-center px-4 border-b border-gray-200 dark:border-gray-700 justify-between">
+        <div className="flex h-16 shrink-0 items-center px-4 border-b border-gray-200 dark:border-gray-700 justify-between">
           <Link
             href="/dashboard"
             className={classNames(
@@ -724,7 +705,12 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
         </div>
 
         {/* Navigation */}
-        <nav className={classNames('py-4', isCollapsed && !isMobile ? 'px-1' : 'px-2')}>
+        <nav
+          className={classNames(
+            'flex-1 min-h-0 overflow-y-auto py-4',
+            isCollapsed && !isMobile ? 'px-1' : 'px-2'
+          )}
+        >
           {askMilitary && (!effectiveCollapsed || isMobile) && (
             <div className="mb-3 mx-1 rounded-lg border border-indigo-200 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-800 p-3">
               <p className="text-xs text-gray-700 dark:text-gray-200">
@@ -811,7 +797,7 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
                           'flex items-center flex-grow rounded-md group',
                           isCollapsed && !isMobile ? 'justify-center p-2' : 'px-3 py-2'
                         )}
-                        onClick={() => isMobile && !item.children && setIsOpen(false)}
+                        onClick={() => isMobile && !(item as any).children && setIsOpen(false)}
                         title={isCollapsed && !isMobile ? item.name : undefined}
                       >
                         <item.icon
@@ -849,25 +835,27 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
                     )}
 
                     {/* Dropdown toggle button - only show when not collapsed or on mobile */}
-                    {item.children && !isComingSoon && (!effectiveCollapsed || isMobile) && (
-                      <button
-                        onClick={() => toggleSection(item.name)}
-                        className="p-1 rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 focus:outline-none"
-                      >
-                        <ChevronIcon
-                          className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                        />
-                      </button>
-                    )}
+                    {(item as any).children &&
+                      !isComingSoon &&
+                      (!effectiveCollapsed || isMobile) && (
+                        <button
+                          onClick={() => toggleSection(item.name)}
+                          className="p-1 rounded-md text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 focus:outline-none"
+                        >
+                          <ChevronIcon
+                            className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                          />
+                        </button>
+                      )}
                   </div>
 
                   {/* Child items - only show when section is expanded and not collapsed or on mobile */}
-                  {item.children &&
+                  {(item as any).children &&
                     !isComingSoon &&
                     isExpanded &&
                     (!effectiveCollapsed || isMobile) && (
                       <div className="ml-8 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-2">
-                        {item.children.map((child) => {
+                        {(item as any).children.map((child) => {
                           const isChildActive = pathname === child.href;
                           return (
                             <Link
@@ -1010,28 +998,60 @@ export default function Sidebar({ collapsed: forceCollapsed = false }: SidebarPr
           })}
         </nav>
 
-        {/* Bottom section - only show when not collapsed or on mobile */}
-        {(!effectiveCollapsed || isMobile) && (
-          <div className="absolute bottom-0 left-0 right-0 p-4">
-            <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-3">
-              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                Premium Desktop
-              </h3>
-              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                Access advanced features in our desktop app
-              </p>
-              <a
-                href="https://nexlevel-intelligence.com/download"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+        {/* Account footer — who you are, which persona is active, the environment, and sign-out.
+            Pinned at the bottom of the flex column (shrink-0), always visible, never overlapping nav. */}
+        <div className="shrink-0 border-t border-gray-200 dark:border-gray-700">
+          {!effectiveCollapsed || isMobile ? (
+            <div className="p-3 text-xs">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Signed in as
+              </div>
+              <div
+                className="truncate font-medium text-gray-900 dark:text-gray-100"
+                title={email || ''}
               >
-                Download now
-                <ArrowRightIcon className="ml-1 h-3 w-3" />
-              </a>
+                {email || '—'}
+              </div>
+              <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Active persona
+              </div>
+              <div className="truncate text-gray-700 dark:text-gray-300">
+                {persona || 'None selected'}
+              </div>
+              <div className="mt-2 flex items-center gap-1.5">
+                <span className="inline-flex items-center rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                  Beta Sandbox
+                </span>
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <Link
+                  href="/dashboard/profile"
+                  onClick={() => isMobile && setIsOpen(false)}
+                  className="flex-1 rounded-md border border-gray-300 px-2 py-1.5 text-center font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
+                >
+                  Profile
+                </Link>
+                <button
+                  onClick={signOut}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-md bg-gray-900 px-2 py-1.5 font-medium text-white hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600"
+                >
+                  <LogoutIcon className="h-3.5 w-3.5" />
+                  Sign out
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            // Collapsed rail: just a sign-out icon so the action is never lost.
+            <button
+              onClick={signOut}
+              title="Sign out"
+              aria-label="Sign out"
+              className="flex w-full items-center justify-center p-3 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              <LogoutIcon className="h-5 w-5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Mobile toggle button */}
