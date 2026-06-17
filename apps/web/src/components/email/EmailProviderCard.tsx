@@ -24,6 +24,8 @@ interface EmailProviderCardProps {
   busy?: boolean;
   onConnect: (provider: EmailProviderId) => void;
   onDisconnect: (provider: EmailProviderId) => void;
+  /** Pilot: email connect is deferred (Gmail is a restricted Google scope pending verification). */
+  comingSoon?: boolean;
 }
 
 export function EmailProviderCard({
@@ -31,6 +33,7 @@ export function EmailProviderCard({
   busy,
   onConnect,
   onDisconnect,
+  comingSoon = false,
 }: EmailProviderCardProps) {
   const meta = PROVIDER_META[status.provider];
 
@@ -47,7 +50,14 @@ export function EmailProviderCard({
           </div>
         </div>
 
-        {status.connected ? (
+        {comingSoon ? (
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-1 text-xs font-medium text-teal-700 dark:bg-teal-900/30 dark:text-teal-300"
+            data-testid={`email-status-comingsoon-${status.provider}`}
+          >
+            Coming soon
+          </span>
+        ) : status.connected ? (
           <span
             className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800 dark:bg-green-900/40 dark:text-green-300"
             data-testid={`email-status-connected-${status.provider}`}
@@ -71,7 +81,14 @@ export function EmailProviderCard({
         </p>
       )}
 
-      {!status.oauthConfigured && !status.connected && (
+      {comingSoon && (
+        <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+          {meta.name} inbox context is coming soon — we&rsquo;re completing Google&rsquo;s security
+          review for email access. Calendar is available now.
+        </p>
+      )}
+
+      {!comingSoon && !status.oauthConfigured && !status.connected && (
         <p className="mt-3 flex items-start gap-1.5 text-xs text-amber-700 dark:text-amber-400">
           <ExclamationTriangleIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
           Connection is not available yet &mdash; {meta.sub} sign-in is being provisioned.
@@ -79,7 +96,16 @@ export function EmailProviderCard({
       )}
 
       <div className="mt-4">
-        {status.connected ? (
+        {comingSoon ? (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled
+            data-testid={`email-comingsoon-${status.provider}`}
+          >
+            Coming soon
+          </Button>
+        ) : status.connected ? (
           <Button
             variant="outline"
             size="sm"
