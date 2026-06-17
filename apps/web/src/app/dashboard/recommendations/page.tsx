@@ -13,6 +13,8 @@ import {
   ShieldCheck,
   Gauge,
   FileWarning,
+  Trophy,
+  TrendingUp,
 } from 'lucide-react';
 
 interface Formula {
@@ -250,23 +252,53 @@ function Explainability({ a }: { a: Action }) {
   );
 }
 
+// Pull every "estimated impact" datapoint we already compute into short, human chips.
+function impactChips(a: Action): string[] {
+  const qi = a.quantified_impact || {};
+  const bits: string[] = [];
+  if (qi.financial_impact_annual)
+    bits.push(`+$${Number(qi.financial_impact_annual).toLocaleString()}/yr`);
+  if (qi.readiness_before != null && qi.readiness_after != null)
+    bits.push(`readiness ${qi.readiness_before} → ${qi.readiness_after}`);
+  if (qi.coverage_gap) bits.push(`coverage gap $${Number(qi.coverage_gap).toLocaleString()}`);
+  if (qi.estimated_value) bits.push(String(qi.estimated_value));
+  if (a.expected_benefit) bits.push(a.expected_benefit);
+  return bits;
+}
+
 function Card({
   a,
   lead,
+  whyNumberOne,
   onAct,
   busy,
 }: {
   a: Action;
   lead?: boolean;
+  whyNumberOne?: string;
   onAct: (id: string, s: string) => void;
   busy: string;
 }) {
   const qi = a.quantified_impact || {};
   const [open, setOpen] = useState(false);
+  const chips = impactChips(a);
+  const evidenceCount = (a.evidence || []).filter(
+    (e) => e && (e.statement || e.source_table)
+  ).length;
   return (
     <div
       className={`bg-white rounded-xl border p-5 ${lead ? 'border-indigo-300 shadow-md' : 'border-gray-100 shadow-sm'}`}
     >
+      {/* Why this is #1 — surfaces the already-computed ranking rationale (why_ranking.why_number_one,
+          delivered as roadmap.why_now). Only on the lead card; honest empty otherwise. */}
+      {lead && whyNumberOne && (
+        <div className="mb-3 flex items-start gap-1.5 rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
+          <Trophy className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
+          <span>
+            <b>Why this is #1:</b> {whyNumberOne}
+          </span>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <span
           className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${TYPE[a.rec_type] ?? TYPE.INFORMATION}`}
@@ -293,18 +325,26 @@ function Card({
           <b>Do:</b> {a.recommended_action}
         </p>
       )}
-      {(qi.financial_impact_annual || qi.readiness_after) && (
-        <p className="text-sm text-emerald-700 mt-1">
-          {qi.financial_impact_annual
-            ? `+$${Number(qi.financial_impact_annual).toLocaleString()}/yr`
-            : ''}
-          {qi.readiness_before && qi.readiness_after
-            ? `  ·  readiness ${qi.readiness_before} → ${qi.readiness_after}`
-            : ''}
-        </p>
+      {/* Estimated impact — every quantified_impact / expected_benefit datapoint we already compute,
+          shown up front (was previously dropped or buried in the drawer). */}
+      {chips.length > 0 && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
+          {chips.map((c, i) => (
+            <span
+              key={i}
+              className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
+            >
+              {c}
+            </span>
+          ))}
+        </div>
       )}
       <div className="mt-2 text-xs text-gray-400">
         {a.source_module} · confidence {Math.round((a.confidence ?? 0) * 100)}%
+        {evidenceCount
+          ? ` · ${evidenceCount} supporting datapoint${evidenceCount > 1 ? 's' : ''}`
+          : ''}
         {a.merged_from?.length ? ` · merged ${a.merged_from.length} related finding(s)` : ''}
         {a.formula
           ? ` · priority ${a.formula.priority_score} = I${a.formula.impact}×C${a.formula.confidence}×U${a.formula.urgency}×E${a.formula.evidence_strength}÷${a.formula.effort}`
@@ -316,7 +356,7 @@ function Card({
         className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800"
       >
         <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
-        {open ? 'Hide' : 'Why & evidence'}
+        {open ? 'Hide' : 'Why, impact & evidence'}
       </button>
       {open && <Explainability a={a} />}
       <div className="mt-3 flex gap-2 flex-wrap">
@@ -408,11 +448,10 @@ export default function RecommendationsPage() {
                 <span className="text-xs font-bold uppercase tracking-wide text-indigo-600">
                   Now
                 </span>
-                {d.why_now && <span className="text-xs text-gray-400">— {d.why_now}</span>}
               </div>
               <div className="space-y-3">
                 {d.now.map((a) => (
-                  <Card key={a.id} a={a} lead onAct={onAct} busy={busy} />
+                  <Card key={a.id} a={a} lead whyNumberOne={d.why_now} onAct={onAct} busy={busy} />
                 ))}
               </div>
             </section>

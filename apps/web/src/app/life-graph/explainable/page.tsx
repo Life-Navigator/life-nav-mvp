@@ -10,6 +10,7 @@ import {
 } from '@/features/life-graph/components/LifeGraphCanvas';
 import { NodeDetailsPanel } from '@/features/life-graph/components/NodeDetailsPanel';
 import { GraphSidebar } from '@/features/life-graph/components/GraphSidebar';
+import { GraphStoryHeader } from '@/features/life-graph/components/GraphStoryHeader';
 import { GraphAnalyticsStrip } from '@/features/life-graph/components/GraphAnalyticsStrip';
 import { GraphBreadcrumbs, type Crumb } from '@/features/life-graph/components/GraphBreadcrumbs';
 
@@ -135,6 +136,8 @@ export default function LifeGraphExplainablePage() {
             </div>
           </header>
 
+          {hasGraph && <GraphStoryHeader workspace={workspace!} />}
+
           {hasGraph && (
             <GraphAnalyticsStrip
               workspace={workspace!}
@@ -161,11 +164,18 @@ export default function LifeGraphExplainablePage() {
             {workspace && workspace.nodes.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="max-w-md rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
-                  <div className="text-lg font-semibold">No life graph built yet</div>
+                  <div className="text-lg font-semibold">Your life graph is still forming</div>
                   <p className="mt-2 text-sm text-slate-400">
-                    Add goals, documents, accounts, or recommendations to build your explainable
-                    life model.
+                    As you talk to your advisor and connect your accounts, documents, and goals,
+                    your real life model — and every cited connection between things — appears here.
+                    Nothing here is ever fabricated.
                   </p>
+                  <a
+                    href="/dashboard/advisor"
+                    className="mt-4 inline-flex items-center justify-center rounded-lg bg-indigo-500/90 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-500"
+                  >
+                    Talk to your advisor
+                  </a>
                 </div>
               </div>
             )}

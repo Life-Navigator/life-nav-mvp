@@ -430,7 +430,9 @@ const navigation = [
   { name: 'Home', href: '/dashboard', icon: HomeIcon, current: false, section: 'Core' },
   { name: 'My Life', href: '/dashboard/my-life', icon: CompassIcon, current: false },
   { name: 'Advisor', href: '/dashboard/advisor', icon: ChatIcon, current: false },
-  { name: 'Life Graph', href: '/life-graph', icon: PuzzlePieceIcon, current: false },
+  // Primary Life Graph entry = the explainable, provenance-first graph (real edges + citations + XAI).
+  // The older /life-graph page stays reachable by direct URL but is no longer the primary nav target.
+  { name: 'Life Graph', href: '/life-graph/explainable', icon: PuzzlePieceIcon, current: false },
   // ── Domains ──
   {
     name: 'Finance',

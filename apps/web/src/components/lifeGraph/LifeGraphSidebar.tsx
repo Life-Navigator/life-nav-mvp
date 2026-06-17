@@ -48,7 +48,7 @@ const GROUPS: {
   {
     title: 'Knowledge',
     items: [
-      { label: 'Life Graph', href: '/life-graph', icon: Network },
+      { label: 'Life Graph', href: '/life-graph/explainable', icon: Network },
       { label: 'Documents', href: '/dashboard/documents', icon: FolderOpen },
       { label: 'Data Sources', href: '/dashboard/documents', icon: Database },
     ],

@@ -8,6 +8,7 @@
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import AddDataModal from '@/components/dashboard/AddDataModal';
+import DiscoveryReveal from '@/components/onboarding/DiscoveryReveal';
 import StreamingText from '@/components/ui/StreamingText';
 import ArcanaStatus from '@/components/ui/ArcanaStatus';
 import {
@@ -199,9 +200,11 @@ export default function AdvisorPage() {
     } catch {
       /* best-effort; still navigate so the user is never trapped */
     }
-    // P0.7: an intentional handoff (Life Model summary) before the dashboard — not an abrupt jump.
+    // P0.7 + Pilot Polish: an intentional handoff before the dashboard — not an abrupt jump. We show
+    // the full "Arcana's Understanding Of Your Life" reveal (DiscoveryReveal), and navigation is
+    // driven by that reveal's onContinue (explicit CTA or its own safety auto-advance), so the user
+    // reaches the dashboard deliberately and is never trapped.
     setTransitioning(true);
-    setTimeout(() => router.push('/dashboard'), 3200);
   };
 
   // Skip-policy hardening: a skip is never a one-click bypass — it opens a warning, and the recorded
@@ -404,47 +407,13 @@ export default function AdvisorPage() {
     if (el && (showConfirmation || showFinalQuestion)) el.scrollTop = el.scrollHeight;
   }, [showConfirmation, showFinalQuestion]);
 
-  // P0.7: intentional transition into the dashboard.
+  // P0.7 + Pilot Polish: the intentional handoff into the dashboard is the full End-of-Discovery
+  // Reveal — "Arcana's Understanding Of Your Life" — sourced from the canonical /api/life/my-life
+  // (life_brief + what_matters_most + narrative_explanation). It handles its own honest empty state
+  // (life_brief.ready=false) and drives navigation via onContinue (explicit CTA or safety
+  // auto-advance), so the user is never trapped on the reveal.
   if (transitioning) {
-    const priorities = [panel.primary_objective, ...(panel.top_themes || [])]
-      .filter(Boolean)
-      .slice(0, 3) as string[];
-    const risks = (panel.top_risks || []).slice(0, 3);
-    const opps = (panel.top_opportunities || []).slice(0, 3);
-    const Col = ({ title, items, dot }: { title: string; items: string[]; dot: string }) => (
-      <div className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-600">
-          {title}
-        </div>
-        {items.length ? (
-          <ul className="space-y-1 text-sm text-gray-700">
-            {items.map((x, i) => (
-              <li key={i} className="flex gap-2">
-                <span className={dot}>•</span>
-                {x}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-gray-600">Builds as you add more.</p>
-        )}
-      </div>
-    );
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600 mb-4" />
-        <h2 className="text-2xl font-bold text-gray-900">Your Life Model is ready.</h2>
-        <p className="text-gray-500 mt-1">
-          Here&apos;s what matters most — your dashboard reflects it.
-        </p>
-        <div className="mt-6 grid w-full max-w-3xl gap-4 text-left sm:grid-cols-3">
-          <Col title="Top priorities" items={priorities} dot="text-indigo-500" />
-          <Col title="Top risks" items={risks} dot="text-red-500" />
-          <Col title="Top opportunities" items={opps} dot="text-emerald-500" />
-        </div>
-        <p className="mt-5 text-sm text-gray-600">Taking you to your dashboard…</p>
-      </div>
-    );
+    return <DiscoveryReveal onContinue={() => router.push('/dashboard')} />;
   }
 
   return (
