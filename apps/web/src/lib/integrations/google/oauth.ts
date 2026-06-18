@@ -101,9 +101,9 @@ export const GOOGLE_SCOPES = {
 // Scope bundles for common use cases
 export const SCOPE_BUNDLES = {
   basic: [GOOGLE_SCOPES.profile, GOOGLE_SCOPES.email, GOOGLE_SCOPES.openid],
-  calendar: [GOOGLE_SCOPES.calendarEvents, GOOGLE_SCOPES.calendarReadonly],
+  calendar: [GOOGLE_SCOPES.calendarReadonly], // pilot: READ-ONLY (use calendarFull for write)
   calendarFull: [GOOGLE_SCOPES.calendar],
-  gmail: [GOOGLE_SCOPES.gmailReadonly, GOOGLE_SCOPES.gmailSend],
+  gmail: [GOOGLE_SCOPES.gmailReadonly], // read-only (deferred for pilot; gmailSend dropped)
   gmailFull: [GOOGLE_SCOPES.gmail],
   drive: [GOOGLE_SCOPES.driveFile, GOOGLE_SCOPES.driveMetadataReadonly],
   driveFull: [GOOGLE_SCOPES.drive, GOOGLE_SCOPES.driveActivity],

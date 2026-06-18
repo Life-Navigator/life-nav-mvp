@@ -4,9 +4,10 @@ import { cookies } from 'next/headers';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 
 const MICROSOFT_SCOPES = {
-  basic: ['openid', 'profile', 'email', 'offline_access'],
-  calendar: ['Calendars.Read', 'Calendars.ReadWrite'],
-  mail: ['Mail.Read', 'Mail.Send'],
+  basic: ['openid', 'profile', 'email', 'offline_access', 'User.Read'],
+  // Pilot: READ-ONLY calendar only. Write (Calendars.ReadWrite) + mail are deferred.
+  calendar: ['Calendars.Read'],
+  mail: ['Mail.Read'],
 } as const;
 
 type ScopeBundleKey = keyof typeof MICROSOFT_SCOPES;
