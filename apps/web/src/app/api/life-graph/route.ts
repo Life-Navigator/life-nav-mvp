@@ -56,11 +56,14 @@ export async function GET() {
       : Array.isArray(roadmap)
         ? roadmap
         : [];
+  // /v1/life/my-life returns life_readiness as an OBJECT {overall,status,domains} — read .overall.
+  // (Prior code checked myLife.readiness.overall + a scalar life_readiness, neither of which matches,
+  // silently degrading the center-node readiness to graph-integrity/null.)
   const readiness =
-    typeof myLife?.readiness?.overall === 'number'
-      ? Math.round(myLife.readiness.overall)
-      : typeof myLife?.life_readiness === 'number'
-        ? Math.round(myLife.life_readiness)
+    typeof myLife?.life_readiness?.overall === 'number'
+      ? Math.round(myLife.life_readiness.overall)
+      : typeof myLife?.readiness?.overall === 'number'
+        ? Math.round(myLife.readiness.overall)
         : typeof graph?.graph_integrity?.score === 'number'
           ? Math.round(graph.graph_integrity.score)
           : null;

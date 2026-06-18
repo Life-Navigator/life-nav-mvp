@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const bundlesParam = searchParams.get('bundles') || 'basic,calendar,mail';
   const bundles = bundlesParam.split(',').map((b) => b.trim()) as ScopeBundleKey[];
-  const redirect = searchParams.get('redirect') || '/settings/integrations';
+  const redirect = searchParams.get('redirect') || '/dashboard/integrations';
 
   const scopeSet = new Set<string>();
   for (const bundle of bundles) {
@@ -75,10 +75,11 @@ export async function GET(request: NextRequest) {
   try {
     const authUrl = getMicrosoftAuthUrl(Array.from(scopeSet), state);
     return NextResponse.redirect(authUrl);
-  } catch (error) {
-    return NextResponse.json(
-      { error: (error as Error).message || 'Microsoft OAuth not configured' },
-      { status: 503 }
+  } catch {
+    // Creds not provisioned yet — this GET is navigated to directly, so degrade to an honest redirect
+    // (never a raw 503 JSON page). Lands on the real integrations hub with a clear message.
+    return NextResponse.redirect(
+      new URL('/dashboard/integrations?error=oauth_not_configured&provider=microsoft', request.url)
     );
   }
 }

@@ -13,6 +13,13 @@ interface NBA {
   cta_label: string;
   href: string;
   step: string;
+  // Richer fields forwarded from the Recommendation OS top action (present only when the
+  // dashboard's next-best-action comes from the spine). Rendered honestly — omit when absent.
+  recommended_action?: string;
+  expected_benefit?: string;
+  quantified_impact?: Record<string, unknown>;
+  confidence?: number;
+  why_number_one?: string;
 }
 interface Gap {
   domain: string;
@@ -59,6 +66,21 @@ const JOURNEY: [keyof Dash['journey'], string][] = [
 
 const CLARITY =
   'LifeNavigator turns your documents, goals, and life data into evidence-backed decisions, prioritized actions, and advisor-ready reports.';
+
+// Format the OS quantified_impact the same way the sample preview does — annual $ impact and the
+// retirement-success lift — but only the keys actually present (never fabricate a number).
+function formatImpact(qi?: Record<string, unknown>): string {
+  if (!qi) return '';
+  const q = qi as Record<string, number>;
+  const parts: string[] = [];
+  if (q.financial_impact_annual)
+    parts.push(`+$${Number(q.financial_impact_annual).toLocaleString()}/yr`);
+  if (q.retirement_success_before_pct && q.retirement_success_after_pct)
+    parts.push(
+      `retirement success ${q.retirement_success_before_pct}% → ${q.retirement_success_after_pct}%`
+    );
+  return parts.join(', ');
+}
 
 interface Sample {
   label: string;
@@ -194,10 +216,42 @@ export default function MissionControl() {
               Your next best move
             </div>
             <div className="text-lg font-bold text-gray-900 mt-1">{d.next_best_action.title}</div>
-            <div className="text-sm text-gray-600 mt-1">{d.next_best_action.why}</div>
+            <div className="text-sm text-gray-600 mt-1">
+              {d.next_best_action.recommended_action || d.next_best_action.why}
+            </div>
+
+            {/* Quantified impact + expected benefit — only what the OS actually returned */}
+            {(() => {
+              const impact = formatImpact(d.next_best_action.quantified_impact);
+              const benefit = d.next_best_action.expected_benefit;
+              if (!impact && !benefit) return null;
+              return (
+                <div className="mt-2 text-sm font-semibold text-emerald-700">
+                  {impact || benefit}
+                </div>
+              );
+            })()}
+
+            {/* Why this is #1 + confidence — the ranking transparency the spine computes */}
+            {(d.next_best_action.why_number_one ||
+              typeof d.next_best_action.confidence === 'number') && (
+              <div className="mt-2 flex flex-col gap-1">
+                {d.next_best_action.why_number_one && (
+                  <div className="text-xs text-gray-500">
+                    <b className="text-indigo-600">Why this is #1:</b>{' '}
+                    {d.next_best_action.why_number_one}
+                  </div>
+                )}
+                {typeof d.next_best_action.confidence === 'number' && (
+                  <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+                    Confidence {Math.round(d.next_best_action.confidence * 100)}%
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <Link
-            href={d.next_best_action.href}
+            href={d.next_best_action.href || '/dashboard/recommendations'}
             className="mt-3 inline-flex w-fit items-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
           >
             {d.next_best_action.cta_label} →

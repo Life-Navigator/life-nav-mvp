@@ -225,8 +225,13 @@ class UniversalReportEngine:
                 bits = []
                 if qi.get("financial_impact_annual"):
                     bits.append(f"+${float(qi['financial_impact_annual']):,.0f}/yr")
-                if qi.get("readiness_before") is not None and qi.get("readiness_after") is not None:
-                    bits.append(f"readiness {qi['readiness_before']} → {qi['readiness_after']}")
+                # The OS writes before/after as *_before_pct/*_after_pct (retirement_success, protection_adequacy),
+                # not readiness_before/after — read the real keys so the strongest computed outcome shows.
+                for metric, label in (("retirement_success", "retirement success"),
+                                      ("protection_adequacy", "protection")):
+                    b, af = qi.get(f"{metric}_before_pct"), qi.get(f"{metric}_after_pct")
+                    if b is not None and af is not None:
+                        bits.append(f"{label} {b}% → {af}%")
                 if a.get("expected_benefit"):
                     bits.append(str(a["expected_benefit"]))
                 recs.append({

@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   const additionalScopes = searchParams.get('scopes')?.split(',') || [];
 
   // Get optional redirect after OAuth completes
-  const redirect = searchParams.get('redirect') || '/settings/integrations';
+  const redirect = searchParams.get('redirect') || '/dashboard/integrations';
 
   // Build scope list from bundles
   const scopeSet = new Set<string>();
@@ -86,7 +86,11 @@ export async function GET(request: NextRequest) {
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
-    return NextResponse.json({ error: 'Google OAuth not configured' }, { status: 503 });
+    // This GET is navigated to directly (full-page) by the Connect button — degrade to an honest
+    // redirect, never a raw 503 JSON page. Lands on the real integrations hub with a clear message.
+    return NextResponse.redirect(
+      new URL('/dashboard/integrations?error=oauth_not_configured&provider=google', request.url)
+    );
   }
 
   const oauthService = new GoogleOAuthService(clientId, clientSecret);
@@ -111,7 +115,7 @@ export async function POST(request: NextRequest) {
 
   // Alternative POST method for programmatic initiation
   const body = await request.json();
-  const { bundles = ['basic'], scopes = [], redirect = '/settings/integrations' } = body;
+  const { bundles = ['basic'], scopes = [], redirect = '/dashboard/integrations' } = body;
 
   // Build scope list from bundles
   const scopeSet = new Set<string>();

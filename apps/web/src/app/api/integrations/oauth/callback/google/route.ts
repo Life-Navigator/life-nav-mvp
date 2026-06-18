@@ -42,7 +42,7 @@ function parseRedirectPath(state: string): string {
   } catch {
     // keep default
   }
-  return '/settings/integrations';
+  return '/dashboard/integrations';
 }
 
 export async function GET(request: NextRequest) {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
   if (error) {
     return NextResponse.redirect(
       new URL(
-        `/settings/integrations?error=${encodeURIComponent(error)}&message=${encodeURIComponent(errorDescription || 'OAuth authorization failed')}`,
+        `/dashboard/integrations?error=${encodeURIComponent(error)}&message=${encodeURIComponent(errorDescription || 'OAuth authorization failed')}`,
         request.url
       )
     );
@@ -64,7 +64,9 @@ export async function GET(request: NextRequest) {
 
   // Validate required parameters
   if (!code) {
-    return NextResponse.redirect(new URL('/settings/integrations?error=missing_code', request.url));
+    return NextResponse.redirect(
+      new URL('/dashboard/integrations?error=missing_code', request.url)
+    );
   }
 
   // Validate state parameter (CSRF protection)
@@ -72,14 +74,14 @@ export async function GET(request: NextRequest) {
   const storedState = cookieStore.get('google_oauth_state')?.value;
   if (!state || state !== storedState) {
     return NextResponse.redirect(
-      new URL('/settings/integrations?error=invalid_state', request.url)
+      new URL('/dashboard/integrations?error=invalid_state', request.url)
     );
   }
 
   // Identify the user from the Supabase session (same as the Microsoft path).
   const userId = await getUserIdFromJWT(request);
   if (!userId) {
-    return NextResponse.redirect(new URL('/login?redirect=/settings/integrations', request.url));
+    return NextResponse.redirect(new URL('/login?redirect=/dashboard/integrations', request.url));
   }
 
   const encryptionKey = process.env.INTEGRATION_ENCRYPTION_KEY;
@@ -89,7 +91,7 @@ export async function GET(request: NextRequest) {
   // Honest disabled state when OAuth / crypto isn't configured.
   if (!clientId || !clientSecret || !encryptionKey) {
     return NextResponse.redirect(
-      new URL('/settings/integrations?error=oauth_not_configured', request.url)
+      new URL('/dashboard/integrations?error=oauth_not_configured', request.url)
     );
   }
 
@@ -171,7 +173,7 @@ export async function GET(request: NextRequest) {
     // Never leak the internal error message into the redirect URL — it can
     // contain provider tokens, SDK details, or other internals.
     return NextResponse.redirect(
-      new URL('/settings/integrations?error=exchange_failed', request.url)
+      new URL('/dashboard/integrations?error=exchange_failed', request.url)
     );
   }
 }

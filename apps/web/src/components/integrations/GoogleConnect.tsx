@@ -82,9 +82,7 @@ export function GoogleConnect({
   onConnect,
   onDisconnect,
 }: GoogleConnectProps) {
-  const [selectedServices, setSelectedServices] = useState<Set<ServiceBundle>>(
-    new Set(['basic'])
-  );
+  const [selectedServices, setSelectedServices] = useState<Set<ServiceBundle>>(new Set(['basic']));
   const [loading, setLoading] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
 
@@ -107,7 +105,7 @@ export function GoogleConnect({
       // Build URL with selected bundles
       const bundles = Array.from(selectedServices).join(',');
       const response = await fetch(
-        `/api/integrations/oauth/google?bundles=${bundles}&redirect=/settings/integrations`,
+        `/api/integrations/oauth/google?bundles=${bundles}&redirect=/dashboard/integrations`,
         { method: 'GET', redirect: 'manual' }
       );
 
@@ -119,7 +117,7 @@ export function GoogleConnect({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             bundles: Array.from(selectedServices),
-            redirect: '/settings/integrations',
+            redirect: '/dashboard/integrations',
           }),
         });
 
@@ -129,7 +127,7 @@ export function GoogleConnect({
         }
       } else {
         // Direct redirect for GET
-        window.location.href = `/api/integrations/oauth/google?bundles=${bundles}&redirect=/settings/integrations`;
+        window.location.href = `/api/integrations/oauth/google?bundles=${bundles}&redirect=/dashboard/integrations`;
       }
     } catch (err) {
       console.error('Failed to initiate OAuth:', err);
@@ -182,12 +180,8 @@ export function GoogleConnect({
               </svg>
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900 dark:text-white">
-                Google Connected
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {connectedEmail}
-              </p>
+              <h3 className="font-semibold text-gray-900 dark:text-white">Google Connected</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">{connectedEmail}</p>
             </div>
           </div>
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
@@ -255,9 +249,7 @@ export function GoogleConnect({
           </svg>
         </div>
         <div>
-          <h3 className="font-semibold text-gray-900 dark:text-white">
-            Connect Google Account
-          </h3>
+          <h3 className="font-semibold text-gray-900 dark:text-white">Connect Google Account</h3>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Select which Google services to connect
           </p>
@@ -284,12 +276,7 @@ export function GoogleConnect({
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-500'
                 }`}
               >
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"

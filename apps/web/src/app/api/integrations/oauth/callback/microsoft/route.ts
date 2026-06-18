@@ -31,27 +31,29 @@ export async function GET(request: NextRequest) {
   if (error) {
     return NextResponse.redirect(
       new URL(
-        `/settings/integrations?error=${encodeURIComponent(error)}&message=${encodeURIComponent(errorDescription || 'OAuth authorization failed')}`,
+        `/dashboard/integrations?error=${encodeURIComponent(error)}&message=${encodeURIComponent(errorDescription || 'OAuth authorization failed')}`,
         request.url
       )
     );
   }
 
   if (!code) {
-    return NextResponse.redirect(new URL('/settings/integrations?error=missing_code', request.url));
+    return NextResponse.redirect(
+      new URL('/dashboard/integrations?error=missing_code', request.url)
+    );
   }
 
   const cookieStore = await cookies();
   const storedState = cookieStore.get('microsoft_oauth_state')?.value;
   if (!state || state !== storedState) {
     return NextResponse.redirect(
-      new URL('/settings/integrations?error=invalid_state', request.url)
+      new URL('/dashboard/integrations?error=invalid_state', request.url)
     );
   }
 
   const userId = await getUserIdFromJWT(request);
   if (!userId) {
-    return NextResponse.redirect(new URL('/login?redirect=/settings/integrations', request.url));
+    return NextResponse.redirect(new URL('/login?redirect=/dashboard/integrations', request.url));
   }
 
   const clientId = process.env.MICROSOFT_CLIENT_ID;
@@ -65,7 +67,7 @@ export async function GET(request: NextRequest) {
 
   if (!clientId || !clientSecret || !encryptionKey) {
     return NextResponse.redirect(
-      new URL('/settings/integrations?error=oauth_not_configured', request.url)
+      new URL('/dashboard/integrations?error=oauth_not_configured', request.url)
     );
   }
 
@@ -147,7 +149,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    let redirectPath = '/settings/integrations';
+    let redirectPath = '/dashboard/integrations';
     try {
       const stateData = JSON.parse(Buffer.from(state.split('.')[0], 'base64url').toString('utf8'));
       if (stateData?.redirect) {
@@ -172,7 +174,7 @@ export async function GET(request: NextRequest) {
       context: { route: 'oauth/callback/microsoft' },
     });
     return NextResponse.redirect(
-      new URL(`/settings/integrations?error=exchange_failed`, request.url)
+      new URL(`/dashboard/integrations?error=exchange_failed`, request.url)
     );
   }
 }

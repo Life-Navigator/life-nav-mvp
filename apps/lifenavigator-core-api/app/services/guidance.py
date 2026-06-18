@@ -74,8 +74,18 @@ class GuidanceEngine:
                 if pri.get("top_actions"):
                     ta = pri["top_actions"][0]
                     next_action = {"title": ta["title"], "why": ta.get("why") or "", "cta_label": "Review",
-                                   "href": "/dashboard/readiness", "step": "recommendation",
+                                   "href": "/dashboard/recommendations", "step": "recommendation",
                                    "source": "recommendation_os", "recommendation_id": ta["id"]}
+                    # Forward the richer fields the OS already computed (no fabrication — only what
+                    # prioritize() returns), so the dashboard hero is as rich as the recommendation
+                    # spine. Backward-compatible: only add keys, never rename existing ones.
+                    for key in ("recommended_action", "expected_benefit", "quantified_impact", "confidence"):
+                        val = ta.get(key)
+                        if val not in (None, "", {}, []):
+                            next_action[key] = val
+                    why_one = (pri.get("why_ranking") or {}).get("why_number_one")
+                    if why_one:
+                        next_action["why_number_one"] = why_one
             except Exception:  # noqa: BLE001 — never break the dashboard
                 pass
         return {

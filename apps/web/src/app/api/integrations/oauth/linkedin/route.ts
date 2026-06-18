@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'LinkedIn not configured' }, { status: 503 });
   }
 
-  const redirect = request.nextUrl.searchParams.get('redirect') || '/settings/integrations';
+  const redirect = request.nextUrl.searchParams.get('redirect') || '/dashboard/integrations';
   const statePayload = Buffer.from(JSON.stringify({ redirect })).toString('base64url');
   const nonce = generateOAuthState();
   const state = `${statePayload}.${nonce}`;
