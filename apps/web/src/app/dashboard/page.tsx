@@ -1,7 +1,9 @@
 import DashboardClient from '@/components/dashboard/DashboardClient';
 import ExecutiveSummary from '@/components/dashboard/ExecutiveSummary';
 import LifeBrief from '@/components/dashboard/LifeBrief';
-import LifeIntelligence from '@/components/dashboard/LifeIntelligence';
+// NOTE: LifeIntelligence is intentionally NOT rendered on the dashboard (pilot UX cleanup) — it is
+// pure internal reasoning (primary/competing objectives + confidence%). The component file is kept so
+// it can live behind "My Life" later. Do not re-add the import here without that decision.
 import MissionControl from '@/components/dashboard/MissionControl';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import type { FirstInsight } from '@/lib/finance/first-insight';
@@ -61,29 +63,35 @@ export default async function DashboardPage() {
     // Never block the dashboard on the insight; it degrades to null.
   }
 
+  // Dashboard order (pilot UX cleanup), top → bottom:
+  //   1. DashboardClient — the operational overview (Welcome · domain Overviews · Alerts · Goals ·
+  //      Quick Actions). The FIRST thing the user sees.
+  //   2. LifeBrief — compact narrative card (collapsible).
+  //   3. ExecutiveSummary — the page's single readiness ring + grounded priorities/risks/opps.
+  //   4. MissionControl — enriched next-best-action + onboarding CTA (its own ring is hidden).
+  // LifeIntelligence is intentionally removed (internal reasoning).
   return (
     <>
-      <div className="px-6 pt-6 max-w-[1400px] mx-auto w-full">
-        {/* Life Brief (Experience Excellence): the narrative the user reads FIRST — their own life
-            story, goals, tension, and next move in plain language. Leads with meaning, not metrics.
+      <DashboardClient firstInsight={firstInsight} />
+      <div className="px-6 pb-6 max-w-[1400px] mx-auto w-full">
+        {/* Life Brief (Experience Excellence): the narrative — their own life story, goals, tension,
+            and next move in plain language. Compact by default; expandable to the full brief.
             100% real data from /api/life/my-life `life_brief`; honest "still forming" empty state. */}
         <div className="mb-6">
           <LifeBrief />
         </div>
-        {/* Executive summary (P4): readiness, vision, next best action, priorities, risks,
+        {/* Executive summary (P4): readiness ring, vision, next best action, priorities, risks,
             opportunities, goal progress — 100% real data from /api/life/my-life + /api/goals,
-            honest empty states. The trust-first hero of the dashboard. */}
+            honest empty states. Holds the page's single readiness ring. */}
         <div className="mb-6">
           <ExecutiveSummary />
         </div>
-        {/* 1. Life snapshot (vision / primary objective / discovery), then status.
-            Recommendations are NOT shown here — the top recommendation appears as a
-            compact preview inside the Alerts & Notifications module below the domain
-            cards (DashboardClient); the full list lives on /dashboard/recommendations. */}
-        <LifeIntelligence />
+        {/* Mission Control: the enriched next-best-action + onboarding CTA. Its own readiness ring
+            is hidden — only ExecutiveSummary shows a ring. The top recommendation also appears as a
+            compact preview inside DashboardClient's Alerts module; full list on
+            /dashboard/recommendations. */}
         <MissionControl />
       </div>
-      <DashboardClient firstInsight={firstInsight} />
     </>
   );
 }

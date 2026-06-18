@@ -50,12 +50,6 @@ interface Dash {
   };
 }
 
-const RING: Record<Status, string> = {
-  green: 'border-emerald-500 text-emerald-700',
-  yellow: 'border-amber-400 text-amber-700',
-  orange: 'border-orange-500 text-orange-700',
-  red: 'border-rose-500 text-rose-700',
-};
 const JOURNEY: [keyof Dash['journey'], string][] = [
   ['documents', 'Add documents'],
   ['readiness', 'See readiness'],
@@ -187,30 +181,15 @@ export default function MissionControl() {
     );
   }
   if (!d || !d.status) return null;
-  const s = d.status;
-  const ring = RING[s.status] ?? RING.yellow;
 
   return (
     <div className="mb-6">
-      {/* Status + Next best action */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center gap-4">
-          <div
-            className={`w-20 h-20 rounded-full border-4 ${ring} flex items-center justify-center bg-white shrink-0`}
-          >
-            <span className="text-2xl font-extrabold">{s.index}</span>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
-              Your Life Readiness
-            </div>
-            <div className="text-sm font-semibold text-gray-900 mt-0.5">{s.headline}</div>
-            <div className="text-xs text-gray-500 mt-1">{s.summary}</div>
-          </div>
-        </div>
-
+      {/* Next best action only. The readiness/index RING (and its "Your Life Readiness" status tile)
+          is intentionally hidden here — the dashboard shows exactly ONE readiness ring, in
+          ExecutiveSummary. The NBA now spans the full width on its own. */}
+      <div className="grid grid-cols-1 gap-4">
         {/* The single next best action — the answer to "what should I do next, and why" */}
-        <div className="lg:col-span-2 rounded-xl shadow-sm border-2 border-indigo-200 bg-indigo-50 p-6 flex flex-col justify-between">
+        <div className="rounded-xl shadow-sm border-2 border-indigo-200 bg-indigo-50 p-6 flex flex-col justify-between">
           <div>
             <div className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">
               Your next best move

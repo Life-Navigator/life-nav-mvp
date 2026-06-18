@@ -7,6 +7,10 @@ import AddDataModal from '@/components/dashboard/AddDataModal';
 import PinnedScenarioWidget from '@/components/scenario-lab/PinnedScenarioWidget';
 import DomainCoverage, { type DomainCoverageData } from '@/components/dashboard/DomainCoverage';
 
+// Pilot UX cleanup: the "Help Shape the Future" feature-voting modules are hidden for the pilot.
+// Flip this to `true` to re-enable the voting UI (all the code below is kept intact, just gated).
+const SHOW_FEATURE_VOTING = false;
+
 interface DashboardData {
   financial: {
     netWorth: number;
@@ -1067,53 +1071,56 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
           </div>
         </div>
 
-        {/* Future Modules Voting Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-md">
-          <div className="mb-4">
-            <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-white">
-              Help Shape the Future
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Vote for the features you'd like to see next
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {futureModules.map((module) => {
-              const hasVoted = votedModules.has(module.id);
-              return (
-                <div
-                  key={module.id}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    hasVoted
-                      ? 'border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <h4 className="text-sm font-semibold mb-1 text-gray-900 dark:text-white">
-                        {module.name}
-                      </h4>
-                      <p className="text-xs mb-3 text-gray-600 dark:text-gray-400">
-                        {module.description}
-                      </p>
+        {/* Future Modules Voting Section — HIDDEN for the pilot behind SHOW_FEATURE_VOTING.
+            Code kept intact so it can be re-enabled by flipping the flag. */}
+        {SHOW_FEATURE_VOTING && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-md">
+            <div className="mb-4">
+              <h3 className="text-lg font-bold mb-1 text-gray-900 dark:text-white">
+                Help Shape the Future
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Vote for the features you'd like to see next
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {futureModules.map((module) => {
+                const hasVoted = votedModules.has(module.id);
+                return (
+                  <div
+                    key={module.id}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      hasVoted
+                        ? 'border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold mb-1 text-gray-900 dark:text-white">
+                          {module.name}
+                        </h4>
+                        <p className="text-xs mb-3 text-gray-600 dark:text-gray-400">
+                          {module.description}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleVote(module.id)}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
+                          hasVoted
+                            ? 'bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600'
+                        } border`}
+                      >
+                        {hasVoted ? '✓ Voted' : 'Vote'}
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleVote(module.id)}
-                      className={`px-3 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
-                        hasVoted
-                          ? 'bg-blue-600 dark:bg-blue-500 text-white border-blue-600 dark:border-blue-500'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white border-gray-200 dark:border-gray-600'
-                      } border`}
-                    >
-                      {hasVoted ? '✓ Voted' : 'Vote'}
-                    </button>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Add Data Modal */}

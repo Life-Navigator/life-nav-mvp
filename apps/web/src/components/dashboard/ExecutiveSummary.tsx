@@ -271,16 +271,6 @@ export default function ExecutiveSummary() {
                 {v.primary_objective && (
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                     <span className="font-medium text-gray-700">{v.primary_objective}</span>
-                    {typeof v.confidence_pct === 'number' && (
-                      <span className="text-xs text-gray-400">
-                        · {v.confidence_pct}% confidence
-                      </span>
-                    )}
-                    {typeof v.discovery_completion_pct === 'number' && (
-                      <span className="text-xs text-gray-400">
-                        · {v.discovery_completion_pct}% discovered
-                      </span>
-                    )}
                   </div>
                 )}
               </>
@@ -293,12 +283,8 @@ export default function ExecutiveSummary() {
                 {v.primary_objective ? (
                   <p className="mt-1 text-sm leading-relaxed text-gray-600">
                     It currently points toward{' '}
-                    <span className="font-medium text-gray-800">{v.primary_objective}</span>
-                    {v.objective_inferred ? ' (inferred from your onboarding)' : ''}, but we need
-                    more detail before treating this as your confirmed north star.
-                    {typeof v.discovery_completion_pct === 'number'
-                      ? ` ${v.discovery_completion_pct}% discovered so far.`
-                      : ''}
+                    <span className="font-medium text-gray-800">{v.primary_objective}</span>, but we
+                    need more detail before treating this as your confirmed north star.
                   </p>
                 ) : (
                   <p className="mt-1 text-sm leading-relaxed text-gray-500">
