@@ -222,15 +222,98 @@ class MyLifeService:
         except Exception:  # noqa: BLE001
             canonical = []
 
+        # ── Canonical Rendering Contract (Data Flow & Rendering Integrity) ──────────────────────────
+        # Surface what discovery ALREADY understands but never exposed on this aggregate — uniformly,
+        # with honest residuals. NO new intelligence: pure read/compose of the snapshot. No fabrication.
+        narrative = snap.get("dominant_narrative") or {}
+        narrative_summary = narrative.get("summary")
+        # Motivations: discovery never writes life.motivations rows (documented residual). The motivational
+        # signal IS already captured as emotional_signals on the narrative — surface THAT as motivations
+        # rather than building a new extractor. Each is labeled inferred-from-discovery (never a confirmed fact).
+        emotional = list(snap.get("emotional_signals") or [])
+        motivations = self._motivations_from_signals(emotional)
+        # Timeline: pass-through ONLY — discovery stores time_horizon as free text + goal status (active/
+        # future_goal). We DO NOT parse or fabricate dates. Surface the raw horizon text + any future-tagged
+        # goals so the UI can render "what the user said" without us inventing a structured schedule.
+        timeline = await self._timeline_passthrough(ctx, snap)
+        # Coverage / missing_context: which discovery areas are still empty — honest, from discovery_health.
+        coverage = {
+            "model_quality_pct": discovery_pct,
+            "covered_areas": health.get("covered_areas") or [],
+            "missing_areas": health.get("missing_areas") or [],
+            "average_confidence": health.get("average_confidence"),
+            "source": "Discovery health",
+        }
+        missing_context = [
+            {"area": area, "why_it_matters": "Completing this sharpens your plan and unlocks recommendations.",
+             "cta": "/dashboard/advisor"}
+            for area in (health.get("missing_areas") or [])
+        ]
+
         return {
             "life_brief": brief,
             "canonical_goals": canonical,
             # "Why Arcana believes this" — explainability for the dominant narrative (None until one exists).
             "narrative_explanation": snap.get("narrative_explanation"),
+            # Canonical narrative fields surfaced uniformly (the UI no longer has to reach into life_brief).
+            "dominant_narrative": narrative or None,
+            "narrative_summary": narrative_summary,
             "life_vision": vision, "what_matters_most": what_matters, "life_readiness": readiness,
             "next_best_action": next_action, "constraints": constraints[:6], "recent_intelligence": recent,
+            # Understood-but-previously-unexposed blocks (honest residuals; inferred stays inferred).
+            "goal_portfolio": snap.get("goal_portfolio") or [],
+            "motivations": motivations,
+            "emotional_signals": emotional,
+            "timeline": timeline,
+            "coverage": coverage,
+            "missing_context": missing_context,
             "has_discovery": bool(snap.get("objectives")),
             "note": "Your life operating system — organized around your life, not our architecture.",
+        }
+
+    # Human phrasing for the deterministic emotional signals (mirrors life_discovery._SIGNAL_PHRASES but
+    # framed as a motivation/driver). Surfacing-only: these are INFERRED from how the user spoke, never
+    # presented as confirmed facts. Signals with no clear motivational reading are omitted (honest).
+    _MOTIVATION_PHRASES: dict[str, str] = {
+        "distress": "Relieving the pressure you're under right now",
+        "money_stress": "Easing financial strain",
+        "burnout": "Protecting your health and time after a stretch of overwork",
+        "money_fine": "Building on a stable financial base",
+        "ambition": "A strong drive to advance and achieve",
+        "family": "Providing for and being present with your family",
+        "legacy": "Building something lasting and meaningful",
+        "urgency": "Acting on a near-term deadline",
+    }
+
+    def _motivations_from_signals(self, signals: list[str]) -> list[dict[str, Any]]:
+        """Expose the already-computed emotional_signals as motivations (inferred), rather than building a
+        new extractor or reading the never-written life.motivations table. Honest provenance + no fabrication."""
+        out: list[dict[str, Any]] = []
+        for s in signals:
+            phrase = self._MOTIVATION_PHRASES.get(s)
+            if phrase:
+                out.append({"text": phrase, "signal": s, "provenance_type": "advisor_inferred",
+                            "source": "Inferred from how you described things (emotional signals)"})
+        return out
+
+    async def _timeline_passthrough(self, ctx: UserContext, snap: dict[str, Any]) -> dict[str, Any]:
+        """Pass-through timeline view — NO date parsing, NO fabrication. Surfaces the free-text time_horizon
+        the user gave + any goals discovery tagged future_goal. The UI renders what the user said; we never
+        invent a structured schedule (documented residual gap)."""
+        horizon_text = None
+        try:
+            vis = await self._sb.select("life_vision", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema="life")
+            if vis:
+                horizon_text = (vis[0].get("prompts") or {}).get("time_horizon")
+        except Exception:  # noqa: BLE001
+            horizon_text = None
+        future_goals = [g.get("goal") for g in (snap.get("goal_portfolio") or [])
+                        if str(g.get("status") or "") == "future_goal" and g.get("goal")]
+        return {
+            "time_horizon_text": horizon_text,   # raw free text exactly as stated (never parsed)
+            "future_goals": future_goals,        # goals the user framed as later (status=future_goal)
+            "structured": False,                 # honest: no parsed/structured dates exist
+            "source": "Advisor Discovery (free text — not parsed into dates)",
         }
 
     async def _recent_intelligence(self, ctx: UserContext) -> list[dict[str, Any]]:

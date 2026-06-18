@@ -137,6 +137,64 @@ async def test_converse_returns_discovery_reveal():
     assert rev["confidence_pct"] > 0
 
 
+# ---- Data Flow & Rendering Integrity: per-item persistence of the onboarding statement ----
+@pytest.mark.asyncio
+async def test_multi_goal_statement_persists_every_candidate_goal():
+    """The opening statement carries many goals (wedding/home/family/promotion/education/fitness). EVERY
+    one must accumulate in life.candidate_goals across the turn — none collapsed, none dropped."""
+    sb = FakeSupabase({})
+    rm = _rm(sb)
+    statement = ("I'm getting married next June, then we want to buy a home and start a family, "
+                 "I'm gunning for a promotion to director, I'd like to do a Masters in AI, "
+                 "and I want to get in better shape")
+    await rm.converse(CTX, statement, pending_key="primary_goal")
+    cands = await sb.select("candidate_goals", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
+    blob = " ".join(str(c.get("goal_text", "")).lower() for c in cands)
+    # at least the distinct life domains the user named are captured
+    domains = {str(c.get("domain")) for c in cands}
+    assert {"family", "career", "education", "health"} & domains == {"family", "career", "education", "health"} \
+        or all(k in blob for k in ("married", "home", "promotion", "masters", "shape"))
+    assert len(cands) >= 4  # not collapsed into one
+
+
+@pytest.mark.asyncio
+async def test_answered_constraint_persists_to_life_constraints():
+    sb = FakeSupabase({})
+    rm = _rm(sb)
+    await rm.answer(CTX, "constraint", "money is tight and my energy is drained from overwork")
+    cons = await sb.select("constraints", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
+    assert cons and cons[0]["kind"] == "stated"
+    assert "money" in cons[0]["label"].lower()
+
+
+@pytest.mark.asyncio
+async def test_dominant_narrative_persists_and_returns_in_snapshot():
+    sb = FakeSupabase({})
+    rm = _rm(sb)
+    # primary_goal answer persists narrative free text + candidate goals → snapshot computes the story
+    await rm.answer(CTX, "primary_goal", "I'm getting married and we want to start a family this year")
+    snap = await LifeDiscoveryService(sb).snapshot(CTX)
+    nar = snap.get("dominant_narrative")
+    assert nar and nar.get("key") and nar.get("summary")
+    # the narrative free text was persisted to life_vision.prompts.narrative (resumable, not in-memory)
+    vis = await sb.select("life_vision", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
+    assert (vis[0].get("prompts") or {}).get("narrative")
+
+
+@pytest.mark.asyncio
+async def test_candidate_goals_are_not_auto_promoted_to_confirmed_objectives():
+    """Trust rule: a candidate/inferred goal stays candidate. Only the user's explicit priority CONFIRMS
+    one objective — extra candidate goals must NOT be marked confirmed by the act of being captured."""
+    sb = FakeSupabase({})
+    rm = _rm(sb)
+    await rm.converse(CTX, "I want to retire early and also get an MBA someday", pending_key="primary_goal")
+    cands = await sb.select("candidate_goals", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
+    # candidate_goals table has no 'confirmed' column — they are inherently unconfirmed candidates
+    assert cands and all("confirmed" not in c for c in cands)
+    # a future-framed goal keeps future_goal status (not silently promoted to active/confirmed)
+    assert any(c.get("status") == "future_goal" for c in cands)
+
+
 def test_advisor_copy_is_human_not_procedural():
     # the questions should sound like an advisor, not a form ("Question 3 of 9")
     from app.services.relationship_manager import FLOW

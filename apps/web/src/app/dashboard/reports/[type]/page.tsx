@@ -26,6 +26,21 @@ type Rec = {
   unlocks?: string[] | null;
 };
 type Tradeoff = { between?: unknown; reason?: string | null; focus?: string | null };
+// Constraints arrive from the life_model section as {label, detail} OBJECTS (snapshot.active_constraints),
+// not bare strings. Accept either shape so we render the label, never raw JSON.
+type Constraint = string | { label?: string | null; detail?: string | null };
+// "Why Arcana believes this" — same explainability the dashboard shows; surfaced from advisor_executive.
+type NarrativeExplanation = {
+  why?: string | null;
+  contributing_goals?: string[] | null;
+  evidence_signals?: string[] | null;
+  confidence_pct?: number | null;
+  confidence_label?: string | null;
+};
+const constraintLabel = (c: Constraint): { label: string; detail?: string | null } =>
+  typeof c === 'string'
+    ? { label: c }
+    : { label: String(c?.label ?? '').trim(), detail: c?.detail ?? null };
 type Plan = {
   now?: (string | null)[] | null;
   next?: (string | null)[] | null;
@@ -51,11 +66,13 @@ type AdvBody = {
     status?: string | null;
     progress?: number | null;
     category?: string | null;
+    confirmation_status?: string | null;
     target_value?: unknown;
     current_value?: unknown;
   }[];
   recommendations?: Rec[];
   next_best_action?: Rec | null;
+  narrative_explanation?: NarrativeExplanation | null;
   risks?: string[];
   opportunities?: string[];
   missing_data?: string[];
@@ -75,7 +92,7 @@ type LifeModelBody = {
     reasoning?: string | null;
   };
   themes?: string[] | null;
-  constraints?: string[] | null;
+  constraints?: Constraint[] | null;
   opportunities?: string[] | null;
   tradeoffs?: Tradeoff[] | null;
 };
@@ -251,7 +268,14 @@ export default function ReportViewerPage() {
   const tradeoffs = lm?.tradeoffs ?? [];
   const risks = (adv?.risks ?? []) as string[];
   const opportunities = (adv?.opportunities ?? lm?.opportunities ?? []) as string[];
-  const constraints = (lm?.constraints ?? []) as string[];
+  // Constraints are {label,detail} objects (or strings) — normalize to labels so we never render raw JSON.
+  const constraints = ((lm?.constraints ?? []) as Constraint[])
+    .map(constraintLabel)
+    .filter((c) => c.label);
+  // "Why Arcana believes this" — same explainability the dashboard renders; null until a narrative exists.
+  const narrativeWhy = adv?.narrative_explanation ?? null;
+  const whyGoals = (narrativeWhy?.contributing_goals ?? []).filter((g) => g && g.trim());
+  const whySignals = (narrativeWhy?.evidence_signals ?? []).filter((s) => s && s.trim());
   const recs = adv?.recommendations ?? [];
   const plan = adv?.plan_90 ?? {};
   const citations = report?.citations ?? [];
@@ -362,6 +386,46 @@ export default function ReportViewerPage() {
             )}
           </SectionShell>
 
+          {/* Why Arcana believes this — explainability for the dominant narrative. Renders only when the
+              engine supplied a rationale (same source the dashboard reads); honest empty → section omitted. */}
+          {narrativeWhy?.why && (
+            <SectionShell n={next()} title="Why Arcana believes this">
+              <p className="text-sm text-gray-700">{narrativeWhy.why}</p>
+              {whyGoals.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                    Which goals contributed
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {whyGoals.map((g, i) => (
+                      <Chip key={i}>{g}</Chip>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {whySignals.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                    What evidence supports it
+                  </p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-gray-600">
+                    {whySignals.map((s, i) => (
+                      <li key={i}>{s}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(narrativeWhy.confidence_label || narrativeWhy.confidence_pct != null) && (
+                <p className="mt-3 text-[11px] text-gray-400">
+                  {narrativeWhy.confidence_label
+                    ? `${narrativeWhy.confidence_label} confidence`
+                    : 'Confidence'}
+                  {narrativeWhy.confidence_pct != null ? ` · ${narrativeWhy.confidence_pct}%` : ''}
+                </p>
+              )}
+            </SectionShell>
+          )}
+
           {/* Goals */}
           <SectionShell n={next()} title="Goals">
             {(lm?.primary_objective?.title || adv?.primary_objective?.title) && (
@@ -393,6 +457,14 @@ export default function ReportViewerPage() {
                       {g.category && (
                         <span className="ml-2 text-xs text-gray-400">{g.category}</span>
                       )}
+                      {/* Confirmation state — confirmed vs persona/candidate goal. Shown only when unconfirmed. */}
+                      {g.confirmation_status &&
+                        g.confirmation_status !== 'confirmed' &&
+                        g.confirmation_status !== 'confirmed_goal' && (
+                          <span className="ml-2 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            candidate
+                          </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-2">
                       {g.progress != null && <Chip>{g.progress}%</Chip>}
@@ -439,7 +511,10 @@ export default function ReportViewerPage() {
             {constraints.length > 0 ? (
               <ul className="list-disc space-y-1 pl-5 text-sm text-gray-700">
                 {constraints.map((c, i) => (
-                  <li key={i}>{typeof c === 'string' ? c : JSON.stringify(c)}</li>
+                  <li key={i}>
+                    {c.label}
+                    {c.detail && <span className="text-gray-400"> — {c.detail}</span>}
+                  </li>
                 ))}
               </ul>
             ) : (

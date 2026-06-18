@@ -10,6 +10,8 @@ import {
   Target,
   TrendingUp,
   AlertTriangle,
+  Lock,
+  Heart,
   Loader2,
 } from 'lucide-react';
 import ProvenanceBadge, { type Provenance } from '@/components/ui/ProvenanceBadge';
@@ -55,6 +57,10 @@ interface MyLife {
   } | null;
   constraints?: { label: string; detail?: string | null; source?: string }[];
   has_discovery?: boolean;
+  // Incoming canonical fields (added by the backend this sprint). Read DEFENSIVELY — render only when
+  // present + non-empty; never fabricated. Accept either strings or {label} objects.
+  motivations?: (string | { label?: string | null })[] | null;
+  emotional_signals?: (string | { label?: string | null })[] | null;
 }
 interface Goal {
   id: string;
@@ -141,6 +147,20 @@ function EmptyLine({ text }: { text: string }) {
   return <p className="text-sm leading-relaxed text-gray-400">{text}</p>;
 }
 
+// Coerce a mixed string|{label} list into clean, de-duped strings (honest empty when nothing real).
+function toLabels(
+  items: (string | { label?: string | null } | null | undefined)[] | null | undefined
+): string[] {
+  if (!Array.isArray(items)) return [];
+  const out: string[] = [];
+  for (const it of items) {
+    const s = typeof it === 'string' ? it : it && typeof it === 'object' ? (it.label ?? '') : '';
+    const t = String(s || '').trim();
+    if (t) out.push(t);
+  }
+  return Array.from(new Set(out));
+}
+
 export default function ExecutiveSummary() {
   const [ml, setMl] = useState<MyLife | null>(null);
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -182,6 +202,25 @@ export default function ExecutiveSummary() {
   const rd = ml?.life_readiness || {};
   const nba = ml?.next_best_action;
   const hasDiscovery = ml?.has_discovery;
+  // Constraints — prefer the top-level constraints[] (richest: label+detail); fall back to
+  // what_matters_most.constraints. Deduped by label. Defensive: render only when non-empty.
+  const constraints = (
+    Array.isArray(ml?.constraints) && ml!.constraints!.length
+      ? ml!.constraints!
+      : toLabels(wm.constraints).map((label) => ({ label }))
+  ).filter((c) => c && String(c.label || '').trim());
+  const seenConstraint = new Set<string>();
+  const constraintList = constraints.filter((c) => {
+    const k = String(c.label).trim();
+    if (seenConstraint.has(k)) return false;
+    seenConstraint.add(k);
+    return true;
+  });
+  // Motivations / emotional context — only when the backend surfaced them. Never fabricated.
+  const motivations = [...toLabels(ml?.motivations), ...toLabels(ml?.emotional_signals)].slice(
+    0,
+    6
+  );
 
   // Honest empty state — no discovery yet → guide to the advisor, no fabricated metrics.
   if (!hasDiscovery && !v.life_vision && !v.primary_objective) {
@@ -395,6 +434,45 @@ export default function ExecutiveSummary() {
         </Card>
       </div>
 
+      {/* Constraints + Motivations — surfaced ONLY when grounded data exists. Constraints are what's
+          currently blocking progress; motivations are what's driving the user (read defensively). Both
+          render nothing when empty (honest — never fabricated). */}
+      {(constraintList.length > 0 || motivations.length > 0) && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {constraintList.length > 0 && (
+            <Card>
+              <SectionHead icon={Lock} title="What's holding things back" tint="text-slate-500" />
+              <ul className="space-y-1.5 text-sm text-gray-700">
+                {constraintList.slice(0, 5).map((c, i) => (
+                  <li key={`${c.label}-${i}`} className="flex gap-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+                    <span>
+                      {c.label}
+                      {c.detail && <span className="text-gray-400"> — {c.detail}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+          {motivations.length > 0 && (
+            <Card>
+              <SectionHead icon={Heart} title="What's driving you" tint="text-violet-500" />
+              <div className="flex flex-wrap gap-1.5">
+                {motivations.map((m, i) => (
+                  <span
+                    key={`${m}-${i}`}
+                    className="rounded-full bg-violet-50 px-3 py-1 text-xs font-medium text-violet-700 ring-1 ring-inset ring-violet-100"
+                  >
+                    {m}
+                  </span>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Goal progress + domain readiness */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -420,8 +498,19 @@ export default function ExecutiveSummary() {
                 return (
                   <li key={g.id}>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="truncate font-medium text-gray-800">
-                        {g.title || 'Goal'}
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate font-medium text-gray-800">
+                          {g.title || 'Goal'}
+                        </span>
+                        {/* Confirmation state — distinguishes a user-confirmed goal from a persona/
+                            candidate one. Rendered only when the canonical view marks it unconfirmed. */}
+                        {g.confirmation_status &&
+                          g.confirmation_status !== 'confirmed' &&
+                          g.confirmation_status !== 'confirmed_goal' && (
+                            <span className="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-100">
+                              candidate
+                            </span>
+                          )}
                       </span>
                       <span className="ml-2 shrink-0 text-xs text-gray-400">
                         {pct != null ? `${pct}%` : g.status || ''}

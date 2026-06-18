@@ -24,6 +24,8 @@ import {
   TrendingUp,
   ShieldAlert,
   Compass,
+  Lock,
+  Heart,
   Loader2,
 } from 'lucide-react';
 import StreamingText from '@/components/ui/StreamingText';
@@ -65,7 +67,25 @@ interface MyLife {
   life_brief?: LifeBriefData | null;
   what_matters_most?: WhatMattersMost | null;
   narrative_explanation?: NarrativeExplanation | null;
+  // Incoming canonical fields (added by the backend this sprint). Read DEFENSIVELY — render only when
+  // present + non-empty; never fabricated. Accept either a list of strings or {label} objects.
+  motivations?: (string | { label?: string | null })[] | null;
+  emotional_signals?: (string | { label?: string | null })[] | null;
 }
+
+// Coerce a mixed string|{label} list into clean, de-duped strings (honest empty when nothing real).
+const toLabels = (
+  items: (string | { label?: string | null } | null | undefined)[] | null | undefined
+): string[] => {
+  if (!Array.isArray(items)) return [];
+  const out: string[] = [];
+  for (const it of items) {
+    const s = typeof it === 'string' ? it : it && typeof it === 'object' ? (it.label ?? '') : '';
+    const t = String(s || '').trim();
+    if (t) out.push(t);
+  }
+  return Array.from(new Set(out));
+};
 
 const first = (...vals: (string | null | undefined)[]): string | null => {
   for (const v of vals) {
@@ -180,6 +200,13 @@ export default function DiscoveryReveal({ onContinue }: { onContinue: () => void
   const risk = first(brief.stakes, (wm.risks || [])[0]);
   const nextMove = first(brief.next_move);
   const goals = (brief.goals_held || []).filter((g) => g && g.trim());
+  // Constraints — what's holding the plan back (grounded only; from what_matters_most). Defensive.
+  const constraints = toLabels(wm.constraints).slice(0, 4);
+  // Motivations / emotional context — only if the backend surfaced them. Never fabricated.
+  const motivations = [...toLabels(data?.motivations), ...toLabels(data?.emotional_signals)].slice(
+    0,
+    4
+  );
   const confidence =
     typeof brief.confidence_pct === 'number'
       ? brief.confidence_pct
@@ -272,13 +299,36 @@ export default function DiscoveryReveal({ onContinue }: { onContinue: () => void
                 body={nextMove}
               />
             )}
-            {!tension && !opportunity && !risk && !nextMove && (
-              <div className="sm:col-span-2 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600 shadow-sm">
-                <Target className="mb-1 h-4 w-4 text-indigo-500" />I have your core picture. As you
-                add more, I&apos;ll surface the opportunities, risks, and next moves here — grounded
-                in your real situation, never assumptions.
-              </div>
+            {/* Constraints — what's currently in the way. Grounded only; rendered when present. */}
+            {constraints.length > 0 && (
+              <RevealCard
+                icon={<Lock className="h-4 w-4" />}
+                tone="slate"
+                title="What's holding things back"
+                body={constraints.join(' · ')}
+              />
             )}
+            {/* Motivations / emotional context — only when the model actually surfaced them. */}
+            {motivations.length > 0 && (
+              <RevealCard
+                icon={<Heart className="h-4 w-4" />}
+                tone="violet"
+                title="What's driving you"
+                body={motivations.join(' · ')}
+              />
+            )}
+            {!tension &&
+              !opportunity &&
+              !risk &&
+              !nextMove &&
+              constraints.length === 0 &&
+              motivations.length === 0 && (
+                <div className="sm:col-span-2 rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600 shadow-sm">
+                  <Target className="mb-1 h-4 w-4 text-indigo-500" />I have your core picture. As
+                  you add more, I&apos;ll surface the opportunities, risks, and next moves here —
+                  grounded in your real situation, never assumptions.
+                </div>
+              )}
           </div>
         )}
 
@@ -321,6 +371,12 @@ const TONES: Record<string, { ring: string; chip: string; icon: string }> = {
     ring: 'border-indigo-200',
     chip: 'text-indigo-600',
     icon: 'bg-indigo-50 text-indigo-600',
+  },
+  slate: { ring: 'border-slate-200', chip: 'text-slate-600', icon: 'bg-slate-100 text-slate-600' },
+  violet: {
+    ring: 'border-violet-200',
+    chip: 'text-violet-600',
+    icon: 'bg-violet-50 text-violet-600',
   },
 };
 

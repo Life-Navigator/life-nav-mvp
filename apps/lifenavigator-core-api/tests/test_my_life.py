@@ -173,6 +173,75 @@ async def test_no_grounded_action_yields_honest_insufficient_state():
     assert "income" in nba["needed_to_act"].lower()
 
 
+# ---- Data Flow & Rendering Integrity: canonical rendering contract on /v1/life/my-life ----
+@pytest.mark.asyncio
+async def test_my_life_exposes_full_canonical_contract():
+    """Every understood-but-previously-unexposed block is present (honest residuals, never fabricated)."""
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    rm_vision = "Get married next year, buy a home, and start a family"
+    await life.save_vision(CTX, vision_text=rm_vision)
+    await life.discover_goal(CTX, surface_goal="buy a house", why_chain=[{"a": "start a family"}])
+    out = await _svc(sb).my_life(CTX)
+    for field in ("dominant_narrative", "narrative_summary", "goal_portfolio", "canonical_goals",
+                  "constraints", "motivations", "emotional_signals", "timeline", "coverage",
+                  "missing_context", "what_matters_most", "next_best_action", "life_brief"):
+        assert field in out, f"canonical contract missing {field}"
+    # coverage is honest (real areas, never blank claims) and timeline is pass-through (no parsed dates)
+    assert "missing_areas" in out["coverage"] and "covered_areas" in out["coverage"]
+    assert out["timeline"]["structured"] is False
+    assert "risks" in out["what_matters_most"] and "opportunities" in out["what_matters_most"]
+
+
+@pytest.mark.asyncio
+async def test_my_life_timeline_is_passthrough_not_parsed():
+    """time_horizon free text is surfaced verbatim; we never parse 'next June' into a date (residual gap)."""
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    await life.save_vision(CTX, vision_text="Build a family",
+                           prompts={"time_horizon": "we're aiming for next June", "source": "relationship_manager"})
+    out = await _svc(sb).my_life(CTX)
+    tl = out["timeline"]
+    assert tl["time_horizon_text"] == "we're aiming for next June"  # raw, unparsed
+    assert tl["structured"] is False
+    assert isinstance(tl["future_goals"], list)
+
+
+@pytest.mark.asyncio
+async def test_my_life_motivations_are_inferred_from_signals_never_confirmed():
+    """Motivations are surfaced from emotional_signals (discovery never writes life.motivations) and are
+    always provenance_type=advisor_inferred — candidate/inferred is never promoted to a confirmed fact."""
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    # A narrative with clear emotional signals (family + ambition) so motivations are non-empty.
+    await life.save_vision(CTX, vision_text="I'm getting married and want to get promoted to director")
+    # persist candidate goals so the snapshot narrative + signals compute
+    await sb.upsert("candidate_goals", {"id": "c1", "user_id": CTX.user_id, "tenant_id": CTX.user_id,
+                                        "goal_text": "get married", "normalized_goal": "get married",
+                                        "domain": "family", "confidence": 0.7, "status": "active"}, schema="life")
+    # also seed the narrative free text so dominant_narrative has signals
+    await life.save_vision(CTX, vision_text="x", prompts={"narrative": "getting married and want a promotion to director"})
+    out = await _svc(sb).my_life(CTX)
+    for m in out["motivations"]:
+        assert m["provenance_type"] == "advisor_inferred"  # NEVER confirmed
+        assert m.get("signal") and m.get("text")
+    # honest: emotional_signals list is exposed verbatim alongside motivations
+    assert isinstance(out["emotional_signals"], list)
+
+
+@pytest.mark.asyncio
+async def test_my_life_coverage_is_honest_about_missing_areas():
+    sb = FakeSupabase({})
+    life = LifeDiscoveryService(sb)
+    await life.discover_goal(CTX, surface_goal="get a new job", why_chain=[{"a": "burned out"}])  # career only
+    out = await _svc(sb).my_life(CTX)
+    cov = out["coverage"]
+    assert "career" in cov["covered_areas"]
+    # missing areas are surfaced honestly as missing_context entries (no fabricated data)
+    assert out["missing_context"], "missing areas should surface as honest missing_context"
+    assert all(mc.get("area") and mc.get("cta") for mc in out["missing_context"])
+
+
 @pytest.mark.asyncio
 async def test_attention_surfaces_risk_alerts_regression():
     """Regression: attention() previously called active().get(...) on a LIST and checked the wrong
