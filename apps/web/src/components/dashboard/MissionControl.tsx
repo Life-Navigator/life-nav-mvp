@@ -189,13 +189,13 @@ export default function MissionControl() {
           ExecutiveSummary. The NBA now spans the full width on its own. */}
       <div className="grid grid-cols-1 gap-4">
         {/* The single next best action — the answer to "what should I do next, and why" */}
-        <div className="rounded-xl shadow-sm border-2 border-indigo-200 bg-indigo-50 p-6 flex flex-col justify-between">
+        <div className="rounded-xl shadow-md border border-indigo-500/30 bg-gradient-to-br from-indigo-600 to-violet-600 p-6 text-white flex flex-col justify-between">
           <div>
-            <div className="text-[11px] uppercase tracking-wide text-indigo-500 font-semibold">
+            <div className="text-[11px] uppercase tracking-wide text-indigo-100 font-semibold">
               Your next best move
             </div>
-            <div className="text-lg font-bold text-gray-900 mt-1">{d.next_best_action.title}</div>
-            <div className="text-sm text-gray-600 mt-1">
+            <div className="text-lg font-bold text-white mt-1">{d.next_best_action.title}</div>
+            <div className="text-sm text-indigo-50 mt-1">
               {d.next_best_action.recommended_action || d.next_best_action.why}
             </div>
 
@@ -205,7 +205,7 @@ export default function MissionControl() {
               const benefit = d.next_best_action.expected_benefit;
               if (!impact && !benefit) return null;
               return (
-                <div className="mt-2 text-sm font-semibold text-emerald-700">
+                <div className="mt-2 text-sm font-semibold text-emerald-200">
                   {impact || benefit}
                 </div>
               );
@@ -216,13 +216,13 @@ export default function MissionControl() {
               typeof d.next_best_action.confidence === 'number') && (
               <div className="mt-2 flex flex-col gap-1">
                 {d.next_best_action.why_number_one && (
-                  <div className="text-xs text-gray-500">
-                    <b className="text-indigo-600">Why this is #1:</b>{' '}
+                  <div className="text-xs text-indigo-100">
+                    <b className="text-white">Why this is #1:</b>{' '}
                     {d.next_best_action.why_number_one}
                   </div>
                 )}
                 {typeof d.next_best_action.confidence === 'number' && (
-                  <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+                  <div className="text-[11px] uppercase tracking-wide text-indigo-200 font-semibold">
                     Confidence {Math.round(d.next_best_action.confidence * 100)}%
                   </div>
                 )}
@@ -231,7 +231,7 @@ export default function MissionControl() {
           </div>
           <Link
             href={d.next_best_action.href || '/dashboard/recommendations'}
-            className="mt-3 inline-flex w-fit items-center px-4 py-2 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700"
+            className="mt-3 inline-flex w-fit items-center px-4 py-2 rounded-md bg-white text-indigo-700 text-sm font-semibold hover:bg-indigo-50"
           >
             {d.next_best_action.cta_label} →
           </Link>

@@ -134,36 +134,38 @@ export default function LifeBrief() {
   const biggestRisk = (brief.stakes || '').trim();
 
   return (
-    <div className="rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-500">
+    <div className="rounded-2xl border border-indigo-300/40 bg-gradient-to-br from-[#0f172a] via-[#13294b] to-[#0d3a4a] p-5 text-white shadow-md">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-teal-300">
         <Sparkles className="h-3.5 w-3.5" /> Your Life Brief
       </div>
-      <h2 className="mt-1 text-xl font-bold leading-snug text-gray-900">{brief.headline}</h2>
+      <h2 className="mt-1 text-xl font-bold leading-snug text-white">{brief.headline}</h2>
 
-      {summary && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">{summary}</p>}
+      {summary && (
+        <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-200">{summary}</p>
+      )}
 
       {/* Next move + biggest risk — the two lines that matter most, shown even when collapsed. */}
       {(nextMove || biggestRisk) && (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {nextMove && (
-            <div className="flex items-start gap-2 rounded-lg bg-indigo-50/80 px-3 py-2 ring-1 ring-inset ring-indigo-100">
-              <Target className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />
+            <div className="flex items-start gap-2 rounded-lg bg-white/[0.06] px-3 py-2 ring-1 ring-inset ring-white/10">
+              <Target className="mt-0.5 h-3.5 w-3.5 shrink-0 text-teal-300" />
               <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-teal-300">
                   Next move
                 </div>
-                <p className="text-sm leading-relaxed text-gray-700">{nextMove}</p>
+                <p className="text-sm leading-relaxed text-slate-100">{nextMove}</p>
               </div>
             </div>
           )}
           {biggestRisk && (
-            <div className="flex items-start gap-2 rounded-lg bg-rose-50/70 px-3 py-2 ring-1 ring-inset ring-rose-100">
-              <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-500" />
+            <div className="flex items-start gap-2 rounded-lg bg-white/[0.06] px-3 py-2 ring-1 ring-inset ring-white/10">
+              <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-300" />
               <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-500">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-rose-300">
                   Biggest risk
                 </div>
-                <p className="text-sm leading-relaxed text-gray-700">{biggestRisk}</p>
+                <p className="text-sm leading-relaxed text-slate-100">{biggestRisk}</p>
               </div>
             </div>
           )}
@@ -175,7 +177,7 @@ export default function LifeBrief() {
         type="button"
         onClick={() => setExpanded((e) => !e)}
         aria-expanded={expanded}
-        className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:underline"
+        className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-teal-300 hover:text-teal-200 hover:underline"
       >
         {expanded ? (
           <>
@@ -190,17 +192,17 @@ export default function LifeBrief() {
 
       {/* Expanded detail — goals, watching/could-change, readiness, provenance, and the why panel. */}
       {expanded && (
-        <div className="mt-4 space-y-4 border-t border-indigo-100 pt-4">
+        <div className="mt-4 space-y-4 border-t border-white/10 pt-4">
           {goals.length > 0 && (
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                 What you&apos;re holding right now
               </div>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {goals.map((g, i) => (
                   <span
                     key={`${g}-${i}`}
-                    className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-100"
+                    className="rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-teal-100 ring-1 ring-inset ring-white/10"
                   >
                     {g}
                   </span>
@@ -214,13 +216,13 @@ export default function LifeBrief() {
           {(watching.length > 0 || couldChange.length > 0) && (
             <div className="grid gap-3 sm:grid-cols-2">
               {watching.length > 0 && (
-                <div className="rounded-xl bg-gray-50 p-3 ring-1 ring-inset ring-gray-100">
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-teal-600">
+                <div className="rounded-xl bg-white/[0.06] p-3 ring-1 ring-inset ring-white/10">
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-teal-300">
                     <Eye className="h-3.5 w-3.5" /> What Arcana is watching
                   </div>
                   <ul className="mt-1.5 space-y-1">
                     {watching.map((w, i) => (
-                      <li key={`${w}-${i}`} className="text-xs leading-relaxed text-gray-600">
+                      <li key={`${w}-${i}`} className="text-xs leading-relaxed text-slate-200">
                         • {w}
                       </li>
                     ))}
@@ -228,13 +230,13 @@ export default function LifeBrief() {
                 </div>
               )}
               {couldChange.length > 0 && (
-                <div className="rounded-xl bg-gray-50 p-3 ring-1 ring-inset ring-gray-100">
-                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600">
+                <div className="rounded-xl bg-white/[0.06] p-3 ring-1 ring-inset ring-white/10">
+                  <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
                     <GitCompareArrows className="h-3.5 w-3.5" /> What could change the plan
                   </div>
                   <ul className="mt-1.5 space-y-1">
                     {couldChange.map((c, i) => (
-                      <li key={`${c}-${i}`} className="text-xs leading-relaxed text-gray-600">
+                      <li key={`${c}-${i}`} className="text-xs leading-relaxed text-slate-200">
                         • {c}
                       </li>
                     ))}
@@ -244,13 +246,13 @@ export default function LifeBrief() {
             </div>
           )}
 
-          {brief.readiness_line && <p className="text-xs text-gray-500">{brief.readiness_line}</p>}
+          {brief.readiness_line && <p className="text-xs text-slate-300">{brief.readiness_line}</p>}
 
           {/* Provenance — confidence + source, so the narrative is never presented as fact-free magic. */}
           {(typeof brief.confidence_pct === 'number' || brief.source) && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-gray-100 pt-3 text-[11px] text-gray-400">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-white/10 pt-3 text-[11px] text-slate-400">
               {typeof brief.confidence_pct === 'number' && (
-                <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-600">
+                <span className="inline-flex items-center rounded-full bg-white/10 px-2 py-0.5 font-medium text-slate-200">
                   {brief.confidence_pct}% confidence
                 </span>
               )}
