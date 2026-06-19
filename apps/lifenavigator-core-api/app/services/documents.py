@@ -18,8 +18,10 @@ from typing import Any, Optional
 
 from ..clients.supabase import SupabaseClient
 from ..models.common import UserContext
+from .ingestion import IngestionService
 
 DOCS = "documents"
+FAMILY = "family"
 _REC_NS = uuid.UUID("6f3b1e22-0000-4000-8000-00000000000b")
 
 # ── PII safeguard (Sprint 42B): detect sensitive identifiers in uploads. High-precision so normal
@@ -67,11 +69,23 @@ def scan_pii(text: str) -> dict[str, int]:
 
 _PII_LABELS = {"ssn": "Social Security Number", "credit_or_debit_card": "Credit/debit card number",
                "routing_number": "Routing number", "account_number": "Account number"}
+# Bridge: a document fact is auto-CONFIRMED only when it is a labeled native-text field at high
+# confidence; otherwise it is INFERRED (qualified when surfaced, never silently promoted).
+_CONFIRM_THRESHOLD = 0.85
+# Valid ingestion Domain values (mirror app.services.ingestion.Domain) — used to pick a fact's domain.
+_INGEST_DOMAINS = {"finance", "family", "health", "education", "career", "core"}
 GREEN, YELLOW, ORANGE, RED = "green", "yellow", "orange", "red"
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _num(v: Any) -> Optional[float]:
+    try:
+        return float(str(v).replace(",", "")) if v is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 # ── Taxonomy: doc_type -> (category, label, expected fields {key: type}, affected domains, critical) ──
@@ -96,7 +110,7 @@ TAXONOMY: dict[str, T] = {
     "401k_statement": T("benefits", "401(k) Statement", {"vested_balance": "money", "total_balance": "money", "contribution_rate": "percent", "employer_match": "percent"}, ["finance"], True),
     "pension": T("benefits", "Pension", {"monthly_benefit": "money", "vesting_date": "date"}, ["finance"]),
     # Insurance
-    "life_insurance_policy": T("insurance", "Life Insurance Policy", {"coverage_amount": "money", "premium": "money", "beneficiary": "text", "term_years": "number"}, ["family", "finance"], True),
+    "life_insurance_policy": T("insurance", "Life Insurance Policy", {"coverage_amount": "money", "premium": "money", "insurer": "text", "policy_type": "text", "insured_person": "text", "beneficiaries": "text", "term_years": "number"}, ["family", "finance"], True),
     "disability_insurance": T("insurance", "Disability Insurance", {"monthly_benefit": "money", "benefit_period": "text", "elimination_period_days": "number"}, ["family", "finance"], True),
     "ltc_insurance": T("insurance", "Long-Term Care Insurance", {"daily_benefit": "money", "benefit_period": "text"}, ["family", "health"]),
     "umbrella_policy": T("insurance", "Umbrella Policy", {"coverage_amount": "money", "premium": "money"}, ["family", "finance"]),
@@ -108,8 +122,8 @@ TAXONOMY: dict[str, T] = {
     "financial_aid_letter": T("education", "Financial Aid Letter", {"grants": "money", "loans": "money", "work_study": "money", "net_cost": "money", "school": "text"}, ["education", "finance"], True),
     "program_details": T("education", "Program Details", {"tuition": "money", "duration_months": "number", "program": "text"}, ["education"]),
     # Family Office
-    "trust": T("family_office", "Trust", {"trust_type": "text", "trustee": "text", "estimated_value": "money"}, ["family"], True),
-    "will": T("family_office", "Will", {"executor": "text", "last_updated": "date"}, ["family"], True),
+    "trust": T("family_office", "Trust", {"trust_name": "text", "grantor": "text", "trustee": "text", "successor_trustee": "text", "beneficiaries": "text", "revocable_status": "text", "estimated_value": "money", "date": "date"}, ["family"], True),
+    "will": T("family_office", "Will", {"executor": "text", "guardian": "text", "beneficiaries": "text", "date": "date", "last_updated": "date"}, ["family"], True),
     "estate_plan": T("family_office", "Estate Plan", {"has_will": "text", "has_poa": "text", "has_healthcare_directive": "text"}, ["family"], True),
     # Military
     "dd214": T("military", "DD214", {"branch": "text", "discharge_type": "text", "separation_date": "date", "rank": "text"}, ["career", "finance"], True),
@@ -138,6 +152,16 @@ _SYNONYMS = {
     "ldl": ["ldl", "ldl cholesterol"], "triglycerides": ["triglycerides", "trig"], "glucose": ["glucose", "fasting glucose"],
     "a1c": ["a1c", "hba1c", "hemoglobin a1c"], "vitamin_d": ["vitamin d", "25-hydroxyvitamin d", "25-oh vitamin d"],
     "tsh": ["tsh", "thyroid stimulating hormone"], "supplements": ["supplements", "supplement"], "medications": ["medications", "medication", "meds"],
+    # estate / will / trust / life-insurance labels (native-text docs)
+    "executor": ["executor", "personal representative", "executrix"],
+    "guardian": ["guardian", "designated guardian", "guardian of minor children", "guardian for minor children"],
+    "beneficiaries": ["beneficiaries", "beneficiary", "named beneficiaries", "primary beneficiary"],
+    "trust_name": ["trust name", "name of trust", "trust"], "grantor": ["grantor", "settlor", "trustor"],
+    "trustee": ["trustee"], "successor_trustee": ["successor trustee", "alternate trustee"],
+    "revocable_status": ["revocable status", "revocable or irrevocable", "trust type", "type of trust"],
+    "insurer": ["insurer", "insurance company", "carrier", "issued by", "underwritten by"],
+    "policy_type": ["policy type", "type of policy", "plan type"],
+    "insured_person": ["insured person", "insured", "name of insured", "life insured"],
 }
 _MONEY = re.compile(r"\$?\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)")
 _PCT = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s?%")
@@ -249,10 +273,12 @@ def evidence_from_fields(doc_type: str, fields: list[dict[str, Any]]) -> list[di
 
 
 class DocumentIntelligenceService:
-    def __init__(self, supabase: SupabaseClient, extractor: Optional[DocumentExtractor] = None, parser: Optional[DocumentParser] = None) -> None:
+    def __init__(self, supabase: SupabaseClient, extractor: Optional[DocumentExtractor] = None, parser: Optional[DocumentParser] = None,
+                 ingestion: Optional[IngestionService] = None) -> None:
         self._sb = supabase
         self._ex = extractor or DocumentExtractor()
         self._parser = parser or DocumentParser()
+        self._ingest = ingestion or IngestionService(supabase)
 
     async def upload(self, ctx: UserContext, *, doc_type: str, filename: str, content_type: str, data: bytes,
                      title: Optional[str] = None, acknowledge_sensitive: bool = False) -> dict[str, Any]:
@@ -352,12 +378,167 @@ class DocumentIntelligenceService:
                 "user_id": ctx.user_id, "tenant_id": ctx.user_id, "field_key": f["field_key"],
                 "field_value": str(f["field_value"]), "field_type": f["field_type"], "confidence": f["confidence"],
             }, schema=DOCS)
+        # ── BRIDGE: turn extracted VALUES into life-model facts (+ Family rows for critical docs). ──
+        # Nothing here is invented — we only bridge fields that were actually extracted. The doc itself
+        # never auto-confirms a life fact unless it's a labeled native-text field at high confidence.
+        bridge = await self._bridge(ctx, doc_id=doc_id, doc_type=doc_type, spec=spec,
+                                    fields=ext["fields"], source_kind=source_kind)
         return {"document_id": doc_id, "doc_type": doc_type, "category": spec.category,
                 "fields_extracted": len(ext["fields"]), "confidence": ext["confidence"],
                 "affects_domains": spec.domains, "status": status, "status_reason": reason,
                 "message": message, "next_steps": next_steps,
                 "processing_status": self._processing_status(classified=True, has_text=has_text, extracted=extracted),
-                "fields": ext["fields"], "evidence": evidence_from_fields(doc_type, ext["fields"])}
+                "fields": ext["fields"], "evidence": evidence_from_fields(doc_type, ext["fields"]),
+                "changed": bridge["changed"], "needs_review": bridge["needs_review"],
+                "bridged_facts": bridge["facts"]}
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # BRIDGE — extracted document values → life.facts (provenance) + Family rows.
+    # ──────────────────────────────────────────────────────────────────────────
+    @staticmethod
+    def _fact_domain(spec: T) -> str:
+        for d in spec.domains:
+            if d in _INGEST_DOMAINS:
+                return d
+        return "core"
+
+    @staticmethod
+    def _confirmation(conf: float, source_kind: str) -> str:
+        """Confirmed ONLY when the value came from labeled native text at high confidence.
+        Everything else is inferred — a document never silently promotes a fact to confirmed."""
+        is_native_text = source_kind in ("text", "pdf")  # machine-readable, labeled-field extraction
+        return "confirmed" if (conf >= _CONFIRM_THRESHOLD and is_native_text) else "inferred"
+
+    async def _bridge(self, ctx: UserContext, *, doc_id: str, doc_type: str, spec: T,
+                      fields: list[dict[str, Any]], source_kind: str) -> dict[str, Any]:
+        changed: list[str] = []
+        needs_review: list[dict[str, Any]] = []
+        facts: list[dict[str, Any]] = []
+        if not fields:
+            return {"changed": changed, "needs_review": needs_review, "facts": facts}
+        domain = self._fact_domain(spec)
+        changed.append(f"{spec.label} detected")
+        # 1. Every extracted field → a life.facts row with document provenance (idempotent by doc+field).
+        for f in fields:
+            key, value, conf = f["field_key"], str(f["field_value"]), float(f.get("confidence") or 0.0)
+            status = self._confirmation(conf, source_kind)
+            res = await self._ingest.submit_life_fact(ctx, {
+                "fact_type": f"{doc_type}.{key}", "value": value, "domain": domain,
+                "confidence": conf, "confirmation_status": status,
+                "idempotency_key": f"{doc_id}:{key}",
+                "provenance": {"submitted_by": "document-intelligence", "source_type": "document",
+                               "document_id": doc_id},
+            })
+            facts.append({"fact_type": f"{doc_type}.{key}", "ok": res.get("ok", False),
+                          "confirmation_status": status})
+            if status == "inferred":
+                needs_review.append({"field_key": key, "reason": "low_confidence_or_scanned", "confidence": conf})
+            label = key.replace("_", " ").capitalize()
+            changed.append(f"{label} identified: {value}")
+        # 2. Family-domain bridge for the critical estate/insurance doc types (real columns only).
+        fam = await self._bridge_family(ctx, doc_type=doc_type, fields=fields, source_kind=source_kind)
+        changed.extend(fam)
+        return {"changed": changed, "needs_review": needs_review, "facts": facts}
+
+    async def _bridge_family(self, ctx: UserContext, *, doc_type: str, fields: list[dict[str, Any]],
+                             source_kind: str) -> list[str]:
+        """Upsert the user-owned Family rows that FamilyService actually READS, so an upload moves
+        family readiness. We only write columns that EXIST in migration 131 and only when the value
+        was actually extracted. Trust/will/insurance attributes with no real column are preserved in
+        the row's `metadata` (and always as life.facts) — never invented as top-level columns.
+        Read-before-write: never overwrite a richer user-confirmed value with a document value."""
+        by_key = {f["field_key"]: str(f["field_value"]) for f in fields}
+        out: list[str] = []
+        if doc_type == "will":
+            out += await self._upsert_estate(ctx, set_will=True, by_key=by_key)
+            guardian = by_key.get("guardian")
+            if guardian:
+                out += await self._upsert_guardianship(ctx, guardian=guardian)
+        elif doc_type == "trust":
+            # estate_plans has no trust columns (migration 131) → record has_will untouched; persist the
+            # trust attributes into estate_plans.metadata + life.facts. has_trust is NOT a real column.
+            out += await self._upsert_estate(ctx, set_will=False, by_key=by_key, trust=True)
+        elif doc_type == "life_insurance_policy":
+            out += await self._upsert_insurance(ctx, by_key=by_key)
+        return out
+
+    async def _existing(self, table: str, ctx: UserContext) -> Optional[dict[str, Any]]:
+        rows = await self._sb.select(table, filters={"user_id": f"eq.{ctx.user_id}"}, limit=1,
+                                     order="updated_at.desc", schema=FAMILY)
+        return rows[0] if rows else None
+
+    @staticmethod
+    def _det_family_id(ctx: UserContext, table: str) -> str:
+        # one row per user for these singletons — deterministic id keeps the upload idempotent.
+        return str(uuid.uuid5(_REC_NS, f"{ctx.user_id}:{table}"))
+
+    async def _upsert_estate(self, ctx: UserContext, *, set_will: bool, by_key: dict[str, str],
+                             trust: bool = False) -> list[str]:
+        existing = await self._existing("estate_plans", ctx)
+        row = dict(existing) if existing else {
+            "id": self._det_family_id(ctx, "estate_plans"), "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+            "has_will": False, "has_poa": False, "has_beneficiaries": False, "status": "incomplete",
+        }
+        meta = dict(row.get("metadata") or {})
+        changed: list[str] = []
+        if set_will:
+            row["has_will"] = True                       # a will document means a will EXISTS
+            changed.append("Estate plan updated (will on file)")
+            for k in ("executor", "beneficiaries", "date"):
+                if by_key.get(k):
+                    meta[k] = by_key[k]                   # no executor/beneficiary COLUMN → metadata + life.facts
+        if trust:
+            # no has_trust column; record trust attributes in metadata only (never invent a column).
+            for k in ("trust_name", "grantor", "trustee", "successor_trustee", "beneficiaries", "revocable_status"):
+                if by_key.get(k):
+                    meta[k] = by_key[k]
+            meta["has_trust"] = True
+            changed.append("Estate plan updated (trust recorded)")
+        row["metadata"] = meta
+        row["updated_at"] = _now().isoformat()
+        await self._sb.upsert("estate_plans", row, schema=FAMILY)
+        return changed
+
+    async def _upsert_guardianship(self, ctx: UserContext, *, guardian: str) -> list[str]:
+        existing = await self._existing("guardianship_plans", ctx)
+        # never overwrite a user-designated guardian with a document value.
+        if existing and existing.get("status") == "designated" and existing.get("designated_guardian"):
+            return []
+        row = dict(existing) if existing else {
+            "id": self._det_family_id(ctx, "guardianship_plans"), "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+        }
+        row["status"] = "designated"
+        row["designated_guardian"] = guardian
+        row["updated_at"] = _now().isoformat()
+        await self._sb.upsert("guardianship_plans", row, schema=FAMILY)
+        return [f"Guardian recorded: {guardian}"]
+
+    async def _upsert_insurance(self, ctx: UserContext, *, by_key: dict[str, str]) -> list[str]:
+        coverage = by_key.get("coverage_amount")
+        if not coverage:
+            return []  # nothing to bridge — never write an insurance row without a real coverage value
+        try:
+            cov_num = float(str(coverage).replace(",", ""))
+        except (TypeError, ValueError):
+            return []
+        existing = await self._existing("insurance_profiles", ctx)
+        # never lower a user's existing higher coverage with a document value (preserve user data).
+        if existing and _num(existing.get("life_coverage")) is not None and _num(existing.get("life_coverage")) >= cov_num and (existing.get("source") or "") != "document-intelligence":
+            return ["Life insurance reviewed (existing coverage kept)"]
+        row = dict(existing) if existing else {
+            "id": self._det_family_id(ctx, "insurance_profiles"), "user_id": ctx.user_id, "tenant_id": ctx.user_id,
+        }
+        meta = dict(row.get("metadata") or {})
+        row["life_coverage"] = cov_num                    # real column
+        row["source"] = "document-intelligence"
+        # policy_type / beneficiaries / premium have NO real columns → metadata + life.facts only.
+        for k in ("policy_type", "beneficiaries", "premium", "insurer", "insured_person"):
+            if by_key.get(k):
+                meta[k] = by_key[k]
+        row["metadata"] = meta
+        row["updated_at"] = _now().isoformat()
+        await self._sb.upsert("insurance_profiles", row, schema=FAMILY)
+        return [f"Protection updated: life coverage ${cov_num:,.0f} on file", "Family readiness will recalculate"]
 
     async def _docs(self, ctx: UserContext) -> list[dict]:
         return await self._sb.select("documents", filters={"user_id": f"eq.{ctx.user_id}"}, limit=500, schema=DOCS)

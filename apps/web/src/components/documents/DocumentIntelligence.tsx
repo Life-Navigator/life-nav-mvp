@@ -7,6 +7,8 @@
 
 import React, { useEffect, useState } from 'react';
 
+import UploadResult, { type UploadResponse } from './UploadResult';
+
 type Status = 'green' | 'yellow' | 'orange' | 'red';
 interface CatReadiness {
   category: string;
@@ -21,16 +23,8 @@ interface Readiness {
   categories: CatReadiness[];
   documents_on_file: number;
 }
-interface RegisterResult {
-  doc_type: string;
-  category: string;
-  fields_extracted: number;
-  confidence: number;
-  affects_domains: string[];
-  fields: { field_key: string; field_value: string; confidence: number }[];
-  document_id?: string;
-  id?: string;
-}
+// The upload/register response is the canonical UploadResponse (defensive to the Core API contract).
+type RegisterResult = UploadResponse;
 
 const COLOR: Record<Status, string> = {
   green: 'bg-emerald-500',
@@ -56,7 +50,14 @@ export const DEFAULT_DOC_GROUPS: DocGroup[] = [
       ['social_security_estimate', 'Social Security Estimate'],
     ],
   },
-  { group: 'Career', items: [['resume', 'Resume'], ['offer_letter', 'Offer Letter'], ['employment_contract', 'Employment Contract']] },
+  {
+    group: 'Career',
+    items: [
+      ['resume', 'Resume'],
+      ['offer_letter', 'Offer Letter'],
+      ['employment_contract', 'Employment Contract'],
+    ],
+  },
   {
     group: 'Education',
     items: [
@@ -67,7 +68,14 @@ export const DEFAULT_DOC_GROUPS: DocGroup[] = [
       ['financial_aid_letter', 'Financial Aid Letter'],
     ],
   },
-  { group: 'Health', items: [['lab_report', 'Lab Report'], ['insurance_card', 'Insurance Card'], ['medication_list', 'Medication List']] },
+  {
+    group: 'Health',
+    items: [
+      ['lab_report', 'Lab Report'],
+      ['insurance_card', 'Insurance Card'],
+      ['medication_list', 'Medication List'],
+    ],
+  },
   {
     group: 'Family',
     items: [
@@ -128,7 +136,8 @@ export default function DocumentIntelligence({
     setUnlock(q.get('unlock') || '');
   }, [domain]);
 
-  const loadReadiness = () => fetch('/api/documents').then(async (x) => (x.ok ? setR(await x.json()) : null));
+  const loadReadiness = () =>
+    fetch('/api/documents').then(async (x) => (x.ok ? setR(await x.json()) : null));
   useEffect(() => {
     loadReadiness();
   }, []);
@@ -186,8 +195,11 @@ export default function DocumentIntelligence({
   };
 
   const requested = !!(returnTo || reason || unlock);
-  const pending = result && (result.fields_extracted ?? 0) === 0;
-  const cats = r ? (categoryFilter ? r.categories.filter((c) => categoryFilter.includes(c.category)) : r.categories) : [];
+  const cats = r
+    ? categoryFilter
+      ? r.categories.filter((c) => categoryFilter.includes(c.category))
+      : r.categories
+    : [];
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -205,8 +217,9 @@ export default function DocumentIntelligence({
       )}
 
       <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-        Please avoid uploading documents with Social Security numbers, full account numbers, or highly
-        sensitive identifiers unless necessary. During beta, use redacted documents when possible.
+        Please avoid uploading documents with Social Security numbers, full account numbers, or
+        highly sensitive identifiers unless necessary. During beta, use redacted documents when
+        possible.
       </div>
 
       <div className="mt-4 bg-white rounded-lg shadow-md p-5 dark:bg-gray-800">
@@ -216,7 +229,9 @@ export default function DocumentIntelligence({
             onChange={(e) => setDocType(e.target.value)}
             className="border border-gray-300 rounded-md px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900"
           >
-            {!knownTypes.has(docType) && <option value={docType}>{docType.replace(/_/g, ' ')}</option>}
+            {!knownTypes.has(docType) && (
+              <option value={docType}>{docType.replace(/_/g, ' ')}</option>
+            )}
             {groups.map((g) => (
               <optgroup key={g.group} label={g.group}>
                 {g.items.map(([v, l]) => (
@@ -256,41 +271,43 @@ export default function DocumentIntelligence({
           className="mt-3 w-full border border-gray-300 rounded-md px-3 py-2 text-sm font-mono dark:border-gray-600 dark:bg-gray-900"
         />
 
-        {result && (
-          <div className="mt-3 border-l-4 border-emerald-500 pl-3">
-            {pending ? (
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                Document uploaded. We&apos;ll use it once processing finishes.
-              </div>
-            ) : (
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                Extracted <b>{result.fields_extracted}</b> fields ({Math.round((result.confidence || 0) * 100)}%
-                confidence)
-                {result.affects_domains?.length ? ` · feeds ${result.affects_domains.join(', ')}` : ''}
-              </div>
-            )}
-            <div className="mt-1 flex flex-wrap gap-1">
-              {(result.fields || []).map((f) => (
-                <span key={f.field_key} className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                  {f.field_key.replace(/_/g, ' ')}: {f.field_value}
-                </span>
-              ))}
-            </div>
-            {redirecting && (
-              <div className="mt-2 text-sm font-medium text-indigo-700">Got it — taking you back…</div>
-            )}
+        {busy && !result && (
+          <div
+            className="mt-3 flex items-center gap-2 text-sm text-gray-500"
+            data-testid="upload-busy"
+          >
+            <span
+              className="inline-block h-3 w-3 animate-pulse rounded-full bg-indigo-500"
+              aria-hidden
+            />
+            Reading your document…
           </div>
+        )}
+
+        {result && (
+          <>
+            <UploadResult res={result} />
+            {redirecting && (
+              <div className="mt-2 text-sm font-medium text-indigo-700" data-testid="redirecting">
+                Got it — taking you back…
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {r && (
         <div className="mt-6">
           <div className="flex items-center gap-3">
-            <div className={`w-14 h-14 rounded-full ${COLOR[r.overall_status]} flex items-center justify-center text-white font-bold`}>
+            <div
+              className={`w-14 h-14 rounded-full ${COLOR[r.overall_status]} flex items-center justify-center text-white font-bold`}
+            >
               {r.overall_score}
             </div>
             <div>
-              <div className="font-semibold text-gray-900 dark:text-gray-100">Document Readiness</div>
+              <div className="font-semibold text-gray-900 dark:text-gray-100">
+                Document Readiness
+              </div>
               <div className="text-sm text-gray-500">{r.documents_on_file} document(s) on file</div>
             </div>
           </div>
@@ -301,7 +318,9 @@ export default function DocumentIntelligence({
                   <span className="font-medium text-gray-800 capitalize dark:text-gray-200">
                     {c.category.replace(/_/g, ' ')}
                   </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full text-white ${COLOR[c.status]}`}>
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded-full text-white ${COLOR[c.status]}`}
+                  >
                     {c.have}/{c.critical}
                   </span>
                 </div>
