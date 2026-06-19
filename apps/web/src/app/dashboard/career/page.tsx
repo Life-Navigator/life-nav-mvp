@@ -13,6 +13,8 @@ import {
 } from '@/components/domain/framework';
 import { careerDomain } from '@/components/domain/configs/career';
 import { DomainSnapshot } from '@/components/domain/DomainSnapshot';
+import { ReadinessCard } from '@/components/domain/ReadinessCard';
+import type { ReadinessResult } from '@/lib/readiness/types';
 
 interface CareerSnapshotVM {
   currentRole: string | null;
@@ -120,6 +122,7 @@ function toCoverageModel(vm: CareerVM | null): CoverageModel {
 export default function CareerOverviewPage() {
   const [vm, setVm] = useState<CareerVM | null>(null);
   const [snapshot, setSnapshot] = useState<CareerSnapshotVM | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -127,6 +130,10 @@ export default function CareerOverviewPage() {
     fetch('/api/career/overview')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setSnapshot(d))
+      .catch(() => {});
+    fetch('/api/career/readiness')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setReadiness(d))
       .catch(() => {});
   }, []);
 
@@ -180,6 +187,13 @@ export default function CareerOverviewPage() {
 
   return (
     <DomainOverview config={careerDomain} model={model}>
+      <ReadinessCard
+        title="Career Readiness"
+        result={readiness}
+        addHref="/dashboard/career/experience"
+        addLabel="Add experience"
+      />
+
       {snapshot && (
         <DomainSnapshot
           title="Career Snapshot"

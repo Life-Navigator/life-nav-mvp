@@ -13,6 +13,8 @@ import {
 } from '@/components/domain/framework';
 import { educationDomain } from '@/components/domain/configs/education';
 import { DomainSnapshot } from '@/components/domain/DomainSnapshot';
+import { ReadinessCard } from '@/components/domain/ReadinessCard';
+import type { ReadinessResult } from '@/lib/readiness/types';
 
 interface Counts {
   records: number;
@@ -102,6 +104,7 @@ async function countOf(path: string): Promise<number> {
 export default function EducationOverviewPage() {
   const [counts, setCounts] = useState<Counts | null>(null);
   const [snapshot, setSnapshot] = useState<EduSnapshotVM | null>(null);
+  const [readiness, setReadiness] = useState<ReadinessResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -109,6 +112,10 @@ export default function EducationOverviewPage() {
     fetch('/api/education/overview')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setSnapshot(d))
+      .catch(() => {});
+    fetch('/api/education/readiness')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setReadiness(d))
       .catch(() => {});
   }, []);
 
@@ -162,6 +169,13 @@ export default function EducationOverviewPage() {
 
   return (
     <DomainOverview config={educationDomain} model={model}>
+      <ReadinessCard
+        title="Education Readiness"
+        result={readiness}
+        addHref="/dashboard/education/degrees"
+        addLabel="Add education"
+      />
+
       {snapshot && (
         <DomainSnapshot
           title="Education Snapshot"
