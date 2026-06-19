@@ -17,6 +17,7 @@ import {
   persistPlaidItem,
   persistAccounts,
   persistInvestmentsAndRetirement,
+  persistPersonaInvestmentHoldings,
   persistTransactions,
   persistPersonaProfile,
   clearPriorFinanceData,
@@ -165,6 +166,20 @@ export async function POST(request: NextRequest) {
       console.warn('persistInvestmentsAndRetirement failed (non-fatal):', irErr);
     }
 
+    // 2c) Seed representative position-level holdings for the sample profile's
+    //     investment accounts so the Investments page positions table renders.
+    //     (Plaid sandbox user_custom items return account balances, not securities.)
+    let holdingsSeeded = 0;
+    try {
+      holdingsSeeded = await persistPersonaInvestmentHoldings(
+        svc,
+        user.id,
+        activation.customConfig
+      );
+    } catch (hErr) {
+      console.warn('persistPersonaInvestmentHoldings failed (non-fatal):', hErr);
+    }
+
     // 3) Transactions (last 30 days).
     const end = new Date();
     const start = new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -256,7 +271,7 @@ export async function POST(request: NextRequest) {
       persona_id: persona.persona_id,
       accounts_linked: accounts.length,
       transactions_synced: txnCount,
-      holdings_synced: invRet.holdings,
+      holdings_synced: invRet.holdings + holdingsSeeded,
       retirement_plans_synced: invRet.retirementPlans,
       graph_promotion: 'enqueued',
     });

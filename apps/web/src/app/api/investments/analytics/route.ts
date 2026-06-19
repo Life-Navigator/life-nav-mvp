@@ -1,18 +1,17 @@
 /**
  * GET /api/investments/analytics
  *
- * Honest, production-safe investment analytics. Position-level holdings are NOT
- * implemented yet (no Plaid Investments holdings sync), so this endpoint NEVER
- * fabricates holdings/allocation/performance. It returns the canonical,
- * user-scoped ACCOUNT-LEVEL investment balance plus an explicit limited-data
- * status, so the page can render real numbers + an honest missing-holdings state.
- *
- * TODO(Plaid Investments): when position-level holdings are persisted (e.g. via
- * Plaid /investments/holdings → finance schema), populate `holdings`, `allocation`,
- * and `performance` from that canonical source. Do not synthesize them here.
+ * Honest, production-safe investment analytics. Position-level holdings come from
+ * the canonical finance.investment_holdings table (manual entry, the /add page,
+ * document extraction, and persona seeding all write here). This endpoint NEVER
+ * fabricates market data it doesn't have (day change, P/E, 52-week range stay 0).
+ * When no holdings exist it falls back to account-level investment balances and an
+ * explicit limited-data status so the page renders real numbers or an honest
+ * missing-holdings state.
  */
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { listFinanceEntries } from '@/lib/services/financeService';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,19 +86,64 @@ export async function GET() {
 
   const hasInvestments = accountCount > 0 || totalInvestmentBalance > 0;
 
+  // Position-level holdings from the canonical finance.investment_holdings table.
+  // Map the REAL columns (quantity/cost_basis/current_price/current_value) to the
+  // page's holding shape. Market-data fields we don't track stay 0 (no fabrication).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let holdings: any[] = [];
+  try {
+    const rows = await listFinanceEntries(sb, user.id, 'investment');
+    holdings = (rows || []).map((h: Record<string, unknown>) => {
+      const shares = Number(h.quantity ?? 0);
+      const currentPrice = h.current_price != null ? Number(h.current_price) : 0;
+      const costBasisPerShare = h.cost_basis != null ? Number(h.cost_basis) : 0;
+      const marketValue = h.current_value != null ? Number(h.current_value) : shares * currentPrice;
+      const costTotal = costBasisPerShare * shares;
+      return {
+        ticker: h.symbol,
+        symbol: h.symbol,
+        name: (h.name as string) ?? (h.symbol as string),
+        shares,
+        costBasis: costBasisPerShare, // page multiplies by shares
+        currentPrice,
+        marketValue,
+        unrealizedGain: marketValue - costTotal,
+        unrealizedGainPercent: costTotal > 0 ? (marketValue - costTotal) / costTotal : 0,
+        sector: (h.sector as string) ?? 'Other',
+        assetClass: (h.asset_class as string) ?? null,
+        // Market data we do not track — never fabricated.
+        dividendYield: 0,
+        dayChange: 0,
+        dayChangePercent: 0,
+        peRatio: 0,
+        fiftyTwoWeekHigh: 0,
+        fiftyTwoWeekLow: 0,
+      };
+    });
+  } catch {
+    holdings = [];
+  }
+
+  const status = holdings.length
+    ? 'has_holdings'
+    : hasInvestments
+      ? 'limited_data'
+      : 'no_investment_accounts';
+
   return NextResponse.json({
-    status: hasInvestments ? 'limited_data' : 'no_investment_accounts',
+    status,
     totalInvestmentBalance,
     accountCount,
     accounts,
-    // No fabricated position-level data — see TODO above.
-    holdings: [],
+    holdings,
     allocation: null,
     performance: null,
-    message: hasInvestments
-      ? 'Position-level holdings are not available yet. Showing account-level investment balances from connected accounts.'
-      : 'No investment accounts found. Connect a brokerage or add an investment account to see your balances here.',
-    dataSource: 'connected_accounts',
+    message: holdings.length
+      ? 'Showing your position-level holdings.'
+      : hasInvestments
+        ? 'Position-level holdings are not available yet. Showing account-level investment balances from connected accounts.'
+        : 'No investment accounts found. Connect a brokerage or add an investment account to see your balances here.',
+    dataSource: holdings.length ? 'investment_holdings' : 'connected_accounts',
     lastUpdated: lastUpdated ?? new Date().toISOString(),
   });
 }

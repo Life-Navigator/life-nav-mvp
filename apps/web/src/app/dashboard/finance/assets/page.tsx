@@ -15,6 +15,7 @@ import {
   ChartBarIcon,
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
+  PhotoIcon,
 } from '@heroicons/react/24/outline';
 import { AssetType, Asset, AssetSummary } from '@/types/financial';
 
@@ -409,8 +410,104 @@ function EmptyState({ onAddAsset }: { onAddAsset: () => void }) {
 }
 
 // Asset Detail Modal Component
-function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => void }) {
+function AssetDetailModal({
+  asset,
+  onClose,
+  onChanged,
+}: {
+  asset: Asset;
+  onClose: () => void;
+  onChanged?: () => void;
+}) {
   const config = assetTypeConfig[asset.type] || assetTypeConfig.other;
+  const [showLoanForm, setShowLoanForm] = useState(false);
+  const [savingLoan, setSavingLoan] = useState(false);
+  const [loanError, setLoanError] = useState<string | null>(null);
+  const [loan, setLoan] = useState({
+    loanType: 'mortgage',
+    lender: '',
+    currentBalance: '',
+    originalAmount: '',
+    interestRate: '',
+    monthlyPayment: '',
+  });
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docMsg, setDocMsg] = useState<string | null>(null);
+
+  const submitLoan = async () => {
+    setLoanError(null);
+    if (loan.currentBalance === '') {
+      setLoanError('Enter the current loan balance.');
+      return;
+    }
+    setSavingLoan(true);
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/loans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loan),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => null);
+        throw new Error(b?.message || b?.error || `HTTP ${res.status}`);
+      }
+      setShowLoanForm(false);
+      setLoan({
+        loanType: 'mortgage',
+        lender: '',
+        currentBalance: '',
+        originalAmount: '',
+        interestRate: '',
+        monthlyPayment: '',
+      });
+      onChanged?.();
+      onClose();
+    } catch (e) {
+      setLoanError((e as Error).message);
+    } finally {
+      setSavingLoan(false);
+    }
+  };
+
+  const uploadPhoto = async (file: File) => {
+    setDocMsg(null);
+    setUploadingDoc(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`/api/assets/${asset.id}/image`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const b = await res.json().catch(() => null);
+        throw new Error(b?.message || b?.error || `HTTP ${res.status}`);
+      }
+      setDocMsg('Photo saved.');
+      onChanged?.();
+    } catch (e) {
+      setDocMsg(`Upload failed: ${(e as Error).message}`);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const uploadDocument = async (file: File) => {
+    setDocMsg(null);
+    setUploadingDoc(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`/api/assets/${asset.id}/documents`, { method: 'POST', body: fd });
+      if (!res.ok) {
+        const b = await res.json().catch(() => null);
+        throw new Error(b?.message || b?.error || `HTTP ${res.status}`);
+      }
+      setDocMsg('Document attached.');
+      onChanged?.();
+    } catch (e) {
+      setDocMsg(`Upload failed: ${(e as Error).message}`);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -436,6 +533,16 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Photo */}
+          {asset.imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={asset.imageUrl}
+              alt={asset.name}
+              className="w-full max-h-64 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+            />
+          )}
+
           {/* Value & Equity */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
@@ -560,20 +667,118 @@ function AssetDetailModal({ asset, onClose }: { asset: Asset; onClose: () => voi
             </div>
           )}
 
+          {/* Add Loan form */}
+          {showLoanForm && (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Add a loan</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={loan.loanType}
+                  onChange={(e) => setLoan({ ...loan, loanType: e.target.value })}
+                  className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+                >
+                  <option value="mortgage">Mortgage</option>
+                  <option value="auto_loan">Auto loan</option>
+                  <option value="heloc">HELOC</option>
+                  <option value="personal">Personal</option>
+                  <option value="other">Other</option>
+                </select>
+                <input
+                  placeholder="Lender"
+                  value={loan.lender}
+                  onChange={(e) => setLoan({ ...loan, lender: e.target.value })}
+                  className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+                />
+                <input
+                  type="number"
+                  placeholder="Current balance *"
+                  value={loan.currentBalance}
+                  onChange={(e) => setLoan({ ...loan, currentBalance: e.target.value })}
+                  className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+                />
+                <input
+                  type="number"
+                  placeholder="Original amount"
+                  value={loan.originalAmount}
+                  onChange={(e) => setLoan({ ...loan, originalAmount: e.target.value })}
+                  className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="Interest rate (%)"
+                  value={loan.interestRate}
+                  onChange={(e) => setLoan({ ...loan, interestRate: e.target.value })}
+                  className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+                />
+                <input
+                  type="number"
+                  placeholder="Monthly payment"
+                  value={loan.monthlyPayment}
+                  onChange={(e) => setLoan({ ...loan, monthlyPayment: e.target.value })}
+                  className="px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-sm"
+                />
+              </div>
+              {loanError && <p className="text-sm text-red-600">{loanError}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={submitLoan}
+                  disabled={savingLoan}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 text-sm"
+                >
+                  {savingLoan ? 'Saving…' : 'Save loan'}
+                </button>
+                <button
+                  onClick={() => setShowLoanForm(false)}
+                  className="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {docMsg && <p className="text-sm text-slate-600 dark:text-slate-300">{docMsg}</p>}
+
           {/* Actions */}
           <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-            <button className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
-              <WrenchScrewdriverIcon className="w-4 h-4" />
-              Add Upgrade
-            </button>
-            <button className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2">
+            <button
+              onClick={() => setShowLoanForm((v) => !v)}
+              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+            >
               <BanknotesIcon className="w-4 h-4" />
               Add Loan
             </button>
-            <button className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2">
+            <label className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2 cursor-pointer">
               <DocumentIcon className="w-4 h-4" />
-              Documents
-            </button>
+              {uploadingDoc ? 'Uploading…' : 'Add Document'}
+              <input
+                type="file"
+                accept=".pdf,.png,.jpg,.jpeg,.txt,.doc,.docx"
+                className="hidden"
+                disabled={uploadingDoc}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadDocument(f);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+            <label className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2 cursor-pointer">
+              <PhotoIcon className="w-4 h-4" />
+              Add Photo
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={uploadingDoc}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadPhoto(f);
+                  e.target.value = '';
+                }}
+              />
+            </label>
           </div>
         </div>
       </div>
@@ -822,7 +1027,11 @@ export default function AssetsPage() {
 
       {/* Asset Detail Modal */}
       {selectedAsset && (
-        <AssetDetailModal asset={selectedAsset} onClose={() => setSelectedAsset(null)} />
+        <AssetDetailModal
+          asset={selectedAsset}
+          onClose={() => setSelectedAsset(null)}
+          onChanged={fetchAssets}
+        />
       )}
     </div>
   );

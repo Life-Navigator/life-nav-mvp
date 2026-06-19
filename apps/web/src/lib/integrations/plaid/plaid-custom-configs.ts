@@ -31,6 +31,88 @@ type Account = {
 };
 export type PlaidCustomConfig = { override_accounts: Account[] };
 
+/**
+ * Representative position-level holding for a sample (persona) investment account.
+ * Plaid sandbox `user_custom` items return investment ACCOUNT balances but no
+ * securities/holdings, so the Investments page would show an empty positions
+ * table. For sample profiles we derive a small, clearly-representative holdings
+ * breakdown from each investment account's balance (broad index funds), so the
+ * portfolio renders. Cost basis is set equal to current price — we never
+ * fabricate unrealized gains we don't know.
+ */
+export type PersonaHolding = {
+  symbol: string;
+  name: string;
+  quantity: number;
+  cost_basis: number;
+  current_price: number;
+  current_value: number;
+  asset_class: string;
+  sector: string;
+};
+
+const FUND = {
+  VTI: {
+    name: 'Vanguard Total Stock Market ETF',
+    price: 268,
+    asset_class: 'us_equity',
+    sector: 'Diversified Equity',
+  },
+  VXUS: {
+    name: 'Vanguard Total International Stock ETF',
+    price: 62,
+    asset_class: 'intl_equity',
+    sector: 'International Equity',
+  },
+  BND: {
+    name: 'Vanguard Total Bond Market ETF',
+    price: 72,
+    asset_class: 'fixed_income',
+    sector: 'Bonds',
+  },
+  VFIFX: {
+    name: 'Vanguard Target Retirement 2050 Fund',
+    price: 48,
+    asset_class: 'target_date',
+    sector: 'Target Date',
+  },
+} as const;
+
+const holding = (sym: keyof typeof FUND, value: number): PersonaHolding => {
+  const f = FUND[sym];
+  return {
+    symbol: sym,
+    name: f.name,
+    quantity: Math.round((value / f.price) * 1000) / 1000,
+    cost_basis: f.price, // == current price: no fabricated gains
+    current_price: f.price,
+    current_value: Math.round(value * 100) / 100,
+    asset_class: f.asset_class,
+    sector: f.sector,
+  };
+};
+
+/**
+ * Derive representative holdings for a persona investment account from its
+ * balance + subtype. Retirement-style accounts → a single target-date fund;
+ * taxable/brokerage → a 60/25/15 stock/intl/bond split.
+ */
+export function personaHoldingsForAccount(subtype: string, balance: number): PersonaHolding[] {
+  if (!balance || balance <= 0) return [];
+  const s = (subtype || '').toLowerCase();
+  const isRetirement = ['401k', '403b', 'ira', 'roth', 'pension', 'retirement'].some((r) =>
+    s.includes(r)
+  );
+  if (isRetirement) {
+    return [holding('VFIFX', balance)];
+  }
+  return [
+    holding('VTI', balance * 0.6),
+    holding('VXUS', balance * 0.25),
+    holding('BND', balance * 0.15),
+  ];
+}
+
 // Recent-ish fixed dates (deterministic, no Date.now()).
 const D = (mmdd: string) => `2026-${mmdd}`;
 const tx = (date: string, amount: number, description: string): Txn => ({

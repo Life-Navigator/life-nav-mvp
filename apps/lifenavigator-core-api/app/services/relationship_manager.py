@@ -74,6 +74,8 @@ class RelationshipManager:
         self._sb = supabase
         self._life = life          # LifeDiscoveryService — canonical writer
         self._bridge = bridge      # LifeBridge — folds in setup-wizard/persona data
+        from app.services.domain_projection import DomainProjectionService
+        self._projection = DomainProjectionService(supabase)  # discovery goals → domain tables
 
     async def _vision_row(self, ctx: UserContext) -> dict[str, Any]:
         rows = await self._sb.select("life_vision", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema=LIFE)
@@ -95,6 +97,22 @@ class RelationshipManager:
                 if len(w) >= 5 and w not in _STOP:
                     norms.add(w)
         return norms
+
+    # Money framed as the ENABLER/LIMIT that protects what's already built is a
+    # constraint, NOT a "reach financial independence" goal. Without this, any
+    # answer to the finance step was forced into the financial_independence
+    # archetype (+ generic retirement dependencies), mis-reading the user.
+    _CONSTRAINT_SIGNALS = (
+        "constraint", "not the goal", "not a goal", "without weakening",
+        "set up properly", "the means", "enabler", "handle all",
+        "protect the", "protect our", "protect my", "protect what",
+        "the security i", "the security we", "make sure we can",
+    )
+
+    @classmethod
+    def _is_financial_constraint(cls, text: str) -> bool:
+        t = (text or "").lower()
+        return any(s in t for s in cls._CONSTRAINT_SIGNALS)
 
     @staticmethod
     def _future_status(goal: str) -> str:
@@ -272,6 +290,18 @@ class RelationshipManager:
         if step["kind"] == "vision":
             await self._update_vision(ctx, vision_text=ans)
             written["wrote"] = "life.life_vision"
+        elif step["kind"] == "goal" and step["domain"] == "finance" and ans and self._is_financial_constraint(ans):
+            # Money framed as a constraint/enabler protecting existing security → record it
+            # as a financial constraint (NOT a new financial-independence goal). Reinforces
+            # the user's real goals instead of slotting them into a retirement archetype.
+            await self._sb.upsert("constraints", {"id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{ctx.user_id}:rm:fin:{ans[:40]}")),
+                                                  "user_id": ctx.user_id, "tenant_id": ctx.user_id, "objective_id": None,
+                                                  "label": ans, "kind": "financial",
+                                                  "detail": "Money framed as a constraint/enabler during discovery.",
+                                                  "severity": "medium"}, schema=LIFE)
+            written["wrote"] = "life.constraints"
+            written["constraint"] = ans
+            written["is_constraint"] = True
         elif step["kind"] == "goal" and ans:
             root_hint = _GOAL_ROOT_HINT.get(step["domain"])
             res = await self._life.discover_goal(ctx, surface_goal=ans, why_chain=[{"q": step["prompt"], "a": ans}],
@@ -434,6 +464,13 @@ class RelationshipManager:
             # P0.1: persist every surviving candidate goal so it accumulates across turns (never lost).
             if candidate_goals:
                 await self._persist_candidate_goals(ctx, candidate_goals)
+                # Round-trip: project career/education goals + unambiguous family entities into the
+                # domain tables the dashboard pages read, so captured data shows up there (the user
+                # never re-enters it). Fail-soft — never breaks a discovery turn.
+                try:
+                    await self._projection.project(ctx, candidate_goals)
+                except Exception:  # noqa: BLE001
+                    pass
             updates = list(self._WROTE_UPDATES.get(rec.get("wrote", ""), []))
             if updates:
                 # Rule 7: during discovery, nothing is finalized — use draft language, not "recommendations refreshed".

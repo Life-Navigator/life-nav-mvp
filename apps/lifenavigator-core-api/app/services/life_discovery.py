@@ -153,7 +153,8 @@ _DOMAIN_KW: list[tuple[str, tuple[str, ...]]] = [
                 "children", "child", "baby", "spouse", "wife", "husband", "partner", "raise", "dependents",
                 "house", "home", "household")),
     ("career", ("career", "promotion", "my job", "new job", "boss", "salary", "professional", "employer",
-                "business", "founder", "startup")),
+                "business", "founder", "startup", "ceo", "cfo", "cto", "coo", "c-suite", "executive",
+                "leadership", "vice president", "vp ", "director", "management role", "lead a team")),
 ]
 
 

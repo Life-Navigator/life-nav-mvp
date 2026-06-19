@@ -146,6 +146,7 @@ export async function clearPriorFinanceData(svc: Svc, userId: string): Promise<v
     'plaid_items',
     'assets',
     'retirement_plans',
+    'investment_holdings',
   ]) {
     const { error } = await svc.schema('finance').from(table).delete().eq('user_id', userId);
     if (error) console.warn(`clearPriorFinanceData(${table}): ${error.message}`);
@@ -176,6 +177,42 @@ export async function persistInvestmentsAndRetirement(
   // No-op by design: mirroring financial_accounts into assets/retirement_plans
   // double-counted net worth and mislabeled investments. See doc comment above.
   return { holdings: 0, retirementPlans: 0 };
+}
+
+/**
+ * Seed position-level holdings into `finance.investment_holdings` for a sample
+ * (persona) profile. Plaid sandbox `user_custom` items return investment ACCOUNT
+ * balances but no securities, so the Investments page positions table would be
+ * empty. We derive a small, clearly-representative holdings breakdown from each
+ * investment account's balance (see personaHoldingsForAccount) so the portfolio
+ * renders. These rows live ONLY in investment_holdings (NOT summed into net
+ * worth, which uses financial_accounts) so there is no double-counting.
+ *
+ * Writes against the `finance` schema with the service-role client; user_id is
+ * set explicitly so rows stay scoped. Idempotent because clearPriorFinanceData
+ * deletes investment_holdings before each activation.
+ */
+export async function persistPersonaInvestmentHoldings(
+  svc: Svc,
+  userId: string,
+  config:
+    | { override_accounts: Array<{ type: string; subtype: string; starting_balance: number }> }
+    | null
+    | undefined
+): Promise<number> {
+  if (!config?.override_accounts?.length) return 0;
+  const { personaHoldingsForAccount } = await import('./plaid-custom-configs');
+  const rows: Record<string, unknown>[] = [];
+  for (const acc of config.override_accounts) {
+    if ((acc.type || '').toLowerCase() !== 'investment') continue;
+    for (const h of personaHoldingsForAccount(acc.subtype, acc.starting_balance)) {
+      rows.push({ ...h, user_id: userId, purchase_date: null });
+    }
+  }
+  if (!rows.length) return 0;
+  const { error } = await svc.schema('finance').from('investment_holdings').insert(rows);
+  if (error) throw new Error(`persistPersonaInvestmentHoldings: ${error.message}`);
+  return rows.length;
 }
 
 /** Upsert accounts; returns a map of plaid_account_id → finance.financial_accounts.id. */

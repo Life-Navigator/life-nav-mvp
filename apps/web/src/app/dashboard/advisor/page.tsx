@@ -257,6 +257,9 @@ export default function AdvisorPage() {
     setPanel(t.context_panel || {});
     setComplete(t.complete);
     setStatus(st); // 'responding' | 'fallback' | 'safety_response' — cleared to 'idle' on typing done
+    // Refresh per-domain Understanding after each turn — coverage was only fetched
+    // once at mount, so it would otherwise stay at the stale (often 0%) initial state.
+    loadCoverage();
     return true;
   };
 
@@ -441,11 +444,16 @@ export default function AdvisorPage() {
                       </span>
                     </span>
                   ))}
-                  {typeof panel.discovery_completion_pct === 'number' && (
-                    <span className="text-indigo-600 font-semibold">
-                      Overall {panel.discovery_completion_pct}%
-                    </span>
-                  )}
+                  {/* Overall is the mean of the per-domain numbers shown above, so it is
+                      always arithmetically consistent with them (no second formula). */}
+                  <span className="text-indigo-600 font-semibold">
+                    Overall{' '}
+                    {Math.round(
+                      coverage.reduce((a, c) => a + (c.confidence_pct ?? c.coverage_pct ?? 0), 0) /
+                        coverage.length
+                    )}
+                    %
+                  </span>
                 </div>
               ) : (
                 <div className="mt-1 text-xs text-gray-500">Getting to know you…</div>
@@ -518,11 +526,11 @@ export default function AdvisorPage() {
                       ✨ Here&apos;s what I just learned
                     </div>
                     <div className="mt-1 text-sm text-gray-600">
-                      You said: <span className="text-gray-900">“{m.reveal.you_said}”</span>
+                      You said: <span className="text-indigo-950">“{m.reveal.you_said}”</span>
                     </div>
                     <div className="text-sm text-gray-600">
                       What I&apos;m hearing (does this sound right?):{' '}
-                      <span className="text-lg font-bold text-gray-900">
+                      <span className="text-lg font-bold text-indigo-950">
                         {m.reveal.we_discovered}
                       </span>
                     </div>

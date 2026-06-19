@@ -56,14 +56,57 @@ export async function GET(req: NextRequest) {
     rows = [];
   }
 
+  // Per-asset loans (finance.asset_loans) → group active balances by asset_id so
+  // equity = current value − outstanding loans (computed server-side, Rule 1).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const loansByAsset: Record<string, any[]> = {};
+  try {
+    const { data: loanRows } = await sb
+      .schema('finance')
+      .from('asset_loans')
+      .select('*')
+      .eq('user_id', user.id);
+    for (const l of loanRows || []) {
+      (loansByAsset[l.asset_id] = loansByAsset[l.asset_id] || []).push({
+        id: l.id,
+        assetId: l.asset_id,
+        loanType: l.loan_type,
+        lender: l.lender,
+        originalAmount: l.original_amount != null ? Number(l.original_amount) : undefined,
+        currentBalance: Number(l.current_balance ?? 0),
+        interestRate: l.interest_rate != null ? Number(l.interest_rate) : undefined,
+        monthlyPayment: l.monthly_payment != null ? Number(l.monthly_payment) : undefined,
+        startDate: l.start_date ?? undefined,
+        endDate: l.end_date ?? undefined,
+        isActive: l.is_active ?? true,
+      });
+    }
+  } catch {
+    /* asset_loans unavailable → equity falls back to current value */
+  }
+
+  // Sign image paths (private bucket) for direct <img> display.
+  const imageUrlByAsset: Record<string, string> = {};
+  await Promise.all(
+    rows
+      .filter((r) => r.image_url)
+      .map(async (r) => {
+        const { data: signed } = await supabase.storage
+          .from('documents')
+          .createSignedUrl(r.image_url, 60 * 60);
+        if (signed?.signedUrl) imageUrlByAsset[r.id] = signed.signedUrl;
+      })
+  );
+
   const typeFilter = new URL(req.url).searchParams.get('type');
   const assets = rows
     .map((r) => {
       const currentValue = Number(r.current_value ?? 0);
       const purchasePrice = r.purchase_price != null ? Number(r.purchase_price) : undefined;
+      const loans = loansByAsset[r.id] || [];
+      const debt = loans.filter((l) => l.isActive).reduce((n, l) => n + (l.currentBalance || 0), 0);
       // equity/appreciation are computed HERE (server), never in the frontend (Rule 1).
-      // Per-asset loans aren't wired yet (finance.asset_loans) → equity = current value.
-      const equity = currentValue;
+      const equity = currentValue - debt;
       const appreciation =
         purchasePrice && purchasePrice > 0
           ? Math.round(((currentValue - purchasePrice) / purchasePrice) * 1000) / 10
@@ -81,6 +124,9 @@ export async function GET(req: NextRequest) {
         purchaseDate: r.purchase_date ?? undefined,
         location: r.location ?? undefined,
         description: r.description ?? undefined,
+        imageUrl: imageUrlByAsset[r.id] ?? undefined,
+        loans,
+        debt,
         equity,
         appreciation,
         createdAt: r.created_at,
@@ -95,16 +141,17 @@ export async function GET(req: NextRequest) {
     byType[a.type] = byType[a.type] || { type: a.type, count: 0, value: 0, equity: 0 };
     byType[a.type].count += 1;
     byType[a.type].value += a.value;
-    byType[a.type].equity += a.value; // no per-asset loans wired yet; equity = value
+    byType[a.type].equity += a.equity;
   }
   const totalValue = assets.reduce((n, a) => n + a.value, 0);
+  const totalDebt = assets.reduce((n, a) => n + (a.debt || 0), 0);
 
   return NextResponse.json({
     assets,
     summary: {
       totalValue,
-      totalEquity: totalValue,
-      totalDebt: 0,
+      totalEquity: totalValue - totalDebt,
+      totalDebt,
       byType: Object.values(byType),
     },
   });

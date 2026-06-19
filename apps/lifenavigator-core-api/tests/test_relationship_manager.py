@@ -168,6 +168,78 @@ async def test_answered_constraint_persists_to_life_constraints():
 
 
 @pytest.mark.asyncio
+async def test_discovery_projects_career_education_and_pet_into_domain_tables():
+    """Round-trip: goals captured in discovery must appear in the domain tables the
+    dashboard reads, so the user sees we understood and never re-enters data."""
+    from app.services.domain_projection import DomainProjectionService
+
+    sb = FakeSupabase({})
+    proj = DomainProjectionService(sb)
+    candidates = [
+        {"goal": "work toward a CEO role in the next 5 years", "domain": "career",
+         "confidence": 0.8, "supporting_quotes": ["CEO role in 5 years"]},
+        {"goal": "attend executive education at Harvard or Stanford", "domain": "education",
+         "confidence": 0.7, "supporting_quotes": ["executive education"]},
+        {"goal": "we just got a puppy that we must care for", "domain": "family",
+         "confidence": 0.9, "supporting_quotes": ["we just got a puppy"]},
+    ]
+    await proj.project(CTX, candidates)
+
+    careers = await sb.select("career_goals", filters={"user_id": f"eq.{CTX.user_id}"}, schema="career")
+    assert careers and careers[0]["goal_type"] == "advancement" and careers[0]["target_role"] == "CEO"
+    assert careers[0]["metadata"]["source"] == "discovery_projection"
+
+    edu = await sb.select("education_goals", filters={"user_id": f"eq.{CTX.user_id}"}, schema="education")
+    assert edu and edu[0]["goal_type"] == "credential"
+
+    pets = await sb.select("pets", filters={"user_id": f"eq.{CTX.user_id}"}, schema="family")
+    assert pets and pets[0]["species"] == "dog"
+
+
+@pytest.mark.asyncio
+async def test_projection_is_idempotent_across_repeated_turns():
+    from app.services.domain_projection import DomainProjectionService
+
+    sb = FakeSupabase({})
+    proj = DomainProjectionService(sb)
+    cand = [{"goal": "become a CEO", "domain": "career", "confidence": 0.8, "supporting_quotes": []}]
+    await proj.project(CTX, cand)
+    await proj.project(CTX, cand)
+    careers = await sb.select("career_goals", filters={"user_id": f"eq.{CTX.user_id}"}, schema="career")
+    assert len(careers) == 1  # deterministic id → upsert in place, no duplicate
+
+
+@pytest.mark.asyncio
+async def test_financial_constraint_answer_is_not_forced_into_financial_independence():
+    """A money answer framed as a CONSTRAINT protecting existing security must be recorded
+    as a constraint — NOT turned into a 'reach financial independence' objective with
+    boilerplate retirement dependencies (the reported mis-categorization bug)."""
+    sb = FakeSupabase({})
+    rm = _rm(sb)
+    r = await rm.answer(
+        CTX, "financial_goal",
+        "It is the constraint that we need to ensure is set up properly to handle all of "
+        "these things without weakening the security I have built for our family.",
+    )
+    assert r["recorded"]["wrote"] == "life.constraints"
+    assert r["recorded"].get("is_constraint") is True
+    # No financial_independence objective should have been created from this constraint.
+    objs = await sb.select("life_objectives", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
+    assert not any(o.get("root_objective_key") == "financial_independence" for o in objs)
+    cons = await sb.select("constraints", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
+    assert cons and cons[0]["kind"] == "financial"
+
+
+@pytest.mark.asyncio
+async def test_genuine_financial_goal_still_creates_objective():
+    """A real money GOAL (not constraint-framed) still flows to discover_goal as before."""
+    sb = FakeSupabase({})
+    rm = _rm(sb)
+    r = await rm.answer(CTX, "financial_goal", "I want to save aggressively and retire early")
+    assert "life.life_objectives" in r["recorded"]["wrote"]
+
+
+@pytest.mark.asyncio
 async def test_dominant_narrative_persists_and_returns_in_snapshot():
     sb = FakeSupabase({})
     rm = _rm(sb)
