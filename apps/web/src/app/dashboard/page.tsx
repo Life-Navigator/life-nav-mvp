@@ -1,6 +1,7 @@
 import DashboardClient from '@/components/dashboard/DashboardClient';
 import ExecutiveSummary from '@/components/dashboard/ExecutiveSummary';
 import LifeBrief from '@/components/dashboard/LifeBrief';
+import LifeBriefExecutive from '@/components/dashboard/LifeBriefExecutive';
 // NOTE: LifeIntelligence is intentionally NOT rendered on the dashboard (pilot UX cleanup) — it is
 // pure internal reasoning (primary/competing objectives + confidence%). The component file is kept so
 // it can live behind "My Life" later. Do not re-add the import here without that decision.
@@ -74,6 +75,12 @@ export default async function DashboardPage() {
     <>
       <DashboardClient firstInsight={firstInsight} />
       <div className="px-6 pb-6 max-w-[1400px] mx-auto w-full">
+        {/* Life Brief (Phase 6): grounded executive summary from REAL career + education
+            readiness — title, summary, scores, confidence, next move, "why this brief".
+            100% deterministic from /api/life-brief (no fabricated facts). */}
+        <div className="mb-6">
+          <LifeBriefExecutive />
+        </div>
         {/* Life Brief (Experience Excellence): the narrative — their own life story, goals, tension,
             and next move in plain language. Compact by default; expandable to the full brief.
             100% real data from /api/life/my-life `life_brief`; honest "still forming" empty state. */}

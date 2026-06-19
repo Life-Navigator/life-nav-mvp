@@ -4,7 +4,8 @@
  */
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { scoreEducation, type EducationData } from '@/lib/readiness/education';
+import { scoreEducation } from '@/lib/readiness/education';
+import { fetchEducationData } from '@/lib/readiness/fetch';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,39 +17,6 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any;
-  const sel = async (schema: string, table: string, cols: string) => {
-    try {
-      const { data } = await sb.schema(schema).from(table).select(cols).eq('user_id', user.id);
-      return data || [];
-    } catch {
-      return [];
-    }
-  };
-
-  const [degrees, courses, certifications, licenses, goals, careerGoals] = await Promise.all([
-    sel(
-      'public',
-      'education_records',
-      'institution_name,degree_type,field_of_study,status,is_current,graduation_date,school_domain,school_logo_url'
-    ),
-    sel('public', 'courses', 'course_name,status,completion_date'),
-    sel('education', 'certifications', 'name,issuer_domain,status'),
-    sel('education', 'licenses', 'name,issuer_domain,status'),
-    sel('education', 'education_goals', 'title,target_role,target_date,status'),
-    sel('career', 'career_goals', 'status'),
-  ]);
-
-  const data: EducationData = {
-    degrees,
-    courses,
-    certifications,
-    licenses,
-    goals,
-    careerGoalsCount: (careerGoals as { status?: string }[]).filter(
-      (g) => (g.status ?? 'active') === 'active'
-    ).length,
-  };
+  const data = await fetchEducationData(supabase, user.id);
   return NextResponse.json(scoreEducation(data, new Date().toISOString()));
 }
