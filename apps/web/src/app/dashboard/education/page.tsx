@@ -12,12 +12,34 @@ import {
   type CoverageModel,
 } from '@/components/domain/framework';
 import { educationDomain } from '@/components/domain/configs/education';
+import { DomainSnapshot } from '@/components/domain/DomainSnapshot';
 
 interface Counts {
   records: number;
   certifications: number;
   courses: number;
 }
+
+interface EduSnapshotVM {
+  topDegree: { institution?: string; degreeType?: string; field?: string; logoUrl?: string } | null;
+  counts: {
+    degrees: number;
+    certificates: number;
+    licenses: number;
+    courses: number;
+    goals: number;
+  };
+}
+
+const DEGREE_LABEL: Record<string, string> = {
+  high_school: 'High School Diploma',
+  associate: "Associate's",
+  bachelor: "Bachelor's",
+  master: "Master's",
+  doctorate: 'Doctorate',
+  certificate: 'Certificate',
+  bootcamp: 'Bootcamp',
+};
 
 const EDUCATION_UNLOCKS = [
   'Education ROI comparison',
@@ -79,8 +101,16 @@ async function countOf(path: string): Promise<number> {
 
 export default function EducationOverviewPage() {
   const [counts, setCounts] = useState<Counts | null>(null);
+  const [snapshot, setSnapshot] = useState<EduSnapshotVM | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/education/overview')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSnapshot(d))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -124,8 +154,50 @@ export default function EducationOverviewPage() {
 
   const model = toCoverageModel(counts);
 
+  const degreeHero = snapshot?.topDegree
+    ? `${DEGREE_LABEL[snapshot.topDegree.degreeType || ''] || 'Degree'}${
+        snapshot.topDegree.field ? `, ${snapshot.topDegree.field}` : ''
+      }${snapshot.topDegree.institution ? ` · ${snapshot.topDegree.institution}` : ''}`
+    : null;
+
   return (
     <DomainOverview config={educationDomain} model={model}>
+      {snapshot && (
+        <DomainSnapshot
+          title="Education Snapshot"
+          hero={degreeHero}
+          heroLogoName={snapshot.topDegree?.institution || 'Education'}
+          heroLogoUrl={snapshot.topDegree?.logoUrl}
+          stats={[
+            {
+              label: 'Degrees',
+              value: snapshot.counts.degrees,
+              href: '/dashboard/education/degrees',
+            },
+            {
+              label: 'Certificates',
+              value: snapshot.counts.certificates,
+              href: '/dashboard/education/degrees',
+            },
+            {
+              label: 'Licenses',
+              value: snapshot.counts.licenses,
+              href: '/dashboard/education/degrees',
+            },
+            {
+              label: 'Courses',
+              value: snapshot.counts.courses,
+              href: '/dashboard/education/degrees',
+            },
+            { label: 'Goals', value: snapshot.counts.goals, href: '/dashboard/education/goals' },
+          ]}
+          emptyTitle="Build your education record"
+          emptyHint="Add your degrees, certificates, licenses, and courses to unlock ROI analysis and recommendations."
+          ctaHref="/dashboard/education/degrees"
+          ctaLabel="Add education"
+        />
+      )}
+
       {/* 9. Related Recommendations */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">

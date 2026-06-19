@@ -12,6 +12,20 @@ import {
   type CoverageModel,
 } from '@/components/domain/framework';
 import { careerDomain } from '@/components/domain/configs/career';
+import { DomainSnapshot } from '@/components/domain/DomainSnapshot';
+
+interface CareerSnapshotVM {
+  currentRole: string | null;
+  currentEmployer: string | null;
+  yearsExperience: number | null;
+  counts: {
+    employment: number;
+    volunteer: number;
+    sideProjects: number;
+    goals: number;
+    certifications: number;
+  };
+}
 
 interface CareerRec {
   title?: string;
@@ -105,8 +119,16 @@ function toCoverageModel(vm: CareerVM | null): CoverageModel {
 
 export default function CareerOverviewPage() {
   const [vm, setVm] = useState<CareerVM | null>(null);
+  const [snapshot, setSnapshot] = useState<CareerSnapshotVM | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/career/overview')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSnapshot(d))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -150,8 +172,53 @@ export default function CareerOverviewPage() {
   const model = toCoverageModel(vm);
   const recs = vm?.recommendations ?? [];
 
+  const heroLine = snapshot?.currentRole
+    ? `${snapshot.currentRole}${snapshot.currentEmployer ? ` @ ${snapshot.currentEmployer}` : ''}${
+        snapshot.yearsExperience != null ? ` · ${snapshot.yearsExperience} yrs experience` : ''
+      }`
+    : null;
+
   return (
     <DomainOverview config={careerDomain} model={model}>
+      {snapshot && (
+        <DomainSnapshot
+          title="Career Snapshot"
+          hero={heroLine}
+          heroLogoName={snapshot.currentEmployer || snapshot.currentRole || 'Career'}
+          stats={[
+            {
+              label: 'Positions',
+              value: snapshot.counts.employment,
+              href: '/dashboard/career/experience',
+            },
+            {
+              label: 'Volunteer',
+              value: snapshot.counts.volunteer,
+              href: '/dashboard/career/experience',
+            },
+            {
+              label: 'Projects',
+              value: snapshot.counts.sideProjects,
+              href: '/dashboard/career/experience',
+            },
+            {
+              label: 'Certifications',
+              value: snapshot.counts.certifications,
+              href: '/dashboard/education/degrees',
+            },
+            {
+              label: 'Active goals',
+              value: snapshot.counts.goals,
+              href: '/dashboard/career/goals',
+            },
+          ]}
+          emptyTitle="Build your career picture"
+          emptyHint="Add your jobs, volunteer work, side projects, and goals to unlock readiness and recommendations."
+          ctaHref="/dashboard/career/experience"
+          ctaLabel="Add experience"
+        />
+      )}
+
       {/* 9. Related Recommendations (career-specific, labeled) */}
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
