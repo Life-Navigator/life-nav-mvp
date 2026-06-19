@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from ..models.common import UserContext
+from .advisor_facts import build_fact_packet, numbers_in_facts
 
 LIFE = "life"
 
@@ -223,6 +224,10 @@ class AdvisorContext:
     # P0.1 cross-turn context: the recent turns this session (most-recent last), so the advisor never
     # "starts over". [{ "user": "...", "advisor": "..." }]. Read from analytics.advisor_turns, not persisted.
     conversation_so_far: list[dict[str, str]] = field(default_factory=list)
+    # Phase 8: deterministic career/education fact packet, each fact carrying provenance
+    # (domain, sourceTable, recordId, confidence, updatedAt). The advisor may cite these; it
+    # may NOT state career/education facts that are absent here.
+    domain_facts: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def relationships_available(self) -> bool:
@@ -255,6 +260,9 @@ class AdvisorContext:
             # The user's own stated figures — SAFE to reference/reflect back (validator allows these).
             # Surfacing them explicitly so the advisor engages the numbers instead of deflecting.
             "numbers_you_may_reference": sorted(self.allowed_numbers),
+            # Phase 8: grounded career/education facts the advisor MAY cite (and ONLY these for those
+            # domains). Each carries domain/sourceTable/recordId/confidence for auditable citation.
+            "domain_facts": self.domain_facts,
             "relationship_edges": self.relationship_edges,
             "graph_connections": self.connections,
             "relationships_available": self.relationships_available,
@@ -314,6 +322,13 @@ class AdvisorContextBuilder:
             return [], [], set()
         return build_relationships(graph or {})
 
+    async def _facts(self, ctx: UserContext) -> list[dict[str, Any]]:
+        """Phase 8: deterministic career/education fact packet (provenance-carrying). Empty on error."""
+        try:
+            return await build_fact_packet(self._sb, ctx)
+        except Exception:  # noqa: BLE001 — grounding must never break a turn
+            return []
+
     def _confirmed(self, panel: dict[str, Any], cands: list[str]) -> list[dict[str, Any]]:
         """Confirmed = the user said it (vision/objective/goals) — these are known, not candidates."""
         out: list[dict[str, Any]] = []
@@ -335,8 +350,8 @@ class AdvisorContextBuilder:
             cands = list(panel.get("priorities_i_heard") or [])
         # These three reads are independent (rejected goals, discovery scores, personal graph) — run them
         # concurrently to cut the context_build stage (~16% of turn latency) roughly to its slowest read.
-        rejected, (scores, priorities), (edges, connections, connected_pairs) = await asyncio.gather(
-            self._rejected(ctx), self._scores(ctx), self._relationships(ctx)
+        rejected, (scores, priorities), (edges, connections, connected_pairs), domain_facts = await asyncio.gather(
+            self._rejected(ctx), self._scores(ctx), self._relationships(ctx), self._facts(ctx)
         )
         risks = [str(r) for r in (panel.get("top_risks") or [])]
         opps = [str(o) for o in (panel.get("top_opportunities") or [])]
@@ -346,6 +361,9 @@ class AdvisorContextBuilder:
         hist = list(history or [])[-6:]
         prior_user_msgs = [str(h.get("user") or "") for h in hist]
         allowed_numbers = numbers_in(message, *prior_user_msgs, *cands, *risks, *opps, *cons, panel.get("life_vision"))
+        # Phase 8: figures that appear in grounded, cited facts are safe to echo — add them so the
+        # validator's number-gate doesn't reject e.g. "~8 years" or a credential count.
+        allowed_numbers |= numbers_in_facts(domain_facts)
         stage = base.get("pending_key") or ("complete" if base.get("complete") else "discovery")
         return AdvisorContext(
             user_id=ctx.user_id,
@@ -370,4 +388,5 @@ class AdvisorContextBuilder:
             connections=connections,
             connected_pairs=connected_pairs,
             conversation_so_far=[{"user": str(h.get("user") or ""), "advisor": str(h.get("advisor") or "")} for h in hist],
+            domain_facts=domain_facts,
         )

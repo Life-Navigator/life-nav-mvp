@@ -217,8 +217,28 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
         if title and not any(r in title or title in r for r in rej):
             cg.append(g)
     safe["candidate_goals"] = cg
-    # Facts must declare a user_message source; drop fabricated-source facts. Categories stay separate.
-    safe["confirmed_facts"] = [f for f in (safe.get("confirmed_facts") or []) if (f or {}).get("source") == "user_message"]
+    # Facts must be grounded: either the user said it (source == "user_message"), OR it is a Phase-8
+    # domain fact cited from its real source table AND whose value actually matches the packet (so the
+    # LLM can't fabricate a fact by stamping a real-looking sourceTable on it). Categories stay separate.
+    packet = context.domain_facts or []
+    packet_tables = {str(p.get("sourceTable")) for p in packet}
+
+    def _grounded(f: Any) -> bool:
+        if not isinstance(f, dict):
+            return False
+        src = str(f.get("source") or "")
+        if src == "user_message":
+            return True
+        if src in packet_tables:
+            val = str(f.get("value") or "").strip().lower()
+            return bool(val) and any(
+                str(p.get("sourceTable")) == src
+                and (val in str(p.get("value") or "").lower() or str(p.get("value") or "").lower() in val)
+                for p in packet
+            )
+        return False
+
+    safe["confirmed_facts"] = [f for f in (safe.get("confirmed_facts") or []) if _grounded(f)]
     safe["candidate_facts"] = [f for f in (safe.get("candidate_facts") or []) if (f or {}).get("source") == "user_message"]
     # Only keep relationship citations that are real graph edges (the accept-path repair).
     safe["relationships_referenced"] = valid_citations
