@@ -10,7 +10,7 @@ export const careerDomain: DomainConfig = {
   tagline: 'Your work, trajectory, and earning power',
   nav: [
     { label: 'Overview', href: '/dashboard/career' },
-    { label: 'Experience', href: '/dashboard/career/experience', beta: true },
+    { label: 'Experience', href: '/dashboard/career/experience' },
     { label: 'Skills', href: '/dashboard/career/skills' },
     { label: 'Certifications', href: '/dashboard/career/certifications', beta: true },
     { label: 'Opportunities', href: '/dashboard/career/opportunities' },
@@ -19,7 +19,7 @@ export const careerDomain: DomainConfig = {
     { label: 'Documents', href: '/dashboard/career/documents', beta: true },
     { label: 'Analysis', href: '/dashboard/career/analysis', beta: true },
     { label: 'Recommendations', href: '/dashboard/career/recommendations', beta: true },
-    { label: 'Goals', href: '/dashboard/career/goals', beta: true },
+    { label: 'Goals', href: '/dashboard/career/goals' },
     { label: 'Reports', href: '/dashboard/career/reports', beta: true },
     { label: 'Settings', href: '/dashboard/career/settings', beta: true },
   ],

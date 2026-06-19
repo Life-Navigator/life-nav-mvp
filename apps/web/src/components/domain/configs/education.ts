@@ -8,7 +8,7 @@ export const educationDomain: DomainConfig = {
   tagline: 'Degrees, credentials, and the ROI of learning',
   nav: [
     { label: 'Overview', href: '/dashboard/education' },
-    { label: 'Degrees', href: '/dashboard/education/degrees', beta: true },
+    { label: 'My Education', href: '/dashboard/education/degrees' },
     { label: 'Certifications', href: '/dashboard/education/certifications' },
     { label: 'Courses', href: '/dashboard/education/courses' },
     { label: 'Skills', href: '/dashboard/education/skills', beta: true },
@@ -16,7 +16,7 @@ export const educationDomain: DomainConfig = {
     { label: 'ROI Analysis', href: '/dashboard/education/roi-analysis', beta: true },
     { label: 'Documents', href: '/dashboard/education/documents', beta: true },
     { label: 'Recommendations', href: '/dashboard/education/recommendations', beta: true },
-    { label: 'Goals', href: '/dashboard/education/goals', beta: true },
+    { label: 'Goals', href: '/dashboard/education/goals' },
     { label: 'Reports', href: '/dashboard/education/reports', beta: true },
     { label: 'Settings', href: '/dashboard/education/settings', beta: true },
   ],
