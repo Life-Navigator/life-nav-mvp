@@ -121,10 +121,19 @@ async def discovery_chat_stream(user: AuthenticatedUser = Depends(authenticated)
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+@router.get("/advisor/agents")
+async def advisor_agents(user: AuthenticatedUser = Depends(authenticated)):
+    """Command Center roster: the agents the user can talk to (Relationship Manager + domain specialists),
+    each with domains, capabilities, and grounding sources for the UI agent selector."""
+    from ..services.advisor_agents import agent_catalog
+    return {"agents": agent_catalog()}
+
+
 @router.post("/advisor/chat")
 async def advisor_chat(user: AuthenticatedUser = Depends(authenticated), svc=Depends(get_advisor_orchestrator),
                        message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True),
-                       conversation_id: str = Body(default="", embed=True), trace: bool = Body(default=False, embed=True)):
+                       conversation_id: str = Body(default="", embed=True), trace: bool = Body(default=False, embed=True),
+                       agent: str = Body(default="", embed=True)):
     """Phase 9I — the LLM-led ADVISOR turn (mode="advisor"), distinct from onboarding's discovery turn.
 
     This runs the full advisor pipeline: deterministic turn → health-safety net → context build (which now
@@ -138,7 +147,8 @@ async def advisor_chat(user: AuthenticatedUser = Depends(authenticated), svc=Dep
     import os
     trace_ok = trace and os.environ.get("ADVISOR_TRACE_ENABLED", "").lower() in ("1", "true", "yes")
     return await svc.converse(_ctx(user), message, pending_key or None,
-                              conversation_id=conversation_id or None, trace=trace_ok, mode="advisor")
+                              conversation_id=conversation_id or None, trace=trace_ok, mode="advisor",
+                              agent=agent or None)
 
 
 from ..services.my_life import MyLifeService  # noqa: E402

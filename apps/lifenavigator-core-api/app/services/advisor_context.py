@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from ..models.common import UserContext
+from .advisor_agents import domains_for
 from .advisor_facts import build_fact_packet, numbers_in_facts
 
 LIFE = "life"
@@ -228,6 +229,11 @@ class AdvisorContext:
     # (domain, sourceTable, recordId, confidence, updatedAt). The advisor may cite these; it
     # may NOT state career/education facts that are absent here.
     domain_facts: list[dict[str, Any]] = field(default_factory=list)
+    # Command Center: the active agent persona (id/name/persona) and the grounding domains in scope for
+    # this turn. Direct agents scope domain_facts to their domain(s); the Relationship Manager routes by
+    # message. None/[] means the legacy broad advisor (back-compat).
+    active_agent: Optional[dict[str, Any]] = None
+    agent_domains: list[str] = field(default_factory=list)
 
     @property
     def relationships_available(self) -> bool:
@@ -263,6 +269,10 @@ class AdvisorContext:
             # Phase 8: grounded career/education facts the advisor MAY cite (and ONLY these for those
             # domains). Each carries domain/sourceTable/recordId/confidence for auditable citation.
             "domain_facts": self.domain_facts,
+            # Command Center: who is answering + which domains are in scope. The model adopts this persona
+            # and stays within agent_domains; it must not answer outside its grounding.
+            "active_agent": self.active_agent,
+            "agent_domains": self.agent_domains,
             "relationship_edges": self.relationship_edges,
             "graph_connections": self.connections,
             "relationships_available": self.relationships_available,
@@ -341,9 +351,14 @@ class AdvisorContextBuilder:
         return out
 
     async def build(self, ctx: UserContext, message: str, base: dict[str, Any],
-                    history: Optional[list[dict[str, str]]] = None) -> AdvisorContext:
+                    history: Optional[list[dict[str, str]]] = None,
+                    agent: Optional[Any] = None) -> AdvisorContext:
         """`base` is the deterministic RelationshipManager.converse() result for this turn. `history` is the
-        recent conversation (most-recent last, [{user, advisor}]) — P0.1 cross-turn context."""
+        recent conversation (most-recent last, [{user, advisor}]) — P0.1 cross-turn context.
+
+        `agent` (Command Center) is an advisor_agents.Agent. A DIRECT agent scopes domain_facts to its
+        domain(s) so it answers only from its own grounding; the Relationship Manager keeps all facts but
+        routes which domains it drew from. None → legacy broad advisor (all facts, no persona)."""
         panel = base.get("context_panel") or {}
         cands = [c.get("goal") for c in (base.get("candidate_goals") or []) if c.get("goal")]
         if not cands:
@@ -361,6 +376,17 @@ class AdvisorContextBuilder:
         hist = list(history or [])[-6:]
         prior_user_msgs = [str(h.get("user") or "") for h in hist]
         allowed_numbers = numbers_in(message, *prior_user_msgs, *cands, *risks, *opps, *cons, panel.get("life_vision"))
+        # Command Center: scope grounding to the active agent's domains. A direct agent (e.g. Career)
+        # sees ONLY its domains' facts, so it can't wander into another domain it isn't grounding for.
+        # The Relationship Manager (is_orchestrator) keeps every fact and synthesizes across them.
+        active_agent: Optional[dict[str, Any]] = None
+        agent_domains: list[str] = []
+        if agent is not None:
+            agent_domains = domains_for(agent, message)
+            active_agent = {"id": agent.id, "name": agent.name, "persona": agent.persona,
+                            "domains": agent_domains, "isOrchestrator": agent.is_orchestrator}
+            if not agent.is_orchestrator and agent_domains:
+                domain_facts = [f for f in domain_facts if f.get("domain") in agent_domains]
         # Phase 8: figures that appear in grounded, cited facts are safe to echo — add them so the
         # validator's number-gate doesn't reject e.g. "~8 years" or a credential count.
         allowed_numbers |= numbers_in_facts(domain_facts)
@@ -389,4 +415,6 @@ class AdvisorContextBuilder:
             connected_pairs=connected_pairs,
             conversation_so_far=[{"user": str(h.get("user") or ""), "advisor": str(h.get("advisor") or "")} for h in hist],
             domain_facts=domain_facts,
+            active_agent=active_agent,
+            agent_domains=agent_domains,
         )

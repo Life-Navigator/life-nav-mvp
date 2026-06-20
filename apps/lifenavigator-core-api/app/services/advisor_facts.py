@@ -165,6 +165,49 @@ async def build_fact_packet(sb: Any, ctx: UserContext) -> list[dict[str, Any]]:
             facts.append(_fact("education", "Education goal", str(g["title"]), "Education goal",
                                "education.education_goals", g.get("id"), g.get("updated_at"), 0.9))
 
+    # ---- Finance ---- (Command Center: grounds the Finance / Scenario / Report agents)
+    accounts = await _rows(sb, ctx, "finance", "financial_accounts",
+                           "id,account_name,account_type,current_balance,interest_rate,credit_limit,is_active,updated_at")
+    active_accounts = [a for a in accounts if a.get("is_active", True) and a.get("account_name")]
+    for a in active_accounts[:_MAX_PER_CATEGORY]:
+        atype = (a.get("account_type") or "account").replace("_", " ")
+        bal = a.get("current_balance")
+        rate = a.get("interest_rate")
+        val = f"{a['account_name']} ({atype})"
+        if bal is not None:
+            val += f": ${bal}"
+        if rate is not None:
+            val += f" @ {rate}% APR"
+        facts.append(_fact("finance", "Account", val, "Financial account",
+                           "finance.financial_accounts", a.get("id"), a.get("updated_at"), 0.92))
+    if active_accounts:
+        facts.append(_fact("finance", "Accounts on file", f"{len(active_accounts)} active account(s)",
+                           "Financial accounts", "finance.financial_accounts", None, None, 0.85))
+
+    # ---- Family ---- (grounds the Family agent). Schema varies — select * and read defensively.
+    dependents = await _rows(sb, ctx, "family", "dependents", "*")
+    named_deps = [d for d in dependents if d.get("name") or d.get("full_name") or d.get("first_name")]
+    if dependents:
+        facts.append(_fact("family", "Dependents", f"{len(dependents)} dependent(s)",
+                           "Family dependents", "family.dependents", None, None, 0.85))
+    for d in named_deps[:_MAX_PER_CATEGORY]:
+        nm = d.get("name") or d.get("full_name") or d.get("first_name")
+        rel = d.get("relationship") or d.get("relation")
+        facts.append(_fact("family", "Dependent", str(nm) + (f" ({rel})" if rel else ""),
+                           "Family dependent", "family.dependents", d.get("id"), d.get("updated_at"), 0.85))
+
+    # ---- Documents ---- (grounds the Document Intelligence agent)
+    docs = await _rows(sb, ctx, "documents", "documents", "*")
+    named_docs = [d for d in docs if d.get("title") or d.get("file_name") or d.get("document_type")]
+    if docs:
+        facts.append(_fact("documents", "Documents on file", f"{len(docs)} document(s)",
+                           "Documents", "documents.documents", None, None, 0.85))
+    for d in named_docs[:_MAX_PER_CATEGORY]:
+        label = d.get("title") or d.get("file_name") or "Document"
+        dtype = d.get("document_type") or d.get("type")
+        facts.append(_fact("documents", "Document", str(label) + (f" — {dtype}" if dtype else ""),
+                           "Document", "documents.documents", d.get("id"), d.get("updated_at"), 0.85))
+
     return facts
 
 

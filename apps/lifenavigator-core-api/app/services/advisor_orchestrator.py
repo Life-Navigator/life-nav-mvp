@@ -30,11 +30,31 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from ..models.common import UserContext
+from .advisor_agents import get_agent
 from .advisor_context import AdvisorContextBuilder
 from .advisor_llm import AdvisorLLM, ADVISOR_PROMPT_VERSION
 from .advisor_validator import validate
 from . import model_registry as reg
 from .model_router import detect_health_urgent, health_safety_response
+
+
+def _citations_from_context(context: Any) -> list[dict[str, Any]]:
+    """Map the in-scope grounded facts → citation records (Phase 9: source domain, table, record id,
+    confidence, timestamp). These are SECTION-LEVEL: the grounding the agent was constrained to for this
+    turn, not a per-sentence map — labeled honestly as such in the UI. Bounded by the fact packet size."""
+    cites: list[dict[str, Any]] = []
+    for f in getattr(context, "domain_facts", []) or []:
+        cites.append({
+            "kind": "fact",
+            "domain": f.get("domain"),
+            "label": f.get("label"),
+            "value": f.get("value"),
+            "sourceTable": f.get("sourceTable"),
+            "recordId": f.get("recordId"),
+            "confidence": f.get("confidence"),
+            "updatedAt": f.get("updatedAt"),
+        })
+    return cites
 
 log = logging.getLogger("core.advisor")
 
@@ -251,7 +271,7 @@ class AdvisorOrchestrator:
 
     async def _enhance(self, base: dict[str, Any], ctx: UserContext, message: str, tr: dict[str, Any], lap,
                        history: Optional[list[dict[str, str]]] = None, llm: Any = None,
-                       fallback_llm: Any = None) -> None:
+                       fallback_llm: Any = None, agent: Any = None) -> None:
         """LLM enhancement: build context → generate → validate → compose. Mutates base + tr in place.
         Never raises — on any failure, base keeps its deterministic fallback text and llm_status is set.
         `llm` is the routed model for this turn (defaults to the DI LLM); `fallback_llm` (if provided by the
@@ -259,8 +279,11 @@ class AdvisorOrchestrator:
         to the user. Shared by converse()/converse_stream() so both paths produce identical outcomes."""
         active = llm or self._llm
         try:
-            context = await self._ctx.build(ctx, message, base, history or [])
+            context = await self._ctx.build(ctx, message, base, history or [], agent=agent)
             lap("context_build")
+            # Command Center: surface the grounded sources for this turn (Phase 9). Section-level — these
+            # are the provenance-carrying facts the agent was constrained to, set even if generation fails.
+            base["citations"] = _citations_from_context(context)
             constraints = build_constraints(base, context)
             lap("plan")
             out = await active.generate(context, constraints)
@@ -334,7 +357,7 @@ class AdvisorOrchestrator:
 
     async def converse(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
                        *, conversation_id: Optional[str] = None, trace: bool = False,
-                       mode: str = "advisor") -> dict[str, Any]:
+                       mode: str = "advisor", agent: Optional[str] = None) -> dict[str, Any]:
         t0 = time.perf_counter()
         tr = self._init_trace(message, conversation_id, ctx.user_id)
         tr["mode"] = mode
@@ -349,6 +372,11 @@ class AdvisorOrchestrator:
         # 1) Deterministic turn — persistence (candidate/rejected goals), canonical writes, safe fallback text.
         base = await self._rm.converse(ctx, message, pending_key)
         lap("deterministic_turn")
+        # Command Center: resolve the answering agent (advisor mode only; discovery has no agent persona).
+        agent_obj = get_agent(agent) if (mode != "discovery" and agent) else None
+        if agent_obj is not None:
+            base["agent"] = agent_obj.id
+            tr["agent"] = agent_obj.id
         # Health urgent-care safety net runs BEFORE any model (deterministic, no LLM) — wins in EVERY mode.
         if self._health_safety_check(message, base, tr):
             return self._finish(ctx, base, tr, t0, trace)
@@ -366,12 +394,12 @@ class AdvisorOrchestrator:
         history = await self._fetch_history(ctx, conversation_id)
         lap("history_fetch")
         primary_llm, fallback_llm = self._route(ctx, message, None, tr)
-        await self._enhance(base, ctx, message, tr, lap, history, primary_llm, fallback_llm)
+        await self._enhance(base, ctx, message, tr, lap, history, primary_llm, fallback_llm, agent=agent_obj)
         return self._finish(ctx, base, tr, t0, trace)
 
     async def converse_stream(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
                               *, conversation_id: Optional[str] = None, trace: bool = False,
-                              mode: str = "advisor"):
+                              mode: str = "advisor", agent: Optional[str] = None):
         """Progressive variant: yield a fast deterministic ACK first (the trust-safe text we'd show on
         fallback anyway, ready in ~1s), then the fully validated enhanced answer. Same telemetry/persistence
         as converse(). The validator still gates everything the user accepts as advice — the ack only mirrors
@@ -388,6 +416,10 @@ class AdvisorOrchestrator:
 
         base = await self._rm.converse(ctx, message, pending_key)
         lap("deterministic_turn")
+        agent_obj = get_agent(agent) if (mode != "discovery" and agent) else None
+        if agent_obj is not None:
+            base["agent"] = agent_obj.id
+            tr["agent"] = agent_obj.id
         # Health urgent-care safety net runs BEFORE the ack so an urgent message never shows the generic
         # opener first. If triggered, the safety reply IS the ack and the final.
         if self._health_safety_check(message, base, tr):
@@ -411,7 +443,7 @@ class AdvisorOrchestrator:
             history = await self._fetch_history(ctx, conversation_id)
             lap("history_fetch")
             primary_llm, fallback_llm = self._route(ctx, message, None, tr)
-            await self._enhance(base, ctx, message, tr, lap, history, primary_llm, fallback_llm)
+            await self._enhance(base, ctx, message, tr, lap, history, primary_llm, fallback_llm, agent=agent_obj)
         else:
             tr["llm_status"] = base.get("llm_status") or "disabled"
         self._finish(ctx, base, tr, t0, trace)  # log + best-effort persist + (optional) attach _trace

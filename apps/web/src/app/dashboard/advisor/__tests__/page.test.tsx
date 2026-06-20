@@ -4,8 +4,8 @@ import AdvisorPage from '@/app/dashboard/advisor/page';
 
 // Mock the heavy children so the test isolates the MODE-ROUTING decision (the actual fix), not their
 // internals. The discovery (OnboardingAdvisor) child lives in the page file itself, so we identify it
-// indirectly: when onboarding is complete + no ?onboarding=1, the page must render DashboardAdvisor.
-jest.mock('@/components/dashboard/DashboardAdvisor', () => ({
+// indirectly: when onboarding is complete + no ?onboarding=1, the page must render the Command Center.
+jest.mock('@/components/chat/CommandCenter', () => ({
   __esModule: true,
   default: () => <div data-testid="dashboard-advisor">advisor mode</div>,
 }));
