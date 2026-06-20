@@ -8,6 +8,7 @@
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useRef, useState } from 'react';
 import AddDataModal from '@/components/dashboard/AddDataModal';
+import DashboardAdvisor from '@/components/dashboard/DashboardAdvisor';
 import DiscoveryReveal from '@/components/onboarding/DiscoveryReveal';
 import StreamingText from '@/components/ui/StreamingText';
 import ArcanaStatus from '@/components/ui/ArcanaStatus';
@@ -69,7 +70,11 @@ interface Msg {
   llmStatus?: string;
 }
 
-export default function AdvisorPage() {
+// The onboarding/discovery advisor — the chat-native intake. Reached only DURING onboarding
+// (?onboarding=1 or onboarding not yet complete). It runs in discovery mode and is where the
+// "let's build your life plan" reveal belongs. After onboarding, the default export below routes to
+// the ongoing DashboardAdvisor (advisor mode) instead, so a finished user never re-enters intake.
+function OnboardingAdvisor() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   // Stable id for this chat session so the backend can thread cross-turn context (P0.1). Generated once.
   const [conversationId] = useState<string>(() =>
@@ -823,4 +828,47 @@ export default function AdvisorPage() {
       </div>
     </div>
   );
+}
+
+// Mode router for /dashboard/advisor. Onboarding (?onboarding=1, or middleware forced it because
+// onboarding isn't complete yet) → the discovery intake (OnboardingAdvisor). A finished user who clicks
+// "Advisor" from the dashboard → the ongoing DashboardAdvisor (advisor mode). This is the fix for the
+// dashboard chat re-running onboarding and saying "That's everything I need to start" after completion.
+export default function AdvisorPage() {
+  const [mode, setMode] = useState<'loading' | 'onboarding' | 'advisor'>('loading');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('onboarding') === '1') {
+      setMode('onboarding');
+      return;
+    }
+    // No explicit onboarding flag → decide by actual completion state, so a user who lands here
+    // mid-onboarding (without the flag) still gets discovery, and a finished user gets the advisor.
+    let cancelled = false;
+    fetch('/api/onboarding/status', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled) return;
+        setMode(d?.onboarding_completed ? 'advisor' : 'onboarding');
+      })
+      .catch(() => {
+        // Fail safe toward the advisor — a completed user is the common case here, and the advisor
+        // route degrades gracefully (trust-safe deterministic reply) if the profile can't be read.
+        if (!cancelled) setMode('advisor');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (mode === 'loading') {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-sm text-gray-500">
+        Loading…
+      </div>
+    );
+  }
+  return mode === 'onboarding' ? <OnboardingAdvisor /> : <DashboardAdvisor />;
 }

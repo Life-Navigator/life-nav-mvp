@@ -2,42 +2,50 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { agentApi } from '@/lib/api/agent';
+import { useAdvisorChat } from '@/components/chat/useAdvisorChat';
+import { ADVISOR_WELCOME, ADVISOR_INCOMPLETE_ONBOARDING } from '@/lib/chat/advisor';
 
-// Auth is handled by middleware — client-side check is best-effort
-function isAuthenticated(): boolean {
-  if (typeof window === 'undefined') return false;
-  return true; // Middleware gates access; sidebar renders optimistically
-}
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
+// Floating Advisor — the global chat launcher in the bottom-right of the portal. It is the SAME advisor
+// as the dashboard Advisor: it talks to advisor mode (/api/life/advisor/chat) via the shared
+// useAdvisorChat hook. Previously this was a dead shell — it gated all sending on an `agentId` loaded
+// from a legacy external agent backend (NEXT_PUBLIC_AGENT_API_URL) that is unset in prod, so the send
+// button was permanently disabled. That dependency is gone; the chat works on its own.
 
 interface ChatSidebarProps {
   context?: string; // Optional context about the current page
 }
 
 export default function ChatSidebar({ context }: ChatSidebarProps) {
-  // Rule 8: during advisor onboarding there is ONE conversation — the advisor itself. Hide this
-  // second assistant on the advisor route so the user never sees two AIs at once.
+  // During advisor onboarding the page IS the advisor (one conversation) — hide this second assistant
+  // on that route so the user never sees two advisors at once.
   const pathname = usePathname();
   const hiddenForOnboarding = pathname === '/dashboard/advisor';
+
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [agentId, setAgentId] = useState<string | null>(null);
-  const [agentName, setAgentName] = useState<string>('AI Assistant');
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  // null = unknown (optimistic: allow chat), true/false once /api/onboarding/status resolves.
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Open (and optionally pre-fill) when another surface — e.g. the First
-  // Insight "Ask your advisor about this" button — requests the governed
-  // advisor. See AskAdvisorButton / OPEN_ADVISOR_EVENT.
+  const { messages, loading, error, send } = useAdvisorChat({ welcome: ADVISOR_WELCOME });
+
+  // Resolve onboarding completion so an unfinished user gets a clear "finish setup" state instead of
+  // advice grounded in an empty profile. Unknown/failed → optimistic (chat stays usable).
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/onboarding/status', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d) setOnboardingComplete(!!d.onboarding_completed);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Open (and optionally pre-fill) when another surface — e.g. the First Insight
+  // "Ask your advisor about this" button — requests the governed advisor.
   useEffect(() => {
     const onOpen = (e: Event) => {
       setIsOpen(true);
@@ -48,162 +56,23 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
     return () => window.removeEventListener('lifenav:open-advisor', onOpen);
   }, []);
 
-  // Load available agent on mount (only if authenticated)
   useEffect(() => {
-    // Don't try to load agents if user is not authenticated
-    if (!isAuthenticated()) {
-      return;
-    }
-
-    async function loadAgent() {
-      try {
-        const agents = await agentApi.listAgents('default_user');
-        if (agents.length > 0) {
-          // Use agent_id field from the API response
-          const firstAgent = agents[0] as any;
-          setAgentId(firstAgent.agent_id || firstAgent.id);
-          setAgentName(
-            firstAgent.agent_id
-              ?.replace(/_/g, ' ')
-              .replace(/\b\w/g, (l: string) => l.toUpperCase()) ||
-              firstAgent.name ||
-              'AI Assistant'
-          );
-        }
-      } catch (error) {
-        console.error('Failed to load agents:', error);
-      }
-    }
-    loadAgent();
-  }, []);
-
-  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  }, [messages, loading]);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+  const inputDisabled = loading || onboardingComplete === false;
 
-  const handleSendMessage = async (preset?: string) => {
+  const handleSend = (preset?: string) => {
     const text = (typeof preset === 'string' ? preset : input).trim();
-    if (!text || isLoading || !agentId) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    const userInput = text;
+    if (!text || inputDisabled) return;
     setInput('');
-    setIsLoading(true);
-
-    // Create placeholder for streaming assistant message
-    const assistantMessageId = (Date.now() + 1).toString();
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-    };
-    setMessages((prev) => [...prev, assistantMessage]);
-
-    try {
-      // Call streaming chat endpoint
-      const response = await fetch('/api/agent/chat?stream=true', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          agent_id: agentId,
-          message: userInput,
-          conversation_id: conversationId || undefined,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Chat request failed: ${response.statusText}`);
-      }
-
-      // Read the stream
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('Response body is not readable');
-      }
-
-      const decoder = new TextDecoder();
-      let accumulatedContent = '';
-      let metadata = null;
-
-      // eslint-disable-next-line no-constant-condition
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-
-        // Check if we've reached metadata
-        if (chunk.includes('__METADATA__')) {
-          const parts = chunk.split('__METADATA__');
-          accumulatedContent += parts[0];
-
-          // Update final message
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMessageId ? { ...msg, content: accumulatedContent } : msg
-            )
-          );
-
-          // Extract metadata
-          try {
-            metadata = JSON.parse(parts[1].trim());
-            if (metadata?.conversation_id) {
-              setConversationId(metadata.conversation_id);
-            }
-          } catch (e) {
-            console.error('Failed to parse metadata:', e);
-          }
-          break;
-        }
-
-        accumulatedContent += chunk;
-
-        // Update message with accumulated content
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === assistantMessageId ? { ...msg, content: accumulatedContent } : msg
-          )
-        );
-      }
-
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      setIsLoading(false);
-
-      // Update the placeholder message with error
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMessageId
-            ? {
-                ...msg,
-                content:
-                  'Sorry, I encountered an error connecting to the AI service. Please try again.',
-              }
-            : msg
-        )
-      );
-    }
+    void send(text);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSendMessage();
+      handleSend();
     }
   };
 
@@ -216,7 +85,7 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 z-40 p-4 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-full shadow-lg transition-all transform hover:scale-110"
-        aria-label="Toggle AI Assistant"
+        aria-label="Toggle Advisor"
       >
         {isOpen ? (
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -249,10 +118,8 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-500 dark:to-blue-600">
             <div className="flex items-center space-x-2">
-              <div
-                className={`w-2 h-2 rounded-full ${agentId ? 'bg-green-400 animate-pulse' : 'bg-yellow-400'}`}
-              ></div>
-              <h2 className="text-lg font-semibold text-white">{agentName}</h2>
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+              <h2 className="text-lg font-semibold text-white">Your Advisor</h2>
             </div>
             <button
               onClick={() => setIsOpen(false)}
@@ -277,71 +144,59 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
             </div>
           )}
 
+          {/* Onboarding-incomplete state — a clear STATE message, not a dead shell, never the
+              "that's everything I need to start" onboarding loop. */}
+          {onboardingComplete === false && (
+            <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+              <p className="text-xs text-amber-800 dark:text-amber-300">
+                {ADVISOR_INCOMPLETE_ONBOARDING}
+              </p>
+            </div>
+          )}
+
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="text-6xl mb-4">🤖</div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  Welcome to {agentName}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 max-w-xs">
-                  {agentId
-                    ? 'Your advisor knows your accounts and goals. Ask anything — or start here:'
-                    : 'Loading AI agent...'}
-                </p>
-                {agentId && (
-                  <div className="mt-4 flex flex-col gap-2 w-full max-w-xs">
-                    {[
-                      'What should I do with my money this month?',
-                      'Can I afford a $30,000 car?',
-                      'Should I pay down debt or invest first?',
-                    ].map((starter) => (
-                      <button
-                        key={starter}
-                        type="button"
-                        onClick={() => handleSendMessage(starter)}
-                        disabled={isLoading}
-                        className="text-left rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
-                      >
-                        {starter}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              messages.map((message) => (
+            {messages.map((message, i) => (
+              <div
+                key={i}
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
                 <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
+                    message.role === 'user'
+                      ? 'bg-blue-600 dark:bg-blue-500 text-white'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                  }`}
                 >
-                  <div
-                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                      message.role === 'user'
-                        ? 'bg-blue-600 dark:bg-blue-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <p
-                      className={`text-xs mt-1 ${
-                        message.role === 'user'
-                          ? 'text-blue-100 dark:text-blue-200'
-                          : 'text-gray-500 dark:text-gray-400'
-                      }`}
-                    >
-                      {message.timestamp.toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  </div>
+                  <p className="text-sm whitespace-pre-wrap">{message.text}</p>
                 </div>
-              ))
-            )}
-            {isLoading && (
-              <div className="flex justify-start">
+              </div>
+            ))}
+
+            {/* Starter prompts before the first user turn (advisor mode only). */}
+            {onboardingComplete !== false &&
+              messages.filter((m) => m.role === 'user').length === 0 && (
+                <div className="flex flex-col gap-2">
+                  {[
+                    'What should I work on next?',
+                    'What do you know about my career?',
+                    'What information are you missing?',
+                  ].map((starter) => (
+                    <button
+                      key={starter}
+                      type="button"
+                      onClick={() => handleSend(starter)}
+                      disabled={inputDisabled}
+                      className="text-left rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
+                    >
+                      {starter}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+            {loading && (
+              <div className="flex justify-start" data-testid="advisor-loading">
                 <div className="bg-gray-100 dark:bg-gray-700 rounded-lg px-4 py-2">
                   <div className="flex space-x-2">
                     <div className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce"></div>
@@ -357,6 +212,11 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
                 </div>
               </div>
             )}
+            {error && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 dark:bg-rose-950/40 px-4 py-2 text-sm text-rose-700 dark:text-rose-300">
+                {error}
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -366,17 +226,19 @@ export default function ChatSidebar({ context }: ChatSidebarProps) {
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Ask me anything..."
+                onKeyDown={handleKeyPress}
+                placeholder={
+                  onboardingComplete === false ? 'Finish setup to chat…' : 'Ask your advisor…'
+                }
                 rows={1}
-                className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
-                disabled={isLoading}
+                className="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50"
+                disabled={inputDisabled}
               />
               <button
-                onClick={() => handleSendMessage()}
-                disabled={!input.trim() || isLoading || !agentId}
+                onClick={() => handleSend()}
+                disabled={!input.trim() || inputDisabled}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                title={!agentId ? 'Loading AI agent...' : 'Send message'}
+                title="Send message"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path

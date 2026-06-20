@@ -69,6 +69,11 @@ global.fetch = jest.fn(() =>
   } as Response)
 );
 
+// jsdom does not implement scrollIntoView (chat surfaces auto-scroll to the newest message).
+if (typeof window !== 'undefined' && !window.HTMLElement.prototype.scrollIntoView) {
+  window.HTMLElement.prototype.scrollIntoView = jest.fn();
+}
+
 // Clean up mocks after each test
 afterEach(() => {
   jest.clearAllMocks();
