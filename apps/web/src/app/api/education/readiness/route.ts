@@ -6,6 +6,8 @@ import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { scoreEducation } from '@/lib/readiness/education';
 import { fetchEducationData } from '@/lib/readiness/fetch';
+import { persistSnapshot } from '@/lib/readiness/snapshot';
+import { educationSnapshotFacts } from '@/lib/readiness/snapshotFacts';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,5 +20,19 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const data = await fetchEducationData(supabase, user.id);
-  return NextResponse.json(scoreEducation(data, new Date().toISOString()));
+  const result = scoreEducation(data, new Date().toISOString());
+  // Record the computed result so the Python advisor/report cite the same numbers (one source of truth).
+  await persistSnapshot(supabase, user.id, 'education', {
+    score: result.score,
+    status: result.status,
+    confidence: result.confidence,
+    components: result.components,
+    strengths: result.strengths,
+    gaps: result.gaps,
+    recommendedActions: result.recommendedActions,
+    dataSources: result.dataSources,
+    missingData: result.missingData,
+    payload: { ...result, snapshot: educationSnapshotFacts(data) },
+  });
+  return NextResponse.json(result);
 }

@@ -99,6 +99,15 @@ class UniversalReportEngine:
                 definition.sections.insert(0, await self._advisor_executive_section(ctx, 0))
             except Exception:  # noqa: BLE001 — the briefing never breaks report generation
                 pass
+        # Phase 9 — Career & Education intelligence, sourced from the readiness snapshots the web
+        # tier computed (life.readiness_snapshots) so the PDF cites the SAME numbers as the dashboard.
+        if report_type in ("full", "financial"):
+            try:
+                ce = await self._career_education_section(ctx, len(definition.sections) + 1)
+                if ce:
+                    definition.sections.append(ce)
+            except Exception:  # noqa: BLE001 — never breaks report generation
+                pass
         # Sprint 36: lead with the user's life model (vision/objective/themes/constraints/tradeoffs).
         life_sec = await self._life_model_section(ctx, 0)
         if life_sec:
@@ -297,6 +306,68 @@ class UniversalReportEngine:
                          "avg_confidence_pct": round(sum(confs) / len(confs) * 100) if confs else None},
         }
         return ReportSection(key="advisor_executive", title="Executive Briefing", ord=ord_n, body=payload)
+
+    async def _career_education_section(self, ctx: UserContext, ord_n: int) -> Optional[ReportSection]:
+        """Phase 9 — Career & Education intelligence for the advisor PDF, read from the readiness
+        snapshots the web tier computed (life.readiness_snapshots). One source of truth: the scores,
+        strengths, gaps, actions, components, sources and missing-data here are exactly what the
+        dashboard shows — this section RECORDS them, it does not re-score. Honest empties throughout."""
+        try:
+            rows = await self._sb.select(
+                "readiness_snapshots",
+                filters={"user_id": f"eq.{ctx.user_id}"},
+                schema="life",
+            )
+        except Exception:  # noqa: BLE001
+            rows = []
+        by_domain = {r.get("domain"): r for r in (rows or [])}
+
+        def _domain_block(domain: str) -> dict[str, Any]:
+            row = by_domain.get(domain) or {}
+            payload = row.get("payload") or {}
+            return {
+                "present": bool(row),
+                "snapshot": payload.get("snapshot") or {},
+                "readiness": {
+                    "score": row.get("score"),
+                    "status": row.get("status"),
+                    "confidence": row.get("confidence"),
+                    "strengths": row.get("strengths") or [],
+                    "gaps": row.get("gaps") or [],
+                    "recommended_actions": row.get("recommended_actions") or [],
+                    "components": row.get("components") or [],
+                },
+                "sources": row.get("data_sources") or [],
+                "missing_data": row.get("missing_data") or [],
+                "generated_at": row.get("generated_at"),
+            }
+
+        career = _domain_block("career")
+        education = _domain_block("education")
+        lb_row = by_domain.get("life_brief") or {}
+        life_brief = lb_row.get("payload") or None
+
+        # If the snapshots were never computed (web readiness endpoints not yet hit), say so honestly
+        # rather than emitting an empty section.
+        if not career["present"] and not education["present"]:
+            return ReportSection(
+                key="career_education", title="Career & Education", ord=ord_n,
+                body={"available": False,
+                      "note": "Career & Education readiness has not been computed yet. Open the Career "
+                              "and Education dashboards (or your Life Brief) to generate these scores; "
+                              "they will then appear here, fully cited."})
+
+        # Section-level provenance: the source tables actually consulted, deduped across both domains.
+        sources = sorted({s for s in (career["sources"] + education["sources"]) if s})
+        return ReportSection(
+            key="career_education", title="Career & Education", ord=ord_n,
+            body={"available": True, "life_brief": life_brief, "career": career, "education": education,
+                  "provenance": {"sources": sources, "source_count": len(sources),
+                                 "generated_at": career.get("generated_at") or education.get("generated_at")}},
+            evidence=[EvidenceReference(metric_name=f"{dom} readiness", metric_value=str(blk["readiness"].get("score")),
+                                        source_table=src)
+                      for dom, blk in (("career", career), ("education", education)) if blk["present"]
+                      for src in (blk["sources"] or ["life.readiness_snapshots"])])
 
     async def _compensation_report(self, ctx: UserContext) -> ReportDefinition:
         if self._comp is None:

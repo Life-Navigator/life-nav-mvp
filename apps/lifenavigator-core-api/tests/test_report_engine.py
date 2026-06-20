@@ -106,3 +106,53 @@ async def test_generate_stores_report_and_version():
     # the store wrote a reports row + a report_versions row
     tables = [t for t, _ in eng._sb.inserts]  # type: ignore[attr-defined]
     assert "reports" in tables and "report_versions" in tables
+
+
+# ── Phase 9 — Career & Education section reads readiness snapshots ────────────
+def _snap(domain, score, status, snapshot):
+    return {
+        "domain": domain, "score": score, "status": status, "confidence": 90,
+        "components": [{"label": "x", "score": 5, "max": 10, "reason": "r"}],
+        "strengths": ["s1"], "gaps": ["g1"], "recommended_actions": ["a1"],
+        "data_sources": [f"{domain}.records"], "missing_data": ["m1"],
+        "payload": {"snapshot": snapshot}, "generated_at": "2026-06-19T00:00:00Z",
+    }
+
+
+@pytest.mark.asyncio
+async def test_career_education_section_reads_snapshots_one_source_of_truth():
+    rows = dict(ROWS)
+    rows["readiness_snapshots"] = [
+        _snap("career", 88, "strong", {"currentRole": "VP Eng", "employmentCount": 3}),
+        _snap("education", 84, "strong", {"topEducation": {"label": "Master's"}, "certificationsCount": 2}),
+    ]
+    sec = await _engine(rows)._career_education_section(CTX, 7)
+    assert sec is not None and sec.body["available"] is True
+    # scores come straight from the snapshot rows — not recomputed
+    assert sec.body["career"]["readiness"]["score"] == 88
+    assert sec.body["education"]["readiness"]["score"] == 84
+    assert sec.body["career"]["snapshot"]["currentRole"] == "VP Eng"
+    # provenance lists the real source tables, deduped
+    assert set(sec.body["provenance"]["sources"]) == {"career.records", "education.records"}
+    # evidence references carry the source table for auditability
+    assert any(e.source_table for e in sec.evidence)
+
+
+@pytest.mark.asyncio
+async def test_career_education_section_honest_when_no_snapshots():
+    sec = await _engine(ROWS)._career_education_section(CTX, 7)
+    assert sec is not None and sec.body["available"] is False
+    assert "has not been computed" in sec.body["note"]
+
+
+@pytest.mark.asyncio
+async def test_full_report_includes_career_education_section_when_snapshots_exist():
+    rows = dict(ROWS)
+    rows["readiness_snapshots"] = [
+        _snap("career", 88, "strong", {"currentRole": "VP Eng", "employmentCount": 3}),
+        _snap("education", 84, "strong", {"topEducation": {"label": "Master's"}}),
+    ]
+    d = await _engine(rows).build(CTX, "full")
+    ce = next((s for s in d.sections if s.key == "career_education"), None)
+    assert ce is not None and ce.body["available"] is True
+    assert ce.body["career"]["readiness"]["score"] == 88

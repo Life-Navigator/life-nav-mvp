@@ -90,7 +90,8 @@ def render_report_pdf(definition: dict[str, Any], report_type: str = "full") -> 
     if report_type in ("full", "financial"):
         adv = next((s.get("body") for s in definition.get("sections", []) if s.get("key") == "advisor_executive"), None)
         if adv:
-            return HTML(string=_full_html(adv, definition, report_type)).write_pdf()
+            ce = next((s.get("body") for s in definition.get("sections", []) if s.get("key") == "career_education"), None)
+            return HTML(string=_full_html(adv, definition, report_type, ce)).write_pdf()
     return HTML(string=_generic_html(definition, report_type)).write_pdf()
 
 
@@ -152,7 +153,7 @@ def _bar(pct: Any, status: str) -> str:
     return f'<div class="bar"><i style="width:{p}%;background:{col}"></i></div>'
 
 
-def _full_html(adv: dict[str, Any], d: dict[str, Any], report_type: str) -> str:
+def _full_html(adv: dict[str, Any], d: dict[str, Any], report_type: str, ce: dict[str, Any] | None = None) -> str:
     now = datetime.now(timezone.utc).strftime("%B %d, %Y")
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     cov = adv.get("cover") or {}
@@ -261,8 +262,8 @@ def _full_html(adv: dict[str, Any], d: dict[str, Any], report_type: str) -> str:
     plansec = (f'<div class="pb"></div><h2><span class="n">6</span>Your 90-Day Action Plan</h2>'
                f'{_plan_block("Now", plan.get("now"))}{_plan_block("Next", plan.get("next"))}{_plan_block("Later", plan.get("later"))}{blk}') if plan else ''
 
-    # 12 — Appendix
-    appxsec = (f'<h2><span class="n">7</span>Appendix</h2><table class="appx">'
+    # 8 — Appendix
+    appxsec = (f'<h2><span class="n">8</span>Appendix</h2><table class="appx">'
                f'<tr><td>Report version</td><td>v{_esc(d.get("version", 1))}</td></tr>'
                f'<tr><td>Generated</td><td>{ts}</td></tr>'
                f'<tr><td>Recommendations</td><td>{_esc(appx.get("recommendation_count", 0))}</td></tr>'
@@ -271,10 +272,161 @@ def _full_html(adv: dict[str, Any], d: dict[str, Any], report_type: str) -> str:
                f'<tr><td>Average confidence</td><td>{(str(appx.get("avg_confidence_pct")) + "%") if appx.get("avg_confidence_pct") is not None else "—"}</td></tr>'
                f'</table>')
 
+    # 7 — Career & Education intelligence (Phase 9) — rendered right after the 90-day plan.
+    cesec = _career_education_html(ce, start_n=7) if ce else ""
+
     boundary = (d.get("governance") or {}).get("disclaimer_text") or "Decision support — not financial, medical, legal, or tax advice. Every figure traces to your real data."
     foot = f'<div class="boundary">{_esc(boundary)}</div>'
-    return (f"<!doctype html><html><head><meta charset='utf-8'><style>{_full_css()}</style></head><body>"
-            f"{cover}{exec_s}{readi}{goalsec}{recsec}{missec}{plansec}{appxsec}{foot}</body></html>")
+    return (f"<!doctype html><html><head><meta charset='utf-8'><style>{_full_css()}{_ce_css()}</style></head><body>"
+            f"{cover}{exec_s}{readi}{goalsec}{recsec}{missec}{plansec}{cesec}{appxsec}{foot}</body></html>")
+
+
+# ── Career & Education renderer (Phase 9) ────────────────────────────────────
+# Readiness status (not_started/limited_data/developing/strong/excellent) → (ink, wash, label).
+_READINESS = {
+    "not_started": ("#9ca3af", "#f3f4f6", "Not started"),
+    "limited_data": ("#b45309", "#fffbeb", "Limited data"),
+    "developing": ("#b45309", "#fff7ed", "Developing"),
+    "strong": ("#047857", "#ecfdf5", "Strong"),
+    "excellent": ("#047857", "#ecfdf5", "Excellent"),
+}
+
+
+def _ce_css() -> str:
+    return """
+    .dcard { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; margin: 10px 0 16px; page-break-inside: avoid; }
+    .dcard .hd { display: flex; align-items: center; gap: 16px; }
+    .dcard .hd .meta { flex: 1; }
+    .dcard .hd .title { font-size: 13pt; font-weight: 700; }
+    .dcard .hd .status { font-size: 9pt; font-weight: 600; }
+    .facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 4px; }
+    .fact { flex: 1 1 28%; min-width: 3.2cm; background: #f9fafb; border-radius: 7px; padding: 7px 10px; }
+    .fact .k { font-size: 8pt; color: #6b7280; text-transform: uppercase; letter-spacing: .4px; }
+    .fact .v { font-size: 12.5pt; font-weight: 700; }
+    .sg { display: flex; gap: 16px; margin-top: 8px; } .sg > div { flex: 1; }
+    .sg h4 { font-size: 9.5pt; margin: 4px 0; }
+    .comp { margin: 5px 0; }
+    .comp .row { display: flex; justify-content: space-between; font-size: 9pt; }
+    .comp .reason { font-size: 8pt; color: #6b7280; }
+    .prov { font-size: 8.5pt; color: #6b7280; margin-top: 8px; }
+    .prov .src { font-family: 'DejaVu Sans Mono', monospace; font-size: 7.5pt; background:#fff; border:1px solid #e5e7eb; border-radius:3px; padding:0 4px; }
+    h4 { font-size: 9.5pt; margin: 6px 0 3px; color: #374151; }
+    """
+
+
+def _ring(score: Any, status: str) -> str:
+    """A clean SVG donut showing the 0–100 readiness score, colored by status."""
+    ink = _READINESS.get(status, ("#6366f1", "", ""))[0]
+    try:
+        s = max(0, min(100, int(round(float(score)))))
+    except (TypeError, ValueError):
+        s = 0
+    r, c = 26, 2 * 3.14159 * 26
+    dash = c * s / 100
+    val = str(s) if score is not None else "—"
+    return (f'<svg width="68" height="68" viewBox="0 0 68 68">'
+            f'<circle cx="34" cy="34" r="{r}" fill="none" stroke="#eef2ff" stroke-width="8"/>'
+            f'<circle cx="34" cy="34" r="{r}" fill="none" stroke="{ink}" stroke-width="8" stroke-linecap="round" '
+            f'stroke-dasharray="{dash:.1f} {c:.1f}" transform="rotate(-90 34 34)"/>'
+            f'<text x="34" y="39" text-anchor="middle" font-size="16" font-weight="700" fill="{ink}">{val}</text>'
+            f'</svg>')
+
+
+def _ce_list(items: list, empty: str) -> str:
+    items = [x for x in (items or []) if x]
+    if not items:
+        return f'<p class="empty">{_esc(empty)}</p>'
+    return '<ul class="tight">' + "".join(f"<li>{_esc(x)}</li>" for x in items[:5]) + "</ul>"
+
+
+def _ce_components(components: list) -> str:
+    rows = ""
+    for c in (components or [])[:8]:
+        earned, mx = c.get("score"), c.get("max")
+        pct = round((earned / mx) * 100) if (isinstance(earned, (int, float)) and mx) else 0
+        rows += (f'<div class="comp"><div class="row"><b>{_esc(c.get("label") or c.get("key"))}</b>'
+                 f'<span>{_esc(earned)}/{_esc(mx)}</span></div>{_bar(pct, "strong")}'
+                 f'<div class="reason">{_esc(c.get("reason") or "")}</div></div>')
+    return rows or '<p class="empty">No component breakdown recorded.</p>'
+
+
+def _domain_card(title: str, blk: dict[str, Any], facts_rows: list[tuple[str, Any]], empty_msg: str) -> str:
+    if not blk or not blk.get("present"):
+        return (f'<div class="dcard"><div class="hd"><div class="meta"><div class="title">{_esc(title)}</div>'
+                f'<div class="status" style="color:#9ca3af">No data yet</div></div></div>'
+                f'<p class="empty">{_esc(empty_msg)}</p></div>')
+    rd = blk.get("readiness") or {}
+    status = rd.get("status") or "not_started"
+    ink, wash, label = _READINESS.get(status, ("#6366f1", "#eef2ff", status))
+    conf = rd.get("confidence")
+    facts = "".join(
+        f'<div class="fact"><div class="k">{_esc(k)}</div><div class="v">{_esc(v) if v not in (None, "") else "—"}</div></div>'
+        for k, v in facts_rows)
+    prov_sources = blk.get("sources") or []
+    src_html = " ".join(f'<span class="src">{_esc(s)}</span>' for s in prov_sources) or "—"
+    missing = blk.get("missing_data") or []
+    missing_html = (f'<div class="prov"><b>Missing data:</b> {", ".join(_esc(m) for m in missing[:6])}</div>'
+                    if missing else '<div class="prov" style="color:#047857">No critical data gaps.</div>')
+    return (f'<div class="dcard">'
+            f'<div class="hd">{_ring(rd.get("score"), status)}'
+            f'<div class="meta"><div class="title">{_esc(title)}</div>'
+            f'<div class="status"><span class="pill" style="background:{wash};color:{ink}">{_esc(label)}</span>'
+            f'{(" · " + str(conf) + "% confidence") if conf is not None else " · confidence n/a"}</div></div></div>'
+            f'<div class="facts">{facts}</div>'
+            f'<div class="sg"><div><h4>Top strengths</h4>{_ce_list(rd.get("strengths"), "None recorded yet.")}</div>'
+            f'<div><h4>Top gaps</h4>{_ce_list(rd.get("gaps"), "No gaps identified.")}</div></div>'
+            f'<h4 style="margin-top:8px">Recommended next actions</h4>{_ce_list(rd.get("recommended_actions"), "No actions recommended yet.")}'
+            f'<h4 style="margin-top:8px">Score breakdown</h4>{_ce_components(rd.get("components"))}'
+            f'{missing_html}'
+            f'<div class="prov"><b>Sources:</b> {src_html}</div></div>')
+
+
+def _career_education_html(ce: dict[str, Any], start_n: int) -> str:
+    if not ce or not ce.get("available"):
+        note = (ce or {}).get("note") or "Career & Education readiness has not been computed yet."
+        return (f'<div class="pb"></div><h2><span class="n">{start_n}</span>Career &amp; Education</h2>'
+                f'<p class="empty">{_esc(note)}</p>')
+    career = ce.get("career") or {}
+    education = ce.get("education") or {}
+    csnap = career.get("snapshot") or {}
+    esnap = education.get("snapshot") or {}
+    lb = ce.get("life_brief") or None
+
+    lead = ""
+    if lb and (lb.get("summary") or lb.get("title")):
+        lead = (f'<div class="lead"><b>{_esc(lb.get("title") or "Life Brief")}</b><br>{_esc(lb.get("summary") or "")}</div>')
+
+    career_facts = [
+        ("Current role", csnap.get("currentRole")),
+        ("Employer", csnap.get("currentEmployer")),
+        ("Years experience", csnap.get("yearsExperience")),
+        ("Positions", csnap.get("employmentCount")),
+        ("Volunteer roles", csnap.get("volunteerCount")),
+        ("Projects", csnap.get("projectCount")),
+        ("Active goals", csnap.get("activeCareerGoals")),
+    ]
+    top_edu = esnap.get("topEducation") or {}
+    edu_label = None
+    if top_edu:
+        edu_label = " · ".join(x for x in [top_edu.get("label"), top_edu.get("field")] if x) or top_edu.get("label")
+    education_facts = [
+        ("Top education", edu_label or "No completed degree on file"),
+        ("Institution", top_edu.get("institution")),
+        ("Certifications", esnap.get("certificationsCount")),
+        ("Licenses", esnap.get("licensesCount")),
+        ("Courses", esnap.get("coursesCount")),
+        ("Education goals", esnap.get("educationGoalsCount")),
+    ]
+
+    prov = ce.get("provenance") or {}
+    prov_html = (f'<p class="prov" style="margin-top:10px">Section provenance — {_esc(prov.get("source_count", 0))} '
+                 f'source table(s): ' + " ".join(f'<span class="src">{_esc(s)}</span>' for s in (prov.get("sources") or [])) + "</p>") if prov.get("sources") else ""
+
+    return (f'<div class="pb"></div><h2><span class="n">{start_n}</span>Career &amp; Education</h2>'
+            f'{lead}'
+            f'{_domain_card("Career", career, career_facts, "No career data on file yet. Add roles, projects, and goals to generate a career readiness score.")}'
+            f'{_domain_card("Education", education, education_facts, "No education data on file yet. Add degrees, certifications, and courses to generate an education readiness score.")}'
+            f'{prov_html}')
 
 
 def _human(key: str) -> str:

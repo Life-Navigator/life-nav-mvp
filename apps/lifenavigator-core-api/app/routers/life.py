@@ -121,6 +121,26 @@ async def discovery_chat_stream(user: AuthenticatedUser = Depends(authenticated)
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+@router.post("/advisor/chat")
+async def advisor_chat(user: AuthenticatedUser = Depends(authenticated), svc=Depends(get_advisor_orchestrator),
+                       message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True),
+                       conversation_id: str = Body(default="", embed=True), trace: bool = Body(default=False, embed=True)):
+    """Phase 9I — the LLM-led ADVISOR turn (mode="advisor"), distinct from onboarding's discovery turn.
+
+    This runs the full advisor pipeline: deterministic turn → health-safety net → context build (which now
+    carries the Phase-8 career/education `domain_facts` packet, each fact provenance-tagged) → LLM enhancement
+    → validator gate. The validator drops any career/education claim that is not grounded in `domain_facts`
+    (proven by tests/test_advisor_facts.py), so every factual statement the user accepts is cited. If the LLM
+    is not enabled in this environment, the orchestrator returns the trust-safe deterministic reply unchanged.
+
+    Cost note: unlike discovery, this path calls the model — wire it into a surface deliberately. Not deployed
+    by default. `trace=true` returns the per-turn diagnostic trace only when ADVISOR_TRACE_ENABLED is set."""
+    import os
+    trace_ok = trace and os.environ.get("ADVISOR_TRACE_ENABLED", "").lower() in ("1", "true", "yes")
+    return await svc.converse(_ctx(user), message, pending_key or None,
+                              conversation_id=conversation_id or None, trace=trace_ok, mode="advisor")
+
+
 from ..services.my_life import MyLifeService  # noqa: E402
 
 
