@@ -6,6 +6,7 @@ import LifeBriefExecutive from '@/components/dashboard/LifeBriefExecutive';
 // pure internal reasoning (primary/competing objectives + confidence%). The component file is kept so
 // it can live behind "My Life" later. Do not re-add the import here without that decision.
 import MissionControl from '@/components/dashboard/MissionControl';
+import RecentlyLearned from '@/components/dashboard/RecentlyLearned';
 import { createServerSupabaseClient, createServiceRoleClient } from '@/lib/supabase/server';
 import type { FirstInsight } from '@/lib/finance/first-insight';
 import { getRecommendations, type Recommendation } from '@/lib/finance/recommendations';
@@ -86,6 +87,12 @@ export default async function DashboardPage() {
             100% real data from /api/life/my-life `life_brief`; honest "still forming" empty state. */}
         <div className="mb-6">
           <LifeBrief />
+        </div>
+        {/* Recently learned (UI/Backend Parity): surfaces extracted document facts (life.facts) so the
+            user SEES what uploads taught the platform. 100% real data from /api/life/facts; hidden until
+            there is something real to show. */}
+        <div className="mb-6">
+          <RecentlyLearned />
         </div>
         {/* Executive summary (P4): readiness ring, vision, next best action, priorities, risks,
             opportunities, goal progress — 100% real data from /api/life/my-life + /api/goals,

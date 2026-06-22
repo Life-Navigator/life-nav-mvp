@@ -430,9 +430,10 @@ const navigation = [
   { name: 'Home', href: '/dashboard', icon: HomeIcon, current: false, section: 'Core' },
   { name: 'My Life', href: '/dashboard/my-life', icon: CompassIcon, current: false },
   { name: 'Advisor', href: '/dashboard/advisor', icon: ChatIcon, current: false },
-  // Primary Life Graph entry = the explainable, provenance-first graph (real edges + citations + XAI).
-  // The older /life-graph page stays reachable by direct URL but is no longer the primary nav target.
-  { name: 'Life Graph', href: '/life-graph/explainable', icon: PuzzlePieceIcon, current: false },
+  // Life Graph is REMOVED from primary nav for the pilot (GRAPH_GO_NO_GO = NO-GO): the data spine is
+  // strong but the presentation is engineering-first, below the investor bar. Both graph pages stay
+  // reachable by direct URL (/life-graph/explainable) for internal/dev use; a premium "Life Map —
+  // Coming Soon" hero is the user-facing replacement (GRAPH_PILOT_DECISION). Re-add only after redesign.
   // ── Domains ──
   {
     name: 'Finance',

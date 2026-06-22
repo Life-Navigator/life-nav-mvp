@@ -7,9 +7,11 @@ from fastapi import APIRouter, Body, Depends
 from fastapi.responses import StreamingResponse
 
 from ..auth import AuthenticatedUser
-from ..dependencies import authenticated, get_advisor_orchestrator, get_discovery_coverage, get_life_bridge, get_life_discovery, get_my_life, get_relationship_manager
+from ..clients.supabase import SupabaseClient
+from ..dependencies import authenticated, get_advisor_orchestrator, get_discovery_coverage, get_life_bridge, get_life_discovery, get_my_life, get_relationship_manager, get_supabase
 from ..models.common import UserContext
 from ..services.life_discovery import LifeDiscoveryService
+from ..services.life_facts import recent_facts
 
 router = APIRouter(prefix="/v1/life", tags=["life"])
 
@@ -35,6 +37,17 @@ async def goal(user: AuthenticatedUser = Depends(authenticated), svc: LifeDiscov
 @router.get("/snapshot")
 async def snapshot(user: AuthenticatedUser = Depends(authenticated), svc: LifeDiscoveryService = Depends(get_life_discovery)):
     return await svc.snapshot(_ctx(user))
+
+
+@router.get("/facts")
+async def facts(domain: str = "", limit: int = 20,
+                user: AuthenticatedUser = Depends(authenticated),
+                supabase: SupabaseClient = Depends(get_supabase)):
+    """Extracted document facts (life.facts) for the UI — the surfacing primitive behind the dashboard
+    'recently learned' strip, Reports appendix, and per-domain evidence. Confirmed/inferred only; honest
+    empty when none. Read-only over an existing table."""
+    items = await recent_facts(supabase, _ctx(user), domain=domain or None, limit=limit)
+    return {"facts": items, "count": len(items)}
 
 
 @router.get("/graph")
