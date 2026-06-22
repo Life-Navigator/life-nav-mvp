@@ -14,7 +14,10 @@
 // it reads `changed` / `fields` / `needs_review` / `status` / `status_reason` / `message` /
 // `next_steps` / `processing_status` only if present.
 
-import React from 'react';
+import React, { useState } from 'react';
+
+import DocumentEvidence from './DocumentEvidence';
+import ResumeImportReview from './ResumeImportReview';
 
 /** Shape the Core API returns from POST /v1/documents and /v1/documents/upload.
  *  Every field optional — we are defensive to a backend contract still being finalized. */
@@ -165,6 +168,8 @@ function StepRow({ label, state, detail }: { label: string; state: StageState; d
 }
 
 export default function UploadResult({ res }: { res: UploadResponse }) {
+  const [showEvidence, setShowEvidence] = useState(false);
+
   // PII block is its own terminal — surface the detected categories + the API's own message.
   if (res.requires_confirmation || res.status === 'blocked_pending_confirmation') {
     return (
@@ -198,6 +203,7 @@ export default function UploadResult({ res }: { res: UploadResponse }) {
   const needsReview = res.needs_review ?? [];
   const fields = res.fields ?? [];
   const nextSteps = res.next_steps ?? [];
+  const docId = res.document_id || res.id || '';
 
   // Prefer the backend's own step list (with its details) when present; otherwise our derived stages.
   const usingBackendSteps = (res.processing_status?.length ?? 0) > 0;
@@ -303,6 +309,27 @@ export default function UploadResult({ res }: { res: UploadResponse }) {
               {f.field_key.replace(/_/g, ' ')}: {f.field_value}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* Resume → the Import Review screen (Phase 8): review extracted records, then import to domains. */}
+      {docId && res.doc_type === 'resume' && (
+        <div className="mt-4 border-t border-gray-100 pt-4 dark:border-gray-700">
+          <ResumeImportReview documentId={docId} />
+        </div>
+      )}
+
+      {/* View Evidence — trace every field to its source page/section + confirm/edit/reject (P0 trust). */}
+      {docId && res.doc_type !== 'resume' && terminal !== 'failed' && (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowEvidence((v) => !v)}
+            className="text-xs font-semibold text-indigo-700 hover:underline dark:text-indigo-400"
+            data-testid="view-evidence-toggle"
+          >
+            {showEvidence ? 'Hide evidence' : 'View evidence'}
+          </button>
+          {showEvidence && <DocumentEvidence documentId={docId} />}
         </div>
       )}
     </div>

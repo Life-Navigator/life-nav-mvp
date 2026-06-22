@@ -7,6 +7,7 @@
 
 import React, { useEffect, useState } from 'react';
 
+import ConflictReview from './ConflictReview';
 import UploadResult, { type UploadResponse } from './UploadResult';
 
 type Status = 'green' | 'yellow' | 'orange' | 'red';
@@ -53,7 +54,7 @@ export const DEFAULT_DOC_GROUPS: DocGroup[] = [
   {
     group: 'Career',
     items: [
-      ['resume', 'Resume'],
+      ['resume', 'Resume / CV'],
       ['offer_letter', 'Offer Letter'],
       ['employment_contract', 'Employment Contract'],
     ],
@@ -294,6 +295,11 @@ export default function DocumentIntelligence({
             )}
           </>
         )}
+      </div>
+
+      {/* Phase 6: surface contradictions across documents + profile. Re-mounts after each upload. */}
+      <div className="mt-6">
+        <ConflictReview key={String(result?.document_id ?? 'init')} embedded />
       </div>
 
       {r && (

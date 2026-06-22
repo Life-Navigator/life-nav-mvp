@@ -97,6 +97,9 @@ class T:
 
 TAXONOMY: dict[str, T] = {
     # Employment
+    # Resume: a first-class multi-record source. Field extraction is handled by ResumeImportService
+    # (sections → reviewable records), not the labeled-field extractor — fields={} here on purpose.
+    "resume": T("employment", "Resume / CV", {}, ["career", "education"], False),
     "offer_letter": T("employment", "Offer Letter", {"base_salary": "money", "signing_bonus": "money", "annual_bonus": "money", "equity_grant": "money", "start_date": "date", "title": "text"}, ["career", "finance"], True),
     "compensation_plan": T("employment", "Compensation Plan", {"base_salary": "money", "target_bonus": "percent", "equity_grant": "money", "commission_rate": "percent"}, ["career", "finance"]),
     "employment_agreement": T("employment", "Employment Agreement", {"title": "text", "start_date": "date", "non_compete_months": "number", "severance": "text"}, ["career"]),
@@ -168,11 +171,22 @@ _PCT = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s?%")
 _DATE = re.compile(r"(\d{4}-\d{2}-\d{2})|(\d{1,2}/\d{1,2}/\d{2,4})|([A-Z][a-z]+ \d{1,2},? \d{4})")
 
 
+def _page_for_offset(offset: int, pages: Optional[list[tuple[int, int]]]) -> Optional[int]:
+    """Map a character offset in the joined document text → 1-based page number, using the page spans the
+    parser recorded. Returns None for pasted text (no page structure)."""
+    if not pages:
+        return None
+    for i, (start, end) in enumerate(pages):
+        if start <= offset <= end:
+            return i + 1
+    return len(pages)  # past the last recorded span → last page
+
+
 class DocumentExtractor:
     """Deterministic labeled-field extraction over document text, guided by the doc_type's
     expected fields + synonyms. (LLM/OCR is the upgrade path for unstructured scans.)"""
 
-    def extract(self, doc_type: str, text: str) -> dict[str, Any]:
+    def extract(self, doc_type: str, text: str, pages: Optional[list[tuple[int, int]]] = None) -> dict[str, Any]:
         spec = TAXONOMY.get(doc_type)
         if not spec or not text:
             return {"fields": [], "confidence": 0.0, "dates": {}}
@@ -182,8 +196,14 @@ class DocumentExtractor:
             labels = _SYNONYMS.get(key, [key.replace("_", " ")])
             hit = self._find(lower, text, labels, ftype)
             if hit is not None:
-                value, conf = hit
-                fields.append({"field_key": key, "field_value": value, "field_type": ftype, "confidence": conf})
+                value, conf, idx, matched_label = hit
+                fields.append({
+                    "field_key": key, "field_value": value, "field_type": ftype, "confidence": conf,
+                    # Provenance (P0): where in the document this value was found.
+                    "char_start": idx, "char_end": idx + len(matched_label) + 40,
+                    "page_number": _page_for_offset(idx, pages), "section": matched_label,
+                    "extraction_method": "regex",
+                })
         overall = round(sum(f["confidence"] for f in fields) / len(fields), 2) if fields else 0.0
         # surface effective/document/expiry dates if present
         dates: dict[str, Any] = {}
@@ -193,7 +213,9 @@ class DocumentExtractor:
         return {"fields": fields, "confidence": overall, "dates": dates}
 
     @staticmethod
-    def _find(lower: str, original: str, labels: list[str], ftype: str) -> Optional[tuple[str, float]]:
+    def _find(lower: str, original: str, labels: list[str], ftype: str) -> Optional[tuple[str, float, int, str]]:
+        """Returns (value, confidence, match_offset, matched_label). The offset + label are the provenance
+        anchor (which char span / section the value came from)."""
         for label in labels:
             idx = lower.find(label)
             if idx < 0:
@@ -202,24 +224,24 @@ class DocumentExtractor:
             if ftype == "money":
                 m = _MONEY.search(window[len(label):])
                 if m:
-                    return m.group(1).replace(",", ""), 0.9
+                    return m.group(1).replace(",", ""), 0.9, idx, label
             elif ftype == "percent":
                 m = _PCT.search(window)
                 if m:
-                    return m.group(1), 0.9
+                    return m.group(1), 0.9, idx, label
             elif ftype == "date":
                 m = _DATE.search(window)
                 if m:
-                    return m.group(0), 0.85
+                    return m.group(0), 0.85, idx, label
             elif ftype == "number":
                 m = re.search(r"([0-9][0-9,]*(?:\.[0-9]+)?)", window[len(label):])  # allow decimals (e.g. A1C 5.4)
                 if m:
-                    return m.group(1).replace(",", ""), 0.8
+                    return m.group(1).replace(",", ""), 0.8, idx, label
             else:  # text — take the rest of the line after a colon
                 seg = window[len(label):].lstrip(" :\t")
                 val = seg.splitlines()[0].strip() if seg else ""
                 if val:
-                    return val[:120], 0.7
+                    return val[:120], 0.7, idx, label
         return None
 
 
@@ -231,23 +253,59 @@ class DocumentParser:
         ct = (content_type or "").lower()
         name = (filename or "").lower()
         if "pdf" in ct or name.endswith(".pdf"):
-            return {"text": self._pdf(data), "kind": "pdf"}
+            text, pages = self._pdf(data)
+            return {"text": text, "kind": "pdf", "pages": pages}
+        if "wordprocessingml" in ct or name.endswith(".docx"):
+            return {"text": self._docx(data), "kind": "docx", "pages": []}
         if ct.startswith("text/") or name.endswith((".txt", ".md", ".csv")):
-            return {"text": data.decode("utf-8", errors="replace"), "kind": "text"}
+            return {"text": data.decode("utf-8", errors="replace"), "kind": "text", "pages": []}
         if ct.startswith("image/"):
-            return {"text": "", "kind": "image"}  # OCR upgrade path
-        return {"text": data.decode("utf-8", errors="replace"), "kind": "unknown"}
+            return {"text": "", "kind": "image", "pages": []}  # OCR upgrade path
+        return {"text": data.decode("utf-8", errors="replace"), "kind": "unknown", "pages": []}
 
     @staticmethod
-    def _pdf(data: bytes) -> str:
+    def _docx(data: bytes) -> str:
+        """Dependency-free DOCX → text: a .docx is a zip; we read word/document.xml and pull the
+        <w:t> runs paragraph-by-paragraph. (python-docx is the upgrade path for tables/styles.)"""
+        try:
+            import io
+            import zipfile
+
+            with zipfile.ZipFile(io.BytesIO(data)) as z:
+                xml = z.read("word/document.xml").decode("utf-8", errors="replace")
+            paras: list[str] = []
+            for chunk in xml.split("</w:p>"):
+                runs = re.findall(r"<w:t[^>]*>(.*?)</w:t>", chunk, re.S)
+                line = "".join(runs)
+                for a, b in (("&amp;", "&"), ("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&apos;", "'")):
+                    line = line.replace(a, b)
+                if line.strip():
+                    paras.append(line)
+            return "\n".join(paras)
+        except Exception:  # noqa: BLE001 — unreadable docx -> empty text -> needs_review
+            return ""
+
+    @staticmethod
+    def _pdf(data: bytes) -> tuple[str, list[tuple[int, int]]]:
+        """Return (full_text, page_spans) where page_spans[i] = (char_start, char_end) of page i+1 in the
+        joined text. Page spans let the extractor map a match offset back to a 1-based page number — the
+        foundation of 'View Evidence → jump to the source page'."""
         try:
             import io
 
             from pypdf import PdfReader  # type: ignore[import-not-found]
             reader = PdfReader(io.BytesIO(data))
-            return "\n".join((page.extract_text() or "") for page in reader.pages)
+            parts: list[str] = []
+            spans: list[tuple[int, int]] = []
+            cursor = 0
+            for page in reader.pages:
+                t = page.extract_text() or ""
+                spans.append((cursor, cursor + len(t)))
+                parts.append(t)
+                cursor += len(t) + 1  # +1 for the "\n" join separator
+            return "\n".join(parts), spans
         except Exception:  # noqa: BLE001 — unparseable PDF -> empty text -> needs_review
-            return ""
+            return "", []
 
 
 def evidence_from_fields(doc_type: str, fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -299,7 +357,8 @@ class DocumentIntelligenceService:
         path = f"{ctx.user_id}/{doc_id}/{(filename or 'document')[:80]}"
         await self._sb.storage_upload("documents", path, data, content_type or "application/octet-stream")
         res = await self.register(ctx, doc_type=doc_type, text=parsed["text"], title=title or filename,
-                                  file_ref=path, _doc_id=doc_id, source_kind=parsed["kind"], acknowledge_sensitive=True)
+                                  file_ref=path, _doc_id=doc_id, source_kind=parsed["kind"], acknowledge_sensitive=True,
+                                  pages=parsed.get("pages"))
         res["parsed_kind"] = parsed["kind"]
         res["parsed_chars"] = len(parsed["text"])
         return res
@@ -330,7 +389,8 @@ class DocumentIntelligenceService:
 
     async def register(self, ctx: UserContext, *, doc_type: str, text: str = "", title: Optional[str] = None,
                        file_ref: Optional[str] = None, _doc_id: Optional[str] = None, source_kind: str = "text",
-                       acknowledge_sensitive: bool = False) -> dict[str, Any]:
+                       acknowledge_sensitive: bool = False,
+                       pages: Optional[list[tuple[int, int]]] = None) -> dict[str, Any]:
         spec = TAXONOMY.get(doc_type)
         if not spec:
             raise ValueError(f"unknown doc_type {doc_type}")
@@ -347,7 +407,14 @@ class DocumentIntelligenceService:
                     "status": "blocked_pending_confirmation"}
         if pii and acknowledge_sensitive:
             await self._log_pii(ctx, doc_type, pii, acknowledged=True)
-        ext = self._ex.extract(doc_type, text)
+        # Resume is a multi-record source — delegate to the resume pipeline (sections → reviewable
+        # records), reusing this document/provenance/conflict stack rather than the field extractor.
+        if doc_type == "resume":
+            from .resume import ResumeImportService
+            return await ResumeImportService(self._sb).ingest(
+                ctx, text=text, pages=pages, title=title, file_ref=file_ref, _doc_id=_doc_id,
+                source_kind=source_kind)
+        ext = self._ex.extract(doc_type, text, pages)
         doc_id = _doc_id or str(uuid.uuid4())
         extracted_json = {f["field_key"]: f["field_value"] for f in ext["fields"]}
         has_text = bool((text or "").strip())
@@ -373,16 +440,26 @@ class DocumentIntelligenceService:
             "affects_domains": spec.domains,
         }, schema=DOCS)
         for f in ext["fields"]:
+            # Per-field review lifecycle: low-confidence fields start as needs_review so the UI prompts the
+            # user to confirm/edit; the rest are 'extracted' until the user confirms.
+            field_review = "needs_review" if (f.get("confidence") or 0) < 0.6 else "extracted"
             await self._sb.insert("document_fields", {
                 "id": str(uuid.uuid5(_REC_NS, f"{doc_id}:{f['field_key']}")), "document_id": doc_id,
                 "user_id": ctx.user_id, "tenant_id": ctx.user_id, "field_key": f["field_key"],
                 "field_value": str(f["field_value"]), "field_type": f["field_type"], "confidence": f["confidence"],
+                # P0 provenance: page/section/char-span + method + review status.
+                "page_number": f.get("page_number"), "section": f.get("section"),
+                "char_start": f.get("char_start"), "char_end": f.get("char_end"),
+                "extraction_method": f.get("extraction_method") or "regex",
+                "review_status": field_review,
             }, schema=DOCS)
         # ── BRIDGE: turn extracted VALUES into life-model facts (+ Family rows for critical docs). ──
         # Nothing here is invented — we only bridge fields that were actually extracted. The doc itself
         # never auto-confirms a life fact unless it's a labeled native-text field at high confidence.
         bridge = await self._bridge(ctx, doc_id=doc_id, doc_type=doc_type, spec=spec,
                                     fields=ext["fields"], source_kind=source_kind)
+        # Phase 6: re-scan for conflicts now that new fields landed (best-effort — never break upload).
+        await self._scan_conflicts(ctx)
         return {"document_id": doc_id, "doc_type": doc_type, "category": spec.category,
                 "fields_extracted": len(ext["fields"]), "confidence": ext["confidence"],
                 "affects_domains": spec.domains, "status": status, "status_reason": reason,
@@ -391,6 +468,52 @@ class DocumentIntelligenceService:
                 "fields": ext["fields"], "evidence": evidence_from_fields(doc_type, ext["fields"]),
                 "changed": bridge["changed"], "needs_review": bridge["needs_review"],
                 "bridged_facts": bridge["facts"]}
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # HUMAN REVIEW — confirm / edit / reject an extracted field (P0 trust loop).
+    # ──────────────────────────────────────────────────────────────────────────
+    _REVIEW_ACTIONS = {"confirm": "user_confirmed", "edit": "user_edited", "reject": "rejected"}
+
+    async def set_field_review(self, ctx: UserContext, *, field_id: str, action: str,
+                               new_value: Optional[str] = None) -> dict[str, Any]:
+        """Apply a user's review decision to one extracted field. confirm → user_confirmed (trusted),
+        edit → user_edited with the corrected value, reject → rejected (advisor must ignore). Tenant-scoped
+        by user_id so a user can only review their own fields."""
+        status = self._REVIEW_ACTIONS.get(action)
+        if not status:
+            raise ValueError(f"unknown review action {action}")
+        patch: dict[str, Any] = {"review_status": status}
+        if action == "edit":
+            if not new_value:
+                raise ValueError("edit requires new_value")
+            patch["field_value"] = str(new_value)
+        await self._sb.update("document_fields", patch,
+                              filters={"id": f"eq.{field_id}", "user_id": f"eq.{ctx.user_id}"}, schema=DOCS)
+        # Phase 6: a confirm/edit/reject can create or clear a conflict — re-scan (best-effort).
+        await self._scan_conflicts(ctx)
+        return {"field_id": field_id, "review_status": status,
+                **({"field_value": patch["field_value"]} if "field_value" in patch else {})}
+
+    async def _scan_conflicts(self, ctx: UserContext) -> None:
+        """Trigger deterministic conflict detection. Never raise — grounding must not break the write."""
+        try:
+            from .conflicts import ConflictDetectionService
+            await ConflictDetectionService(self._sb).scan(ctx)
+        except Exception:  # noqa: BLE001
+            pass
+
+    async def field_evidence(self, ctx: UserContext, *, document_id: str) -> dict[str, Any]:
+        """Evidence payload for the 'View Evidence' drawer: the document + every field with its page,
+        section, char span, confidence, method, and review status. Tenant-scoped."""
+        docs = await self._sb.select("documents", columns="id,doc_type,title,confidence,status,file_ref,uploaded_at",
+                                     filters={"id": f"eq.{document_id}", "user_id": f"eq.{ctx.user_id}"}, schema=DOCS)
+        if not docs:
+            return {"document": None, "fields": []}
+        fields = await self._sb.select(
+            "document_fields",
+            columns="id,field_key,field_value,field_type,confidence,page_number,section,char_start,char_end,extraction_method,review_status",
+            filters={"document_id": f"eq.{document_id}", "user_id": f"eq.{ctx.user_id}"}, schema=DOCS) or []
+        return {"document": docs[0], "fields": fields}
 
     # ──────────────────────────────────────────────────────────────────────────
     # BRIDGE — extracted document values → life.facts (provenance) + Family rows.
