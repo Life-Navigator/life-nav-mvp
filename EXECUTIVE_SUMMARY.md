@@ -1,45 +1,39 @@
-# EXECUTIVE_SUMMARY.md — Read-Side Performance Sprint
+# EXECUTIVE_SUMMARY.md — My Life Top-Level Parallelization
 
 ## What we did
 
-Traced the slow read paths to a single root: `LifeReadinessEngine.assess()` ran a **serial** loop over the domain summaries (finance/health/career/family + education + decision + goals). Both the dashboard (`/my-life`) and the recommendations roadmap funnel through it.
+Parallelized the six **independent** top-level reads in `MyLifeService.my_life()` (snapshot, discovery_health, prioritize, assess, recent_intelligence, canonical_goals) with `asyncio.gather`. They each take only `ctx` — none depends on another's result — so concurrency is safe. `_timeline_passthrough` (needs `snap`) correctly stays serial. No caching, no staleness.
 
-**Fix:** parallelized the independent calls with `asyncio.gather` — same computation, run concurrently, **no caching, no staleness**.
+## Result (measured live, prod)
 
-## Results (measured live, prod)
+|                                | `/my-life`            |
+| ------------------------------ | --------------------- |
+| Sprint start                   | 4.3s                  |
+| After assess() parallelization | 2.5s                  |
+| **After this sprint**          | **1.8s (−58% total)** |
 
-| Path                    | Before       | After     | Δ    |
-| ----------------------- | ------------ | --------- | ---- |
-| Recommendations roadmap | 3.8s         | **1.7s**  | −55% |
-| Dashboard `/my-life`    | 4.3s         | **2.5s**  | −42% |
-| Family / Health / facts | already fast | unchanged | —    |
-
-601 backend tests pass; dashboard renders correctly (Playwright); core-api deployed; `main` = prod.
-
-## Honest note on approach
-
-The sprint specified snapshot-based read caching. I used **parallelization** instead because it reaches the same goal with **zero staleness risk** (no freshness metadata or invalidation to get wrong). The snapshot-cache path is fully specified in `FAST_READ_CONTRACT.md` for sub-1s if the demo needs it — but parallelization captured most of the win safely.
+Output identical (19 keys, readiness 69, 2 goals, brief + recent present). 601 tests pass. Dashboard renders correctly (Playwright). core-api deployed; `main` = prod.
 
 ## Final questions
 
-1. Dashboard latency improved? **Yes — 4.3s → 2.5s.**
-2. Roadmap latency improved? **Yes — 3.8s → 1.7s (near target).**
-3. Advisor context loading? Advisor is a separate 22s LLM path (perceived-latency fixed prior sprint); not re-touched here.
-4. Snapshots used safely? Parallelization used — no snapshot serving, so no staleness; snapshot option specified.
-5. Freshness visible? N/A (no stale data served — live compute, just concurrent).
-6. Recompute still available? **Yes — every read still computes fresh (no cache).**
-7. Stale values labeled honestly? **No stale values exist** (no caching).
-8. Tests pass? **Yes — 601.**
-9. Playwright validation pass? **Yes — dashboard renders correctly.**
-10. Investor-demo quality responsiveness? **Materially better** — roadmap ~1.7s, dashboard ~2.5s (was 4s+); the advisor "feels alive" via step progress. Sub-1s on the dashboard is the next safe increment (parallelize my_life top-level + optional snapshot cache).
+1. `/my-life` latency improved? **Yes — 2.5s → 1.8s (4.3s → 1.8s overall).**
+2. Output identical? **Yes — same 19 keys + values.**
+3. Values unchanged? **Yes — readiness 69, goals 2, brief/recent present.**
+4. Independent branches safely parallelized? **Yes — all 6 ctx-only reads.**
+5. Dependent branches still serialized? **Yes — `_timeline_passthrough` (needs snap) + all sync assembly.**
+6. Tests pass? **Yes — 601.**
+7. Playwright pass? **Yes — cards, readiness, recently-learned, no error.**
+8. Investor-demo quality responsiveness? **Yes — ~1.8s to a full life dashboard (was 4.3s).**
+9. Snapshot caching still needed? **No — for the demo. Parallelization reached 1.8s with zero staleness. Caching only if strict sub-1s is required.**
+10. Next bottleneck? **The slowest single read in the gather — `snapshot` / `assess` at ~1.5–1.8s. Below that needs per-call optimization or serving readiness from `life.readiness_snapshots`.**
 
 ## Deliverables
 
-`READ_PATH_LATENCY_TRACE.md` · `READ_CACHE_PERFORMANCE_REPORT.md` · `FAST_READ_CONTRACT.md` (snapshot-cache option) · this summary.
+`MY_LIFE_TOP_LEVEL_TRACE.md` · `MY_LIFE_DEPENDENCY_MAP.md` · `MY_LIFE_PERFORMANCE_REPORT.md` · `MY_LIFE_UX_VALIDATION.md` · this summary.
 
 ---
 
-# FINAL STATUS: READ_CACHE_READY
+# FINAL STATUS: MY_LIFE_FAST_READY
 
-Read latency materially reduced (both surfaces, −42%/−55%), correctness preserved, no staleness introduced, verified live. The snapshot-cache path is documented for the remaining sub-1s if needed.
+`/my-life` 4.3s → 1.8s across the two perf sprints, output identical, no staleness, verified live. Near the ~1.5s target; the snapshot cache remains the documented (unneeded-for-now) path to sub-1s.
 </content>
