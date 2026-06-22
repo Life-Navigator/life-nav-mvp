@@ -305,7 +305,24 @@ class FinanceService(DomainService):
     async def investments(self, ctx: UserContext) -> DomainViewModel:
         holdings = await self._rows("investment_holdings", ctx)
         if not holdings:
-            return self._vm(ctx, {"holdings": [], "total": None}, sources=[], missing=["investments"], basis="missing")
+            # Holding-level detail (investment_holdings) is rarely populated; the user's real money lives
+            # in connected investment/brokerage ACCOUNTS (finance.financial_accounts). Surface those so the
+            # page shows real balances instead of empty. (Root-cause fix: the data was here all along.)
+            accts = [a for a in await self._rows("financial_accounts", ctx)
+                     if any(t in (a.get("account_type") or "").lower() for t in ("invest", "brokerage"))
+                     and a.get("is_active", True)]
+            if not accts:
+                return self._vm(ctx, {"holdings": [], "total": None}, sources=[], missing=["investments"], basis="missing")
+            total = sum(self._bal(a) for a in accts)
+            return self._vm(
+                ctx,
+                {"total": _money(total),
+                 "holdings": [{"id": a.get("id"), "name": a.get("account_name") or a.get("name") or "Investment account",
+                               "value": _money(self._bal(a)),
+                               "share_pct": round(self._bal(a) / total * 100, 1) if total else None}
+                              for a in accts]},
+                sources=[_src("financial_accounts")], missing=[], basis="complete",
+            )
         total = sum(self._bal(h) for h in holdings)
         return self._vm(
             ctx,
@@ -324,7 +341,22 @@ class FinanceService(DomainService):
     async def retirement(self, ctx: UserContext) -> DomainViewModel:
         plans = await self._rows("retirement_plans", ctx)
         if not plans:
-            return self._vm(ctx, {"accounts": [], "total": None}, sources=[], missing=["retirement_plans"], basis="missing")
+            # Same root-cause fix as investments: retirement money lives in connected retirement/401k/IRA
+            # ACCOUNTS (finance.financial_accounts), not the (empty) retirement_plans table. Surface them.
+            accts = [a for a in await self._rows("financial_accounts", ctx)
+                     if any(t in (a.get("account_type") or "").lower()
+                            for t in ("retire", "401", "403b", "ira", "pension"))
+                     and a.get("is_active", True)]
+            if not accts:
+                return self._vm(ctx, {"accounts": [], "total": None}, sources=[], missing=["retirement_plans"], basis="missing")
+            return self._vm(
+                ctx,
+                {"total": _money(sum(self._bal(a) for a in accts)),
+                 "accounts": [{"id": a.get("id"), "name": a.get("account_name") or a.get("name") or a.get("account_type"),
+                               "balance": _money(self._bal(a))} for a in accts],
+                 "projection_available": False},
+                sources=[_src("financial_accounts")], missing=["contribution_rate"], basis="partial",
+            )
         return self._vm(
             ctx,
             {

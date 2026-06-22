@@ -74,6 +74,48 @@ async def test_finance_service_summary_is_typed_view_model():
 
 
 @pytest.mark.asyncio
+async def test_investments_falls_back_to_investment_accounts():
+    """Root-cause fix: when investment_holdings is empty, surface investment/brokerage ACCOUNTS from
+    financial_accounts (where the real money is) instead of an empty state."""
+    svc = FinanceService(supabase=FakeSupabase({
+        "investment_holdings": [],
+        "financial_accounts": [
+            {"id": "a1", "account_name": "Brokerage", "account_type": "investment", "current_balance": 10000, "is_active": True},
+            {"id": "a2", "account_name": "Checking", "account_type": "checking", "current_balance": 500, "is_active": True},
+        ],
+    }))
+    vm = await svc.investments(UserContext(user_id="u-1"))
+    assert vm.data["total"] is not None
+    assert len(vm.data["holdings"]) == 1  # only the investment account, not checking
+    assert vm.data["holdings"][0]["name"] == "Brokerage"
+    assert vm.confidence.basis == "complete"
+
+
+@pytest.mark.asyncio
+async def test_retirement_falls_back_to_retirement_accounts():
+    svc = FinanceService(supabase=FakeSupabase({
+        "retirement_plans": [],
+        "financial_accounts": [
+            {"id": "r1", "account_name": "401(k)", "account_type": "retirement", "current_balance": 50000, "is_active": True},
+            {"id": "a2", "account_name": "Checking", "account_type": "checking", "current_balance": 500, "is_active": True},
+        ],
+    }))
+    vm = await svc.retirement(UserContext(user_id="u-1"))
+    assert vm.data["total"] is not None
+    assert len(vm.data["accounts"]) == 1
+    assert vm.data["accounts"][0]["name"] == "401(k)"
+
+
+@pytest.mark.asyncio
+async def test_investments_truly_empty_stays_honest():
+    svc = FinanceService(supabase=FakeSupabase({"investment_holdings": [], "financial_accounts": [
+        {"id": "a2", "account_name": "Checking", "account_type": "checking", "current_balance": 500, "is_active": True}]}))
+    vm = await svc.investments(UserContext(user_id="u-1"))
+    assert vm.data["holdings"] == [] and vm.data["total"] is None
+    assert "investments" in vm.missing
+
+
+@pytest.mark.asyncio
 async def test_finance_chat_context_shape():
     svc = FinanceService(supabase=FakeSupabase(SAMPLE_ACCOUNTS))
     ctx = await svc.chat_context(UserContext(user_id="u-1"))
