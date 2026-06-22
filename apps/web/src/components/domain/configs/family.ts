@@ -19,7 +19,7 @@ export const familyDomain: DomainConfig = {
     { label: 'Documents', href: '/dashboard/family/documents' },
     { label: 'Recommendations', href: '/dashboard/family/recommendations' },
     { label: 'Goals', href: '/dashboard/family/goals', beta: true },
-    { label: 'Estate', href: '/dashboard/family/estate', beta: true },
+    { label: 'Estate & Family Office', href: '/dashboard/family/estate' },
     { label: 'Reports', href: '/dashboard/family/reports', beta: true },
     { label: 'Settings', href: '/dashboard/family/settings', beta: true },
   ],

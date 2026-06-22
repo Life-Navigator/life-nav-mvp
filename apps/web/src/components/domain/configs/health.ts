@@ -15,7 +15,7 @@ export const healthDomain: DomainConfig = {
     { label: 'Medications', href: '/dashboard/healthcare/medications', beta: true },
     { label: 'Insurance', href: '/dashboard/healthcare/insurance' },
     { label: 'Documents', href: '/dashboard/healthcare/documents', beta: true },
-    { label: 'Analysis', href: '/dashboard/healthcare/analysis', beta: true },
+    { label: 'Health Intelligence', href: '/dashboard/healthcare/analysis' },
     { label: 'Recommendations', href: '/dashboard/healthcare/recommendations', beta: true },
     { label: 'Goals', href: '/dashboard/healthcare/goals', beta: true },
     { label: 'Reports', href: '/dashboard/healthcare/reports', beta: true },
