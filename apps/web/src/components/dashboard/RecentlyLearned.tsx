@@ -14,6 +14,25 @@ type Fact = {
   updatedAt?: string | null;
 };
 
+// Format clearly money-like values as currency ($185,000) without mis-formatting non-money facts.
+// Only applies when the label/fact looks monetary AND the value is a plain number >= 1000.
+const MONEY_HINT =
+  /salary|bonus|coverage|premium|amount|value|income|equity|balance|net.?worth|grant|benefit|cost|contribution/i;
+function fmtValue(label: string, value: string): string {
+  const raw = String(value ?? '').trim();
+  if (MONEY_HINT.test(label) && /^\d[\d,]*(\.\d+)?$/.test(raw)) {
+    const n = Number(raw.replace(/,/g, ''));
+    if (!Number.isNaN(n) && n >= 1000) {
+      return n.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0,
+      });
+    }
+  }
+  return raw;
+}
+
 const DOMAIN_STYLE: Record<string, string> = {
   family: 'bg-rose-50 text-rose-700',
   career: 'bg-blue-50 text-blue-700',
@@ -52,18 +71,20 @@ export default function RecentlyLearned() {
 
   return (
     <section
-      className="rounded-xl border border-slate-200 bg-white p-5"
+      className="rounded-xl border border-slate-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800"
       aria-label="Recently learned about you"
     >
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">Recently learned about you</h2>
-        <span className="text-xs text-slate-500">from your documents</span>
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-gray-100">
+          Recently learned about you
+        </h2>
+        <span className="text-xs text-slate-500 dark:text-gray-400">from your documents</span>
       </div>
       <ul className="grid gap-2 sm:grid-cols-2">
         {facts.map((f) => (
           <li
             key={f.id}
-            className="flex items-start gap-2 rounded-lg border border-slate-100 px-3 py-2"
+            className="flex items-start gap-2 rounded-lg border border-slate-100 px-3 py-2 dark:border-gray-700"
           >
             <span
               className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${
@@ -73,10 +94,10 @@ export default function RecentlyLearned() {
               {f.domain}
             </span>
             <div className="min-w-0">
-              <div className="text-sm text-slate-900">
-                <span className="font-medium">{f.label}:</span> {f.value}
+              <div className="text-sm text-slate-900 dark:text-gray-100">
+                <span className="font-medium">{f.label}:</span> {fmtValue(f.label, f.value)}
               </div>
-              <div className="text-[11px] text-slate-500">
+              <div className="text-[11px] text-slate-500 dark:text-gray-400">
                 {f.docType ? `from your ${f.docType.replace(/_/g, ' ')}` : 'from a document'}
                 {f.needsConfirmation ? ' · pending your confirmation' : ''}
               </div>
