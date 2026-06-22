@@ -522,7 +522,7 @@ export default function RetirementPlanningPage() {
           </div>
           <div className="mt-4 bg-white/20 rounded-full h-3">
             <div
-              className="bg-white rounded-full h-3 transition-all"
+              className="bg-white dark:bg-gray-800 rounded-full h-3 transition-all"
               style={{ width: `${plan.readinessScore ?? 0}%` }}
             />
           </div>
@@ -544,8 +544,8 @@ export default function RetirementPlanningPage() {
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-          <p className="text-gray-600 mb-3">
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 text-center">
+          <p className="text-gray-600 dark:text-gray-300 mb-3">
             Add your retirement plan details to see your readiness score and projection.
           </p>
           <a
@@ -558,66 +558,70 @@ export default function RetirementPlanningPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Total Portfolio</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Total Portfolio</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {formatCurrency(accountTotals?.totalBalance || 0)}
           </div>
           <div className="text-xs text-green-600 mt-1">
             Projected: {formatCurrency(accountTotals?.totalProjectedBalance || 0)}
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Monthly Contributions</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Monthly Contributions</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {formatCurrency(accountTotals?.totalMonthlyContributions || 0)}
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Est. SS Benefit (FRA)</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Est. SS Benefit (FRA)</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {formatCurrency((socialSecurity?.calculatedBenefits?.atFRA || 0) / 12)}/mo
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Healthcare Reserve</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Healthcare Reserve</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {formatCurrency(healthcareProjection?.savingsTarget || 0)}
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Account Tax Allocation</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          Account Tax Allocation
+        </h3>
         <div className="grid grid-cols-3 gap-4">
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
+          <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg">
             <div className="text-sm text-blue-600 font-medium">Tax-Deferred</div>
             <div className="text-2xl font-bold text-blue-700">
               {formatCurrency(accountTotals?.byTaxStatus?.taxDeferred || 0)}
             </div>
-            <div className="text-xs text-gray-500">401(k), Traditional IRA</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">401(k), Traditional IRA</div>
           </div>
-          <div className="text-center p-4 bg-green-50 rounded-lg">
+          <div className="text-center p-4 bg-green-50 dark:bg-green-950/30 rounded-lg">
             <div className="text-sm text-green-600 font-medium">Tax-Free</div>
             <div className="text-2xl font-bold text-green-700">
               {formatCurrency(accountTotals?.byTaxStatus?.taxFree || 0)}
             </div>
-            <div className="text-xs text-gray-500">Roth IRA, Roth 401(k)</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">Roth IRA, Roth 401(k)</div>
           </div>
-          <div className="text-center p-4 bg-purple-50 rounded-lg">
+          <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg">
             <div className="text-sm text-purple-600 font-medium">Taxable</div>
             <div className="text-2xl font-bold text-purple-700">
               {formatCurrency(accountTotals?.byTaxStatus?.taxable || 0)}
             </div>
-            <div className="text-xs text-gray-500">Brokerage, Savings</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">Brokerage, Savings</div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Optimization Opportunities</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          Optimization Opportunities
+        </h3>
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+          <div className="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-200">
             <div>
               <div className="font-medium text-yellow-800">Roth Conversion Opportunity</div>
               <div className="text-sm text-yellow-600">
@@ -631,7 +635,7 @@ export default function RetirementPlanningPage() {
               Analyze
             </button>
           </div>
-          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200">
             <div>
               <div className="font-medium text-blue-800">Social Security Optimization</div>
               <div className="text-sm text-blue-600">Review optimal claiming strategy</div>
@@ -643,7 +647,7 @@ export default function RetirementPlanningPage() {
               Review
             </button>
           </div>
-          <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+          <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200">
             <div>
               <div className="font-medium text-green-800">Scenario Analysis</div>
               <div className="text-sm text-green-600">
@@ -666,29 +670,31 @@ export default function RetirementPlanningPage() {
   const renderAccounts = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Total Balance</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Total Balance</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {formatCurrency(accountTotals?.totalBalance || 0)}
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Projected at Retirement</div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Projected at Retirement</div>
           <div className="text-2xl font-bold text-green-600">
             {formatCurrency(accountTotals?.totalProjectedBalance || 0)}
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Monthly Savings</div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Monthly Savings</div>
           <div className="text-2xl font-bold text-blue-600">
             {formatCurrency(accountTotals?.totalMonthlyContributions || 0)}
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="text-lg font-semibold text-gray-900">Retirement Accounts</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Retirement Accounts
+          </h3>
           <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
             + Add Account
           </button>
@@ -699,8 +705,10 @@ export default function RetirementPlanningPage() {
               <div key={account.id} className="p-4 hover:bg-gray-50">
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-medium text-gray-900">{account.accountName}</div>
-                    <div className="text-sm text-gray-500">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                      {account.accountName}
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
                       {account.accountType.replace(/_/g, ' ')}{' '}
                       {account.institution && `- ${account.institution}`}
                     </div>
@@ -718,7 +726,7 @@ export default function RetirementPlanningPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-lg font-semibold text-gray-900">
+                    <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                       {formatCurrency(account.currentBalance)}
                     </div>
                     {account.projection && (
@@ -726,7 +734,7 @@ export default function RetirementPlanningPage() {
                         Projected: {formatCurrency(account.projection.nominalBalance)}
                       </div>
                     )}
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
                       +{formatCurrency(account.monthlyContribution)}/mo{' '}
                       {account.employerMatch > 0 &&
                         `(+${formatCurrency(account.employerMatch)} match)`}
@@ -741,7 +749,7 @@ export default function RetirementPlanningPage() {
               </div>
             ))
           ) : (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
               No retirement accounts found. Add your first account to get started.
             </div>
           )}
@@ -758,9 +766,11 @@ export default function RetirementPlanningPage() {
     const hasData = !!ss && (ss.atFRA || ss.atAge62 || ss.atAge70);
     if (!hasData) {
       return (
-        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Social Security optimization</h2>
-          <p className="text-sm text-gray-500 max-w-xl mx-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-8 text-center">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+            Social Security optimization
+          </h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-xl mx-auto">
             Coming soon. We&apos;ll estimate your benefit at 62, Full Retirement Age, and 70, and
             recommend an optimal claiming age — once your Social Security earnings record is
             connected. We don&apos;t show estimated benefits until they&apos;re based on your real
@@ -791,9 +801,11 @@ export default function RetirementPlanningPage() {
           </div>
         </div>
         {socialSecurity?.optimizedClaimingAge && (
-          <div className="bg-white rounded-lg border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recommended Strategy</h3>
-            <div className="flex items-center gap-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              Recommended Strategy
+            </h3>
+            <div className="flex items-center gap-4 p-4 bg-green-50 dark:bg-green-950/30 border border-green-200 rounded-lg">
               <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
                 {socialSecurity.optimizedClaimingAge}
               </div>
@@ -817,9 +829,11 @@ export default function RetirementPlanningPage() {
   // Withdrawal Strategies Tab
   const renderWithdrawals = () => (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Withdrawal Strategy Comparison</h3>
-        <p className="text-sm text-gray-500 mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Withdrawal Strategy Comparison
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
           Compare different withdrawal strategies to find the best fit for your retirement.
         </p>
         <div className="space-y-4">
@@ -827,30 +841,34 @@ export default function RetirementPlanningPage() {
             withdrawalStrategies.map((strategy, index) => (
               <div
                 key={index}
-                className={`p-4 border rounded-lg ${index === 0 ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
+                className={`p-4 border rounded-lg ${index === 0 ? 'border-green-300 bg-green-50 dark:bg-green-950/30' : 'border-gray-200 dark:border-gray-700'}`}
               >
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">{strategy.strategyName}</span>
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">
+                        {strategy.strategyName}
+                      </span>
                       {index === 0 && (
                         <span className="px-2 py-0.5 bg-green-600 text-white text-xs rounded-full">
                           Recommended
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">{strategy.description}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                      {strategy.description}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                       {formatPercent(strategy.initialWithdrawalRate)}
                     </div>
-                    <div className="text-xs text-gray-500">Initial Rate</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Initial Rate</div>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200">
+                <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                   <div>
-                    <div className="text-sm text-gray-500">Success Rate</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Success Rate</div>
                     <div
                       className={`font-semibold ${strategy.successProbability >= 0.9 ? 'text-green-600' : strategy.successProbability >= 0.8 ? 'text-yellow-600' : 'text-red-600'}`}
                     >
@@ -858,14 +876,14 @@ export default function RetirementPlanningPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-gray-500">Avg Withdrawal</div>
-                    <div className="font-semibold text-gray-900">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Avg Withdrawal</div>
+                    <div className="font-semibold text-gray-900 dark:text-gray-100">
                       {formatCurrency(strategy.averageWithdrawal)}/yr
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-gray-500">Median Legacy</div>
-                    <div className="font-semibold text-gray-900">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Median Legacy</div>
+                    <div className="font-semibold text-gray-900 dark:text-gray-100">
                       {formatCurrency(strategy.medianEndingBalance)}
                     </div>
                   </div>
@@ -873,8 +891,8 @@ export default function RetirementPlanningPage() {
               </div>
             ))
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              <div className="font-medium text-gray-700">Coming soon</div>
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <div className="font-medium text-gray-700 dark:text-gray-300">Coming soon</div>
               <p className="mt-1 text-sm">
                 Withdrawal-strategy modeling (4% rule, dynamic, guardrails) will appear here once
                 the planning engine is connected to your retirement inputs.
@@ -910,50 +928,61 @@ export default function RetirementPlanningPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Conversion Strategies</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Conversion Strategies
+          </h3>
         </div>
         <div className="divide-y divide-gray-200">
           {rothStrategies.length > 0 ? (
             rothStrategies.slice(0, 5).map((strategy, index) => (
-              <div key={index} className={`p-4 ${index === 0 ? 'bg-purple-50' : ''}`}>
+              <div
+                key={index}
+                className={`p-4 ${index === 0 ? 'bg-purple-50 dark:bg-purple-950/30' : ''}`}
+              >
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-gray-900">{strategy.name}</span>
+                      <span className="font-semibold text-gray-900 dark:text-gray-100">
+                        {strategy.name}
+                      </span>
                       {index === 0 && (
                         <span className="px-2 py-0.5 bg-purple-600 text-white text-xs rounded-full">
                           Optimal
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">{strategy.description}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                      {strategy.description}
+                    </p>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm text-gray-500">Score</div>
-                    <div className="text-xl font-bold text-gray-900">{strategy.score}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Score</div>
+                    <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                      {strategy.score}
+                    </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-200 text-sm">
+                <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 text-sm">
                   <div>
-                    <div className="text-gray-500">Total Conversions</div>
+                    <div className="text-gray-500 dark:text-gray-400">Total Conversions</div>
                     <div className="font-semibold">{formatCurrency(strategy.totalConversions)}</div>
                   </div>
                   <div>
-                    <div className="text-gray-500">Total Tax Paid</div>
+                    <div className="text-gray-500 dark:text-gray-400">Total Tax Paid</div>
                     <div className="font-semibold text-red-600">
                       {formatCurrency(strategy.totalTaxPaid)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500">Ending Roth</div>
+                    <div className="text-gray-500 dark:text-gray-400">Ending Roth</div>
                     <div className="font-semibold text-green-600">
                       {formatCurrency(strategy.endingRothBalance)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500">Ending Traditional</div>
+                    <div className="text-gray-500 dark:text-gray-400">Ending Traditional</div>
                     <div className="font-semibold">
                       {formatCurrency(strategy.endingTraditionalBalance)}
                     </div>
@@ -962,8 +991,8 @@ export default function RetirementPlanningPage() {
               </div>
             ))
           ) : (
-            <div className="p-8 text-center text-gray-500">
-              <div className="font-medium text-gray-700">Coming soon</div>
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+              <div className="font-medium text-gray-700 dark:text-gray-300">Coming soon</div>
               <p className="mt-1 text-sm">
                 Roth-conversion optimization (tax-bracket-aware multi-year planning) will appear
                 here once the planning engine is connected to your tax and account details.
@@ -989,26 +1018,26 @@ export default function RetirementPlanningPage() {
             Projected at 65: {formatCurrency(healthSavingsData?.summary?.projectedAge65HSA || 0)}
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">FSA Remaining</div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">FSA Remaining</div>
           <div className="text-2xl font-bold text-orange-600">
             {formatCurrency(healthSavingsData?.summary?.totalFSARemaining || 0)}
           </div>
-          <div className="text-xs text-gray-500 mt-1">Use it or lose it!</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Use it or lose it!</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Annual Tax Savings</div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Annual Tax Savings</div>
           <div className="text-2xl font-bold text-green-600">
             {formatCurrency(healthSavingsData?.summary?.annualTaxSavings || 0)}
           </div>
-          <div className="text-xs text-gray-500 mt-1">From contributions</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">From contributions</div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Lifetime Tax Savings</div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Lifetime Tax Savings</div>
           <div className="text-2xl font-bold text-blue-600">
             {formatCurrency(healthSavingsData?.summary?.lifetimeTaxSavings || 0)}
           </div>
-          <div className="text-xs text-gray-500 mt-1">Projected savings</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">Projected savings</div>
         </div>
       </div>
 
@@ -1021,8 +1050,10 @@ export default function RetirementPlanningPage() {
               1
             </div>
             <div>
-              <div className="font-medium text-gray-900">Tax-Free Contributions</div>
-              <div className="text-sm text-gray-600">
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                Tax-Free Contributions
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">
                 Reduce taxable income by contributing pre-tax
               </div>
             </div>
@@ -1032,8 +1063,10 @@ export default function RetirementPlanningPage() {
               2
             </div>
             <div>
-              <div className="font-medium text-gray-900">Tax-Free Growth</div>
-              <div className="text-sm text-gray-600">Investment gains grow without taxes</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">Tax-Free Growth</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">
+                Investment gains grow without taxes
+              </div>
             </div>
           </div>
           <div className="flex items-start gap-3">
@@ -1041,19 +1074,23 @@ export default function RetirementPlanningPage() {
               3
             </div>
             <div>
-              <div className="font-medium text-gray-900">Tax-Free Withdrawals</div>
-              <div className="text-sm text-gray-600">No tax on qualified medical expenses</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                Tax-Free Withdrawals
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">
+                No tax on qualified medical expenses
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* HSA Accounts */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">HSA Accounts</h3>
-            <p className="text-sm text-gray-500">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">HSA Accounts</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Health Savings Accounts for qualified HDHP enrollees
             </p>
           </div>
@@ -1067,15 +1104,17 @@ export default function RetirementPlanningPage() {
               <div key={account.id} className="p-4">
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-medium text-gray-900">{account.provider}</div>
-                    <div className="text-sm text-gray-500">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                      {account.provider}
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
                       {account.hdhdPlanType === 'family' ? 'Family' : 'Individual'} HDHP Coverage
                     </div>
                     <div className="flex gap-2 mt-2">
                       <span className="px-2 py-0.5 text-xs bg-emerald-100 text-emerald-700 rounded-full">
                         {formatCurrency(account.investedBalance)} invested
                       </span>
-                      <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 rounded-full">
+                      <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-700 dark:text-gray-300 rounded-full">
                         {formatCurrency(account.cashBalance)} cash
                       </span>
                       {account.catchUpEligible && (
@@ -1086,10 +1125,10 @@ export default function RetirementPlanningPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900">
+                    <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                       {formatCurrency(account.balance)}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
                       YTD: {formatCurrency(account.ytdContributions)} contributed
                     </div>
                     {account.employerContributions > 0 && (
@@ -1102,7 +1141,9 @@ export default function RetirementPlanningPage() {
                 {/* Contribution Progress */}
                 <div className="mt-4">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-500">2024 Contribution Progress</span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      2024 Contribution Progress
+                    </span>
                     <span className="font-medium">
                       {formatCurrency(account.ytdContributions + account.employerContributions)} /{' '}
                       {formatCurrency(
@@ -1130,7 +1171,7 @@ export default function RetirementPlanningPage() {
               </div>
             ))
           ) : (
-            <div className="p-8 text-center text-gray-500">
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
               <div className="text-lg mb-2">No HSA accounts found</div>
               <p className="text-sm">
                 Add your HSA account to track contributions and optimize tax savings
@@ -1141,21 +1182,25 @@ export default function RetirementPlanningPage() {
       </div>
 
       {/* FSA Accounts */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Flexible Spending Accounts (FSA)</h3>
-          <p className="text-sm text-gray-500">Healthcare, Dependent Care, and Commuter benefits</p>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Flexible Spending Accounts (FSA)
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Healthcare, Dependent Care, and Commuter benefits
+          </p>
         </div>
         <div className="divide-y divide-gray-200">
           {healthSavingsData?.fsaAccounts && healthSavingsData.fsaAccounts.length > 0 ? (
             healthSavingsData.fsaAccounts.map((fsa) => (
               <div
                 key={fsa.id}
-                className={`p-4 ${fsa.forfeitsAt < 60 ? 'bg-red-50' : fsa.forfeitsAt < 120 ? 'bg-yellow-50' : ''}`}
+                className={`p-4 ${fsa.forfeitsAt < 60 ? 'bg-red-50 dark:bg-red-950/30' : fsa.forfeitsAt < 120 ? 'bg-yellow-50 dark:bg-yellow-950/30' : ''}`}
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
                       {fsa.type === 'healthcare'
                         ? 'Healthcare FSA'
                         : fsa.type === 'dependent_care'
@@ -1164,7 +1209,7 @@ export default function RetirementPlanningPage() {
                             ? 'Transit FSA'
                             : 'Parking FSA'}
                     </div>
-                    <div className="text-sm text-gray-500">{fsa.provider}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{fsa.provider}</div>
                     {fsa.forfeitsAt < 90 && (
                       <div className="mt-2 px-3 py-1 bg-red-100 text-red-700 text-xs rounded-full inline-block">
                         {fsa.forfeitsAt} days until forfeit!
@@ -1172,17 +1217,17 @@ export default function RetirementPlanningPage() {
                     )}
                   </div>
                   <div className="text-right">
-                    <div className="text-xl font-bold text-gray-900">
+                    <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
                       {formatCurrency(fsa.remainingBalance)}
                     </div>
-                    <div className="text-sm text-gray-500">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
                       remaining of {formatCurrency(fsa.electionAmount)}
                     </div>
                   </div>
                 </div>
                 <div className="mt-3">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-gray-500">Usage</span>
+                    <span className="text-gray-500 dark:text-gray-400">Usage</span>
                     <span>{formatCurrency(fsa.usedAmount)} used</span>
                   </div>
                   <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -1200,32 +1245,36 @@ export default function RetirementPlanningPage() {
               </div>
             ))
           ) : (
-            <div className="p-8 text-center text-gray-500">No FSA accounts found</div>
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+              No FSA accounts found
+            </div>
           )}
         </div>
       </div>
 
       {/* IRS Limits Reference */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">2024 IRS Contribution Limits</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          2024 IRS Contribution Limits
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">HSA Limits</h4>
+            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">HSA Limits</h4>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Individual</span>
+                <span className="text-gray-500 dark:text-gray-400">Individual</span>
                 <span className="font-medium">
                   {formatCurrency(healthSavingsData?.limits?.current?.hsa?.individual || 4150)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Family</span>
+                <span className="text-gray-500 dark:text-gray-400">Family</span>
                 <span className="font-medium">
                   {formatCurrency(healthSavingsData?.limits?.current?.hsa?.family || 8300)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Catch-up (55+)</span>
+                <span className="text-gray-500 dark:text-gray-400">Catch-up (55+)</span>
                 <span className="font-medium">
                   +{formatCurrency(healthSavingsData?.limits?.current?.hsa?.catchUp || 1000)}
                 </span>
@@ -1233,22 +1282,22 @@ export default function RetirementPlanningPage() {
             </div>
           </div>
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">FSA Limits</h4>
+            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">FSA Limits</h4>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Healthcare</span>
+                <span className="text-gray-500 dark:text-gray-400">Healthcare</span>
                 <span className="font-medium">
                   {formatCurrency(healthSavingsData?.limits?.current?.fsa?.healthcare || 3200)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Carryover Max</span>
+                <span className="text-gray-500 dark:text-gray-400">Carryover Max</span>
                 <span className="font-medium">
                   {formatCurrency(healthSavingsData?.limits?.current?.fsa?.carryover || 640)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Dependent Care</span>
+                <span className="text-gray-500 dark:text-gray-400">Dependent Care</span>
                 <span className="font-medium">
                   {formatCurrency(healthSavingsData?.limits?.current?.fsa?.dependentCare || 5000)}
                 </span>
@@ -1256,16 +1305,18 @@ export default function RetirementPlanningPage() {
             </div>
           </div>
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">Commuter Limits (Monthly)</h4>
+            <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">
+              Commuter Limits (Monthly)
+            </h4>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Transit</span>
+                <span className="text-gray-500 dark:text-gray-400">Transit</span>
                 <span className="font-medium">
                   {formatCurrency(healthSavingsData?.limits?.current?.commuter?.transit || 315)}/mo
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Parking</span>
+                <span className="text-gray-500 dark:text-gray-400">Parking</span>
                 <span className="font-medium">
                   {formatCurrency(healthSavingsData?.limits?.current?.commuter?.parking || 315)}/mo
                 </span>
@@ -1276,30 +1327,34 @@ export default function RetirementPlanningPage() {
       </div>
 
       {/* Tax Savings Breakdown */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Tax Savings Breakdown</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          Tax Savings Breakdown
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-3">
             {healthSavingsData?.taxSavings?.breakdown?.map((item, index) => (
               <div
                 key={index}
-                className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+                className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-900/40 rounded-lg"
               >
                 <div>
-                  <div className="font-medium text-gray-900">{item.category}</div>
-                  <div className="text-xs text-gray-500">{item.description}</div>
+                  <div className="font-medium text-gray-900 dark:text-gray-100">
+                    {item.category}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">{item.description}</div>
                 </div>
                 <div className="font-semibold text-green-600">{formatCurrency(item.amount)}</div>
               </div>
             ))}
           </div>
-          <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+          <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-4 border border-green-200">
             <div className="text-center">
               <div className="text-sm text-green-600 font-medium">Total Annual Tax Savings</div>
               <div className="text-4xl font-bold text-green-700 mt-2">
                 {formatCurrency(healthSavingsData?.taxSavings?.totalAnnualSavings || 0)}
               </div>
-              <div className="text-sm text-gray-600 mt-2">
+              <div className="text-sm text-gray-600 dark:text-gray-300 mt-2">
                 Estimated marginal rate:{' '}
                 {formatPercent(healthSavingsData?.userInfo?.estimatedMarginalRate || 0.24, 0)}
               </div>
@@ -1309,20 +1364,24 @@ export default function RetirementPlanningPage() {
       </div>
 
       {/* HSA vs Roth Comparison */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">HSA vs Roth IRA Comparison</h3>
-        <p className="text-sm text-gray-500 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          HSA vs Roth IRA Comparison
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
           See which account provides better value in different scenarios
         </p>
         <div className="space-y-4">
           {healthSavingsData?.hsaVsRothComparison?.map((comparison, index) => (
             <div
               key={index}
-              className={`p-4 rounded-lg border ${comparison.winner === 'HSA' ? 'border-emerald-300 bg-emerald-50' : comparison.winner === 'Roth' ? 'border-purple-300 bg-purple-50' : 'border-gray-200'}`}
+              className={`p-4 rounded-lg border ${comparison.winner === 'HSA' ? 'border-emerald-300 bg-emerald-50' : comparison.winner === 'Roth' ? 'border-purple-300 bg-purple-50 dark:bg-purple-950/30' : 'border-gray-200 dark:border-gray-700'}`}
             >
               <div className="flex justify-between items-start mb-3">
                 <div>
-                  <div className="font-medium text-gray-900">{comparison.scenario}</div>
+                  <div className="font-medium text-gray-900 dark:text-gray-100">
+                    {comparison.scenario}
+                  </div>
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full ${comparison.winner === 'HSA' ? 'bg-emerald-200 text-emerald-800' : 'bg-purple-200 text-purple-800'}`}
                   >
@@ -1332,23 +1391,23 @@ export default function RetirementPlanningPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div
-                  className={`text-center p-3 rounded-lg ${comparison.winner === 'HSA' ? 'bg-emerald-100' : 'bg-white'}`}
+                  className={`text-center p-3 rounded-lg ${comparison.winner === 'HSA' ? 'bg-emerald-100' : 'bg-white dark:bg-gray-800'}`}
                 >
-                  <div className="text-sm text-gray-500">HSA Value</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">HSA Value</div>
                   <div className="text-xl font-bold text-emerald-700">
                     {formatCurrency(comparison.hsaValue)}
                   </div>
                 </div>
                 <div
-                  className={`text-center p-3 rounded-lg ${comparison.winner === 'Roth' ? 'bg-purple-100' : 'bg-white'}`}
+                  className={`text-center p-3 rounded-lg ${comparison.winner === 'Roth' ? 'bg-purple-100' : 'bg-white dark:bg-gray-800'}`}
                 >
-                  <div className="text-sm text-gray-500">Roth Value</div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">Roth Value</div>
                   <div className="text-xl font-bold text-purple-700">
                     {formatCurrency(comparison.rothValue)}
                   </div>
                 </div>
               </div>
-              <div className="mt-3 text-xs text-gray-500">
+              <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                 Assumptions: {comparison.assumptions?.join(' | ')}
               </div>
             </div>
@@ -1357,33 +1416,41 @@ export default function RetirementPlanningPage() {
       </div>
 
       {/* Optimization Recommendations */}
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Optimization Recommendations</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          Optimization Recommendations
+        </h3>
         <div className="space-y-3">
           {healthSavingsData?.optimizations?.map((opt, index) => (
             <div
               key={index}
-              className={`p-4 rounded-lg border ${opt.priority === 'high' ? 'border-red-200 bg-red-50' : opt.priority === 'medium' ? 'border-yellow-200 bg-yellow-50' : 'border-gray-200 bg-gray-50'}`}
+              className={`p-4 rounded-lg border ${opt.priority === 'high' ? 'border-red-200 bg-red-50 dark:bg-red-950/30' : opt.priority === 'medium' ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-950/30' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40'}`}
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`px-2 py-0.5 text-xs rounded-full ${opt.priority === 'high' ? 'bg-red-200 text-red-800' : opt.priority === 'medium' ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-200 text-gray-800'}`}
+                      className={`px-2 py-0.5 text-xs rounded-full ${opt.priority === 'high' ? 'bg-red-200 text-red-800' : opt.priority === 'medium' ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-200 text-gray-800 dark:text-gray-100'}`}
                     >
                       {opt.priority}
                     </span>
-                    <span className="text-xs text-gray-500">{opt.category}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">{opt.category}</span>
                   </div>
-                  <div className="font-medium text-gray-900 mt-1">{opt.title}</div>
-                  <div className="text-sm text-gray-600 mt-1">{opt.description}</div>
+                  <div className="font-medium text-gray-900 dark:text-gray-100 mt-1">
+                    {opt.title}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
+                    {opt.description}
+                  </div>
                   {opt.action && (
                     <div className="text-sm text-blue-600 mt-2">Action: {opt.action}</div>
                   )}
                 </div>
                 {opt.potentialSavings && opt.potentialSavings > 0 && (
                   <div className="text-right ml-4">
-                    <div className="text-xs text-gray-500">Potential Savings</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Potential Savings
+                    </div>
                     <div className="font-semibold text-green-600">
                       {formatCurrency(opt.potentialSavings)}
                     </div>
@@ -1401,43 +1468,48 @@ export default function RetirementPlanningPage() {
   const renderHealthcare = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Lifetime Healthcare Cost</div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Lifetime Healthcare Cost</div>
           <div className="text-2xl font-bold text-red-600">
             {formatCurrency(healthcareProjection?.totalLifetimeCost || 0)}
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Average Annual Cost</div>
-          <div className="text-2xl font-bold text-gray-900">
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Average Annual Cost</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
             {formatCurrency(healthcareProjection?.averageAnnualCost || 0)}
           </div>
         </div>
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="text-sm text-gray-500">Recommended Reserve</div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Recommended Reserve</div>
           <div className="text-2xl font-bold text-blue-600">
             {formatCurrency(healthcareProjection?.savingsTarget || 0)}
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Healthcare Coverage Timeline</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          Healthcare Coverage Timeline
+        </h3>
         <div className="space-y-4">
           {healthcareProjection?.phases?.map((phase, index) => (
-            <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+            <div
+              key={index}
+              className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-gray-900/40 rounded-lg"
+            >
               <div className="w-24 text-center">
-                <div className="text-sm text-gray-500">Ages</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">Ages</div>
                 <div className="font-semibold">
                   {phase.startAge} - {phase.endAge}
                 </div>
               </div>
               <div className="flex-1">
-                <div className="font-medium text-gray-900">{phase.name}</div>
-                <div className="text-sm text-gray-500">{phase.coverageType}</div>
+                <div className="font-medium text-gray-900 dark:text-gray-100">{phase.name}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">{phase.coverageType}</div>
               </div>
               <div className="text-right">
-                <div className="font-semibold text-gray-900">
+                <div className="font-semibold text-gray-900 dark:text-gray-100">
                   {formatCurrency(phase.annualTotal)}/yr
                 </div>
               </div>
@@ -1446,13 +1518,18 @@ export default function RetirementPlanningPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Healthcare Planning Tips</h3>
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          Healthcare Planning Tips
+        </h3>
         <ul className="space-y-3">
           {healthcareProjection?.recommendations?.map((rec, index) => (
-            <li key={index} className="flex items-start gap-3 p-3 bg-blue-50 rounded-lg">
+            <li
+              key={index}
+              className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg"
+            >
               <span className="text-blue-600 font-bold">*</span>
-              <span className="text-sm text-gray-700">{rec}</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">{rec}</span>
             </li>
           ))}
         </ul>
@@ -1463,9 +1540,11 @@ export default function RetirementPlanningPage() {
   // Scenarios Tab
   const renderScenarios = () => (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">What-If Scenario Analysis</h3>
-        <p className="text-sm text-gray-500 mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          What-If Scenario Analysis
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
           Test your retirement plan against various life events and market conditions.
         </p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1473,12 +1552,16 @@ export default function RetirementPlanningPage() {
             scenarios.map((scenario, index) => (
               <div
                 key={index}
-                className={`p-4 border rounded-lg ${scenario.impactSeverity === 'critical' ? 'border-red-300 bg-red-50' : scenario.impactSeverity === 'high' ? 'border-orange-300 bg-orange-50' : scenario.impactSeverity === 'medium' ? 'border-yellow-300 bg-yellow-50' : 'border-green-300 bg-green-50'}`}
+                className={`p-4 border rounded-lg ${scenario.impactSeverity === 'critical' ? 'border-red-300 bg-red-50 dark:bg-red-950/30' : scenario.impactSeverity === 'high' ? 'border-orange-300 bg-orange-50' : scenario.impactSeverity === 'medium' ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30' : 'border-green-300 bg-green-50 dark:bg-green-950/30'}`}
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <div className="font-semibold text-gray-900">{scenario.name}</div>
-                    <div className="text-xs text-gray-500">{scenario.description}</div>
+                    <div className="font-semibold text-gray-900 dark:text-gray-100">
+                      {scenario.name}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {scenario.description}
+                    </div>
                   </div>
                   <span
                     className={`px-2 py-1 text-xs rounded-full ${scenario.impactSeverity === 'critical' ? 'bg-red-200 text-red-800' : scenario.impactSeverity === 'high' ? 'bg-orange-200 text-orange-800' : scenario.impactSeverity === 'medium' ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800'}`}
@@ -1488,7 +1571,7 @@ export default function RetirementPlanningPage() {
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-sm">
                   <div>
-                    <div className="text-gray-500">Success Rate</div>
+                    <div className="text-gray-500 dark:text-gray-400">Success Rate</div>
                     <div
                       className={`font-semibold ${scenario.keyMetrics.successProbability >= 0.8 ? 'text-green-600' : scenario.keyMetrics.successProbability >= 0.6 ? 'text-yellow-600' : 'text-red-600'}`}
                     >
@@ -1496,7 +1579,7 @@ export default function RetirementPlanningPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500">vs Baseline</div>
+                    <div className="text-gray-500 dark:text-gray-400">vs Baseline</div>
                     <div
                       className={`font-semibold ${scenario.comparison.successDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}
                     >
@@ -1505,16 +1588,18 @@ export default function RetirementPlanningPage() {
                     </div>
                   </div>
                   <div>
-                    <div className="text-gray-500">Legacy</div>
+                    <div className="text-gray-500 dark:text-gray-400">Legacy</div>
                     <div className="font-semibold">
                       {formatCurrency(scenario.keyMetrics.legacyAmount)}
                     </div>
                   </div>
                 </div>
                 {scenario.adjustmentsNeeded.length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <div className="text-xs font-medium text-gray-500 mb-1">Key Actions:</div>
-                    <ul className="text-xs text-gray-600 space-y-1">
+                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                      Key Actions:
+                    </div>
+                    <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
                       {scenario.adjustmentsNeeded.slice(0, 2).map((adj, i) => (
                         <li key={i}>* {adj}</li>
                       ))}
@@ -1524,7 +1609,7 @@ export default function RetirementPlanningPage() {
               </div>
             ))
           ) : (
-            <div className="col-span-2 text-center py-8 text-gray-500">
+            <div className="col-span-2 text-center py-8 text-gray-500 dark:text-gray-400">
               Loading scenario analysis...
             </div>
           )}
@@ -1558,10 +1643,10 @@ export default function RetirementPlanningPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900/40 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading retirement data...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading retirement data...</p>
         </div>
       </div>
     );
@@ -1569,23 +1654,25 @@ export default function RetirementPlanningPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900/40 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-600 text-xl mb-4">Error</div>
-          <p className="text-gray-600">{error}</p>
+          <p className="text-gray-600 dark:text-gray-300">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900/40">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Retirement Planning</h1>
-              <p className="text-sm text-gray-500 mt-1">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                Retirement Planning
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 Advanced retirement analysis and optimization
               </p>
             </div>
@@ -1598,14 +1685,14 @@ export default function RetirementPlanningPage() {
         </div>
       </div>
 
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <nav className="flex space-x-1 overflow-x-auto py-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+                className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-colors ${activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 hover:bg-gray-100'}`}
               >
                 {tab.label}
               </button>

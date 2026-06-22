@@ -25,10 +25,10 @@ interface Resolved {
 const SRC_COLOR: Record<string, string> = {
   'Plaid sandbox persona': 'bg-sky-50 text-sky-700 border-sky-100',
   'Uploaded document': 'bg-violet-50 text-violet-700 border-violet-100',
-  'Advisor onboarding': 'bg-indigo-50 text-indigo-700 border-indigo-100',
+  'Advisor onboarding': 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 border-indigo-100',
   'User-entered': 'bg-emerald-50 text-emerald-700 border-emerald-100',
-  'Deterministic tool run': 'bg-amber-50 text-amber-700 border-amber-100',
-  Missing: 'bg-rose-50 text-rose-700 border-rose-100',
+  'Deterministic tool run': 'bg-amber-50 dark:bg-amber-950/30 text-amber-700 border-amber-100',
+  Missing: 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 border-rose-100',
 };
 const BAND_COLOR: Record<string, string> = {
   High: 'text-emerald-600',
@@ -122,7 +122,7 @@ export default function FinancialResolverPanel({
 
   if (loading)
     return (
-      <div className="rounded-xl border border-gray-100 bg-white p-5 text-gray-400">
+      <div className="rounded-xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-5 text-gray-400 dark:text-gray-500">
         Loading canonical data…
       </div>
     );
@@ -130,10 +130,10 @@ export default function FinancialResolverPanel({
   const updated = r.last_updated ? new Date(r.last_updated).toLocaleDateString() : 'recently';
 
   return (
-    <section className="rounded-2xl border border-gray-100 bg-white shadow-sm p-5">
+    <section className="rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm p-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-bold text-gray-800">{title}</h2>
-        <span className="text-[11px] text-gray-400">Updated: {updated}</span>
+        <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">{title}</h2>
+        <span className="text-[11px] text-gray-400 dark:text-gray-500">Updated: {updated}</span>
       </div>
       <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
         {keys.map((key) => {
@@ -141,16 +141,23 @@ export default function FinancialResolverPanel({
           if (!f) return null;
           if (!f.present) {
             return (
-              <div key={key} className="rounded-lg border border-rose-100 bg-rose-50 p-3">
+              <div
+                key={key}
+                className="rounded-lg border border-rose-100 bg-rose-50 dark:bg-rose-950/30 p-3"
+              >
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-800">{LABELS[key] ?? key}</span>
+                  <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                    {LABELS[key] ?? key}
+                  </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">
                     Missing
                   </span>
                 </div>
-                {f.prompt && <div className="text-xs text-gray-600 mt-1">{f.prompt}</div>}
+                {f.prompt && (
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">{f.prompt}</div>
+                )}
                 {f.unlocks?.length > 0 && (
-                  <div className="text-[11px] text-gray-500 mt-1">
+                  <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                     Unlocks: {f.unlocks.join(' · ')}
                   </div>
                 )}
@@ -167,20 +174,22 @@ export default function FinancialResolverPanel({
             <button
               key={key}
               onClick={() => setDrawer({ key, field: f })}
-              className="text-left rounded-lg border border-gray-100 p-3 hover:shadow-sm"
+              className="text-left rounded-lg border border-gray-100 dark:border-gray-700 p-3 hover:shadow-sm"
             >
-              <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
+              <div className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500 font-semibold">
                 {LABELS[key] ?? key}
               </div>
-              <div className="text-xl font-bold text-gray-900">{fmt(key, f.value)}</div>
+              <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                {fmt(key, f.value)}
+              </div>
               <div className="mt-1 flex items-center gap-2">
                 <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full border ${SRC_COLOR[f.source] ?? 'bg-gray-50 text-gray-600 border-gray-100'}`}
+                  className={`text-[10px] px-2 py-0.5 rounded-full border ${SRC_COLOR[f.source] ?? 'bg-gray-50 dark:bg-gray-900/40 text-gray-600 dark:text-gray-300 border-gray-100 dark:border-gray-700'}`}
                 >
                   {f.source}
                 </span>
                 <span
-                  className={`text-[10px] font-semibold ${BAND_COLOR[f.confidence_band] ?? 'text-gray-500'}`}
+                  className={`text-[10px] font-semibold ${BAND_COLOR[f.confidence_band] ?? 'text-gray-500 dark:text-gray-400'}`}
                 >
                   {f.confidence_band} confidence
                 </span>
@@ -191,19 +200,21 @@ export default function FinancialResolverPanel({
       </div>
 
       {withProjection && proj && (
-        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div className="mt-4 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-gray-800">Projected retirement assets</h3>
-            <span className="text-[10px] px-2 py-0.5 rounded-full border bg-amber-100 text-amber-700 border-amber-200">
+            <h3 className="text-sm font-bold text-gray-800 dark:text-gray-100">
+              Projected retirement assets
+            </h3>
+            <span className="text-[10px] px-2 py-0.5 rounded-full border bg-amber-100 text-amber-700 border-amber-200 dark:border-amber-800">
               {proj.available ? 'Source: Deterministic tool run' : 'Source: Missing'}
             </span>
           </div>
           {proj.available && proj.outputs ? (
             <>
-              <div className="text-3xl font-extrabold text-gray-900 mt-1">
+              <div className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 mt-1">
                 {money(proj.outputs.projected_assets)}
               </div>
-              <div className="text-sm text-gray-600 mt-0.5">
+              <div className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
                 {proj.outputs.on_track
                   ? 'On track'
                   : `Funding gap ${money(proj.outputs.funding_gap)}`}{' '}
@@ -211,23 +222,25 @@ export default function FinancialResolverPanel({
                 confidence
               </div>
               {proj.assumptions && proj.assumptions.length > 0 && (
-                <div className="text-[11px] text-gray-500 mt-2">
+                <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-2">
                   Assumptions: {proj.assumptions.join(' · ')}
                 </div>
               )}
               {proj.limitations && proj.limitations.length > 0 && (
-                <div className="text-[11px] text-gray-400 mt-1">{proj.limitations.join(' ')}</div>
+                <div className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">
+                  {proj.limitations.join(' ')}
+                </div>
               )}
-              <div className="text-[10px] text-gray-400 mt-1 font-mono">
+              <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 font-mono">
                 Tool run: {proj.tool_run_id?.slice(0, 8)}
               </div>
             </>
           ) : (
             <div className="mt-1">
-              <div className="text-sm text-gray-700">
+              <div className="text-sm text-gray-700 dark:text-gray-300">
                 {proj.message || 'A required input is missing.'}
               </div>
-              <div className="text-[11px] text-gray-500 mt-1">
+              <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                 Missing: {(proj.missing || []).map((m) => m.input).join(', ')}
               </div>
               {(proj.missing || []).some((m) => m.input === 'current_age') && (
@@ -237,7 +250,7 @@ export default function FinancialResolverPanel({
                     onChange={(e) => setAge(e.target.value)}
                     placeholder="Your age"
                     inputMode="numeric"
-                    className="w-24 rounded-md border border-gray-200 px-2 py-1 text-sm"
+                    className="w-24 rounded-md border border-gray-200 dark:border-gray-700 px-2 py-1 text-sm"
                   />
                   <button
                     onClick={() => loadProjection(age)}
@@ -259,44 +272,46 @@ export default function FinancialResolverPanel({
           onClick={() => setDrawer(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6"
+            className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
-              <h3 className="font-bold text-gray-900">{LABELS[drawer.key] ?? drawer.key}</h3>
+              <h3 className="font-bold text-gray-900 dark:text-gray-100">
+                {LABELS[drawer.key] ?? drawer.key}
+              </h3>
               <button
                 onClick={() => setDrawer(null)}
-                className="text-gray-400 text-xl leading-none"
+                className="text-gray-400 dark:text-gray-500 text-xl leading-none"
               >
                 ×
               </button>
             </div>
-            <div className="text-2xl font-extrabold text-gray-900 mt-2">
+            <div className="text-2xl font-extrabold text-gray-900 dark:text-gray-100 mt-2">
               {fmt(drawer.key, drawer.field.value)}
             </div>
             <dl className="mt-3 space-y-1.5 text-sm">
               <div className="flex justify-between">
-                <dt className="text-gray-500">Source</dt>
+                <dt className="text-gray-500 dark:text-gray-400">Source</dt>
                 <dd className="font-medium">{drawer.field.source}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-gray-500">Origin</dt>
+                <dt className="text-gray-500 dark:text-gray-400">Origin</dt>
                 <dd className="font-mono text-xs">{drawer.field.origin}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-gray-500">Confidence</dt>
+                <dt className="text-gray-500 dark:text-gray-400">Confidence</dt>
                 <dd className="font-medium">
                   {drawer.field.confidence_band} ({Math.round(drawer.field.confidence * 100)}%)
                 </dd>
               </div>
               {drawer.field.unlocks?.length > 0 && (
                 <div className="flex justify-between">
-                  <dt className="text-gray-500">Powers</dt>
+                  <dt className="text-gray-500 dark:text-gray-400">Powers</dt>
                   <dd className="text-right">{drawer.field.unlocks.join(', ')}</dd>
                 </div>
               )}
             </dl>
-            <div className="mt-3 text-xs text-gray-400">
+            <div className="mt-3 text-xs text-gray-400 dark:text-gray-500">
               This value is read from Supabase — LifeNavigator renders it, it doesn&apos;t create
               it.
             </div>

@@ -8,12 +8,9 @@ import { EnhancedTransaction } from '@/types/financial';
 // Removed mock data import - will fetch from database
 
 export default function TransactionsPage() {
-  // Initialize with last 30 days as default
-  const [startDate, setStartDate] = useState(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 30);
-    return date;
-  });
+  // Default to ALL available transactions — for pilot/demo a user must see their data immediately,
+  // not have to widen a 30-day filter. The date filters below still let them narrow the range.
+  const [startDate, setStartDate] = useState(() => new Date('2000-01-01'));
 
   const [endDate, setEndDate] = useState(new Date());
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
