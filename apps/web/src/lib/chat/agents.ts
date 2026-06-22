@@ -21,7 +21,7 @@ export interface AgentInfo {
 export const AGENT_FALLBACK: AgentInfo[] = [
   {
     id: RELATIONSHIP_MANAGER,
-    name: 'Relationship Manager',
+    name: 'Arcana',
     description: 'Coordinates every domain advisor for broad questions and your next best action.',
     icon: 'compass',
     domains: [],
@@ -115,7 +115,7 @@ export function agentName(
   id: string | null | undefined,
   roster: AgentInfo[] = AGENT_FALLBACK
 ): string {
-  if (!id) return 'Relationship Manager';
+  if (!id) return 'Arcana';
   return (
     roster.find((a) => a.id === id)?.name ??
     AGENT_FALLBACK.find((a) => a.id === id)?.name ??

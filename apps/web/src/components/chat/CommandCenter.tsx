@@ -16,6 +16,40 @@ import { chatClient, type Project, type Thread, type Citation } from '@/lib/chat
 import { AGENT_FALLBACK, RELATIONSHIP_MANAGER, agentName, type AgentInfo } from '@/lib/chat/agents';
 import { ADVISOR_WELCOME, ADVISOR_INCOMPLETE_ONBOARDING, ADVISOR_ERROR } from '@/lib/chat/advisor';
 
+// Step-based "work happening" indicator. The advisor response can take ~20s (LLM + multi-agent
+// orchestration); a passive "thinking…" makes it feel frozen. Rotate through real-sounding steps +
+// animated dots so the user always sees progress.
+const THINKING_STEPS = [
+  'reviewing what we know about you…',
+  'checking your documents and facts…',
+  'reviewing your recommendations…',
+  'updating your readiness…',
+  'preparing your answer…',
+];
+function ThinkingProgress({ name }: { name: string }) {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setStep((s) => Math.min(s + 1, THINKING_STEPS.length - 1)), 2600);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div
+      className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
+      data-testid="cc-loading"
+    >
+      <span className="inline-flex gap-1" aria-hidden>
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.3s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.15s]" />
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400" />
+      </span>
+      <span>
+        <span className="font-medium text-gray-600 dark:text-gray-300">{name}</span> is{' '}
+        {THINKING_STEPS[step]}
+      </span>
+    </div>
+  );
+}
+
 interface UiMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -258,11 +292,7 @@ export default function CommandCenter({
           </div>
         ))}
 
-        {loading && (
-          <div className="text-xs text-gray-500" data-testid="cc-loading">
-            {agentName(selectedAgent, agents)} is thinking…
-          </div>
-        )}
+        {loading && <ThinkingProgress name={agentName(selectedAgent, agents)} />}
         {error && (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700">
             {error}
