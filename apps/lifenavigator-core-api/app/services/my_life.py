@@ -8,6 +8,7 @@ composes what already exists into one coherent destination.
 """
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from ..models.common import UserContext
@@ -90,22 +91,32 @@ class MyLifeService:
                 "view_all": "/dashboard/recommendations", "life_vision": ml["life_vision"]}
 
     async def my_life(self, ctx: UserContext) -> dict[str, Any]:
-        snap = await self._life.snapshot(ctx)
-        try:
-            health = await self._life.discovery_health(ctx)
-        except Exception:  # noqa: BLE001
-            health = {}
+        # All six top-level reads take only ctx and are INDEPENDENT — fetch them concurrently instead of
+        # serially (the residual /my-life latency). snapshot + recent_intelligence stay un-wrapped (a
+        # failure fails the endpoint, as before); the rest keep their existing fallbacks. Identical values
+        # + error behavior — pure latency win.
+        from .canonical_goals import CanonicalGoalsService
+
+        async def _opt(coro: Any, fallback: Any) -> Any:
+            try:
+                return await coro
+            except Exception:  # noqa: BLE001
+                return fallback
+
+        snap, health, pri, r_assess, recent, canonical = await asyncio.gather(
+            self._life.snapshot(ctx),
+            _opt(self._life.discovery_health(ctx), {}),
+            _opt(self._os.prioritize(ctx, top=6), {}),
+            _opt(self._readiness.assess(ctx), None),
+            self._recent_intelligence(ctx),
+            _opt(CanonicalGoalsService(self._life, self._sb).canonical_goals(ctx), []),
+        )
         po = snap.get("primary_objective") or {}
 
         # Grounded risks/opportunities ONLY (Dashboard Trust Fix). Source from the recommendation engine
         # (evidence-backed) — archetype objective-template labels (GENERIC_RISK_OPP_LABELS) are NOT surfaced
         # as personalized dashboard risks/opps without real grounding. They still live in the Life Graph.
-        ranked: list[dict[str, Any]] = []
-        try:
-            pri = await self._os.prioritize(ctx, top=6)
-            ranked = pri.get("top_actions") or []
-        except Exception:  # noqa: BLE001
-            ranked = []
+        ranked: list[dict[str, Any]] = (pri or {}).get("top_actions") or []
 
         def _typ(x: dict[str, Any]) -> str:
             return str(x.get("rec_type") or x.get("classification") or "").upper()
@@ -166,14 +177,14 @@ class MyLifeService:
             "source": "Recommendation OS + Advisor Discovery",
         }
 
-        # Section 3 — Life Readiness snapshot (cross-domain; missing surfaced honestly)
-        try:
-            r = await self._readiness.assess(ctx)
+        # Section 3 — Life Readiness snapshot (cross-domain; missing surfaced honestly). r_assess is
+        # prefetched above (None if the assess() call failed — same fallback as the prior try/except).
+        if r_assess:
             domains = [{"domain": d["domain"], "progress": d["progress"], "status": d["status"],
-                        "gap": d.get("gap")} for d in r.get("domains", [])]
-            readiness = {"overall": r["index"]["score"], "status": r["index"]["status"],
+                        "gap": d.get("gap")} for d in r_assess.get("domains", [])]
+            readiness = {"overall": r_assess["index"]["score"], "status": r_assess["index"]["status"],
                          "domains": domains, "source": "Life Readiness Engine"}
-        except Exception:  # noqa: BLE001
+        else:
             readiness = {"overall": None, "domains": [], "source": "Life Readiness Engine"}
 
         # Section 4 — Next Best Action OR Highest Priority Issue (P4). Prefer the top ACTION/OPPORTUNITY
@@ -207,20 +218,15 @@ class MyLifeService:
         for area in (health.get("missing_areas") or []):
             constraints.append({"label": f"Missing {area} discovery", "detail": "Completing this sharpens your plan.", "source": "Discovery health"})
 
-        # Section 6 — Recent Intelligence (the platform feels alive)
-        recent = await self._recent_intelligence(ctx)
+        # Section 6 — Recent Intelligence (the platform feels alive) — prefetched in the gather above.
 
         # Life Brief — the narrative the user reads first ("this understands me"). Pure surfacing of the
         # already-computed Life Model (snapshot narrative + goals + grounded risk + Recommendation OS action).
         brief = life_brief(snap, next_action=next_action, readiness=readiness)
 
-        # Canonical goals — ONE deduped goal view across all four goal stores (read-path join). The
-        # dashboard/report must read THIS, never a single raw store, so users never see duplicate goals.
-        try:
-            from .canonical_goals import CanonicalGoalsService
-            canonical = await CanonicalGoalsService(self._life, self._sb).canonical_goals(ctx)
-        except Exception:  # noqa: BLE001
-            canonical = []
+        # Canonical goals — ONE deduped goal view across all four goal stores (read-path join), prefetched
+        # in the gather above. The dashboard/report reads THIS, never a single raw store, so users never
+        # see duplicate goals.
 
         # ── Canonical Rendering Contract (Data Flow & Rendering Integrity) ──────────────────────────
         # Surface what discovery ALREADY understands but never exposed on this aggregate — uniformly,
