@@ -244,16 +244,37 @@ export default function RetirementPlanningPage() {
     }
   }, []);
 
-  // Fetch accounts data
+  // Fetch accounts data — real retirement/401k/IRA accounts from /api/finance/retirement
+  // (backed by finance.financial_accounts). The previous /api/retirement/accounts endpoint never
+  // existed, so this page showed nothing. We map the domain view-model into the page's shape; the
+  // advanced tabs (Social Security optimization, withdrawal/Roth strategies) remain honestly empty
+  // until those engines exist.
   const fetchAccountsData = useCallback(async () => {
     try {
-      const response = await fetch(
-        '/api/retirement/accounts?includeProjections=true&includeOptimization=true'
-      );
+      const response = await fetch('/api/finance/retirement');
       if (response.ok) {
-        const data = await response.json();
-        setAccounts(data.accounts || []);
-        setAccountTotals(data.totals || null);
+        const vm = await response.json();
+        const raw: Array<{ id?: string; name?: string; balance?: { amount?: number } | number }> =
+          vm?.data?.accounts || [];
+        const mapped: RetirementAccount[] = raw.map((a) => ({
+          id: a.id || '',
+          accountName: a.name || 'Retirement account',
+          accountType: 'retirement',
+          currentBalance: (typeof a.balance === 'object' ? a.balance?.amount : a.balance) ?? 0,
+          monthlyContribution: 0,
+          employerMatch: 0,
+          expectedReturn: 0,
+          taxStatus: 'TAX_DEFERRED',
+        }));
+        setAccounts(mapped);
+        const totalBalance =
+          vm?.data?.total?.amount ?? mapped.reduce((s, a) => s + (a.currentBalance || 0), 0);
+        setAccountTotals({
+          totalBalance,
+          totalProjectedBalance: totalBalance,
+          totalMonthlyContributions: 0,
+          byTaxStatus: { taxDeferred: totalBalance, taxFree: 0, taxable: 0 },
+        });
       }
     } catch (err) {
       console.error('Error fetching accounts:', err);
