@@ -72,20 +72,23 @@ GRANT SELECT                          ON chat.projects TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE  ON chat.projects TO service_role;
 
 -- ---------------------------------------------------------------------------
--- 6. Refresh public views (security_invoker preserved by 113/114 default)
+-- 6. Refresh public views. NOTE: CREATE OR REPLACE VIEW can only APPEND columns
+--    at the end (never reorder/rename existing ones), so the new columns go last
+--    after the original migration-111 column order. WITH (security_invoker = true)
+--    preserves the RLS-as-caller behavior set by migration 113.
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE VIEW public.chat_projects AS
+CREATE OR REPLACE VIEW public.chat_projects WITH (security_invoker = true) AS
   SELECT id, user_id, name, description, domain, created_at, updated_at, archived_at
   FROM chat.projects;
 
-CREATE OR REPLACE VIEW public.chat_conversations AS
-  SELECT id, user_id, project_id, title, mode, selected_agent,
-         last_message_at, message_count, metadata, created_at, updated_at, archived_at
+CREATE OR REPLACE VIEW public.chat_conversations WITH (security_invoker = true) AS
+  SELECT id, user_id, title, last_message_at, message_count, metadata, created_at,
+         project_id, mode, selected_agent, updated_at, archived_at
   FROM chat.conversations;
 
-CREATE OR REPLACE VIEW public.chat_messages AS
-  SELECT id, conversation_id, user_id, role, content, agent, citations,
-         governance_audit_id, metadata, created_at
+CREATE OR REPLACE VIEW public.chat_messages WITH (security_invoker = true) AS
+  SELECT id, conversation_id, user_id, role, content, governance_audit_id, metadata, created_at,
+         agent, citations
   FROM chat.messages;
 
 GRANT SELECT ON public.chat_projects, public.chat_conversations, public.chat_messages TO authenticated;

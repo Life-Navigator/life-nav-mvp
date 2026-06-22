@@ -22,9 +22,9 @@ def _esc(v: Any) -> str:
     return _html.escape(str(v)) if v is not None else ""
 
 
-def _css() -> str:
+def _css(footer_label: str = "Life Intelligence Report") -> str:
     return f"""
-    @page {{ size: A4; margin: 2cm 1.8cm; @bottom-center {{ content: "LifeNavigator · Education Intelligence Report · page " counter(page); font-size: 8pt; color: {MUTED}; }} }}
+    @page {{ size: A4; margin: 2cm 1.8cm; @bottom-center {{ content: "LifeNavigator · {footer_label} · page " counter(page); font-size: 8pt; color: {MUTED}; }} }}
     @page :first {{ margin: 0; }}
     body {{ font-family: 'DejaVu Sans', sans-serif; color: {INK}; font-size: 10.5pt; line-height: 1.5; }}
     .cover {{ height: 100vh; background: linear-gradient(135deg, {BRAND}, #312e81); color: white; padding: 4cm 2cm; }}
@@ -74,6 +74,16 @@ _SUBTITLE = {
     "education": "Programs ranked against your life goals",
     "health": "Your wellness, activity, and sleep guidance",
 }
+# Per-type page-footer label so a Decision/Family/Health/Compensation PDF never says "Education".
+_REPORT_LABEL = {
+    "full": "Life Intelligence Report",
+    "financial": "Financial Intelligence Report",
+    "decision": "Decision Intelligence Report",
+    "family": "Family Intelligence Report",
+    "compensation": "Compensation Intelligence Report",
+    "education": "Education Intelligence Report",
+    "health": "Health Intelligence Report",
+}
 _MONEY_HINT = ("salary", "value", "cost", "balance", "amount", "comp", "savings", "benefit",
                "premium", "coverage", "contribution", "net_worth", "income", "bonus", "equity",
                "gap", "need", "pay", "match", "total", "tuition", "fund")
@@ -89,7 +99,10 @@ def render_report_pdf(definition: dict[str, Any], report_type: str = "full") -> 
     # P4 — advisor-grade briefing for the full/financial life report.
     if report_type in ("full", "financial"):
         adv = next((s.get("body") for s in definition.get("sections", []) if s.get("key") == "advisor_executive"), None)
-        if adv:
+        # Route to the branded briefing whenever the section is PRESENT — even with an empty body.
+        # _full_html renders honest empty states throughout, so a brand-new user gets an advisor-grade
+        # briefing with guidance, not a near-blank generic PDF (only fall through when truly absent).
+        if adv is not None:
             ce = next((s.get("body") for s in definition.get("sections", []) if s.get("key") == "career_education"), None)
             return HTML(string=_full_html(adv, definition, report_type, ce)).write_pdf()
     return HTML(string=_generic_html(definition, report_type)).write_pdf()
@@ -151,6 +164,52 @@ def _bar(pct: Any, status: str) -> str:
     p = max(0, min(100, int(pct or 0)))
     col = _STATUS.get(status, ("#6366f1", "", ""))[0]
     return f'<div class="bar"><i style="width:{p}%;background:{col}"></i></div>'
+
+
+def _section_body(d: dict[str, Any], key: str) -> dict[str, Any] | None:
+    return next((s.get("body") for s in d.get("sections", []) if s.get("key") == key), None)
+
+
+_CONF_SEV = {"high": ("#be123c", "#fff1f2", "High"), "medium": ("#b45309", "#fffbeb", "Medium"),
+             "low": ("#6b7280", "#f3f4f6", "Low")}
+
+
+def _resume_imports_html(body: dict[str, Any], n: int) -> str:
+    """Imported From Resume (Phase 8) — what a resume contributed, each with source + confidence."""
+    groups = body.get("sections") or []
+    if not groups:
+        return ""
+    blocks = ""
+    for g in groups:
+        rows = ""
+        for it in (g.get("items") or [])[:20]:
+            conf = it.get("confidence")
+            conf_s = f"{round(conf * 100)}%" if isinstance(conf, (int, float)) else "—"
+            detail = f' <span style="color:{MUTED}">· {_esc(it.get("detail"))}</span>' if it.get("detail") else ""
+            page = f' <span class="src">p.{_esc(it.get("page_number"))}</span>' if it.get("page_number") is not None else ""
+            rows += (f'<div style="margin:4px 0"><b>{_esc(it.get("value") or "Item")}</b>{detail}'
+                     f' <span style="color:{MUTED};font-size:8.5pt">· {conf_s} confidence · {_esc(it.get("review_status") or "imported")}</span>{page}</div>')
+        blocks += f'<h3 style="text-transform:capitalize">{_esc(g.get("section") or "Records")}</h3>{rows}'
+    note = f'<div class="lead">{_esc(body.get("note"))}</div>' if body.get("note") else ""
+    return f'<h2><span class="n">{n}</span>Imported From Resume</h2>{note}{blocks}'
+
+
+def _conflicts_html(body: dict[str, Any], n: int) -> str:
+    """Unresolved Data Conflicts (Phase 6) — contested facts flagged, never presented as truth."""
+    conflicts = body.get("conflicts") or []
+    if not conflicts:
+        return ""
+    rows = ""
+    for c in conflicts[:20]:
+        ink, wash, label = _CONF_SEV.get(str(c.get("severity") or "").lower(), ("#6b7280", "#f3f4f6", _esc(c.get("severity") or "—")))
+        vals = " vs ".join(_esc(v) for v in (c.get("values") or []) if v not in (None, ""))
+        rec = f'<div class="rec why" style="margin-top:3px">Recommended: {_esc(c.get("recommended"))}</div>' if c.get("recommended") else ""
+        rows += (f'<div class="rec"><div class="t">{_esc(c.get("label") or c.get("field_key") or "Conflict")} '
+                 f'<span class="pill" style="background:{wash};color:{ink}">{label}</span></div>'
+                 f'<div class="why">{vals or "Conflicting values on file."}</div>'
+                 f'<div class="meta">{_esc(c.get("domain") or "")}{(" · " + _esc(c.get("conflict_type"))) if c.get("conflict_type") else ""}</div>{rec}</div>')
+    note = f'<div class="lead">{_esc(body.get("note"))}</div>' if body.get("note") else ""
+    return f'<div class="pb"></div><h2><span class="n">{n}</span>Unresolved Data Conflicts</h2>{note}{rows}'
 
 
 def _full_html(adv: dict[str, Any], d: dict[str, Any], report_type: str, ce: dict[str, Any] | None = None) -> str:
@@ -262,8 +321,23 @@ def _full_html(adv: dict[str, Any], d: dict[str, Any], report_type: str, ce: dic
     plansec = (f'<div class="pb"></div><h2><span class="n">6</span>Your 90-Day Action Plan</h2>'
                f'{_plan_block("Now", plan.get("now"))}{_plan_block("Next", plan.get("next"))}{_plan_block("Later", plan.get("later"))}{blk}') if plan else ''
 
-    # 8 — Appendix
-    appxsec = (f'<h2><span class="n">8</span>Appendix</h2><table class="appx">'
+    # 7 — Career & Education intelligence (Phase 9) — rendered right after the 90-day plan.
+    cesec = _career_education_html(ce, start_n=7) if ce else ""
+
+    # 8/9 — Imported-from-resume + unresolved conflicts (Phases 8 & 6). Trust-critical: contested
+    # facts must be flagged in the briefing, not silently dropped. Numbered after the CE section.
+    _n = 8
+    resume_body = _section_body(d, "imported_from_resume")
+    resumesec = _resume_imports_html(resume_body, _n) if resume_body else ""
+    if resumesec:
+        _n += 1
+    conf_body = _section_body(d, "unresolved_conflicts")
+    confsec = _conflicts_html(conf_body, _n) if conf_body else ""
+    if confsec:
+        _n += 1
+
+    # Appendix — numbered last (after any resume/conflict sections).
+    appxsec = (f'<h2><span class="n">{_n}</span>Appendix</h2><table class="appx">'
                f'<tr><td>Report version</td><td>v{_esc(d.get("version", 1))}</td></tr>'
                f'<tr><td>Generated</td><td>{ts}</td></tr>'
                f'<tr><td>Recommendations</td><td>{_esc(appx.get("recommendation_count", 0))}</td></tr>'
@@ -272,13 +346,10 @@ def _full_html(adv: dict[str, Any], d: dict[str, Any], report_type: str, ce: dic
                f'<tr><td>Average confidence</td><td>{(str(appx.get("avg_confidence_pct")) + "%") if appx.get("avg_confidence_pct") is not None else "—"}</td></tr>'
                f'</table>')
 
-    # 7 — Career & Education intelligence (Phase 9) — rendered right after the 90-day plan.
-    cesec = _career_education_html(ce, start_n=7) if ce else ""
-
     boundary = (d.get("governance") or {}).get("disclaimer_text") or "Decision support — not financial, medical, legal, or tax advice. Every figure traces to your real data."
     foot = f'<div class="boundary">{_esc(boundary)}</div>'
     return (f"<!doctype html><html><head><meta charset='utf-8'><style>{_full_css()}{_ce_css()}</style></head><body>"
-            f"{cover}{exec_s}{readi}{goalsec}{recsec}{missec}{plansec}{cesec}{appxsec}{foot}</body></html>")
+            f"{cover}{exec_s}{readi}{goalsec}{recsec}{missec}{plansec}{cesec}{resumesec}{confsec}{appxsec}{foot}</body></html>")
 
 
 # ── Career & Education renderer (Phase 9) ────────────────────────────────────
@@ -502,11 +573,18 @@ def _generic_html(d: dict[str, Any], report_type: str) -> str:
         asm_html = ("<div class='muted'>Assumptions: " + " · ".join(_esc(a.get("text")) for a in asm) + "</div>") if asm else ""
         blocks.append(f'<div class="section"><h2>{_esc(s.get("title", ""))}</h2>{body}{cblocks}{ev_html}{asm_html}</div>')
 
+    if not blocks:  # honest empty-state — never emit a blank page for a brand-new user
+        blocks.append('<div class="section"><h2>Getting Started</h2>'
+                      '<p>This report is empty because we don\'t have data for it yet. '
+                      'Connect an account, upload a document, or complete onboarding, and your '
+                      'evidence-grounded report will appear here — every figure traced to your data.</p></div>')
+
     cites = " · ".join(_esc(c) for c in (d.get("citations") or []))
     cite_html = f'<div class="section"><h2>Sources</h2><p class="cite">{cites or "—"}</p></div>' if cites else ""
     boundary = (d.get("governance") or {}).get("disclaimer_text") or "Decision support — not financial, medical, legal, or tax advice."
     foot = f'<div class="boundary">{_esc(boundary)}</div>'
-    return f"<!doctype html><html><head><meta charset='utf-8'><style>{_css()}{_generic_css()}</style></head><body>{cover}{''.join(blocks)}{cite_html}{foot}</body></html>"
+    label = _REPORT_LABEL.get(report_type, "Life Intelligence Report")
+    return f"<!doctype html><html><head><meta charset='utf-8'><style>{_css(label)}{_generic_css()}</style></head><body>{cover}{''.join(blocks)}{cite_html}{foot}</body></html>"
 
 
 def _generic_css() -> str:
@@ -592,7 +670,7 @@ def _education_html(d: dict[str, Any]) -> str:
     boundary = (d.get('governance') or {}).get('disclaimer_text') or "Decision support, not admissions, financial, or legal advice."
     foot = f'<div class="boundary">{_esc(boundary)}</div>'
 
-    return f"<!doctype html><html><head><meta charset='utf-8'><style>{_css()}</style></head><body>{cover}{es}{pc}{ra}{fam_block}{rk}{ev}{foot}</body></html>"
+    return f"<!doctype html><html><head><meta charset='utf-8'><style>{_css('Education Intelligence Report')}</style></head><body>{cover}{es}{pc}{ra}{fam_block}{rk}{ev}{foot}</body></html>"
 
 
 def _money(v: Any) -> str:

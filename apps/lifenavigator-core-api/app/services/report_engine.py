@@ -123,7 +123,58 @@ class UniversalReportEngine:
         tool_sec = await self._tool_calculations_section(ctx, len(definition.sections) + 1)
         if tool_sec:
             definition.sections.append(tool_sec)
+        # Phase 8: surface what was imported from a resume (with provenance).
+        try:
+            res_sec = await self._resume_imports_section(ctx, len(definition.sections) + 1)
+            if res_sec:
+                definition.sections.append(res_sec)
+        except Exception:  # noqa: BLE001 — never breaks report generation
+            pass
+        # Phase 6: reports must flag unresolved conflicts — never present a contested fact as truth.
+        try:
+            conf_sec = await self._conflicts_section(ctx, len(definition.sections) + 1)
+            if conf_sec:
+                definition.sections.append(conf_sec)
+        except Exception:  # noqa: BLE001 — never breaks report generation
+            pass
         return definition
+
+    async def _resume_imports_section(self, ctx: UserContext, ord_n: int) -> Optional[ReportSection]:
+        """Imported From Resume (Phase 8I): employers / education / certifications brought in from a
+        resume, each with source document + confidence + review status. Honest empty when none."""
+        try:
+            items = await self._sb.select("resume_items", filters={"user_id": f"eq.{ctx.user_id}", "review_status": "eq.imported"},
+                                          limit=200, schema="documents") or []
+        except Exception:  # noqa: BLE001
+            return None
+        if not items:
+            return None
+        groups: dict[str, list[dict]] = {}
+        for it in items:
+            f = it.get("fields") or {}
+            groups.setdefault(it.get("section"), []).append({
+                "value": f.get("title") or f.get("name") or f.get("institution_name") or f.get("organization"),
+                "detail": f.get("employer") or f.get("issuer") or f.get("degree_type"),
+                "confidence": it.get("confidence"), "review_status": it.get("review_status"),
+                "source_document_id": it.get("document_id"), "page_number": it.get("page_number")})
+        return ReportSection(key="imported_from_resume", title="Imported From Resume", ord=ord_n,
+                             body={"note": "These records were imported from your resume and applied to your "
+                                           "Career and Education domains. Each traces back to the source document.",
+                                   "sections": [{"section": s, "items": groups[s]} for s in groups]})
+
+    async def _conflicts_section(self, ctx: UserContext, ord_n: int) -> Optional[ReportSection]:
+        """Unresolved data conflicts (Phase 6H). Honest empty: no section when there are none."""
+        try:
+            from .conflicts import ConflictDetectionService
+            conflicts = await ConflictDetectionService(self._sb).unresolved_summary(ctx)
+        except Exception:  # noqa: BLE001
+            return None
+        if not conflicts:
+            return None
+        return ReportSection(key="unresolved_conflicts", title="Unresolved Data Conflicts", ord=ord_n,
+                             body={"note": "These facts disagree across your sources and are NOT treated as "
+                                           "final truth until you resolve them.",
+                                   "conflicts": conflicts})
 
     async def _tool_calculations_section(self, ctx: UserContext, ord_n: int) -> Optional[ReportSection]:
         """Every number in this report that came from a deterministic tool, with its calculation."""

@@ -199,6 +199,16 @@ def get_document_service(supabase: SupabaseClient = Depends(get_supabase)) -> Do
     return DocumentIntelligenceService(supabase=supabase)
 
 
+def get_conflict_service(supabase: SupabaseClient = Depends(get_supabase)):
+    from .services.conflicts import ConflictDetectionService
+    return ConflictDetectionService(supabase)
+
+
+def get_resume_service(supabase: SupabaseClient = Depends(get_supabase)):
+    from .services.resume import ResumeImportService
+    return ResumeImportService(supabase)
+
+
 def get_comp_benefits_engine(supabase: SupabaseClient = Depends(get_supabase)) -> CompensationBenefitsEngine:
     return CompensationBenefitsEngine(supabase=supabase)
 

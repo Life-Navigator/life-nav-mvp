@@ -1,5 +1,5 @@
 """Sprint 13 — generic report PDF renderer (HTML builder is pure Python)."""
-from app.services.pdf_renderer import _fmt_scalar, _generic_html, _render_value
+from app.services.pdf_renderer import _fmt_scalar, _full_html, _generic_html, _render_value
 
 
 def test_money_formatting_by_key_hint():
@@ -125,6 +125,51 @@ def test_ce_limited_user_shows_missing_data_and_no_fabrication():
     assert "Stanford" not in html
     # missing data surfaced
     assert "Target date for CTO goal" in html
+
+
+def test_generic_footer_label_matches_report_type():
+    from app.services.pdf_renderer import _generic_html
+    d = {"title": "Family Report", "version": 1, "sections": [{"key": "a", "title": "Overview", "ord": 1, "body": {"has_will": True}}], "charts": [], "citations": []}
+    html = _generic_html(d, "family")
+    assert "Family Intelligence Report" in html
+    assert "Education Intelligence Report" not in html  # the old hardcoded mislabel is gone
+    # decision report likewise
+    assert "Decision Intelligence Report" in _generic_html({**d, "title": "Decision Report"}, "decision")
+
+
+def test_generic_empty_report_shows_honest_getting_started():
+    from app.services.pdf_renderer import _generic_html
+    html = _generic_html({"title": "Health Report", "version": 1, "sections": [], "charts": [], "citations": []}, "health")
+    assert "Getting Started" in html and "don't have data" in html
+    assert "Health Intelligence Report" in html  # footer still correct
+
+
+def test_empty_user_advisor_body_renders_full_briefing_not_blank():
+    # A brand-new user: advisor_executive section PRESENT but body is empty {} → must still render the
+    # branded briefing with honest empty states (the cover + section scaffolding), never a blank page.
+    html = _full_html({}, {"version": 1, "sections": [{"key": "advisor_executive", "body": {}}]}, "full")
+    assert "Life Briefing" in html and "Executive Summary" in html
+    assert "Life Readiness" in html  # readiness section present with empty-state copy
+    assert "still forming" in html  # honest empty objective copy on the cover
+
+
+def test_full_html_surfaces_resume_and_conflict_sections():
+    d = {"version": 1, "sections": [
+        {"key": "advisor_executive", "body": {}},
+        {"key": "imported_from_resume", "body": {"note": "Imported from your resume.",
+            "sections": [{"section": "experience", "items": [
+                {"value": "VP Engineering", "detail": "Acme", "confidence": 0.92, "review_status": "imported", "page_number": 1}]}]}},
+        {"key": "unresolved_conflicts", "body": {"note": "These facts disagree.",
+            "conflicts": [{"label": "Current salary", "field_key": "salary", "severity": "high",
+                           "domain": "career", "conflict_type": "value_mismatch",
+                           "values": ["$180,000", "$192,000"], "recommended": "Confirm your current salary."}]}},
+    ]}
+    html = _full_html(d["sections"][0]["body"], d, "full")
+    # resume section surfaces with its value, detail, confidence, page
+    assert "Imported From Resume" in html and "VP Engineering" in html and "Acme" in html and "92% confidence" in html
+    # conflict section surfaces both contested values + severity + recommendation — never picks one as truth
+    assert "Unresolved Data Conflicts" in html and "$180,000" in html and "$192,000" in html
+    assert "High" in html and "Confirm your current salary." in html
 
 
 def test_ce_conflicting_user_renders_without_crashing_on_nulls():
