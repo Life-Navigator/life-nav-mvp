@@ -30,6 +30,13 @@ _DEGREE_LABEL = {
 }
 
 
+def _src(default: str, row: dict[str, Any]) -> str:
+    """Cite the resume when a domain row was imported from one (Phase 8H)."""
+    if (row.get("metadata") or {}).get("source") == "resume-import":
+        return "Imported from your resume"
+    return default
+
+
 def _fact(domain: str, label: str, value: str, source: str, table: str,
           record_id: Any, updated_at: Any, confidence: float) -> dict[str, Any]:
     return {
@@ -73,13 +80,13 @@ async def build_fact_packet(sb: Any, ctx: UserContext) -> list[dict[str, Any]]:
 
     # ---- Career ----
     experience = await _rows(sb, ctx, "career", "experience_records",
-                             "id,title,employer,industry,start_date,end_date,is_current,updated_at")
+                             "id,title,employer,industry,start_date,end_date,is_current,updated_at,metadata")
     current = next((e for e in experience if e.get("is_current")), None)
     if current and current.get("title"):
         emp = current.get("employer")
         facts.append(_fact("career", "Current role",
                            f"{current['title']}" + (f" @ {emp}" if emp else ""),
-                           "Career experience", "career.experience_records",
+                           _src("Career experience", current), "career.experience_records",
                            current.get("id"), current.get("updated_at"), 0.95))
     prev = [e for e in experience if not e.get("is_current") and e.get("title")]
     for e in prev[:_MAX_PER_CATEGORY]:
@@ -122,7 +129,7 @@ async def build_fact_packet(sb: Any, ctx: UserContext) -> list[dict[str, Any]]:
 
     # ---- Education ----
     degrees = await _rows(sb, ctx, "public", "education_records",
-                          "id,institution_name,degree_type,field_of_study,status,graduation_date,updated_at")
+                          "id,institution_name,degree_type,field_of_study,status,graduation_date,updated_at,metadata")
     for d in degrees[:_MAX_PER_CATEGORY]:
         label = _DEGREE_LABEL.get((d.get("degree_type") or "").lower(), "Degree")
         parts = [label]
@@ -132,15 +139,15 @@ async def build_fact_packet(sb: Any, ctx: UserContext) -> list[dict[str, Any]]:
             parts.append(f"from {d['institution_name']}")
         status = (d.get("status") or "").lower()
         suffix = " (in progress)" if status and status != "completed" else ""
-        facts.append(_fact("education", "Degree", " ".join(parts) + suffix, "Education record",
+        facts.append(_fact("education", "Degree", " ".join(parts) + suffix, _src("Education record", d),
                            "public.education_records", d.get("id"), d.get("updated_at"), 0.95))
 
-    certs = await _rows(sb, ctx, "education", "certifications", "id,name,issuer,status,updated_at")
+    certs = await _rows(sb, ctx, "education", "certifications", "id,name,issuer,status,updated_at,metadata")
     for c in certs[:_MAX_PER_CATEGORY]:
         if c.get("name"):
             iss = c.get("issuer")
             facts.append(_fact("education", "Certification",
-                               str(c["name"]) + (f" ({iss})" if iss else ""), "Certification",
+                               str(c["name"]) + (f" ({iss})" if iss else ""), _src("Certification", c),
                                "education.certifications", c.get("id"), c.get("updated_at"), 0.9))
 
     lics = await _rows(sb, ctx, "education", "licenses", "id,name,issuing_authority,state,status,updated_at")
@@ -207,6 +214,37 @@ async def build_fact_packet(sb: Any, ctx: UserContext) -> list[dict[str, Any]]:
         dtype = d.get("document_type") or d.get("type")
         facts.append(_fact("documents", "Document", str(label) + (f" — {dtype}" if dtype else ""),
                            "Document", "documents.documents", d.get("id"), d.get("updated_at"), 0.85))
+
+    # ---- Extracted document facts (life.facts) ----
+    # The document pipeline (documents._bridge -> submit_life_fact) writes EVERY extracted field value
+    # here with provenance, but until now nothing read it: the advisor could say "you have a trust on
+    # file" yet not cite the successor trustee, beneficiaries, or coverage amount inside it. Surface those
+    # values so the advisor can cite them and the number-gate accepts the figures they came from. Only
+    # confirmed/inferred (real extractions) — never speculative 'candidate' agent inferences.
+    life_facts = await _rows(sb, ctx, "life", "facts",
+                             "id,fact_type,value,domain,confidence,confirmation_status,source,updated_at")
+    doc_facts = [f for f in life_facts
+                 if f.get("value") and f.get("confirmation_status") in ("confirmed", "inferred")]
+    # Confirmed first, then by confidence; bounded so the advisor context stays small + cheap.
+    doc_facts.sort(key=lambda f: (f.get("confirmation_status") == "confirmed", float(f.get("confidence") or 0.0)),
+                   reverse=True)
+    for f in doc_facts[:_MAX_PER_CATEGORY * 2]:
+        ft = str(f.get("fact_type") or "")
+        doc_type, _dot, key = ft.partition(".")
+        label = (key or ft).replace("_", " ").strip().capitalize() or "Extracted fact"
+        src = (f"Extracted from your {doc_type.replace('_', ' ')}" if doc_type
+               else "Extracted from your document")
+        if f.get("confirmation_status") == "inferred":  # never assert an unconfirmed value as settled fact
+            src += " (pending your confirmation)"
+        facts.append(_fact(f.get("domain") or "documents", label, str(f["value"]), src,
+                           "life.facts", f.get("id"), f.get("updated_at"), float(f.get("confidence") or 0.5)))
+
+    # ---- Conflicts ---- (Phase 6G: the advisor must KNOW when data is contested, and never pick silently)
+    try:
+        from .conflicts import open_conflict_facts
+        facts.extend(await open_conflict_facts(sb, ctx))
+    except Exception:  # noqa: BLE001 — grounding must never break a turn
+        pass
 
     return facts
 

@@ -69,6 +69,39 @@ async def test_years_of_experience_is_a_derived_fact_not_a_guess():
     assert toks and all(any(ch.isdigit() for ch in t) for t in toks)
 
 
+@pytest.mark.asyncio
+async def test_extracted_document_facts_surface_from_life_facts():
+    """Sprint B (Life Facts Visibility): values the document pipeline wrote to life.facts must reach
+    the advisor as cited, number-gate-eligible facts — confirmed/inferred only, candidates excluded."""
+    sb = FakeSupabase({
+        "facts": [
+            {"id": "f1", "fact_type": "trust.successor_trustee", "value": "Jane Doe", "domain": "family",
+             "confidence": 0.9, "confirmation_status": "confirmed", "source": "document", "updated_at": "2026-06-20"},
+            {"id": "f2", "fact_type": "life_insurance_policy.coverage_amount", "value": "1000000", "domain": "family",
+             "confidence": 0.8, "confirmation_status": "inferred", "source": "document", "updated_at": "2026-06-20"},
+            {"id": "f3", "fact_type": "trust.note", "value": "speculative guess", "domain": "family",
+             "confidence": 0.3, "confirmation_status": "candidate", "source": "agent_inference", "updated_at": None},
+        ],
+    })
+    facts = await build_fact_packet(sb, CTX)
+    life = [f for f in facts if f["sourceTable"] == "life.facts"]
+
+    vals = {f["value"] for f in life}
+    assert "Jane Doe" in vals and "1000000" in vals      # confirmed + inferred surface
+    assert "speculative guess" not in vals               # candidate excluded (trust gate)
+
+    trustee = next(f for f in life if f["value"] == "Jane Doe")
+    assert trustee["label"] == "Successor trustee"
+    assert trustee["recordId"] == "f1"
+    assert "trust" in trustee["source"].lower()
+    for f in life:
+        assert REQUIRED.issubset(f.keys()) and f["sourceTable"] == "life.facts"
+
+    cov = next(f for f in life if f["value"] == "1000000")
+    assert "pending your confirmation" in cov["source"]  # inferred never asserted as settled
+    assert "1000000" in numbers_in_facts(facts)          # extracted figure now available to the number-gate
+
+
 def _ctx_with_packet(packet):
     return AdvisorContext(
         user_id=CTX.user_id, user_message="what do you know about my career?", current_stage="complete",
