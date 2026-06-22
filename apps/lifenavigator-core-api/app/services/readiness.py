@@ -8,6 +8,7 @@ honestly as "get started", never a fake green.
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import date, datetime, timezone
 from typing import Any, Optional
 
@@ -55,31 +56,37 @@ class LifeReadinessEngine:
         self._planning = planning  # optional FinancialPlanningEngine — enriches Finance readiness
 
     async def assess(self, ctx: UserContext) -> dict[str, Any]:
-        readinesses: list[dict[str, Any]] = []
-        for domain in ("finance", "health", "career", "family"):
-            svc = self._domains.get(domain)
-            if not svc:
-                continue
+        # The domain summaries are INDEPENDENT — run them concurrently instead of serially (this is the
+        # dashboard/roadmap latency bottleneck). A failing domain reads as "needs attention", never breaks
+        # the board. Same results as before, just not summed end-to-end.
+        domain_names = [d for d in ("finance", "health", "career", "family") if self._domains.get(d)]
+
+        async def _domain(domain: str) -> dict[str, Any]:
             try:
-                vm = await svc.summary(ctx)
-            except Exception:  # noqa: BLE001 — a failing domain reads as "needs attention", never breaks the board
-                readinesses.append(self._unavailable(domain))
-                continue
-            readinesses.append(self._assess_vm(domain, vm))
-        # Education (backed engine, not in get_domain_services)
-        try:
-            evm = await self._edu.summary(ctx)
-            readinesses.append(self._assess_vm("education", evm))
-        except Exception:  # noqa: BLE001
-            readinesses.append(self._unavailable("education"))
-        # Decision confidence
-        readinesses.append(await self._decision_readiness(ctx))
+                return self._assess_vm(domain, await self._domains[domain].summary(ctx))
+            except Exception:  # noqa: BLE001
+                return self._unavailable(domain)
+
+        async def _education() -> dict[str, Any]:
+            try:
+                return self._assess_vm("education", await self._edu.summary(ctx))
+            except Exception:  # noqa: BLE001
+                return self._unavailable("education")
+
+        gathered = await asyncio.gather(
+            *[_domain(d) for d in domain_names],
+            _education(),
+            self._decision_readiness(ctx),
+            self._goals(ctx),
+        )
+        readinesses: list[dict[str, Any]] = list(gathered[:-1])  # domains + education + decision
+        goals = gathered[-1]
         # New readiness inputs (Sprint 16): enrich Finance with retirement-readiness from the plan.
+        # Runs after the gather because it reads/mutates the finance entry.
         if self._planning is not None:
             await self._enrich_finance(ctx, readinesses)
 
         index_score = round(sum(_WEIGHTS.get(r["domain"], 0.0) * r["progress"] for r in readinesses))
-        goals = await self._goals(ctx)
         worst = min((r["status"] for r in readinesses), key=lambda s: _ORDER[s], default=GREEN)
         return {
             "generated_at": _now(),
