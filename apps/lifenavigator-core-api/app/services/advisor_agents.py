@@ -39,13 +39,13 @@ class Agent:
 AGENTS: tuple[Agent, ...] = (
     Agent(
         id=RELATIONSHIP_MANAGER,
-        name="Relationship Manager",
+        name="Arcana",
         description="Coordinates every domain advisor to answer broad, cross-cutting questions and pick your next best action.",
         icon="compass",
         domains=(),  # all
         capabilities=("cross-domain synthesis", "next best action", "prioritization", "tasking specialists"),
         grounding_sources=("all domain fact packets", "readiness snapshots", "personal graph"),
-        persona=("You are the Relationship Manager: the user's lead advisor. Synthesize across the supplied "
+        persona=("You are Arcana: the user's lead advisor. Synthesize across the supplied "
                  "domain fact packets, weigh trade-offs between domains, and give one coherent recommendation. "
                  "Name which areas you drew on and cite the grounded facts you used."),
         is_orchestrator=True,
