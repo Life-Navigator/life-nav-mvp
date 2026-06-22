@@ -236,7 +236,7 @@ export default function InvestmentPage() {
     try {
       setIsLoading(true);
       setError(null);
-      const response = await fetch('/api/investments/analytics', {
+      const response = await fetch('/api/finance/investments', {
         credentials: 'include', // Ensure cookies are sent for auth
       });
 
@@ -258,6 +258,29 @@ export default function InvestmentPage() {
       }
 
       const data = await response.json();
+      // Adapt the finance domain view-model (real account-level investment balances from
+      // finance.financial_accounts) into the holdings/metrics shape this page renders. We have name +
+      // market value + portfolio weight; share/cost/price-level analytics don't exist for account-level
+      // data, so they stay 0 (never fabricated). This replaces the old /api/investments/analytics call,
+      // which returned canonical-summary (no `holdings` array) and so rendered nothing. We assign onto
+      // the (untyped) response so the page's other optional reads keep degrading gracefully.
+      const vmHoldings: Array<{
+        name?: string;
+        value?: { amount?: number } | number;
+        share_pct?: number;
+      }> = data?.data?.holdings || [];
+      data.holdings = vmHoldings.map((h) => ({
+        name: h.name || 'Investment account',
+        marketValue: (typeof h.value === 'object' ? h.value?.amount : h.value) ?? 0,
+        weight: h.share_pct ?? 0,
+        shares: 0,
+        costBasis: 0,
+        currentPrice: 0,
+        sector: 'Other',
+        dividendYield: 0,
+        beta: 0,
+      }));
+      data.portfolioMetrics = { totalValue: data?.data?.total?.amount ?? 0 };
 
       // Transform holdings to match expected interface (API uses ticker, we use symbol)
       const transformedHoldings: Holding[] = (data.holdings || []).map(

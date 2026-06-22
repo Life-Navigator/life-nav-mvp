@@ -750,85 +750,69 @@ export default function RetirementPlanningPage() {
     </div>
   );
 
-  // Social Security Tab
-  const renderSocialSecurity = () => (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl p-6 text-white">
-        <h2 className="text-xl font-semibold mb-4">Social Security Benefits</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="text-center">
-            <div className="text-sm opacity-75">At Age 62</div>
-            <div className="text-3xl font-bold">
-              {formatCurrency((socialSecurity?.calculatedBenefits?.atAge62 || 0) / 12)}/mo
+  // Social Security Tab — only render real, backend-computed benefits. We do NOT fabricate ages,
+  // break-even points, or a "claim at 70" recommendation when there's no Social Security record on
+  // file (the prior version hardcoded 67/77/82/70 as if real). Honest empty until the data exists.
+  const renderSocialSecurity = () => {
+    const ss = socialSecurity?.calculatedBenefits;
+    const hasData = !!ss && (ss.atFRA || ss.atAge62 || ss.atAge70);
+    if (!hasData) {
+      return (
+        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Social Security optimization</h2>
+          <p className="text-sm text-gray-500 max-w-xl mx-auto">
+            Coming soon. We&apos;ll estimate your benefit at 62, Full Retirement Age, and 70, and
+            recommend an optimal claiming age — once your Social Security earnings record is
+            connected. We don&apos;t show estimated benefits until they&apos;re based on your real
+            data.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-6">
+        <div className="bg-gradient-to-br from-green-600 to-emerald-700 rounded-xl p-6 text-white">
+          <h2 className="text-xl font-semibold mb-4">Social Security Benefits</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="text-center">
+              <div className="text-sm opacity-75">At Age 62</div>
+              <div className="text-3xl font-bold">{formatCurrency((ss.atAge62 || 0) / 12)}/mo</div>
             </div>
-            <div className="mt-2 px-3 py-1 bg-white/20 rounded-full text-xs">Reduced 30%</div>
-          </div>
-          <div className="text-center border-x border-white/20">
-            <div className="text-sm opacity-75">
-              At Full Retirement ({socialSecurity?.fullRetirementAge || 67})
+            <div className="text-center border-x border-white/20">
+              <div className="text-sm opacity-75">
+                At Full Retirement ({socialSecurity?.fullRetirementAge ?? '—'})
+              </div>
+              <div className="text-3xl font-bold">{formatCurrency((ss.atFRA || 0) / 12)}/mo</div>
             </div>
-            <div className="text-3xl font-bold">
-              {formatCurrency((socialSecurity?.calculatedBenefits?.atFRA || 0) / 12)}/mo
-            </div>
-            <div className="mt-2 px-3 py-1 bg-white/30 rounded-full text-xs">Full Benefit</div>
-          </div>
-          <div className="text-center">
-            <div className="text-sm opacity-75">At Age 70</div>
-            <div className="text-3xl font-bold">
-              {formatCurrency((socialSecurity?.calculatedBenefits?.atAge70 || 0) / 12)}/mo
-            </div>
-            <div className="mt-2 px-3 py-1 bg-white/20 rounded-full text-xs">
-              +24% Delayed Credits
+            <div className="text-center">
+              <div className="text-sm opacity-75">At Age 70</div>
+              <div className="text-3xl font-bold">{formatCurrency((ss.atAge70 || 0) / 12)}/mo</div>
             </div>
           </div>
         </div>
+        {socialSecurity?.optimizedClaimingAge && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recommended Strategy</h3>
+            <div className="flex items-center gap-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                {socialSecurity.optimizedClaimingAge}
+              </div>
+              <div>
+                <div className="font-semibold text-green-800">
+                  Claim at Age {socialSecurity.optimizedClaimingAge}
+                </div>
+                {socialSecurity.lifetimeBenefit ? (
+                  <div className="text-sm text-green-700">
+                    Estimated Lifetime Benefit: {formatCurrency(socialSecurity.lifetimeBenefit)}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Break-Even Analysis</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <div className="text-sm text-blue-600 font-medium">Age 62 vs Full Retirement</div>
-            <div className="text-2xl font-bold text-blue-700">
-              Age {Math.round(socialSecurity?.calculatedBenefits?.breakEvenAge62vsFRA || 77)}
-            </div>
-            <p className="text-sm text-gray-600 mt-2">
-              If you live past this age, waiting until FRA provides more lifetime benefits.
-            </p>
-          </div>
-          <div className="p-4 bg-purple-50 rounded-lg">
-            <div className="text-sm text-purple-600 font-medium">Full Retirement vs Age 70</div>
-            <div className="text-2xl font-bold text-purple-700">
-              Age {Math.round(socialSecurity?.calculatedBenefits?.breakEvenFRAvs70 || 82)}
-            </div>
-            <p className="text-sm text-gray-600 mt-2">
-              If you live past this age, waiting until 70 provides more lifetime benefits.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recommended Strategy</h3>
-        <div className="flex items-center gap-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-            {socialSecurity?.optimizedClaimingAge || 70}
-          </div>
-          <div>
-            <div className="font-semibold text-green-800">
-              Claim at Age {socialSecurity?.optimizedClaimingAge || 70}
-            </div>
-            <div className="text-sm text-green-700">
-              Estimated Lifetime Benefit: {formatCurrency(socialSecurity?.lifetimeBenefit || 0)}
-            </div>
-            <div className="text-sm text-gray-600 mt-1">
-              Based on life expectancy and break-even analysis
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // Withdrawal Strategies Tab
   const renderWithdrawals = () => (
@@ -889,7 +873,13 @@ export default function RetirementPlanningPage() {
               </div>
             ))
           ) : (
-            <div className="text-center py-8 text-gray-500">Loading withdrawal strategies...</div>
+            <div className="text-center py-8 text-gray-500">
+              <div className="font-medium text-gray-700">Coming soon</div>
+              <p className="mt-1 text-sm">
+                Withdrawal-strategy modeling (4% rule, dynamic, guardrails) will appear here once
+                the planning engine is connected to your retirement inputs.
+              </p>
+            </div>
           )}
         </div>
       </div>
@@ -973,7 +963,11 @@ export default function RetirementPlanningPage() {
             ))
           ) : (
             <div className="p-8 text-center text-gray-500">
-              Loading Roth conversion strategies...
+              <div className="font-medium text-gray-700">Coming soon</div>
+              <p className="mt-1 text-sm">
+                Roth-conversion optimization (tax-bracket-aware multi-year planning) will appear
+                here once the planning engine is connected to your tax and account details.
+              </p>
             </div>
           )}
         </div>
