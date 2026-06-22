@@ -439,9 +439,13 @@ export default function RecommendationsPage() {
     setLoading(false);
   }, []);
   useEffect(() => {
+    // Render the existing roadmap IMMEDIATELY (the GET is fast), then refresh via the slow sync in the
+    // background. Previously the page awaited the POST sync before its first GET, so a user with a real
+    // roadmap stared at "Building your roadmap…" for 6–16s — it looked blank. Stale-while-revalidate.
+    load();
     fetch('/api/recommendations', { method: 'POST' })
       .catch(() => {})
-      .finally(load);
+      .finally(() => load());
   }, [load]);
 
   const onAct = async (id: string, status: string) => {
