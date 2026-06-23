@@ -67,9 +67,14 @@ def _asserts_goal_relationship(text: str, goals: list[str]) -> bool:
 # The number-grounding gate (invented-numbers, below) is UNCHANGED: still zero fabricated figures, ever.
 _ADVICE = re.compile(
     r"("
-    # MEDICAL
-    r"\bi diagnose\b|\byou have (?:a )?(?:condition|disease|disorder)\b|\bprescrib\w*|\bdiagnos(?:e|es|ed|is)\b|"
-    r"\byou should (?:take|start)\b[^.?!]{0,25}\b(?:mg|medication|dose|pill|drug)\b|\btake\b[^.?!]{0,15}\bmg\b|"
+    # MEDICAL — ONLY the advisor acting as a clinician: diagnosing, prescribing, or dosing a MEDICATION,
+    # or telling the user to change a prescribed drug. General fitness/nutrition/supplement/recovery/TRT-
+    # under-provider-supervision coaching is NOT medical advice and must pass (HEALTH_GATE_REFINEMENT).
+    r"\b(?:i|we)(?:'ll| will| can| would)? diagnos\w+\b|\bdiagnos\w+ you\b|"
+    r"\byou (?:have|'ve got) (?:a |an )?(?:medical )?(?:condition|disease|disorder|syndrome) called\b|"
+    r"\bprescrib\w*|"
+    r"\byou should (?:take|start|stop|increase|decrease|adjust)\b[^.?!]{0,30}\b(?:medication|prescription|antibiotic|insulin|statin|dose of|mg of)\b|"
+    r"\b(?:adjust|change|titrate) your (?:medication|dose|dosage)\b|"
     # LEGAL (specific directives)
     r"\blegally,? you (?:should|must)\b|\byou should sue\b|\byou should file (?:suit|a lawsuit)\b|"
     r"\btitle (?:the|your) (?:house|home|assets|property)\b|"
@@ -98,10 +103,18 @@ def _financial_numbers(text: str) -> set[str]:
     return {n for n in out if n}
 
 
-# A personal-financial assertion = 2nd-person ownership ("you", "your", "you've") + a money cue near the
-# number. Used to scope the number-gate to the user's OWN figures (block fabrications about their money)
-# while letting general/benchmark/coaching numbers through. Window is char-based around the matched number.
-_NUM_WINDOW = 64
+# ── Three-tier number policy (FINANCE_GATE_REFINEMENT 2026-06-23) ──────────────────────────────────────
+# Tier 1  Proven PERSONAL numbers — the user's actual net worth / savings / balance / payment. Allowed ONLY
+#         when grounded (user-stated or a verified derivation, i.e. in `allowed`). A claim about the user's
+#         CURRENT holdings is gated even if hedged ("about") — a wrong personal total must never slip through.
+# Tier 2  Industry BENCHMARKS — "20% down avoids PMI", "closing costs 2-5%", "3-6 month emergency fund",
+#         "401k match ~4%". Always allowed.
+# Tier 3  Advisor SCENARIOS/ESTIMATES — a computed illustration ("a 20% down payment would be about
+#         $100,000"). Allowed when LABELED as an estimate/example/scenario or carried by a benchmark cue.
+# Still BLOCKED: an unlabeled, ungrounded figure asserted as the user's actual money (fabricated net worth /
+#         mortgage payment / readiness probability), and an invented bare price the user never gave.
+_NUM_WINDOW = 70
+_TIGHT_WINDOW = 44  # money-cue must be this close for the number to be a claim about the user's holding
 _SECOND_PERSON = re.compile(r"\byou(?:r|rs|'[a-z]+)?\b", re.IGNORECASE)
 _MONEY_CUE = re.compile(
     r"\b(net worth|salar(?:y|ies)|incomes?|savings?|saved|portfolio|balances?|retirement|401k|ira|"
@@ -109,28 +122,40 @@ _MONEY_CUE = re.compile(
     r"spend\w*|spent|budget|net pay|take[- ]home|paycheck|equity)\b",
     re.IGNORECASE,
 )
+# A number near these reads as a benchmark or a labeled estimate/scenario (Tier 2/3) — NOT a fabricated
+# statement of the user's actual figure.
+_BENCHMARK_MARK = re.compile(
+    r"\b(about|around|roughly|approximate\w*|approx|estimat\w+|illustrat\w+|examples?|e\.g\.|scenario|"
+    r"hypothetical|ballpark|typical\w*|often|usual(?:ly)?|common(?:ly)?|general(?:ly)?|on average|"
+    r"averages?|standard|conventional|traditional|recommend\w*|suggest\w*|target|full|"
+    r"rule of thumb|up to|ranges?|guidelines?|benchmark\w*|industry|assume|assuming)\b|~|≈",
+    re.IGNORECASE,
+)
 
 
 def _fabricated_personal_numbers(text: str, allowed: set[str]) -> set[str]:
-    """Ungrounded numbers that assert the USER'S OWN finances — the only thing the gate blocks.
-      * $-amounts → always gated (a dollar figure here is inherently a claim about the user's money),
-      * % / bare integer ≥100 → gated ONLY inside a personal-financial assertion window (2nd-person + a
-        money cue): "your savings rate is 23%", "you have 450000 saved" are caught, while
-        "a typical 401k match is ~4%", "~2000 kcal", "150g protein", "3 sets of 12" pass.
-    A grounded value (user-stated or a verified derivation, in `allowed`) always passes."""
+    """Return ungrounded numbers that are FABRICATED PERSONAL figures (the only thing the gate blocks),
+    per the three-tier policy above. Grounded values (in `allowed`) always pass."""
     blocked: set[str] = set()
     for m in _FIN_NUM.finditer(text or ""):
         tok = m.group(0)
         norm = tok.strip().lstrip("$").rstrip("%").replace(",", "")
         if not norm or norm in allowed:
             continue
-        if tok.startswith("$"):
-            blocked.add(norm)  # dollar figures stay fully gated — the core trust guarantee
-            continue
-        lo, hi = max(0, m.start() - _NUM_WINDOW), min(len(text), m.end() + _NUM_WINDOW)
-        window = text[lo:hi]
-        if _SECOND_PERSON.search(window) and _MONEY_CUE.search(window):
+        window = text[max(0, m.start() - _NUM_WINDOW): min(len(text), m.end() + _NUM_WINDOW)]
+        # Personal-holding detection uses a TIGHT window: the money-cue noun must sit close to the number
+        # for the number to be a claim ABOUT that holding. This stops a labeled scenario figure ("$15k in
+        # closing costs") from being mis-read as personal just because "your savings" is elsewhere in the
+        # sentence. Benchmark/second-person cues use the wider window.
+        tight = text[max(0, m.start() - _TIGHT_WINDOW): min(len(text), m.end() + _TIGHT_WINDOW)]
+        personal_holding = bool(_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight))
+        if personal_holding:
+            # Tier 1: a claim about the user's own money — must be grounded; a hedge word does NOT excuse it.
             blocked.add(norm)
+        elif tok.startswith("$") and not _BENCHMARK_MARK.search(window):
+            # An unlabeled $ figure not tied to the user's state (e.g. an invented price) — fabricated.
+            blocked.add(norm)
+        # else: a benchmark (Tier 2), a labeled estimate/scenario (Tier 3), or a general/coaching number → allow
     return blocked
 
 
