@@ -31,3 +31,30 @@ The benchmark/scenario numbers (`$100,000` 20%-down, `2-5%`, `3-6 months`) now s
 ## Residual
 
 Dollar-dense affordability answers depend on the model labeling scenario figures with a recognized benchmark word. Tuning added `conventional/traditional/standard/typical/recommended/…`; a truly novel phrasing could still trip the gate. The deeper fix (out of scope — no architecture change) is to let `verify_derivations` accept benchmark percentages so "20% of $500k = $100k" verifies as math rather than relying on a label.
+
+---
+
+# Phase 4 (Derivation Verifier Upgrade) — test results
+
+`tests/test_gate_refinement.py` now covers the two-tier verifier — **21 pass**, full suite **641 pass**.
+
+## Should PASS
+
+- 20% down on $500,000 = $100,000 (scenario tier) ✅
+- 3% of $500,000 = $15,000 closing (scenario) ✅
+- 6-month reserve at $8,000/mo = $48,000 (scenario, month multiplier) ✅
+- 95,000 + 40,000 = 135,000 (strict, all-user operands) ✅
+- benchmark percentages ("often 2-5%", "~4% match") in a finance answer ✅
+- scenario value in neutral prose ("a 20% down payment is $100,000") ✅
+
+## Should FAIL
+
+- unsupported net worth ("Your net worth is $1.2M") ✅ blocked
+- unsupported retirement probability ("…success rate is 85%") ✅ blocked
+- unsupported mortgage payment (possessive) ✅ blocked
+- unsupported tax estimate ("Your tax bill will be $18,200") ✅ blocked (scenario value can't excuse a possessive claim)
+- scenario without a label ✅ rejected
+- scenario without a user base / wrong math / factor > 100 ✅ rejected
+- the prior wrong-derivation guard ("about $150,000", true 135k) ✅ still blocked
+
+The trust floor is intact: every "should-fail" fabrication is blocked, and wrong math is always rejected.
