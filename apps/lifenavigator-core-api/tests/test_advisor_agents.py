@@ -104,14 +104,27 @@ async def test_legacy_no_agent_keeps_all_facts_and_no_persona():
 # and substring collisions (work→workout) must not mis-route. Whole-word routing.
 def test_route_domains_p0_intent():
     from app.services.advisor_agents import route_domains
-    assert "health" in route_domains("Build me a workout plan")          # was ['career'] via 'work'
-    assert "health" in route_domains("Let's talk about TRT")             # was finance fallback
-    assert "health" in route_domains("how's my gym progress")
+    health = ["build me a workout plan", "gym plan for the week", "let's talk about TRT", "a HIIT routine",
+              "martial arts training", "swimming for cardio", "my shoulder injury", "knee arthritis"]
+    for m in health:
+        assert "health" in route_domains(m), m
     assert "career" in route_domains("I got a promotion")
+    assert "career" in route_domains("I have a job offer")
+    assert "finance" in route_domains("mortgage and down payment")
+    assert "family" in route_domains("who is the guardian in my will and trust")
     assert "education" in route_domains("should I get a master's degree")
-    assert "family" in route_domains("help with estate planning")        # was finance fallback
-    assert "finance" in route_domains("thinking about a home purchase")
     # broad/unmatched → ALL domains, never finance-only-biased
     assert set(route_domains("hello")) >= {"health", "family", "finance", "career", "education"}
     # 'work' must not fire career on 'workout'
     assert route_domains("workout") == ["health"]
+
+
+def test_route_domains_failed_conversation_replay():
+    """The exact failed conversation: a multi-symptom training-plan request must stay in HEALTH,
+    never leak to finance/career."""
+    from app.services.advisor_agents import route_domains
+    msg = ("Can you build me a weekly training plan? I have knee arthritis and a shoulder injury, "
+           "I'm on TRT with my medical provider, and I do HIIT, martial arts, and swimming.")
+    domains = route_domains(msg)
+    assert "health" in domains
+    assert "finance" not in domains  # the bug: this used to redirect to credit cards / down payments
