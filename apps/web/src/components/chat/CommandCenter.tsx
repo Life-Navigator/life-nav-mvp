@@ -89,6 +89,92 @@ function sourceChipLabel(c: Citation): string {
   return 'Source';
 }
 
+// ---- Advisor Action Loop: the approval-gated life-change card ----------------------------------------
+interface ActionField {
+  key: string;
+  label: string;
+  type: string;
+  optional: boolean;
+}
+interface ActionProposal {
+  action: string;
+  label: string;
+  message: string;
+  impact: string[];
+  fields: ActionField[];
+  domain: string;
+}
+
+function ActionCard({
+  proposal,
+  busy,
+  onApprove,
+  onCancel,
+}: {
+  proposal: ActionProposal;
+  busy: boolean;
+  onApprove: (fields: Record<string, string>) => void;
+  onCancel: () => void;
+}) {
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const canApprove = proposal.fields
+    .filter((f) => !f.optional)
+    .every((f) => (fields[f.key] || '').trim());
+  return (
+    <div className="my-2 max-w-[88%] rounded-xl border border-indigo-200 bg-white p-3 text-left dark:border-indigo-800 dark:bg-gray-800">
+      <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+        Update your plan · {proposal.label}
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {proposal.impact.map((x, j) => (
+          <span
+            key={j}
+            className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+          >
+            {x}
+          </span>
+        ))}
+      </div>
+      <div className="mt-2 space-y-1.5">
+        {proposal.fields.map((f) => (
+          <div key={f.key} className="flex items-center gap-2">
+            <label className="w-32 shrink-0 text-[11px] text-gray-500 dark:text-gray-400">
+              {f.label}
+              {f.optional ? '' : ' *'}
+            </label>
+            <input
+              type={f.type === 'number' ? 'number' : 'text'}
+              value={fields[f.key] || ''}
+              onChange={(e) => setFields((s) => ({ ...s, [f.key]: e.target.value }))}
+              className="flex-1 rounded border border-gray-300 px-2 py-1 text-xs text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-2.5 flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!canApprove || busy}
+          onClick={() => onApprove(fields)}
+          className="rounded-lg bg-indigo-600 px-3 py-1 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+        >
+          {busy ? 'Saving…' : 'Approve & update'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-lg px-3 py-1 text-xs text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+        >
+          Cancel
+        </button>
+      </div>
+      <div className="mt-1.5 text-[10px] text-gray-400">
+        Nothing is saved until you approve — edit the values first if needed.
+      </div>
+    </div>
+  );
+}
+
 const STARTERS = [
   'What should I work on next?',
   'What do you know about my career?',
@@ -114,6 +200,10 @@ export default function CommandCenter({
   const [error, setError] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [openCitations, setOpenCitations] = useState<number | null>(null);
+  // Advisor Action Loop: a detected life change awaiting the user's approval (never auto-applied).
+  const [action, setAction] = useState<ActionProposal | null>(null);
+  const [actionResult, setActionResult] = useState<string | null>(null);
+  const [applyingAction, setApplyingAction] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const refreshThreads = useCallback(async () => {
@@ -149,6 +239,8 @@ export default function CommandCenter({
     setMessages([]);
     setError(null);
     setOpenCitations(null);
+    setAction(null);
+    setActionResult(null);
   };
 
   const openThread = async (t: Thread) => {
@@ -216,10 +308,55 @@ export default function CommandCenter({
           risks: res.risks,
         },
       ]);
+      // Advisor Action Loop: did the user mention a life change? Propose it (no write until approval).
+      try {
+        const det = (await fetch('/api/chat/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ op: 'detect', message: text }),
+        }).then((r) => (r.ok ? r.json() : null))) as ActionProposal | null;
+        if (det && det.action) {
+          setAction(det);
+          setActionResult(null);
+        }
+      } catch {
+        /* detection is best-effort — never block the chat */
+      }
     } catch {
       setError(ADVISOR_ERROR);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // The APPROVAL step — only fires when the user clicks "Approve & update". Writes via the gated
+  // /api/chat/action apply path, then surfaces the result summary. Nothing is written before this.
+  const approveAction = async (fields: Record<string, string>) => {
+    if (!action) return;
+    setApplyingAction(true);
+    try {
+      const res = await fetch('/api/chat/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          op: 'apply',
+          action: action.action,
+          fields,
+          conversation_id: activeThreadId ?? '',
+        }),
+      }).then((r) => (r.ok ? r.json() : null));
+      if (res && res.ok) {
+        setActionResult(
+          res.summary || 'Updated. Your dashboard and recommendations will reflect this.'
+        );
+        setAction(null);
+      } else {
+        setActionResult('That didn’t save — please try again.');
+      }
+    } catch {
+      setActionResult('That didn’t save — please try again.');
+    } finally {
+      setApplyingAction(false);
     }
   };
 
@@ -423,6 +560,21 @@ export default function CommandCenter({
               })()}
           </div>
         ))}
+
+        {/* Advisor Action Loop — approval-gated life-change card + the post-approval result */}
+        {action && (
+          <ActionCard
+            proposal={action}
+            busy={applyingAction}
+            onApprove={approveAction}
+            onCancel={() => setAction(null)}
+          />
+        )}
+        {actionResult && (
+          <div className="my-2 max-w-[88%] rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-left text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200">
+            ✓ {actionResult}
+          </div>
+        )}
 
         {loading && <ThinkingProgress name={agentName(selectedAgent, agents)} />}
         {error && (
