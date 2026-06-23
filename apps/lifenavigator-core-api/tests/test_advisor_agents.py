@@ -36,8 +36,8 @@ def test_route_domains_is_keyword_based_with_safe_default():
     assert "finance" in route_domains("Can I afford a $30,000 car?")
     assert "career" in route_domains("Am I ready for a promotion?")
     assert "education" in route_domains("Should I get an MBA?")
-    # Nothing matched → the core planning domains, never empty.
-    assert route_domains("hello there") == ["career", "education", "finance"]
+    # Nothing matched → ALL life domains (broad synthesis), never empty, never finance-biased.
+    assert set(route_domains("hello there")) == {"finance", "career", "education", "health", "family"}
 
 
 def test_domains_for_direct_vs_orchestrator():
@@ -98,3 +98,20 @@ async def test_legacy_no_agent_keeps_all_facts_and_no_persona():
     })
     ctx = await AdvisorContextBuilder(sb).build(CTX, "hi", _base(), [])
     assert ctx.active_agent is None and ctx.agent_domains == []
+
+
+# P0 — Domain Routing Failure: health/family questions must NOT fall into the finance-biased fallback,
+# and substring collisions (work→workout) must not mis-route. Whole-word routing.
+def test_route_domains_p0_intent():
+    from app.services.advisor_agents import route_domains
+    assert "health" in route_domains("Build me a workout plan")          # was ['career'] via 'work'
+    assert "health" in route_domains("Let's talk about TRT")             # was finance fallback
+    assert "health" in route_domains("how's my gym progress")
+    assert "career" in route_domains("I got a promotion")
+    assert "education" in route_domains("should I get a master's degree")
+    assert "family" in route_domains("help with estate planning")        # was finance fallback
+    assert "finance" in route_domains("thinking about a home purchase")
+    # broad/unmatched → ALL domains, never finance-only-biased
+    assert set(route_domains("hello")) >= {"health", "family", "finance", "career", "education"}
+    # 'work' must not fire career on 'workout'
+    assert route_domains("workout") == ["health"]

@@ -16,6 +16,7 @@ the RM gathers facts (not N LLM calls) and synthesizes once.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -150,24 +151,46 @@ def agent_catalog() -> list[dict]:
 
 # Deterministic relevance router for RM mode — which domains does this question touch?
 _DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
-    "finance": ("money", "afford", "debt", "loan", "save", "saving", "budget", "invest", "income",
-                "salary", "net worth", "cash", "expense", "mortgage", "retirement", "financial"),
-    "career": ("job", "career", "promotion", "promote", "role", "raise", "work", "employer", "skill",
-               "resume", "interview", "professional"),
+    "finance": ("money", "afford", "debt", "loan", "save", "saving", "savings", "budget", "invest",
+                "investment", "investing", "income", "salary", "net worth", "cash", "expense", "spending",
+                "mortgage", "retirement", "401k", "ira", "roth", "pension", "financial", "finances", "tax",
+                "taxes", "down payment", "credit", "credit card", "portfolio", "stocks", "wealth",
+                "home purchase", "buy a house", "buying a house", "refinance", "emergency fund"),
+    "career": ("job", "career", "promotion", "promote", "raise", "employer", "employee", "resume",
+               "interview", "professional", "manager", "offer letter", "compensation", "workplace",
+               "coworker", "negotiate", "new role", "quit", "layoff", "performance review"),
     "education": ("school", "degree", "college", "university", "certification", "certificate", "course",
-                  "study", "mba", "education", "learn"),
-    "health": ("health", "fitness", "wellness", "doctor", "medical", "insurance coverage", "exercise"),
-    "family": ("family", "kids", "child", "children", "spouse", "dependent", "guardian", "household"),
-    "documents": ("document", "upload", "will", "policy", "contract", "statement", "pdf"),
+                  "study", "mba", "master", "masters", "bachelor", "phd", "doctorate", "education",
+                  "tuition", "student", "curriculum", "enroll", "bootcamp"),
+    "health": ("health", "fitness", "wellness", "doctor", "medical", "exercise", "workout", "gym",
+               "training", "lift", "lifting", "weights", "diet", "nutrition", "sleep", "calorie",
+               "calories", "muscle", "cardio", "weight loss", "lose weight", "testosterone", "trt",
+               "hormone", "supplement", "vitamin", "bloodwork", "labs", "cholesterol", "blood pressure",
+               "bmi", "body fat", "protein", "macros", "mental health", "therapy", "meditation", "anxiety"),
+    "family": ("family", "kids", "child", "children", "spouse", "dependent", "guardian", "guardianship",
+               "household", "marriage", "married", "divorce", "partner", "wife", "husband", "parent",
+               "estate", "estate plan", "beneficiary", "trust", "inheritance", "legacy", "custody",
+               "newborn", "baby", "pregnant", "elderly"),
+    "documents": ("document", "upload", "policy", "insurance policy", "contract", "statement", "pdf",
+                  "deed", "living will", "power of attorney"),
+}
+
+# Precompile word-boundary patterns once. Word boundaries are why "work" no longer fires on "workout"
+# (the original substring match mis-routed health questions to career) and multi-word phrases like
+# "home purchase" / "net worth" still match.
+_DOMAIN_PATTERNS: dict[str, re.Pattern[str]] = {
+    d: re.compile(r"\b(?:" + "|".join(re.escape(k) for k in kws) + r")\b")
+    for d, kws in _DOMAIN_KEYWORDS.items()
 }
 
 
 def route_domains(message: str) -> list[str]:
-    """RM mode: pick the domains a broad question touches (for fact gathering). Falls back to the core
-    planning domains when nothing matches, so the RM always has something grounded to reason from."""
+    """RM mode: pick the domains a question touches (for fact gathering), by whole-word match. When
+    NOTHING matches it's a broad/ambiguous question — ground in ALL life domains and let the RM
+    synthesize. Never bias to finance (the old fallback mis-routed health/family questions there)."""
     text = (message or "").lower()
-    hit = [d for d, kws in _DOMAIN_KEYWORDS.items() if any(k in text for k in kws)]
-    return hit or ["career", "education", "finance"]
+    hit = [d for d, pat in _DOMAIN_PATTERNS.items() if pat.search(text)]
+    return hit or ["finance", "career", "education", "health", "family"]
 
 
 def domains_for(agent: Agent, message: str) -> list[str]:
