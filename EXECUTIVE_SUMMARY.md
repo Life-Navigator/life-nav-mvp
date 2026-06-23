@@ -1,36 +1,36 @@
-# EXECUTIVE_SUMMARY.md — Arcana Conversational Presentation
+# EXECUTIVE_SUMMARY.md — Premium Chat UI Sprint
 
-## What was wrong
+## What shipped (frontend-only — no backend/routing/retrieval change)
 
-Retrieval was verified-good, but `advisor_orchestrator._compose()` rendered the LLM's structured reasoning into a six-section consulting memo ("The decision is… / The tradeoffs: / What we know: / My read: / What would change this:") + a verbose inline disclaimer. And a prompt over-restriction made Arcana **refuse** fitness/training requests ("outside my scope").
+The intelligence Arcana already had is now **visible without report-style text**:
 
-## What changed (surgical, no architecture rebuild)
+- **"Why?" evidence drawer** — "What I weighed" (tradeoffs) + "From what you've shared" (grounded facts) + Sources (citations w/ confidence). Hidden by default, never injected into the message.
+- **Source chips** — friendly labels (Document / Career Goal / Finances / Family / Education Goal) from citations.
+- **Risk chips** (rose) from `context_panel.top_risks`; **Goal chips** (emerald) from `candidate_goals`.
+- Plumbed `reasoning`/`goals`/`risks` through `send-server → /api/chat/advisor → client → CommandCenter`.
 
-1. **`_compose` → conversational** (advisor_orchestrator.py): the chat message is now natural prose — decision frame + recommendation as paragraphs + one follow-up question. No section headers, no inline disclaimer (the chat UI already shows a persistent compliance footer).
-2. **Structured reasoning preserved** as `base["reasoning"]` (tradeoffs / what_we_know / what_we_still_need) for an expandable UI drawer — evidence kept, not dumped. Citations unchanged (25 live).
-3. **Fitness coaching unblocked** (advisor_llm.py prompt): general training/exercise planning is ALLOWED (plan + injury modifications + one brief provider caveat); only clinical medical advice stays blocked. Neither validator gate actually blocked plans — it was pure prompt self-censoring.
-
-Routing, retrieval, graph, MCP, document intelligence, recommendations, discovery mode, safety fallback, validator gates: **untouched**.
+Verified live (promotion turn): conversational answer + all chip types + drawer. 7/7 chat unit tests, eslint/tsc clean, deployed.
 
 ## Final questions
 
-1. Still emits six-section markdown? **No** (verified live, 5 domains + 603 unit tests).
-2. Feels conversational? **Yes** (prose + one question).
-3. Health/fitness answers practical planning? **Yes** (phased plan + knee/shoulder mods + provider caveat).
-4. Citations preserved? **Yes** (25 live, full provenance).
-5. Evidence behind structured fields, not dumped? **Yes** (`reasoning`).
-6. Discovery untouched? **Yes** (separate path + tripwire).
-7. Urgent health safety fallback preserved? **Yes** (unit-tested).
-8. Failed health conversation now acceptable? **Yes** (FAILED_HEALTH_CHAT_REPLAY).
-9. UI renders clean (not raw markdown)? **Yes** — message is clean prose; the card/chip/drawer UI is unblocked (backend fields exist) as a frontend follow-up.
-10. Investor-demo ready as a conversational advisor? **Yes** for the message experience; the expandable evidence drawer is the remaining frontend polish.
+1. Chat conversational? **Yes.**
+2. Evidence visible (not dumped)? **Yes — "Why?" drawer.**
+3. Citations visible? **Yes — source chips + Sources list.**
+4. Recommendations visible? **In chat: woven into the message; structured cards live on /dashboard/recommendations (Phase 3 inline card not built — honest).**
+5. Risks visible? **Yes — rose chips.**
+6. Goals visible? **Yes — chips (emerald goal chips when candidate_goals present; Career/Education Goal source chips otherwise).**
+7. No report formatting? **Yes — clean prose + chips + collapsible drawer.**
+
+## Honest scope
+
+Delivered Phases 1 (drawer), 2 (citation chips), 4 (risk chips), 5 (goal chips). **Phase 3 (inline recommendation card)** and **Phase 6 (change timeline)** are NOT built — both need a new backend payload/endpoint (no fabrication), documented for the next sprint. They are the bridge to the **approval-gated Advisor Action Loop**, which is the remaining headline feature.
 
 ## Deliverables
 
-ARCANA_REPORT_FORMAT_AUDIT · ARCANA_CHAT_RESPONSE_CONTRACT · ARCANA_MARKDOWN_REMOVAL_REPORT · ARCANA_DOMAIN_STYLE_GUIDE · ARCANA_CHAT_UI_RENDERING_REPORT · FAILED_HEALTH_CHAT_REPLAY · ARCANA_CONVERSATION_VALIDATION · ARCANA_CHAT_TEST_REPORT · this summary.
+ARCANA_EVIDENCE_DRAWER · ARCANA_CITATION_CHIPS · ARCANA_RISK_CHIPS · ARCANA_GOAL_CHIPS · ARCANA_RECOMMENDATION_CARDS · ARCANA_CHANGE_TIMELINE · ARCANA_UI_VALIDATION · ARCANA_INVESTOR_DEMO_VALIDATION · this summary.
 
 ---
 
-# FINAL STATUS: ARCANA_CHAT_PREMIUM
+# FINAL STATUS: ARCANA_PREMIUM_UI
 
-The six-section report is gone; Arcana answers conversationally across all domains, gives real fitness plans instead of refusing, preserves citations + reasoning as structured data, and keeps every trust/safety guarantee. Remaining polish: the frontend expandable evidence/citation drawer (backend fields are ready).
+The conversation stays conversational; the evidence, citations, risks, and goals are now discoverable as elegant chips + a "Why?" drawer — verified live, no report dumps. Remaining for the full demo arc: inline recommendation card + approval-gated Advisor Action Loop (the next build).
