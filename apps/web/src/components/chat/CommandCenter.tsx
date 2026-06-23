@@ -175,6 +175,85 @@ function ActionCard({
   );
 }
 
+// ---- Impact Summary Card: the instant, HONEST payoff after an approved action --------------------
+interface ActionWritten {
+  fact_type: string;
+  value: string;
+  ok: boolean;
+}
+interface ActionResult {
+  ok: boolean;
+  label?: string;
+  written?: ActionWritten[];
+  impact?: string[];
+  summary?: string;
+}
+function prettyFact(ft: string): string {
+  const k = ft.split('.').pop() || ft;
+  return k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+}
+const _MONEY = /salary|bonus|equity|price|payment|mortgage|tuition|cost|amount|balance/i;
+function fmtFact(ft: string, v: string): string {
+  const raw = String(v ?? '').trim();
+  if (_MONEY.test(ft) && /^\d[\d,]*(\.\d+)?$/.test(raw)) {
+    const n = Number(raw.replace(/,/g, ''));
+    if (!Number.isNaN(n) && n >= 1000)
+      return n.toLocaleString('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0,
+      });
+  }
+  return raw;
+}
+function ImpactSummaryCard({ result }: { result: ActionResult }) {
+  const facts = (result.written || []).filter((w) => w.ok);
+  return (
+    <div className="my-2 max-w-[88%] rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-left dark:border-emerald-800 dark:bg-emerald-900/20">
+      <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">
+        ✓ Update complete{result.label ? ` · ${result.label}` : ''}
+      </div>
+      {facts.length > 0 && (
+        <>
+          <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+            Added to your life model ({facts.length})
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {facts.map((w, j) => (
+              <span
+                key={j}
+                className="rounded-full border border-emerald-200 bg-white px-2 py-0.5 text-[10px] text-emerald-800 dark:border-emerald-700 dark:bg-gray-800 dark:text-emerald-200"
+              >
+                {prettyFact(w.fact_type)}: {fmtFact(w.fact_type, w.value)}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+      {(result.impact || []).length > 0 && (
+        <>
+          <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+            This affects
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {(result.impact || []).map((x, j) => (
+              <span
+                key={j}
+                className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-800/40 dark:text-emerald-200"
+              >
+                {x}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="mt-2 text-[10px] text-emerald-600 dark:text-emerald-400">
+        Your advisor and dashboard now reflect this.
+      </div>
+    </div>
+  );
+}
+
 const STARTERS = [
   'What should I work on next?',
   'What do you know about my career?',
@@ -202,7 +281,7 @@ export default function CommandCenter({
   const [openCitations, setOpenCitations] = useState<number | null>(null);
   // Advisor Action Loop: a detected life change awaiting the user's approval (never auto-applied).
   const [action, setAction] = useState<ActionProposal | null>(null);
-  const [actionResult, setActionResult] = useState<string | null>(null);
+  const [actionResult, setActionResult] = useState<ActionResult | null>(null);
   const [applyingAction, setApplyingAction] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -346,15 +425,16 @@ export default function CommandCenter({
         }),
       }).then((r) => (r.ok ? r.json() : null));
       if (res && res.ok) {
-        setActionResult(
-          res.summary || 'Updated. Your dashboard and recommendations will reflect this.'
-        );
+        setActionResult(res as ActionResult);
         setAction(null);
+        // The new confirmed facts now power the advisor + the dashboard "Recently learned" strip on next
+        // read; the Impact Summary Card is the live payoff in-chat.
+        void refreshThreads();
       } else {
-        setActionResult('That didn’t save — please try again.');
+        setActionResult({ ok: false, summary: 'That didn’t save — please try again.' });
       }
     } catch {
-      setActionResult('That didn’t save — please try again.');
+      setActionResult({ ok: false, summary: 'That didn’t save — please try again.' });
     } finally {
       setApplyingAction(false);
     }
@@ -570,11 +650,14 @@ export default function CommandCenter({
             onCancel={() => setAction(null)}
           />
         )}
-        {actionResult && (
-          <div className="my-2 max-w-[88%] rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-left text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200">
-            ✓ {actionResult}
-          </div>
-        )}
+        {actionResult &&
+          (actionResult.ok ? (
+            <ImpactSummaryCard result={actionResult} />
+          ) : (
+            <div className="my-2 max-w-[88%] rounded-xl border border-rose-200 bg-rose-50 p-3 text-left text-sm text-rose-700">
+              {actionResult.summary}
+            </div>
+          ))}
 
         {loading && <ThinkingProgress name={agentName(selectedAgent, agents)} />}
         {error && (
