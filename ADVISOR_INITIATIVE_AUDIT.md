@@ -1,0 +1,21 @@
+# ADVISOR_INITIATIVE_AUDIT.md — Phase 1
+
+Every place Arcana could choose to **stall** (ask / delay / gather / refuse / defer) instead of **act** (answer / recommend / propose / draft), classified. file:line.
+
+| Location                                                                                  | Behavior                                                      | Classification                     | Action taken                                                                |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------- |
+| `advisor_llm.py` ADVISOR_SYSTEM §6 "BEST NEXT QUESTION" + "Always populate next_question" | Mandated a closing question every turn                        | ❌ Overly cautious / demo-damaging | Made optional (prior sprint) + **ANSWER-FIRST directive added** this sprint |
+| `advisor_validator.py:187` `no next_question and no summary`                              | Rejected answer-only turns                                    | ❌ Overly cautious                 | Relaxed to allow a turn with a substantive `recommendation` (prior sprint)  |
+| `advisor_validator.py` number gate (`_fabricated_personal_numbers`)                       | Blocked finance answers containing benchmark/scenario numbers | ❌ Demo-damaging                   | **3-tier policy** this sprint (benchmarks/labeled scenarios pass)           |
+| `advisor_validator.py` `_ADVICE` medical regex                                            | Intermittently blocked wellness/coaching                      | ❌ Overly cautious                 | **Narrowed to clinical directives** this sprint                             |
+| `advisor_context.py` `_SAFETY`                                                            | "no medical advice / no final financial rec" contradicted V4  | ❌ Overly cautious                 | Reconciled (prior sprint)                                                   |
+| `advisor_orchestrator.py` `_health_safety_check` (urgent-care net)                        | Short-circuits true medical emergencies before LLM            | ✅ Correct                         | Kept                                                                        |
+| `advisor_validator.py` `_ADVICE` legal/tax/product directives                             | Blocks "title your assets", "file as", named securities       | ✅ Correct                         | Kept                                                                        |
+| `advisor_validator.py` relationship gate                                                  | Blocks ungrounded graph claims                                | ✅ Correct                         | Kept                                                                        |
+| `advisor_validator.py` Tier-1 personal-number block                                       | Blocks fabricated net worth / payment / readiness             | ✅ Correct (trust spine)           | Kept                                                                        |
+| `advisor_orchestrator.py` model fallback → deterministic text                             | Falls back when LLM unavailable/invalid                       | ✅ Correct, now LOUD               | Kept (prior sprint)                                                         |
+| Action loop (`advisor_actions.py`) approval gate                                          | Requires user approval before writing life.facts              | ✅ Correct                         | Kept                                                                        |
+
+## Summary
+
+The initiative problems were concentrated in **three policies**: (1) the mandatory closing question, (2) the finance number gate, (3) the medical regex. All three are addressed this sprint (answer-first + 3-tier finance + narrowed medical). The genuinely correct guardrails (emergency net, legal/tax/product blocks, fabricated-personal-number block, approval-gated writes, loud fallback) are untouched — initiative was raised without lowering the trust floor.
