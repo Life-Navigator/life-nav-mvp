@@ -289,6 +289,10 @@ class AdvisorOrchestrator:
                 out = await active.generate(context, constraints)
                 tr["model_fallback"] = True
             lap("llm_generate")
+            # Prove the runtime model/provider actually used this turn (Phase 2/8: metadata proves provider).
+            tr["model"] = getattr(active, "model_name", "") or ""
+            tr["provider"] = getattr(active, "provider", "") or ""
+            base["model"], base["provider"] = tr["model"], tr["provider"]
             usage = getattr(active, "last_usage", {}) or {}
             tr["prompt_tokens"], tr["completion_tokens"], tr["total_tokens"] = (
                 usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), usage.get("total_tokens", 0))
@@ -297,6 +301,10 @@ class AdvisorOrchestrator:
             if out is None:
                 base["llm_status"] = "fallback:unavailable"
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, "llm_unavailable_or_unparseable", "n/a"
+                # LOUD: a model/auth failure must never be a silent quality drop (org-policy / ADC visibility).
+                log.warning(json.dumps({"event": "advisor_model_fallback", "turn_id": tr["turn_id"],
+                                        "reason": "llm_unavailable_or_unparseable",
+                                        "provider": tr.get("provider", ""), "model": tr.get("model", "")}))
                 return
             ok, safe, reasons = validate(out, context)
             lap("validate")
@@ -350,6 +358,10 @@ class AdvisorOrchestrator:
         except Exception as e:  # noqa: BLE001 — never break the user experience
             base["llm_status"] = "fallback:error"
             tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, f"error:{type(e).__name__}", "n/a"
+            # LOUD: surface provider/auth errors (e.g. VertexAuthError) instead of a silent deterministic drop.
+            log.warning(json.dumps({"event": "advisor_model_fallback", "turn_id": tr["turn_id"],
+                                    "reason": f"error:{type(e).__name__}", "detail": str(e)[:200],
+                                    "provider": tr.get("provider", ""), "model": tr.get("model", "")}))
 
     async def converse(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
                        *, conversation_id: Optional[str] = None, trace: bool = False,

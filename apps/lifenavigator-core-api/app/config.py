@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     gemini_embedding_model: str = "gemini-embedding-001"  # 3072-dim; must match the worker
     gemini_generation_model: str = "gemini-2.5-pro"
 
+    # --- Model provider / Vertex (ADC, NO API key) ---
+    # "ai_studio" = Gemini via API key (gemini_api_key). "vertex" = Gemini via Vertex AI + ADC (no key —
+    # required where org policy disallows API keys). Production under that policy MUST set model_provider=vertex.
+    model_provider: str = "ai_studio"
+    vertex_project: str = ""
+    vertex_region: str = "us-central1"
+    vertex_gemini_model: str = "gemini-2.5-pro"
+
     # --- Qdrant (grounding vectors) ---
     qdrant_url: str = ""
     qdrant_api_key: str = ""

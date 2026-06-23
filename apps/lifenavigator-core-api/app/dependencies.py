@@ -279,6 +279,7 @@ def get_advisor_orchestrator(
     supabase: SupabaseClient = Depends(get_supabase),
     rm: RelationshipManager = Depends(get_relationship_manager),
     gemini: GeminiClient = Depends(get_gemini),
+    settings: Settings = Depends(get_settings),
 ) -> "AdvisorOrchestrator":
     # Hybrid advisor: rules supply guardrails (classified facts, discovery scores, domain priorities,
     # safety), the LLM leads the conversation within them, a validator gates the output. Env-flagged
@@ -302,12 +303,21 @@ def get_advisor_orchestrator(
     )
     builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life)
     if use_claude:
+        # Claude on Vertex. ADC by default (no API key); a static VERTEX_ACCESS_TOKEN still wins if set.
+        from .clients.vertex_auth import AdcTokenProvider
+        static_tok = os.environ.get("VERTEX_ACCESS_TOKEN", "")
         llm: Any = VertexClaudeAdvisorLLM(
-            project=os.environ.get("VERTEX_PROJECT", ""),
+            project=os.environ.get("VERTEX_PROJECT", "") or settings.vertex_project,
             region=os.environ.get("VERTEX_REGION", "global"),
             model=os.environ.get("ADVISOR_MODEL", "claude-opus-4-1@20250805"),
-            token=os.environ.get("VERTEX_ACCESS_TOKEN", ""),
+            token=static_tok,
+            token_provider=None if static_tok else AdcTokenProvider(),
         )
+    elif settings.model_provider.lower() == "vertex":
+        # Gemini via Vertex AI + ADC — NO API key (required where org policy disallows keys).
+        from .clients.gemini import VertexGeminiClient
+        from .clients.vertex_auth import AdcTokenProvider
+        llm = GeminiAdvisorLLM(VertexGeminiClient.from_settings(settings, AdcTokenProvider()))
     else:
         llm = GeminiAdvisorLLM(gemini)
 
@@ -327,10 +337,12 @@ def get_advisor_orchestrator(
                                   generation_model=spec["model_id"], timeout=float(spec["timeout_s"]))
             return GeminiAdvisorLLM(client)
         if spec["provider"] == "vertex_anthropic":
+            from .clients.vertex_auth import AdcTokenProvider
+            static_tok = os.environ.get("VERTEX_ACCESS_TOKEN", "")
             return VertexClaudeAdvisorLLM(
                 project=os.environ.get("VERTEX_PROJECT", "gen-lang-client-0849161409"),
                 region=os.environ.get("VERTEX_REGION", "global"), model=spec["model_id"],
-                token=os.environ.get("VERTEX_ACCESS_TOKEN", ""))
+                token=static_tok, token_provider=None if static_tok else AdcTokenProvider())
         return None
 
     router = ModelRouter(_llm_factory)

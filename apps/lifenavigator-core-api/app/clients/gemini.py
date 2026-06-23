@@ -43,11 +43,17 @@ async def _request_with_retry(
 
 
 class GeminiClient:
+    provider = "google_aistudio"  # API-key auth (AI Studio). See VertexGeminiClient for the ADC path.
+
     def __init__(self, api_key: str, embedding_model: str, generation_model: str, timeout: float = 30.0) -> None:
         self._api_key = api_key
         self._embedding_model = embedding_model
         self._generation_model = generation_model
         self._timeout = timeout
+
+    @property
+    def model_name(self) -> str:
+        return self._generation_model
 
     @classmethod
     def from_settings(cls, settings: Settings) -> "GeminiClient":
@@ -95,6 +101,94 @@ class GeminiClient:
             payload["generationConfig"] = {"temperature": float(temperature)}
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             r = await _request_with_retry(lambda: client.post(url, json=payload), label="generate")
+            r.raise_for_status()
+            data = r.json()
+        u = data.get("usageMetadata") or {}
+        usage = {
+            "prompt_tokens": int(u.get("promptTokenCount") or 0),
+            "completion_tokens": int(u.get("candidatesTokenCount") or 0),
+            "total_tokens": int(u.get("totalTokenCount") or 0),
+        }
+        try:
+            return data["candidates"][0]["content"]["parts"][0]["text"], usage
+        except (KeyError, IndexError, TypeError):
+            return "", usage
+
+
+VERTEX_GEMINI_HOST_GLOBAL = "aiplatform.googleapis.com"
+
+
+class VertexGeminiClient:
+    """Gemini via Vertex AI authenticated with ADC — NO API key (org policy disallows keys).
+
+    Exposes the SAME generate()/generate_with_usage()/configured/ready contract as GeminiClient, so the
+    advisor's GeminiAdvisorLLM wrapper uses it unchanged. Embeddings are intentionally NOT provided here
+    (the live advisor path needs generation only; the embedding worker keeps its own path). Auth failure is
+    LOUD: `.token()` raises VertexAuthError, which propagates so the caller logs it and records a visible
+    model fallback — never a silent downgrade.
+    """
+
+    provider = "vertex_gemini"
+
+    def __init__(self, *, project: str, region: str, generation_model: str, token_provider: Any,
+                 timeout: float = 45.0) -> None:
+        self._project = project
+        self._region = region or "us-central1"
+        self._generation_model = generation_model
+        self._tp = token_provider
+        self._timeout = timeout
+
+    @classmethod
+    def from_settings(cls, settings: Settings, token_provider: Any) -> "VertexGeminiClient":
+        return cls(
+            project=settings.vertex_project,
+            region=settings.vertex_region,
+            generation_model=settings.vertex_gemini_model or settings.gemini_generation_model,
+            token_provider=token_provider,
+            timeout=max(settings.http_timeout_seconds, 45.0),
+        )
+
+    @property
+    def configured(self) -> bool:
+        # Config presence only (project + model). Token validity is proven on first call, loudly.
+        return bool(self._project and self._generation_model)
+
+    def ready(self) -> bool:
+        return self.configured
+
+    @property
+    def model_name(self) -> str:
+        return self._generation_model
+
+    def _endpoint(self) -> str:
+        host = VERTEX_GEMINI_HOST_GLOBAL if self._region == "global" else f"{self._region}-aiplatform.googleapis.com"
+        return (f"https://{host}/v1/projects/{self._project}/locations/{self._region}"
+                f"/publishers/google/models/{self._generation_model}:generateContent")
+
+    async def _bearer(self) -> str:
+        # Token refresh is blocking (network); keep it off the event loop.
+        return await asyncio.to_thread(self._tp.token)
+
+    async def generate(self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None) -> str:
+        text, _ = await self.generate_with_usage(system_prompt, user_prompt, temperature)
+        return text
+
+    async def generate_with_usage(
+        self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None
+    ) -> tuple[str, dict[str, int]]:
+        if not self.configured:
+            raise RuntimeError("VertexGeminiClient is not configured (VERTEX_PROJECT / model missing).")
+        token = await self._bearer()  # raises VertexAuthError loudly if ADC is unavailable
+        payload: dict[str, Any] = {
+            "systemInstruction": {"parts": [{"text": system_prompt}]},
+            "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
+        }
+        if temperature is not None:
+            payload["generationConfig"] = {"temperature": float(temperature)}
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            r = await _request_with_retry(
+                lambda: client.post(self._endpoint(), json=payload, headers=headers), label="vertex-generate")
             r.raise_for_status()
             data = r.json()
         u = data.get("usageMetadata") or {}

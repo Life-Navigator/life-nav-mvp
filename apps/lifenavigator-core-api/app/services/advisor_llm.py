@@ -13,8 +13,11 @@ Gemini backend client. Any failure returns None → the orchestrator falls back 
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Any, Optional, Protocol
+
+log = logging.getLogger("core.advisor_llm")
 
 # Prompt version — logged with each turn (model-router audit compatible).
 ADVISOR_PROMPT_VERSION = "advisor-hybrid-6.0.0"
@@ -241,6 +244,14 @@ class GeminiAdvisorLLM:
     def available(self) -> bool:
         return self._g is not None and bool(getattr(self._g, "configured", False))
 
+    @property
+    def provider(self) -> str:
+        return getattr(self._g, "provider", "google_aistudio")
+
+    @property
+    def model_name(self) -> str:
+        return getattr(self._g, "model_name", None) or getattr(self._g, "_generation_model", "") or ""
+
     async def generate(self, context: Any, plan: dict[str, Any]) -> Optional[dict[str, Any]]:
         self.last_usage, self.last_raw = {}, ""
         if not self.available:
@@ -257,9 +268,14 @@ class GeminiAdvisorLLM:
                 raw = await self._g.generate(ADVISOR_SYSTEM, prompt, temperature=_temperature_for(plan))
                 self.last_raw = raw or ""
                 return parse_advisor_json(raw)
-            except Exception:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001
+                log.warning("advisor LLM (%s/%s) failed: %s: %s — falling back",
+                            self.provider, self.model_name, type(e).__name__, e)
                 return None
-        except Exception:  # noqa: BLE001 — the user never sees an LLM error; orchestrator falls back
+        except Exception as e:  # noqa: BLE001 — the user never sees the error; orchestrator falls back LOUDLY in logs
+            # A VertexAuthError (ADC missing/unauthorized) lands here: log it so an auth failure is never silent.
+            log.warning("advisor LLM (%s/%s) failed: %s: %s — falling back",
+                        self.provider, self.model_name, type(e).__name__, e)
             return None
 
 
@@ -270,20 +286,34 @@ class VertexClaudeAdvisorLLM:
     so a benchmark delta is attributable to the MODEL alone. Feature-flagged (USE_VERTEX_CLAUDE); the Gemini
     path remains the default. Never raises → orchestrator falls back exactly as with Gemini.
 
-    Auth for the experiment uses a short-lived VERTEX_ACCESS_TOKEN (gcloud token); a production integration
-    would swap that for a service account without changing this class's contract.
+    Auth: production uses ADC (no API key) via a `token_provider` (AdcTokenProvider); a static
+    `VERTEX_ACCESS_TOKEN` is still accepted for one-off experiments and takes precedence when set.
     """
 
+    provider = "vertex_anthropic"
     prompt_version = ADVISOR_PROMPT_VERSION
 
-    def __init__(self, *, project: str, region: str, model: str, token: str) -> None:
-        self._project, self._region, self._model, self._token = project, region, model, token
+    def __init__(self, *, project: str, region: str, model: str, token: str = "",
+                 token_provider: Any = None) -> None:
+        self._project, self._region, self._model = project, region, model
+        self._token = token
+        self._tp = token_provider  # AdcTokenProvider (ADC); used when no static token is supplied
         self.last_usage: dict[str, int] = {}
         self.last_raw: str = ""
 
     @property
+    def model_name(self) -> str:
+        return self._model
+
+    @property
     def available(self) -> bool:
-        return bool(self._project and self._model and self._token)
+        return bool(self._project and self._model and (self._token or self._tp is not None))
+
+    async def _bearer(self) -> str:
+        if self._token:
+            return self._token
+        import asyncio  # noqa: PLC0415
+        return await asyncio.to_thread(self._tp.token)  # raises VertexAuthError loudly if ADC unavailable
 
     def _endpoint(self) -> str:
         host = "aiplatform.googleapis.com" if self._region == "global" else f"{self._region}-aiplatform.googleapis.com"
@@ -308,9 +338,10 @@ class VertexClaudeAdvisorLLM:
             "messages": [{"role": "user", "content": prompt}],
         }
         try:
+            token = await self._bearer()  # raises VertexAuthError loudly if ADC is unavailable
             async with httpx.AsyncClient(timeout=60.0) as client:
                 r = await client.post(self._endpoint(), json=body,
-                                      headers={"authorization": f"Bearer {self._token}", "content-type": "application/json"})
+                                      headers={"authorization": f"Bearer {token}", "content-type": "application/json"})
                 r.raise_for_status()
                 data = r.json()
             raw = "".join(b.get("text", "") for b in (data.get("content") or []) if b.get("type") == "text")
@@ -322,5 +353,7 @@ class VertexClaudeAdvisorLLM:
             }
             self.last_raw = raw or ""
             return parse_advisor_json(raw)
-        except Exception:  # noqa: BLE001 — same contract as Gemini: any failure → None → deterministic fallback
+        except Exception as e:  # noqa: BLE001 — same contract as Gemini: any failure → None → fallback (logged LOUDLY)
+            log.warning("advisor LLM (vertex_anthropic/%s) failed: %s: %s — falling back",
+                        self._model, type(e).__name__, e)
             return None
