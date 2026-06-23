@@ -164,6 +164,33 @@ async def advisor_chat(user: AuthenticatedUser = Depends(authenticated), svc=Dep
                               agent=agent or None)
 
 
+# ---- Advisor Action Loop (5 explicit, approval-gated life-change actions) ----------------------------
+from ..services import advisor_actions  # noqa: E402
+from ..services.ingestion import IngestionService  # noqa: E402
+
+
+@router.post("/advisor/action/detect")
+async def advisor_action_detect(user: AuthenticatedUser = Depends(authenticated),
+                                message: str = Body(default="", embed=True)):
+    """Detect one of the five life-change actions in the user's message. NO WRITE — returns the impact
+    preview + the fields to collect (so Arcana can propose), or {action: null} when nothing matches."""
+    key = advisor_actions.detect(message)
+    return advisor_actions.proposal(key, message) if key else {"action": None}
+
+
+@router.post("/advisor/action/apply")
+async def advisor_action_apply(user: AuthenticatedUser = Depends(authenticated),
+                               supabase: SupabaseClient = Depends(get_supabase),
+                               action: str = Body(..., embed=True),
+                               fields: dict = Body(default={}, embed=True),
+                               conversation_id: str = Body(default="", embed=True)):
+    """The APPROVED write step — only reached when the user clicks Approve in the action card. Writes the
+    change exclusively through IngestionService.submit_life_fact (tenant-scoped, provenance-stamped,
+    idempotent). Returns what was written + the impacted areas + a plain summary. No silent writes."""
+    return await advisor_actions.apply(IngestionService(supabase), _ctx(user), action, fields or {},
+                                       conversation_id=conversation_id or None)
+
+
 from ..services.my_life import MyLifeService  # noqa: E402
 
 
