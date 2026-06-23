@@ -119,7 +119,7 @@ _SECOND_PERSON = re.compile(r"\byou(?:r|rs|'[a-z]+)?\b", re.IGNORECASE)
 _MONEY_CUE = re.compile(
     r"\b(net worth|salar(?:y|ies)|incomes?|savings?|saved|portfolio|balances?|retirement|401k|ira|"
     r"debts?|owe|owed|mortgages?|earn(?:ings?|ed)?|assets?|liabilit\w*|wealth|nest egg|cash|"
-    r"spend\w*|spent|budget|net pay|take[- ]home|paycheck|equity)\b",
+    r"spend\w*|spent|budget|net pay|take[- ]home|paycheck|equity|tax(?:es|able)?|tax bill)\b",
     re.IGNORECASE,
 )
 # A number near these reads as a benchmark or a labeled estimate/scenario (Tier 2/3) — NOT a fabricated
@@ -133,14 +133,19 @@ _BENCHMARK_MARK = re.compile(
 )
 
 
-def _fabricated_personal_numbers(text: str, allowed: set[str]) -> set[str]:
+def _fabricated_personal_numbers(text: str, allowed: set[str], scenario: set[str] | None = None) -> set[str]:
     """Return ungrounded numbers that are FABRICATED PERSONAL figures (the only thing the gate blocks),
-    per the three-tier policy above. Grounded values (in `allowed`) always pass."""
+    per the three-tier policy above. `allowed` = grounded/strict-verified (bypass all). `scenario` =
+    benchmark/scenario-verified values (allowed EXCEPT inside a possessive personal claim)."""
+    scenario = scenario or set()
     blocked: set[str] = set()
     for m in _FIN_NUM.finditer(text or ""):
         tok = m.group(0)
         norm = tok.strip().lstrip("$").rstrip("%").replace(",", "")
         if not norm or norm in allowed:
+            continue
+        # Account-name digits ("401(k)", "403(b)", "457") are not financial figures.
+        if re.match(r"\(?[kb]\)", text[m.end(): m.end() + 3], re.IGNORECASE):
             continue
         window = text[max(0, m.start() - _NUM_WINDOW): min(len(text), m.end() + _NUM_WINDOW)]
         # Personal-holding detection uses a TIGHT window: the money-cue noun must sit close to the number
@@ -150,8 +155,13 @@ def _fabricated_personal_numbers(text: str, allowed: set[str]) -> set[str]:
         tight = text[max(0, m.start() - _TIGHT_WINDOW): min(len(text), m.end() + _TIGHT_WINDOW)]
         personal_holding = bool(_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight))
         if personal_holding:
-            # Tier 1: a claim about the user's own money — must be grounded; a hedge word does NOT excuse it.
+            # Tier 1: a claim about the user's own money — must be grounded; a hedge word OR a benchmark
+            # derivation does NOT excuse a possessive personal figure ("your tax bill will be $18,200").
             blocked.add(norm)
+        elif norm in scenario:
+            # A verified benchmark/scenario calc (e.g. "a 20% down payment is $100,000") in non-possessive
+            # prose — the arithmetic checks out against a stated base; allow.
+            continue
         elif tok.startswith("$") and not _BENCHMARK_MARK.search(window):
             # An unlabeled $ figure not tied to the user's state (e.g. an invented price) — fabricated.
             blocked.add(norm)
@@ -240,9 +250,9 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     #    finances) plus any % / large bare integer inside a personal-financial assertion. General/benchmark/
     #    coaching numbers (rep ranges, calories/macros, "typical ~4% match", "3-6 months of expenses") pass —
     #    they make advice concrete without fabricating the user's personal figures.
-    verified_vals, kept_derivs = verify_derivations(result.get("derivations"), context.allowed_numbers)
-    allowed = context.allowed_numbers | verified_vals
-    invented = _fabricated_personal_numbers(visible, allowed)
+    strict_vals, scenario_vals, kept_derivs = verify_derivations(result.get("derivations"), context.allowed_numbers)
+    allowed = context.allowed_numbers | strict_vals
+    invented = _fabricated_personal_numbers(visible, allowed, scenario_vals)
     if invented:
         reasons.append(f"invented numbers not in context: {sorted(invented)}")
 

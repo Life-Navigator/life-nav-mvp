@@ -99,32 +99,68 @@ def _forms(v: float) -> set[str]:
     return out
 
 
-def verify_derivations(derivations: Any, allowed_numbers: Iterable[str]) -> tuple[set[str], list[dict[str, Any]]]:
-    """Verify each derivation. Returns (verified_value_strings, kept_derivations).
+# A SCENARIO derivation (benchmark factor applied to a stated/scenario base) must be LABELED as an
+# estimate/illustration or a recognized planning calc — so it reads as a scenario, never as the user's
+# actual figure. (Strict derivations from the user's OWN numbers need no label — they ARE personal data.)
+_SCENARIO_LABEL = re.compile(
+    r"\b(estimat\w+|scenario|illustrat\w+|example|e\.g\.|hypothetical|assum\w+|projection|"
+    r"down ?payment|closing|reserve|emergency fund|withdrawal|savings target|contribution|"
+    r"months? of|years? of|percent of|% of)\b|~|≈",
+    re.IGNORECASE,
+)
+# Benchmark factors are public planning constants (a percentage 0<p≤100, or a small month/year multiplier).
+# They are allowed as derivation operands ONLY alongside ≥1 real user/scenario base AND a scenario label —
+# never as a standalone fabricated figure.
+_BENCHMARK_FACTOR_MAX = 100.0
 
-    verified_value_strings can be unioned into the number gate's allowed set so the prose may cite them.
-    A derivation is kept only if its operands trace to user numbers/unit-constants AND its math is correct.
+
+def verify_derivations(
+    derivations: Any, allowed_numbers: Iterable[str]
+) -> tuple[set[str], set[str], list[dict[str, Any]]]:
+    """Verify each derivation. Returns (strict_values, scenario_values, kept_derivations).
+
+    * strict_values — derived ONLY from the user's own numbers + unit constants (12/52/365/100). These are
+      the user's own math; they may be unioned into the gate's `allowed` set and bypass every check.
+    * scenario_values — a benchmark factor (≤100: a percentage or a month/year multiplier) applied to a
+      stated/scenario base, with a verifiable result AND a scenario/estimate label. These are allowed in
+      prose EXCEPT inside a possessive personal claim ("your … is $X") — so "a 20% down payment is $100,000"
+      passes while "your tax bill will be $18,200" stays blocked.
+    A derivation with wrong math, no user base, or (for scenarios) no label is rejected entirely.
     """
-    verified: set[str] = set()
+    strict: set[str] = set()
+    scenario: set[str] = set()
     kept: list[dict[str, Any]] = []
     if not isinstance(derivations, list):
-        return verified, kept
+        return strict, scenario, kept
     uvals = user_values(allowed_numbers)
-    allowed_ops = uvals | _UNIT_CONSTANTS
+
+    def _is_user(o: float) -> bool:
+        return any(abs(o - u) < 0.5 or (u != 0 and abs(o - u) / abs(u) < 0.01) for u in uvals)
+
+    def _is_unit(o: float) -> bool:
+        return any(abs(o - u) < 1e-9 for u in _UNIT_CONSTANTS)
+
     for d in derivations:
         if not isinstance(d, dict):
             continue
         expr = str(d.get("expression") or "").strip()
         claimed = str(d.get("value") or "").strip()
+        label = str(d.get("label") or "")
         if not expr or not claimed or not _EXPR_OK.match(expr):
             continue
-        # Every literal operand must trace to a user number or a unit constant.
         operands = [float(m.replace(",", "")) for m in _LITERAL.findall(expr)]
         if not operands:
             continue
-        def _ok(o: float) -> bool:
-            return any(abs(o - u) < 0.5 or (u != 0 and abs(o - u) / abs(u) < 0.01) for u in allowed_ops)
-        if not all(_ok(o) for o in operands):
+        # Classify operands: user numbers, unit constants, or benchmark factors (0<o≤100).
+        others = [o for o in operands if not _is_user(o) and not _is_unit(o)]
+        is_strict = not others
+        is_scenario = (
+            not is_strict
+            and any(_is_user(o) for o in operands)                       # a real base must be present
+            and all(0.0 < o <= _BENCHMARK_FACTOR_MAX for o in others)    # only benchmark-scale factors
+            and bool(_SCENARIO_LABEL.search(label) or _SCENARIO_LABEL.search(claimed))
+        )
+        if not (is_strict or is_scenario):
             continue
         try:
             computed = _safe_eval(expr)
@@ -137,8 +173,10 @@ def verify_derivations(derivations: Any, allowed_numbers: Iterable[str]) -> tupl
             continue
         tol = max(1.0, abs(computed) * 0.05)  # allow the model's rounding
         if any(abs(computed - cv) <= tol for cv in claimed_vals):
-            verified |= _forms(computed)
+            forms = set(_forms(computed))
             for cv in claimed_vals:
-                verified |= _forms(cv)
-            kept.append({"label": str(d.get("label") or ""), "expression": expr, "value": claimed})
-    return verified, kept
+                forms |= _forms(cv)
+            (strict if is_strict else scenario).update(forms)
+            kept.append({"label": label, "expression": expr, "value": claimed,
+                         "tier": "personal" if is_strict else "scenario"})
+    return strict, scenario, kept

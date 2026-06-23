@@ -316,10 +316,14 @@ class AdvisorOrchestrator:
                 repair_plan = dict(constraints)
                 repair_plan["repair_note"] = (
                     "Your previous draft was rejected for: " + "; ".join(reasons) + ". Return the SAME "
-                    "six-section answer but REMOVE every ungrounded number and every relationship claim listed "
-                    "— state those points qualitatively instead (e.g. 'a larger down payment', 'several months "
-                    "of expenses'), or, for a number that computes from the user's OWN figures, put it in "
-                    "derivations. Change nothing else; keep all grounded content.")
+                    "six-section answer, keeping all grounded content, but fix each flagged number ONE of "
+                    "three ways: (a) if it computes from a stated/benchmark figure, add a `derivations` entry "
+                    "{label (include 'scenario'/'estimate' or the calc name, e.g. '20% down payment'), "
+                    "expression (e.g. \"500000 * 20 / 100\"), value}; (b) rephrase it as a STANDALONE labeled "
+                    "illustration with a hedge ('a 20% down payment is about $100,000', 'roughly $21,000/yr') "
+                    "— never glued to a possessive holding like 'your salary, that's $21,000'; or (c) state it "
+                    "qualitatively ('a larger down payment', 'several months of expenses'). Do not assert any "
+                    "figure as the user's actual net worth, payment, tax, or balance unless they gave it.")
                 out2 = await active.generate(context, repair_plan)
                 tr["repair_retry"] = True
                 if out2 is not None:
