@@ -54,3 +54,24 @@ Safe, honest, already works. The "call existing endpoints" shortcut is a mirage.
 ### New deliverables this sprint
 
 `DOMAIN_WRITE_GAP_AUDIT.md` · `DOMAIN_WRITE_DECISION.md` · `ACTION_LOOP_REFRESH_VALIDATION.md` · `INVESTOR_IMPACT_VALIDATION.md` · `FINAL_PILOT_GAP_AUDIT.md` · (plus the 5 existing deltas, left intact).
+
+---
+
+# Vertex ADC Live Validation (2026-06-23)
+
+## Status: VERTEX_MODEL_LIVE_VERIFIED (auth + routing). Advisor quality: mixed.
+
+The key-free Vertex path is **proven live** on LifeNav (`gen-lang-client-0849161409`), `us-central1`, `gemini-2.5-pro`, ADC:
+
+- ✅ Gemini 2.5 Pro callable via Vertex ADC (live `PONG`); **no API key** (ADC bearer, `aiplatform.googleapis.com`, no `?key=`).
+- ✅ Every advisor turn proves `provider=vertex_gemini` + `model=gemini-2.5-pro` on the response/telemetry.
+- ✅ **No silent fallback** — fallbacks log `advisor_model_fallback` (provider/model/reason); ADC-absent failures raise + log.
+- ✅ **Workout prompt → concrete plan** (the original failure, now fixed: 500-cal deficit, 3×/week, knee-safe).
+- ⚠️ **Finance** falls back: gemini-2.5-pro writes computed personal $ figures (20%-down=$100k, closing 2-5%) the number gate correctly blocks — excellent answer, killed by the trust spine. Finance-specific actionability gap.
+- ⚠️ **Health** passes when it answers, but the medical-advice regex intermittently over-blocks.
+
+No deploy performed. Deliverables: VERTEX_ADC_LIVE_VALIDATION · MODEL_RUNTIME_PROOF · WORKOUT_PROMPT_REPLAY · FINANCE_HEALTH_MODEL_VALIDATION.
+
+## Next decision (informed by the live run)
+
+Gemini 2.5 Pro is strong on coaching/qualitative (workout, health) but its finance answers are blocked by the number gate, not by quality. Turning on **Claude via Vertex** would face the _same_ gate, so it is **not** a fix for the finance gap on its own. The finance gap is closed by a gate-policy decision (allow labeled benchmark %/ratios in a personal context) — separate from the model choice. Recommend: (a) approve the finance-gate refinement, then (b) optionally A/B Claude on finance/health for qualitative lift.
