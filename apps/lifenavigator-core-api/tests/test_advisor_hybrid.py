@@ -350,8 +350,10 @@ async def test_orchestrator_enhances_text_on_valid_llm():
     orch = AdvisorOrchestrator(rm, AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(_good_llm()))
     out = await orch.converse(_ctx(), "we want to retire at 60")
     assert out["llm_status"] == "enhanced"
-    assert "protect first" in out["assistant_message"]  # the LLM's chosen question
-    assert "shapes every tradeoff" in out["assistant_message"]  # why-it-matters appended
+    assert "protect first" in out["assistant_message"]  # the LLM's chosen question (conversational)
+    # Conversational contract: no six-section report headers leak into the chat message.
+    assert "**My read:**" not in out["assistant_message"]
+    assert "**The tradeoffs:**" not in out["assistant_message"]
     assert out["pending_key"] == base["pending_key"]  # deterministic outcome preserved
 
 
@@ -681,18 +683,28 @@ async def test_discovery_mode_returns_conversational_rm_output():
 
 
 @pytest.mark.asyncio
-async def test_advisor_mode_still_renders_six_section_template():
-    # Default mode (advisor) is UNCHANGED — the six-section template + disclaimer remain available.
+async def test_advisor_mode_renders_conversational_not_six_section():
+    # P0 — Conversational presentation: advisor mode now answers as a NATURAL chat reply (frame + read +
+    # one question), NOT a six-section consulting memo. The reasoning still exists — as structured data.
     base = _base()
     orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
                                FakeLLM(_six_section_llm()))
     out = await orch.converse(_ctx(), "what should I do about retirement")
     assert out["llm_status"] == "enhanced"
-    assert "**My read:**" in out["assistant_message"]
-    assert "**The tradeoffs:**" in out["assistant_message"]
-    assert "licensed professional" in out["assistant_message"]   # advisor scope disclaimer present
-    # And the advisor template is exactly what discovery mode is contractually forbidden from emitting.
-    assert discovery_contract_violations(out["assistant_message"])
+    msg = out["assistant_message"]
+    # The read renders as natural prose…
+    assert "Here's how I see the decision." in msg          # decision frame
+    assert "lean toward a measured pace" in msg             # recommendation, as a paragraph
+    # …with NO report headers and NO inline disclaimer (the UI shows a persistent compliance footer).
+    for banned in ("**My read:**", "**The tradeoffs:**", "**What we know:**", "**What would change this:**",
+                   "licensed professional"):
+        assert banned not in msg
+    # The reasoning is preserved as structured data for the expandable UI drawer, not dumped in chat.
+    assert out["reasoning"]["tradeoffs"][0]["option"] == "Aggressive pace"
+    assert out["reasoning"]["what_we_know"] == ["You value financial independence"]
+    assert out["reasoning"]["what_we_still_need"] == ["your target timeline"]
+    # The conversational message is now clean of the artifacts discovery forbids.
+    assert discovery_contract_violations(msg) == []
 
 
 @pytest.mark.asyncio
@@ -729,7 +741,9 @@ async def test_advisor_stream_still_enhances():
     final = events[-1]
     assert final["type"] == "final"
     assert final["llm_status"] == "enhanced"
-    assert "**My read:**" in final["assistant_message"]
+    # Conversational: the read renders as prose, not a "**My read:**" header.
+    assert "lean toward a measured pace" in final["assistant_message"]
+    assert "**My read:**" not in final["assistant_message"]
 
 
 @pytest.mark.asyncio

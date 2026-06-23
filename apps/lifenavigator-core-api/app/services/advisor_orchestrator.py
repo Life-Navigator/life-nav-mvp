@@ -122,62 +122,53 @@ def discovery_contract_violations(text: str) -> list[str]:
     return [p for p in _DISCOVERY_FORBIDDEN if p.lower() in low]
 
 
+def _reasoning_payload(safe: dict[str, Any]) -> dict[str, Any]:
+    """The structured reasoning the model produced — tradeoffs / what-we-know / what-we-still-need — kept
+    as DATA for the UI to render behind an expandable "Why / evidence" drawer, instead of being dumped into
+    the chat message as '**section:**' markdown headers. Validator-checked already; this only reshapes it."""
+    out: dict[str, Any] = {}
+    tradeoffs = [t for t in (safe.get("tradeoffs") or []) if isinstance(t, dict)
+                 and (t.get("option") or t.get("benefit") or t.get("cost"))]
+    if tradeoffs:
+        out["tradeoffs"] = [{"option": str(t.get("option") or "").strip(),
+                             "benefit": str(t.get("benefit") or "").strip(),
+                             "cost": str(t.get("cost") or "").strip()} for t in tradeoffs]
+    know = [str(x).strip() for x in (safe.get("what_we_know") or []) if str(x).strip()]
+    if know:
+        out["what_we_know"] = know
+    need = [str(x).strip() for x in (safe.get("what_we_still_need") or []) if str(x).strip()]
+    if need:
+        out["what_we_still_need"] = need
+    return out
+
+
 def _compose(safe: dict[str, Any]) -> str:
-    """Assemble the human-facing message as the V3 five-section advisor turn, exposing the reasoning the
-    model already performs: Decision Frame → Tradeoffs → What We Know → What We Still Need → Best Next
-    Question. Every section here was already trust-checked by validate(); we only format it. Sections are
-    rendered only when present, so sparse early-discovery turns stay clean. Falls back to the legacy
-    reflection/summary/question shape if a turn predates the V3 fields.
+    """Assemble the human-facing message as a NATURAL advisor reply, NOT a six-section consulting memo.
+    The model still reasons through Decision Frame → Tradeoffs → What We Know → Recommendation → What Would
+    Change This → Question (and the validator trust-checks all of it), but the CHAT only shows the frame +
+    the read + one question, as flowing prose. Tradeoffs / what-we-know / what-we-still-need travel as
+    structured data (_reasoning_payload) for an expandable UI drawer — never dumped as '**section:**'
+    headers. The inline scope disclaimer is dropped (the chat already shows a persistent compliance footer).
+    Falls back to the legacy reflection/summary shape for pre-V3 turns.
     """
     parts: list[str] = []
 
+    # 1) The read, as natural paragraphs: the decision frame, then the recommendation — no section labels.
     frame = str(safe.get("decision_frame") or safe.get("reflection") or "").strip()
     if frame:
         parts.append(frame)
-
-    tradeoffs = safe.get("tradeoffs") or []
-    rows = []
-    for t in tradeoffs:
-        if not isinstance(t, dict):
-            continue
-        opt = str(t.get("option") or "").strip()
-        ben = str(t.get("benefit") or "").strip()
-        cost = str(t.get("cost") or "").strip()
-        if not (opt or ben or cost):
-            continue
-        if ben and cost:
-            rows.append(f"- **{opt}** — {ben}; but {cost}" if opt else f"- {ben}; but {cost}")
-        else:
-            rows.append(f"- **{opt}** — {ben or cost}" if opt else f"- {ben or cost}")
-    if rows:
-        parts.append("**The tradeoffs:**\n" + "\n".join(rows))
-
-    know = [str(x).strip() for x in (safe.get("what_we_know") or []) if str(x).strip()]
-    if know:
-        parts.append("**What we know:**\n" + "\n".join(f"- {k}" for k in know))
-
-    rec = str(safe.get("recommendation") or "").strip()  # V4: grounded, validator-checked recommendation
+    rec = str(safe.get("recommendation") or "").strip()
     if rec:
-        parts.append("**My read:** " + rec)
+        parts.append(rec)  # a normal paragraph — no "My read:" header
+    if not frame and not rec:
+        s = str(safe.get("summary") or "").strip()
+        if s:
+            parts.append(s)
 
-    need = [str(x).strip() for x in (safe.get("what_we_still_need") or []) if str(x).strip()]
-    if need:
-        parts.append("**What would change this:**\n" + "\n".join(f"- {n}" for n in need))
-
-    s = str(safe.get("summary") or "").strip()
-    if s:
-        parts.append(s)
-
+    # 2) Exactly one natural follow-up question (no bold wrapper, no italic rationale dump).
     q = str(safe.get("next_question") or "").strip()
-    why = str(safe.get("why_this_question") or "").strip()
     if q:
-        parts.append(f"**{q}**")
-        if why:
-            parts.append(f"_{why}_")
-
-    if rec:  # V4: a grounded recommendation carries a light, deterministic scope disclaimer
-        parts.append("_This is general planning guidance based on what you've shared, not personalized "
-                     "financial, legal, or tax advice — confirm specifics with a licensed professional._")
+        parts.append(q)
 
     return "\n\n".join(parts).strip()
 
@@ -344,6 +335,11 @@ class AdvisorOrchestrator:
             base["assistant_message"] = composed
             base["llm_status"] = "enhanced"
             base["prompt_version"] = self.prompt_version
+            # Structured reasoning for the UI's expandable "Why / evidence" drawer (NOT dumped in the chat
+            # message). Citations already travel in base["citations"]. Preserves evidence without the memo feel.
+            reasoning = _reasoning_payload(safe)
+            if reasoning:
+                base["reasoning"] = reasoning
             if safe.get("missing_data"):
                 base["missing_data"] = safe["missing_data"]  # advisory display only — not persisted
             if safe.get("relationships_referenced"):
