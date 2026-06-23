@@ -10,7 +10,7 @@
 
 ## Live replay runbook (after `gcloud auth application-default login` + Vertex enabled)
 
-Env: `MODEL_PROVIDER=vertex`, `VERTEX_PROJECT=lifenavigator-dev`, `VERTEX_REGION=us-central1`. Run core-api, then for each scenario hit `/v1/life/advisor/chat` and assert:
+Env: `MODEL_PROVIDER=vertex`, `VERTEX_PROJECT=gen-lang-client-0849161409`, `VERTEX_REGION=us-central1`. Run core-api, then for each scenario hit `/v1/life/advisor/chat` and assert:
 
 | Scenario                        | Assertions                                                                                                                                                                                         |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -21,18 +21,18 @@ Gemini 2.5 Pro via Vertex AI with ADC — **no API key**. Implemented + unit-tes
 ## Endpoint
 
 `https://{region}-aiplatform.googleapis.com/v1/projects/{project}/locations/{region}/publishers/google/models/{model}:generateContent`
-(`region=global` → `aiplatform.googleapis.com`). Proven: `…/projects/lifenavigator-dev/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent`.
+(`region=global` → `aiplatform.googleapis.com`). Proven: `…/projects/gen-lang-client-0849161409/locations/us-central1/publishers/google/models/gemini-2.5-pro:generateContent`.
 
 ## Turn it on
 
 ```bash
 # Owner (once): authenticate ADC
 gcloud auth application-default login
-gcloud auth application-default set-quota-project lifenavigator-dev   # project with Vertex AI API enabled
+gcloud auth application-default set-quota-project gen-lang-client-0849161409   # project with Vertex AI API enabled
 
 # core-api env
 MODEL_PROVIDER=vertex
-VERTEX_PROJECT=lifenavigator-dev
+VERTEX_PROJECT=gen-lang-client-0849161409
 VERTEX_REGION=us-central1            # a region where gemini-2.5-pro is served
 VERTEX_GEMINI_MODEL=gemini-2.5-pro
 # (do NOT set GEMINI_API_KEY for the advisor path)
@@ -46,7 +46,7 @@ Deploy (Fly): attach a service account with `roles/aiplatform.user`; google-auth
 gcloud auth application-default print-access-token            # mints a token
 cd apps/lifenavigator-core-api && source .venv/bin/activate
 python -c "import asyncio;from app.clients.gemini import VertexGeminiClient;from app.clients.vertex_auth import AdcTokenProvider;\
-print(asyncio.run(VertexGeminiClient(project='lifenavigator-dev',region='us-central1',generation_model='gemini-2.5-pro',token_provider=AdcTokenProvider()).generate('You are terse.','say OK')))"
+print(asyncio.run(VertexGeminiClient(project='gen-lang-client-0849161409',region='us-central1',generation_model='gemini-2.5-pro',token_provider=AdcTokenProvider()).generate('You are terse.','say OK')))"
 ```
 
 Expect the model's text. A `VertexAuthError` means ADC isn't set up; a 403 means the model/region isn't enabled for the project (loud, not silent).

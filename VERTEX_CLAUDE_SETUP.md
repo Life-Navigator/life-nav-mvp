@@ -14,7 +14,7 @@ Claude (Opus/Sonnet) via Vertex AI. Callable in code; availability depends on pr
 ```bash
 # After the owner ADC step (see VERTEX_GEMINI_SETUP.md)
 USE_VERTEX_CLAUDE=true
-VERTEX_PROJECT=lifenavigator-dev
+VERTEX_PROJECT=gen-lang-client-0849161409
 VERTEX_REGION=us-east5            # a region where the Anthropic model is offered on Vertex
 ADVISOR_MODEL=claude-opus-4-1@20250805   # or the Sonnet id you have access to
 ```

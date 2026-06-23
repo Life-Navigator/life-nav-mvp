@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # "ai_studio" = Gemini via API key (gemini_api_key). "vertex" = Gemini via Vertex AI + ADC (no key —
     # required where org policy disallows API keys). Production under that policy MUST set model_provider=vertex.
     model_provider: str = "ai_studio"
-    vertex_project: str = ""
+    vertex_project: str = "gen-lang-client-0849161409"  # LifeNav GCP project (Vertex AI). Override via env.
     vertex_region: str = "us-central1"
     vertex_gemini_model: str = "gemini-2.5-pro"
 
