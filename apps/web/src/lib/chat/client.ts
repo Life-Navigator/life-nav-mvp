@@ -41,12 +41,21 @@ export interface ChatMessage {
   citations: Citation[];
 }
 
+export interface Reasoning {
+  tradeoffs?: { option?: string; benefit?: string; cost?: string }[];
+  what_we_know?: string[];
+  what_we_still_need?: string[];
+}
+
 export interface SendResult {
   assistant_message: string;
   citations: Citation[];
   agent: string | null;
   thread_id?: string | null;
   llm_status?: string;
+  reasoning?: Reasoning | null;
+  goals?: string[];
+  risks?: string[];
 }
 
 async function jsonOrThrow<T>(res: Response): Promise<T> {

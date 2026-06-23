@@ -95,9 +95,10 @@ it('renders citations from a grounded answer', async () => {
   fireEvent.change(box, { target: { value: 'What degree do I have?' } });
   fireEvent.keyDown(box, { key: 'Enter' });
   await screen.findByText('Your degree is from Stanford.');
-  fireEvent.click(screen.getByText('Sources (1)'));
-  expect(await screen.findByText(/Grounded sources/i)).toBeInTheDocument();
-  expect(screen.getByText(/public.education_records/)).toBeInTheDocument();
+  // Premium UI: a compact source chip ("Education") + a "Why?" evidence drawer (no markdown, no "Sources (N)").
+  expect(screen.getByText('Education')).toBeInTheDocument();
+  fireEvent.click(screen.getByText('Why?'));
+  expect(await screen.findByText(/Master's from Stanford/)).toBeInTheDocument();
 });
 
 it('continues an old chat from the sidebar', async () => {

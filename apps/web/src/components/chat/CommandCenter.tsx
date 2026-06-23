@@ -12,7 +12,13 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import StreamingText from '@/components/ui/StreamingText';
-import { chatClient, type Project, type Thread, type Citation } from '@/lib/chat/client';
+import {
+  chatClient,
+  type Project,
+  type Thread,
+  type Citation,
+  type Reasoning,
+} from '@/lib/chat/client';
 import { AGENT_FALLBACK, RELATIONSHIP_MANAGER, agentName, type AgentInfo } from '@/lib/chat/agents';
 import { ADVISOR_WELCOME, ADVISOR_INCOMPLETE_ONBOARDING, ADVISOR_ERROR } from '@/lib/chat/advisor';
 
@@ -55,6 +61,32 @@ interface UiMessage {
   content: string;
   agent?: string | null;
   citations?: Citation[];
+  reasoning?: Reasoning | null;
+  goals?: string[];
+  risks?: string[];
+}
+
+// Friendly labels for citation source tables → human source chips ("Offer Letter", "Life Insurance").
+const SOURCE_LABEL: Record<string, string> = {
+  'life.facts': 'Document',
+  'documents.documents': 'Document',
+  'career.career_goals': 'Career Goal',
+  'career.experience_records': 'Experience',
+  'education.certifications': 'Certification',
+  'education.education_goals': 'Education Goal',
+  'finance.financial_accounts': 'Finances',
+  'family.dependents': 'Family',
+};
+function sourceChipLabel(c: Citation): string {
+  const st = c.sourceTable || '';
+  if (SOURCE_LABEL[st]) return SOURCE_LABEL[st];
+  // Prefer the clean domain over a raw schema prefix (e.g. "public.education_records" → "Education").
+  if (c.domain) return c.domain.charAt(0).toUpperCase() + c.domain.slice(1);
+  if (st.includes('.')) {
+    const d = st.split('.')[0];
+    return d.charAt(0).toUpperCase() + d.slice(1);
+  }
+  return 'Source';
 }
 
 const STARTERS = [
@@ -179,6 +211,9 @@ export default function CommandCenter({
           content: res.assistant_message,
           agent: res.agent,
           citations: res.citations,
+          reasoning: res.reasoning,
+          goals: res.goals,
+          risks: res.risks,
         },
       ]);
     } catch {
@@ -262,33 +297,130 @@ export default function CommandCenter({
                 {agentName(m.agent, agents)}
               </div>
             )}
-            {m.role === 'assistant' && m.citations && m.citations.length > 0 && (
-              <div className="mt-1">
-                <button
-                  type="button"
-                  onClick={() => setOpenCitations(openCitations === i ? null : i)}
-                  className="text-[11px] font-medium text-indigo-600 underline"
-                >
-                  {openCitations === i ? 'Hide sources' : `Sources (${m.citations.length})`}
-                </button>
-                {openCitations === i && (
-                  <div className="mt-1 space-y-1 rounded-lg border border-gray-200 bg-white p-2 text-left">
-                    <div className="text-[10px] uppercase tracking-wide text-gray-500">
-                      Grounded sources (section-level)
-                    </div>
-                    {m.citations.slice(0, 12).map((c, j) => (
-                      <div key={j} className="text-[11px] text-gray-600">
-                        <span className="font-medium text-gray-800">{c.label}:</span> {c.value}{' '}
-                        <span className="text-gray-400">
-                          [{c.sourceTable}
-                          {typeof c.confidence === 'number' ? ` · conf ${c.confidence}` : ''}]
+            {m.role === 'assistant' &&
+              (() => {
+                const cites = m.citations || [];
+                // Distinct human source chips (dedup by friendly label).
+                const sources = Array.from(new Set(cites.map(sourceChipLabel)));
+                const rsn = m.reasoning;
+                const hasWhy =
+                  cites.length > 0 ||
+                  !!(rsn && ((rsn.tradeoffs?.length ?? 0) || (rsn.what_we_know?.length ?? 0)));
+                const goals = m.goals || [];
+                const risks = m.risks || [];
+                if (!goals.length && !risks.length && !sources.length && !hasWhy) return null;
+                return (
+                  <div className="mt-1.5 space-y-1.5 text-left">
+                    {/* Goal (emerald), risk (rose), and source (indigo) chips — compact, never in the text */}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {goals.map((g, j) => (
+                        <span
+                          key={`g${j}`}
+                          className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                        >
+                          {g}
                         </span>
+                      ))}
+                      {risks.map((r, j) => (
+                        <span
+                          key={`r${j}`}
+                          className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-medium text-rose-700 dark:bg-rose-900/30 dark:text-rose-300"
+                        >
+                          {r}
+                        </span>
+                      ))}
+                      {sources.map((label, j) => (
+                        <button
+                          key={`s${j}`}
+                          type="button"
+                          onClick={() => setOpenCitations(openCitations === i ? null : i)}
+                          className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-700 hover:bg-indigo-100"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* The "Why?" evidence drawer — reasoning + sources, hidden by default, never dumped */}
+                    {hasWhy && (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setOpenCitations(openCitations === i ? null : i)}
+                          className="text-[11px] font-medium text-indigo-600 hover:underline"
+                        >
+                          {openCitations === i ? 'Hide why' : 'Why?'}
+                        </button>
+                        {openCitations === i && (
+                          <div className="mt-1 space-y-2 rounded-lg border border-gray-200 bg-white p-2.5 dark:border-gray-700 dark:bg-gray-800">
+                            {rsn?.tradeoffs?.length ? (
+                              <div>
+                                <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                                  What I weighed
+                                </div>
+                                {rsn.tradeoffs.map((t, k) => (
+                                  <div
+                                    key={k}
+                                    className="text-[11px] text-gray-600 dark:text-gray-300"
+                                  >
+                                    {t.option ? (
+                                      <span className="font-medium text-gray-800 dark:text-gray-100">
+                                        {t.option}:{' '}
+                                      </span>
+                                    ) : null}
+                                    {t.benefit}
+                                    {t.benefit && t.cost ? ' — but ' : ''}
+                                    {t.cost}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                            {rsn?.what_we_know?.length ? (
+                              <div>
+                                <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                                  From what you&apos;ve shared
+                                </div>
+                                {rsn.what_we_know.map((w, k) => (
+                                  <div
+                                    key={k}
+                                    className="text-[11px] text-gray-600 dark:text-gray-300"
+                                  >
+                                    • {w}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                            {cites.length ? (
+                              <div>
+                                <div className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">
+                                  Sources
+                                </div>
+                                {cites.slice(0, 12).map((c, j) => (
+                                  <div
+                                    key={j}
+                                    className="text-[11px] text-gray-600 dark:text-gray-300"
+                                  >
+                                    <span className="font-medium text-gray-800 dark:text-gray-100">
+                                      {c.label}:
+                                    </span>{' '}
+                                    {c.value}
+                                    <span className="text-gray-400">
+                                      {' · '}
+                                      {sourceChipLabel(c)}
+                                      {typeof c.confidence === 'number'
+                                        ? ` · conf ${c.confidence}`
+                                        : ''}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            )}
+                );
+              })()}
           </div>
         ))}
 

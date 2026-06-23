@@ -8,6 +8,9 @@ export interface SendResult {
   citations: unknown[];
   agent: string | null;
   llm_status?: string;
+  reasoning?: unknown; // {tradeoffs, what_we_know, what_we_still_need} — for the evidence drawer
+  goals?: string[]; // relevant goal chips (candidate_goals)
+  risks?: string[]; // detected risk chips (context_panel.top_risks)
 }
 
 /**
@@ -42,6 +45,25 @@ export async function sendAdvisorTurn(args: {
   const citations = Array.isArray(turn.citations) ? (turn.citations as unknown[]) : [];
   const answeredAgent = (typeof turn.agent === 'string' ? turn.agent : args.agent) ?? null;
   const llm_status = typeof turn.llm_status === 'string' ? turn.llm_status : undefined;
+  // Surfacing payloads for the premium chat UI (drawer + chips) — never injected into the message text.
+  const reasoning =
+    turn.reasoning && typeof turn.reasoning === 'object' ? turn.reasoning : undefined;
+  const goals = Array.isArray(turn.candidate_goals)
+    ? (turn.candidate_goals as Array<Record<string, unknown>>)
+        .map((g) => (typeof g?.goal === 'string' ? g.goal : ''))
+        .filter(Boolean)
+        .slice(0, 6)
+    : [];
+  const panel =
+    turn.context_panel && typeof turn.context_panel === 'object'
+      ? (turn.context_panel as Record<string, unknown>)
+      : {};
+  const risks = Array.isArray(panel.top_risks)
+    ? (panel.top_risks as unknown[])
+        .map((r) => String(r))
+        .filter(Boolean)
+        .slice(0, 6)
+    : [];
 
   if (args.threadId && assistant) {
     await appendTurn(args.userId, args.threadId, {
@@ -59,5 +81,8 @@ export async function sendAdvisorTurn(args: {
     citations,
     agent: answeredAgent,
     llm_status,
+    reasoning,
+    goals,
+    risks,
   };
 }
