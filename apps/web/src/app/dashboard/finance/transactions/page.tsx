@@ -19,23 +19,29 @@ export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch accounts + transactions from the Finance aggregator. The TODO this
-  // replaces was the reason this page rendered empty even after Plaid sync.
-  // Endpoint reads finance.financial_accounts + finance.transactions under RLS.
+  // Accounts come from the canonical account list (/api/plaid/accounts → finance.financial_accounts);
+  // the transaction ROWS come from the same canonical source the Financial Overview reads
+  // (/api/finance/analytics → finance.transactions). The /api/financial proxy's DomainViewModel
+  // summary carries no transaction rows, so reading it directly rendered this page empty under the
+  // proxy; analytics fixes that with real data (Gap 3). Both read finance.* under RLS.
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/financial?timeframe=year');
-        if (!res.ok) {
+        const [acctRes, analyticsRes] = await Promise.all([
+          fetch('/api/plaid/accounts', { cache: 'no-store' }),
+          fetch('/api/finance/analytics', { cache: 'no-store' }),
+        ]);
+        if (!analyticsRes.ok) {
           setAccounts([]);
           setTransactions([]);
           return;
         }
-        const data = await res.json();
-        const apiAccounts = Array.isArray(data?.accounts) ? data.accounts : [];
-        const recent = Array.isArray(data?.transactions?.recentTransactions)
-          ? data.transactions.recentTransactions
+        const acctData = acctRes.ok ? await acctRes.json() : {};
+        const analytics = await analyticsRes.json();
+        const apiAccounts = Array.isArray(acctData?.accounts) ? acctData.accounts : [];
+        const recent = Array.isArray(analytics?.recent_transactions)
+          ? analytics.recent_transactions
           : [];
 
         // Adapt the aggregator shape to TransactionList's EnhancedTransaction.

@@ -52,6 +52,14 @@ def _fact(domain: str, label: str, value: str, source: str, table: str,
     }
 
 
+def _is_num(v: Any) -> bool:
+    try:
+        float(v)
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
 def _years_since(dates: list[str]) -> float | None:
     from datetime import datetime, timezone
     ts: list[float] = []
@@ -238,6 +246,83 @@ async def build_fact_packet(sb: Any, ctx: UserContext) -> list[dict[str, Any]]:
             src += " (pending your confirmation)"
         facts.append(_fact(f.get("domain") or "documents", label, str(f["value"]), src,
                            "life.facts", f.get("id"), f.get("updated_at"), float(f.get("confidence") or 0.5)))
+
+    # ---- Health ---- (wellness only; grounds the Health agent + makes recent health numbers citable)
+    # Goals + habits are facts the user owns; the sleep/activity summaries surface REAL averages so the
+    # number-gate accepts e.g. "~7.2h" when the advisor cites them. Logs carry no updated_at column.
+    health_goals = await _rows(sb, ctx, "health", "health_goals",
+                               "id,title,target_metric,target_value,target_unit,target_date,status,updated_at")
+    for g in [g for g in health_goals if (g.get("status") or "active") == "active"][:_MAX_PER_CATEGORY]:
+        if g.get("title"):
+            extra = []
+            if g.get("target_value") is not None:
+                extra.append(f"target {g['target_value']}" + (f" {g['target_unit']}" if g.get("target_unit") else ""))
+            if g.get("target_date"):
+                extra.append(f"by {str(g['target_date'])[:10]}")
+            val = str(g["title"]) + (f" ({', '.join(extra)})" if extra else "")
+            facts.append(_fact("health", "Health goal", val, "Health goal",
+                               "health.health_goals", g.get("id"), g.get("updated_at"), 0.9))
+
+    habits = await _rows(sb, ctx, "health", "wellness_habits", "id,name,cadence,streak,is_active,updated_at")
+    for h in [h for h in habits if h.get("is_active", True) and h.get("name")][:_MAX_PER_CATEGORY]:
+        cadence = h.get("cadence")
+        streak = h.get("streak")
+        val = str(h["name"]) + (f" ({cadence})" if cadence else "")
+        if streak:
+            val += f" — {streak}-day streak"
+        facts.append(_fact("health", "Wellness habit", val, "Wellness habit",
+                           "health.wellness_habits", h.get("id"), h.get("updated_at"), 0.85))
+
+    sleep = await _rows(sb, ctx, "health", "sleep_logs", "id,total_hours,night_of")
+    sleep_hours = [float(s["total_hours"]) for s in sleep
+                   if s.get("total_hours") is not None and _is_num(s.get("total_hours"))]
+    if sleep_hours:
+        avg_sleep = round(sum(sleep_hours) / len(sleep_hours), 1)
+        facts.append(_fact("health", "Recent sleep",
+                           f"Avg sleep ~{avg_sleep}h over {len(sleep_hours)} night(s)",
+                           "Sleep logs", "health.sleep_logs", None, None, 0.85))
+
+    activity = await _rows(sb, ctx, "health", "activity_logs", "id,steps,logged_at")
+    steps = [int(a["steps"]) for a in activity if a.get("steps") is not None and _is_num(a.get("steps"))]
+    if steps:
+        avg_steps = round(sum(steps) / len(steps))
+        facts.append(_fact("health", "Recent activity",
+                           f"Avg daily steps ~{avg_steps:,} over {len(steps)} day(s)",
+                           "Activity logs", "health.activity_logs", None, None, 0.85))
+
+    # ---- Military / VA ---- (grounds the Military / VA Pack). Veteran facts are DD214/VA-award
+    # derived (documents.documents.extracted_json keyed by doc_type) — same source MilitaryService reads.
+    # Informational only; the VA / an accredited VSO makes the official determination. Never invented.
+    mil_docs = await _rows(sb, ctx, "documents", "documents", "id,doc_type,extracted_json,updated_at")
+    by_type: dict[str, dict[str, Any]] = {}
+    for r in mil_docs:
+        dt = r.get("doc_type")
+        if dt and dt not in by_type:
+            by_type[dt] = {"data": r.get("extracted_json") or {}, "id": r.get("id"), "updated_at": r.get("updated_at")}
+    dd214 = by_type.get("dd214")
+    if dd214:
+        dd = dd214["data"]
+        branch = dd.get("branch")
+        discharge = dd.get("discharge_type")
+        if branch or discharge:
+            val = " — ".join(p for p in (branch, discharge) if p)
+            facts.append(_fact("military", "Military service",
+                               val, "DD214 (your uploaded service record)",
+                               "documents.documents", dd214["id"], dd214["updated_at"], 0.9))
+    va_award = by_type.get("va_award_letter")
+    if va_award:
+        va = va_award["data"]
+        rating = va.get("disability_rating")
+        if rating is not None and str(rating).strip() != "":
+            r_str = str(rating).strip().rstrip("%")
+            facts.append(_fact("military", "VA disability rating",
+                               f"{r_str}%", "VA award letter (your uploaded document)",
+                               "documents.documents", va_award["id"], va_award["updated_at"], 0.9))
+        benefit = va.get("monthly_benefit")
+        if benefit is not None and str(benefit).strip() != "":
+            facts.append(_fact("military", "VA monthly benefit",
+                               f"${benefit}/mo", "VA award letter (your uploaded document)",
+                               "documents.documents", va_award["id"], va_award["updated_at"], 0.85))
 
     # ---- Conflicts ---- (Phase 6G: the advisor must KNOW when data is contested, and never pick silently)
     try:

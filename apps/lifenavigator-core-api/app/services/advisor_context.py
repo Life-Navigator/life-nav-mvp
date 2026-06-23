@@ -38,9 +38,14 @@ _NUM_RE = re.compile(r"\$?\d[\d,]*(?:\.\d+)?\s*[kKmMbB]?%?")
 _PRIMARY_TYPES = {"Goal", "Life Objective"}
 
 _SAFETY = [
-    "Do not give medical, legal, or tax advice.",
-    "Do not state final financial recommendations — those come from the recommendation engine.",
-    "Never invent goals, facts, or numbers. If unknown, ask or mark as missing.",
+    "Clinical medical advice is off-limits — no diagnosis, prescriptions, dosing, or interpreting labs/"
+    "imaging. General fitness, exercise, sleep, and nutrition COACHING is allowed and encouraged. Specific "
+    "legal or tax directives, and naming a specific investment product/security/insurer, are off-limits — "
+    "refer the user to a licensed professional for those.",
+    "Grounded strategic / personal-finance / life-planning recommendations ARE allowed, reasoned from the "
+    "user's own facts. General benchmarks (e.g. a 3-6 month emergency fund) are fine; do not assert a "
+    "specific dollar figure as the user's own unless they gave it or you show the derivation.",
+    "Never invent goals, facts, or personal financial numbers. If unknown, ask or mark as missing.",
     "Keep confirmed facts, candidate facts, assumptions and missing data in separate categories.",
     "You may suggest candidate facts/goals, but nothing is saved until a deterministic validator confirms it.",
     "Reference a relationship between goals/objectives ONLY if it appears in relationship_edges or "

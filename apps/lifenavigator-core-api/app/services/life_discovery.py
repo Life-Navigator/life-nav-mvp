@@ -921,6 +921,11 @@ class LifeDiscoveryService:
             "top_themes": list(primary.get("themes") or [])[:5] if primary else [],
             "top_risks": [r["label"] for r in risks[:5]],
             "top_opportunities": [o["label"] for o in opps[:5]],
+            # Domain-tagged detail (same order/slice as the label lists) so a domain-focused advisor turn
+            # can scope its chips to the conversation's domain(s). `domain` may be None when the row carries
+            # no domain — callers must KEEP unknown-domain rows (never hide a real risk lacking a tag).
+            "top_risks_detail": [{"label": r["label"], "domain": r.get("domain")} for r in risks[:5]],
+            "top_opportunities_detail": [{"label": o["label"], "domain": o.get("domain")} for o in opps[:5]],
             "active_constraints": [{"label": c["label"], "detail": c.get("detail")} for c in cons[:5]],
             "open_dependencies": [{"label": d["label"], "domain": d["domain"]} for d in deps if not d.get("satisfied")][:8],
             "discovery_status": "in_progress" if not objectives else "active",

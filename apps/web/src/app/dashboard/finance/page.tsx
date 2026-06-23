@@ -124,6 +124,45 @@ const FinancialDashboard = () => {
       .catch(() => {});
   }, []);
 
+  // Spending charts + recent transactions read the SAME canonical source as the real
+  // Financial Overview (/api/finance/analytics → finance.transactions). The /api/financial
+  // proxy's DomainViewModel summary carries no transaction rows, so when the proxy is on these
+  // surfaces would otherwise be blank; analytics fills them from real data (honest empty otherwise).
+  useEffect(() => {
+    fetch('/api/finance/analytics', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d) return;
+        const daily = Array.isArray(d?.spending_trends?.daily) ? d.spending_trends.daily : [];
+        const cats = Array.isArray(d?.spending_trends?.categories)
+          ? d.spending_trends.categories
+          : [];
+        const recent = Array.isArray(d?.recent_transactions) ? d.recent_transactions : [];
+        // Only override when analytics actually has transaction data — never blank out a
+        // populated legacy payload.
+        if (daily.length === 0 && cats.length === 0 && recent.length === 0) return;
+        setTransactions({
+          dailySpending: daily.map((x: { date: string; amount: number }) => ({
+            date: String(x.date),
+            amount: Number(x.amount ?? 0),
+            category: '',
+          })),
+          categorySpending: cats.map((c: { category: string; amount: number }) => ({
+            category: String(c.category),
+            amount: Number(c.amount ?? 0),
+          })),
+          recentTransactions: recent.map((t: Record<string, unknown>) => ({
+            id: String(t.id ?? ''),
+            date: String(t.date ?? ''),
+            description: String(t.description ?? t.merchant ?? ''),
+            amount: Number(t.amount ?? 0),
+            category: String(t.category ?? ''),
+          })),
+        });
+      })
+      .catch(() => {});
+  }, [timeframe]);
+
   // Colors for charts
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -180,7 +219,14 @@ const FinancialDashboard = () => {
       // Plaid coupling lives in the mapper — never in this component.
       const norm = normalizeFinancePayload(data);
       setAccounts(norm.accounts);
-      setTransactions(norm.transactions);
+      // Transactions are owned by the analytics effect (one canonical source). Only seed from
+      // the legacy payload when it actually carries rows; under the Core API proxy the summary
+      // has none, so we leave the analytics-sourced transactions in place (Gap 3).
+      const legacyHasTx =
+        norm.transactions.dailySpending.length > 0 ||
+        norm.transactions.categorySpending.length > 0 ||
+        norm.transactions.recentTransactions.length > 0;
+      if (legacyHasTx) setTransactions(norm.transactions);
       setInvestments(norm.investments);
       setCore(norm.core);
 

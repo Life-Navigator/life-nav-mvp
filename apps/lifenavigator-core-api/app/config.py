@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # --- Gemini (server-side reasoning only; NEVER exposed to frontend) ---
     gemini_api_key: str = ""
     gemini_embedding_model: str = "gemini-embedding-001"  # 3072-dim; must match the worker
-    gemini_generation_model: str = "gemini-2.5-flash"
+    gemini_generation_model: str = "gemini-2.5-pro"
 
     # --- Qdrant (grounding vectors) ---
     qdrant_url: str = ""

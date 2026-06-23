@@ -102,6 +102,87 @@ async def test_extracted_document_facts_surface_from_life_facts():
     assert "1000000" in numbers_in_facts(facts)          # extracted figure now available to the number-gate
 
 
+@pytest.mark.asyncio
+async def test_packet_emits_health_facts_with_provenance():
+    """Health goals/habits + recent sleep/activity summaries surface as cited, number-gate-eligible facts."""
+    sb = FakeSupabase({
+        "health_goals": [
+            {"id": "hg1", "title": "Sleep 8h nightly", "target_value": 8, "target_unit": "hours",
+             "target_date": "2026-12-31", "status": "active"},
+            {"id": "hg2", "title": "Old goal", "status": "archived"},
+        ],
+        "wellness_habits": [{"id": "wh1", "name": "Morning walk", "cadence": "daily", "streak": 12, "is_active": True}],
+        "sleep_logs": [
+            {"id": "s1", "total_hours": 7.0, "night_of": "2026-06-20"},
+            {"id": "s2", "total_hours": 7.4, "night_of": "2026-06-21"},
+        ],
+        "activity_logs": [
+            {"id": "a1", "steps": 8000, "logged_at": "2026-06-20"},
+            {"id": "a2", "steps": 8800, "logged_at": "2026-06-21"},
+        ],
+    })
+    facts = await build_fact_packet(sb, CTX)
+    health = [f for f in facts if f["domain"] == "health"]
+    assert health
+    for f in health:
+        assert REQUIRED.issubset(f.keys())
+        assert f["sourceTable"].startswith("health.")
+        assert 0 < f["confidence"] <= 1
+
+    by_label = {f["label"] for f in health}
+    assert {"Health goal", "Wellness habit", "Recent sleep", "Recent activity"} <= by_label
+
+    goal = next(f for f in health if f["label"] == "Health goal")
+    assert goal["value"].startswith("Sleep 8h nightly")
+    assert goal["sourceTable"] == "health.health_goals" and goal["recordId"] == "hg1"
+    assert "Old goal" not in {f["value"] for f in health}  # archived goal excluded
+
+    habit = next(f for f in health if f["label"] == "Wellness habit")
+    assert "12-day streak" in habit["value"] and habit["sourceTable"] == "health.wellness_habits"
+
+    sleep = next(f for f in health if f["label"] == "Recent sleep")
+    assert sleep["value"] == "Avg sleep ~7.2h over 2 night(s)" and sleep["sourceTable"] == "health.sleep_logs"
+
+    activity = next(f for f in health if f["label"] == "Recent activity")
+    assert activity["value"].startswith("Avg daily steps ~8,400")
+
+    # grounded health numbers become citable by the validator number-gate
+    toks = numbers_in_facts(facts)
+    assert "7.2" in toks and "8,400" in toks
+
+
+@pytest.mark.asyncio
+async def test_packet_emits_military_facts_from_uploaded_documents():
+    """Veteran facts are DD214/VA-award derived (documents.documents.extracted_json) — branch/discharge,
+    VA disability rating %, and monthly benefit, each cited to the real source. Never invented."""
+    sb = FakeSupabase({
+        "documents": [
+            {"id": "doc1", "doc_type": "dd214",
+             "extracted_json": {"branch": "Army", "discharge_type": "Honorable", "separation_date": "2018-05-01"},
+             "updated_at": "2026-06-20"},
+            {"id": "doc2", "doc_type": "va_award_letter",
+             "extracted_json": {"disability_rating": "70", "monthly_benefit": "1700"},
+             "updated_at": "2026-06-20"},
+        ],
+    })
+    facts = await build_fact_packet(sb, CTX)
+    mil = [f for f in facts if f["domain"] == "military"]
+    assert mil
+    for f in mil:
+        assert REQUIRED.issubset(f.keys())
+        assert f["sourceTable"] == "documents.documents"
+        assert 0 < f["confidence"] <= 1
+
+    by_label = {f["label"]: f for f in mil}
+    assert by_label["Military service"]["value"] == "Army — Honorable"
+    assert by_label["Military service"]["recordId"] == "doc1"
+    assert by_label["VA disability rating"]["value"] == "70%"
+    assert by_label["VA monthly benefit"]["value"] == "$1700/mo"
+
+    # the disability % is now citable by the number-gate
+    assert "70" in numbers_in_facts(facts)
+
+
 def _ctx_with_packet(packet):
     return AdvisorContext(
         user_id=CTX.user_id, user_message="what do you know about my career?", current_stage="complete",

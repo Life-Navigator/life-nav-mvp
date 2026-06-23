@@ -186,13 +186,18 @@ _DOMAIN_PATTERNS: dict[str, re.Pattern[str]] = {
 }
 
 
+# The broad fallback set route_domains() returns when a message matches NO single domain — i.e. there is
+# no domain focus and the RM should ground in (and surface) everything.
+ALL_LIFE_DOMAINS: tuple[str, ...] = ("finance", "career", "education", "health", "family")
+
+
 def route_domains(message: str) -> list[str]:
     """RM mode: pick the domains a question touches (for fact gathering), by whole-word match. When
     NOTHING matches it's a broad/ambiguous question — ground in ALL life domains and let the RM
     synthesize. Never bias to finance (the old fallback mis-routed health/family questions there)."""
     text = (message or "").lower()
     hit = [d for d, pat in _DOMAIN_PATTERNS.items() if pat.search(text)]
-    return hit or ["finance", "career", "education", "health", "family"]
+    return hit or list(ALL_LIFE_DOMAINS)
 
 
 def domains_for(agent: Agent, message: str) -> list[str]:
@@ -200,3 +205,23 @@ def domains_for(agent: Agent, message: str) -> list[str]:
     if agent.is_orchestrator:
         return route_domains(message)
     return list(agent.domains)
+
+
+def focus_domains(agent: Optional[Agent], message: str) -> Optional[list[str]]:
+    """The conversation's DOMAIN FOCUS for surfacing (e.g. scoping risk/opportunity chips), or None when
+    the turn is broad and should see the whole-life list.
+
+    Focused → a specific subset of life domains:
+      * a direct domain advisor (Finance/Health/…) → its fixed domains;
+      * the orchestrator routed by the message to a strict subset of the life domains.
+    Broad (None) → no agent, OR the orchestrator with the all-domain fallback (the message matched no
+    single domain). The broad advisor SHOULD see everything, so we never narrow it."""
+    if agent is None:
+        return None
+    if not agent.is_orchestrator:
+        return list(agent.domains) or None
+    routed = route_domains(message)
+    # All-domain fallback == no focus; keep the full whole-life list.
+    if set(routed) >= set(ALL_LIFE_DOMAINS):
+        return None
+    return routed

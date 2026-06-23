@@ -22,6 +22,20 @@ interface Account {
   institution?: string;
 }
 
+// Liability account types (mirror the canonical classification in financial_resolver.summary).
+// Their stored balances are positive Plaid magnitudes, so they must render as what the user OWES
+// (negative / red), never as positive green "assets" (Gap 2).
+function isLiabilityType(type: string | null | undefined): boolean {
+  const s = (type ?? '').toLowerCase();
+  return (
+    s.includes('credit') ||
+    s.includes('loan') ||
+    s.includes('mortgage') ||
+    s.includes('debt') ||
+    s.includes('liability')
+  );
+}
+
 // Helper to get icon based on account type
 function getAccountIcon(type: string) {
   switch (type) {
@@ -143,33 +157,40 @@ export function AccountsSummary() {
       </div>
 
       <div className="space-y-4 mb-6">
-        {filteredAccounts.map((account) => (
-          <div
-            key={account.id}
-            className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-700"
-          >
-            <div className="flex items-center">
-              <div className="bg-slate-100 dark:bg-slate-700 p-2 rounded-full mr-3">
-                {getAccountIcon(account.type)}
-              </div>
-              <div>
-                <p className="font-medium">{account.name}</p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {account.institution || account.subtype || account.type}
-                </p>
-              </div>
-            </div>
+        {filteredAccounts.map((account) => {
+          // A liability account's positive stored balance is money OWED — display it negative/red.
+          // Asset accounts keep their natural sign (a negative balance, e.g. overdraft, stays red).
+          const isLiability = isLiabilityType(account.type) || isLiabilityType(account.subtype);
+          const raw = account.currentBalance || 0;
+          const signed = isLiability ? -Math.abs(raw) : raw;
+          return (
             <div
-              className={`text-right font-medium ${(account.currentBalance || 0) < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}
+              key={account.id}
+              className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-700"
             >
-              {(account.currentBalance || 0) < 0 ? '-' : ''}$
-              {Math.abs(account.currentBalance || 0).toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              <div className="flex items-center">
+                <div className="bg-slate-100 dark:bg-slate-700 p-2 rounded-full mr-3">
+                  {getAccountIcon(account.type)}
+                </div>
+                <div>
+                  <p className="font-medium">{account.name}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {account.institution || account.subtype || account.type}
+                  </p>
+                </div>
+              </div>
+              <div
+                className={`text-right font-medium ${signed < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}
+              >
+                {signed < 0 ? '-' : ''}$
+                {Math.abs(signed).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200 dark:border-slate-700">

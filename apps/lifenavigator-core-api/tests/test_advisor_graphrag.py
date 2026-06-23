@@ -65,7 +65,7 @@ class FakeRM:
     def __init__(self, base: dict[str, Any]) -> None:
         self._base = base
 
-    async def converse(self, ctx, message, pending_key=None) -> dict[str, Any]:
+    async def converse(self, ctx, message, pending_key=None, *, focus_domains=None) -> dict[str, Any]:
         return dict(self._base)
 
 

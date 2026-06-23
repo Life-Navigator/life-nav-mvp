@@ -371,8 +371,36 @@ class RelationshipManager:
         "life.life_vision.prompts.time_horizon": ["✓ Time horizon noted"],
     }
 
-    async def _context_panel(self, ctx: UserContext) -> dict[str, Any]:
-        """The advisor's live view of the user — always reflects the current canonical model (D8)."""
+    @staticmethod
+    def _scope_to_domains(detail: list[dict[str, Any]] | None, labels: list[str] | None,
+                          focus_domains: Optional[list[str]]) -> list[str]:
+        """Scope a risk/opportunity label list to the conversation's focused domain(s).
+
+        Conservative by design:
+          * No focus (broad/default orchestrator turn) → return the full list unchanged.
+          * Focused turn → keep only rows whose domain is in the focus set, PLUS any row whose domain
+            is unknown/None (we never DROP a real risk just because it carries no domain tag).
+        `detail` is the domain-tagged [{label, domain}] from the snapshot (same order as `labels`); when
+        it's missing we cannot scope, so we keep the full list (never fabricate a domain)."""
+        full = list(labels or [])
+        if not focus_domains:
+            return full
+        if not detail:
+            return full
+        focus = {str(d).lower() for d in focus_domains}
+        scoped = [str(row.get("label")) for row in detail
+                  if not row.get("domain") or str(row.get("domain")).lower() in focus]
+        # Safety net: if scoping somehow drops everything (e.g. detail/label mismatch), fall back to the
+        # full list rather than show an empty panel for a real, non-empty risk set.
+        return [s for s in scoped if s] or full
+
+    async def _context_panel(self, ctx: UserContext, focus_domains: Optional[list[str]] = None) -> dict[str, Any]:
+        """The advisor's live view of the user — always reflects the current canonical model (D8).
+
+        `focus_domains`: when this turn is routed to a specific domain (a direct Health/Finance/etc.
+        advisor, or the orchestrator routed to a strict subset), the risk/opportunity chips are scoped to
+        those domains so a HEALTH conversation no longer surfaces finance/career risk chips. When None
+        (the broad Relationship Manager with no domain focus), the full whole-life list is kept."""
         try:
             snap = await self._life.snapshot(ctx)
             health = await self._life.discovery_health(ctx)
@@ -390,15 +418,23 @@ class RelationshipManager:
                 "candidate_goals": cands,
                 "priorities_i_heard": [c["goal"] for c in cands],
                 "domains_touched": sorted({c["domain"] for c in cands if c["domain"] != "core"}),
-                "top_themes": snap.get("top_themes"), "top_risks": snap.get("top_risks"),
+                "top_themes": snap.get("top_themes"),
+                "top_risks": self._scope_to_domains(
+                    snap.get("top_risks_detail"), snap.get("top_risks"), focus_domains),
                 "top_constraints": [c["label"] for c in snap.get("active_constraints", [])],
-                "top_opportunities": snap.get("top_opportunities"),
+                "top_opportunities": self._scope_to_domains(
+                    snap.get("top_opportunities_detail"), snap.get("top_opportunities"), focus_domains),
                 "discovery_completion_pct": round((health.get("model_quality") or 0) * 100),
                 "covered_areas": health.get("covered_areas"), "missing_areas": health.get("missing_areas")}
 
-    async def converse(self, ctx: UserContext, message: str, pending_key: Optional[str] = None) -> dict[str, Any]:
+    async def converse(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
+                       *, focus_domains: Optional[list[str]] = None) -> dict[str, Any]:
         """One advisor turn. If pending_key is set, the message answers it (write canonically + show
-        what updated); then reflect + ask the next question. Stateless — the caller threads pending_key."""
+        what updated); then reflect + ask the next question. Stateless — the caller threads pending_key.
+
+        `focus_domains`: the conversation's routed domain(s) for this turn (set by the orchestrator from
+        the answering agent). When present, the context_panel's risk/opportunity chips are scoped to those
+        domains; when None (broad/default advisor) the full whole-life list is kept."""
         updates: list[str] = []
         reflection = ""
         reveal = None
@@ -422,7 +458,7 @@ class RelationshipManager:
                     pass
             nq0 = _FLOW_BY_KEY.get(pending_key) or {}
             st0 = await self.state(ctx)
-            panel0 = await self._context_panel(ctx)
+            panel0 = await self._context_panel(ctx, focus_domains)
             return {
                 "assistant_message": (
                     "You're right — I overreached, and I should only work from what you actually told me. "
@@ -535,7 +571,7 @@ class RelationshipManager:
             why = nq.get("why_it_matters")
             why_line = f"\n\n_Why I ask: {why}_" if why else ""
             assistant = f"{reflection}{opener}{nq['prompt']}{why_line}"
-        panel = await self._context_panel(ctx)
+        panel = await self._context_panel(ctx, focus_domains)
         return {
             "assistant_message": assistant,
             "pending_key": None if (st.get("complete") or not nq) else nq["key"],

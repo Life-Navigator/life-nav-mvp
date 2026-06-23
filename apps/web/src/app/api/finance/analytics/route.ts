@@ -36,7 +36,9 @@ export async function GET(_req: NextRequest) {
     const { data } = await sb
       .schema('finance')
       .from('transactions')
-      .select('amount, transaction_type, transaction_date, category, merchant, description')
+      .select(
+        'id, account_id, amount, currency, transaction_type, transaction_date, category, merchant, description'
+      )
       .eq('user_id', user.id)
       .gte('transaction_date', start60)
       .order('transaction_date', { ascending: false })
@@ -100,9 +102,17 @@ export async function GET(_req: NextRequest) {
 
   // --- spending trends (expense categories, last 30 days) ---
   const spendByCat: Record<string, number> = {};
+  const spendByDay: Record<string, number> = {};
   for (const t of m)
-    if (!isIncome(t))
-      spendByCat[cat(t)] = (spendByCat[cat(t)] || 0) + Math.abs(Number(t.amount ?? 0));
+    if (!isIncome(t)) {
+      const a = Math.abs(Number(t.amount ?? 0));
+      spendByCat[cat(t)] = (spendByCat[cat(t)] || 0) + a;
+      const day = String(t.transaction_date ?? '').slice(0, 10);
+      if (day) spendByDay[day] = (spendByDay[day] || 0) + a;
+    }
+  const daily = Object.entries(spendByDay)
+    .map(([date, amount]) => ({ date, amount: round2(amount) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
   const total_spending = round2(Object.values(spendByCat).reduce((s, v) => s + v, 0));
   const categories = Object.entries(spendByCat)
     .map(([category, amount]) => ({
@@ -116,6 +126,7 @@ export async function GET(_req: NextRequest) {
     ? {
         total_spending: null,
         categories: [],
+        daily: [],
         trend_direction: 'unknown' as const,
         source: 'finance.transactions',
         last_updated: lastUpdated,
@@ -124,10 +135,27 @@ export async function GET(_req: NextRequest) {
     : {
         total_spending,
         categories,
+        daily,
         trend_direction: 'unknown' as const,
         source: 'finance.transactions',
         last_updated: lastUpdated,
       };
+
+  // --- recent transactions (newest first, last 60 days, capped) — same canonical
+  //     finance.transactions source the overview reads. Lets the legacy dashboard and
+  //     the transactions page render a real list whether or not the /api/financial
+  //     proxy is on (the proxy's DomainViewModel summary carries no transaction rows). ---
+  const recent_transactions = txns.slice(0, 50).map((t) => ({
+    id: String(t.id ?? ''),
+    account_id: String(t.account_id ?? ''),
+    amount: Number(t.amount ?? 0),
+    currency: String(t.currency ?? 'USD'),
+    date: String(t.transaction_date ?? '').slice(0, 10),
+    description: String(t.description ?? ''),
+    merchant: String(t.merchant ?? ''),
+    category: String(t.category ?? ''),
+    type: String(t.transaction_type ?? ''),
+  }));
 
   // --- financial insights (this 30d vs prior 30d, per category) ---
   const prevStart = iso(new Date(now - 60 * 86400000));
@@ -265,5 +293,6 @@ export async function GET(_req: NextRequest) {
     financial_insights,
     upcoming_bills,
     assets,
+    recent_transactions,
   });
 }

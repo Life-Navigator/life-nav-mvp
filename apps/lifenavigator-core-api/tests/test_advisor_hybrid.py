@@ -64,8 +64,10 @@ class FakeRM:
         self._base = base
         self.calls: list[tuple[Any, str, Any]] = []
 
-    async def converse(self, ctx: UserContext, message: str, pending_key: Any = None) -> dict[str, Any]:
+    async def converse(self, ctx: UserContext, message: str, pending_key: Any = None,
+                       *, focus_domains: Any = None) -> dict[str, Any]:
         self.calls.append((ctx, message, pending_key))
+        self.last_focus_domains = focus_domains  # so tests can assert the orchestrator scopes the panel
         return dict(self._base)
 
 

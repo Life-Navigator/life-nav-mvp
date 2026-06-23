@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from ..models.common import UserContext
-from .advisor_agents import get_agent
+from .advisor_agents import focus_domains as _focus_domains, get_agent
 from .advisor_context import AdvisorContextBuilder
 from .advisor_llm import AdvisorLLM, ADVISOR_PROMPT_VERSION
 from .advisor_validator import validate
@@ -365,11 +365,14 @@ class AdvisorOrchestrator:
             tr["stages_ms"][name] = round((now - mark) * 1000, 1)
             mark = now
 
-        # 1) Deterministic turn — persistence (candidate/rejected goals), canonical writes, safe fallback text.
-        base = await self._rm.converse(ctx, message, pending_key)
-        lap("deterministic_turn")
         # Command Center: resolve the answering agent (advisor mode only; discovery has no agent persona).
+        # Resolved BEFORE the deterministic turn so the context_panel chips can be scoped to the turn's
+        # routed domain(s) (a HEALTH turn shouldn't surface finance/career risk chips).
         agent_obj = get_agent(agent) if (mode != "discovery" and agent) else None
+        fdoms = _focus_domains(agent_obj, message) if mode != "discovery" else None
+        # 1) Deterministic turn — persistence (candidate/rejected goals), canonical writes, safe fallback text.
+        base = await self._rm.converse(ctx, message, pending_key, focus_domains=fdoms)
+        lap("deterministic_turn")
         if agent_obj is not None:
             base["agent"] = agent_obj.id
             tr["agent"] = agent_obj.id
@@ -410,9 +413,10 @@ class AdvisorOrchestrator:
             tr["stages_ms"][name] = round((now - mark) * 1000, 1)
             mark = now
 
-        base = await self._rm.converse(ctx, message, pending_key)
-        lap("deterministic_turn")
         agent_obj = get_agent(agent) if (mode != "discovery" and agent) else None
+        fdoms = _focus_domains(agent_obj, message) if mode != "discovery" else None
+        base = await self._rm.converse(ctx, message, pending_key, focus_domains=fdoms)
+        lap("deterministic_turn")
         if agent_obj is not None:
             base["agent"] = agent_obj.id
             tr["agent"] = agent_obj.id

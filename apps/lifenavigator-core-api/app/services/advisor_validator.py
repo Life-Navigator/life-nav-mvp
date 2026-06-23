@@ -98,6 +98,42 @@ def _financial_numbers(text: str) -> set[str]:
     return {n for n in out if n}
 
 
+# A personal-financial assertion = 2nd-person ownership ("you", "your", "you've") + a money cue near the
+# number. Used to scope the number-gate to the user's OWN figures (block fabrications about their money)
+# while letting general/benchmark/coaching numbers through. Window is char-based around the matched number.
+_NUM_WINDOW = 64
+_SECOND_PERSON = re.compile(r"\byou(?:r|rs|'[a-z]+)?\b", re.IGNORECASE)
+_MONEY_CUE = re.compile(
+    r"\b(net worth|salar(?:y|ies)|incomes?|savings?|saved|portfolio|balances?|retirement|401k|ira|"
+    r"debts?|owe|owed|mortgages?|earn(?:ings?|ed)?|assets?|liabilit\w*|wealth|nest egg|cash|"
+    r"spend\w*|spent|budget|net pay|take[- ]home|paycheck|equity)\b",
+    re.IGNORECASE,
+)
+
+
+def _fabricated_personal_numbers(text: str, allowed: set[str]) -> set[str]:
+    """Ungrounded numbers that assert the USER'S OWN finances — the only thing the gate blocks.
+      * $-amounts → always gated (a dollar figure here is inherently a claim about the user's money),
+      * % / bare integer ≥100 → gated ONLY inside a personal-financial assertion window (2nd-person + a
+        money cue): "your savings rate is 23%", "you have 450000 saved" are caught, while
+        "a typical 401k match is ~4%", "~2000 kcal", "150g protein", "3 sets of 12" pass.
+    A grounded value (user-stated or a verified derivation, in `allowed`) always passes."""
+    blocked: set[str] = set()
+    for m in _FIN_NUM.finditer(text or ""):
+        tok = m.group(0)
+        norm = tok.strip().lstrip("$").rstrip("%").replace(",", "")
+        if not norm or norm in allowed:
+            continue
+        if tok.startswith("$"):
+            blocked.add(norm)  # dollar figures stay fully gated — the core trust guarantee
+            continue
+        lo, hi = max(0, m.start() - _NUM_WINDOW), min(len(text), m.end() + _NUM_WINDOW)
+        window = text[lo:hi]
+        if _SECOND_PERSON.search(window) and _MONEY_CUE.search(window):
+            blocked.add(norm)
+    return blocked
+
+
 def _pair_supported(a: str, b: str, pairs: set[frozenset[str]]) -> bool:
     """A cited {a, b} is real if it matches a connected pair — exact, or label-containment either way
     (the LLM may shorten 'Financial Independence' to 'retirement/financial' etc.)."""
@@ -172,20 +208,24 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     if _ADVICE.search(visible):
         reasons.append("contains advice/recommendation/medical-legal language")
 
-    # 2) No invented financial numbers — any financial-looking number must already be in context, OR be a
-    #    deterministically VERIFIED computation from the user's own numbers (V5 grounded math). The verifier
-    #    rejects any derivation with a non-user operand or wrong arithmetic, so a fabricated/incorrect figure
-    #    still never reaches the user — the guarantee widens from "user's own" to "user's own or verified".
+    # 2) No FABRICATED PERSONAL financial figures. (Scope decision 2026-06-23: the gate guards the user's
+    #    OWN money, not general knowledge.) A grounded number — already in context, OR a deterministically
+    #    VERIFIED computation from the user's own numbers (V5 grounded math) — always passes. Of the rest,
+    #    we block every ungrounded $-amount (a dollar figure here is inherently a claim about the user's
+    #    finances) plus any % / large bare integer inside a personal-financial assertion. General/benchmark/
+    #    coaching numbers (rep ranges, calories/macros, "typical ~4% match", "3-6 months of expenses") pass —
+    #    they make advice concrete without fabricating the user's personal figures.
     verified_vals, kept_derivs = verify_derivations(result.get("derivations"), context.allowed_numbers)
     allowed = context.allowed_numbers | verified_vals
-    used = _financial_numbers(visible)
-    invented = {n for n in used if n not in allowed}
+    invented = _fabricated_personal_numbers(visible, allowed)
     if invented:
         reasons.append(f"invented numbers not in context: {sorted(invented)}")
 
-    # 3) Must actually ask a question (discovery turns), unless it's a pure summary turn.
-    if not next_q and not summary:
-        reasons.append("no next_question and no summary")
+    # 3) A question is REQUIRED only when the advisor hasn't actually delivered an answer. A turn that gives
+    #    a substantive recommendation (a direct, concrete answer/plan) or a summary may stand without a
+    #    trailing question — this stops the advisor interrogating the user after it has already answered.
+    if not next_q and not summary and not recommendation:
+        reasons.append("no next_question, summary, or recommendation")
     # NOTE: a multi-question reply is REPAIRED (trimmed to the first question), not rejected — see below.
     # A single question that offers choices ("…sooner, liquidity, or wealth?") has one "?" and is untouched.
 

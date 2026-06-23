@@ -124,6 +124,63 @@ async def test_converse_context_panel_reflects_model():
     assert panel["life_vision"] and panel["primary_objective"] and "discovery_completion_pct" in panel
 
 
+# ---- Domain-scoped risk/opportunity chips: a HEALTH turn must not surface a FINANCE risk chip ----
+def _sb_with_mixed_domain_risks() -> FakeSupabase:
+    """Seed one active objective with risks/opportunities spanning several life domains, plus one risk
+    that carries NO domain (must never be hidden)."""
+    obj_id = "obj-1"
+    return FakeSupabase({
+        "life_objectives": [{"id": obj_id, "user_id": CTX.user_id, "title": "Stay healthy and secure",
+                             "status": "active", "confirmed": True, "confidence": 0.8}],
+        "risks": [
+            {"id": "r-h", "user_id": CTX.user_id, "objective_id": obj_id, "label": "Undetected chronic risk factors", "domain": "health"},
+            {"id": "r-f", "user_id": CTX.user_id, "objective_id": obj_id, "label": "Outliving your assets", "domain": "finance"},
+            {"id": "r-c", "user_id": CTX.user_id, "objective_id": obj_id, "label": "Skill obsolescence", "domain": "career"},
+            {"id": "r-x", "user_id": CTX.user_id, "objective_id": obj_id, "label": "Unknown-domain risk", "domain": None},
+        ],
+        "opportunities": [
+            {"id": "o-h", "user_id": CTX.user_id, "objective_id": obj_id, "label": "Employer wellness + HSA", "domain": "health"},
+            {"id": "o-f", "user_id": CTX.user_id, "objective_id": obj_id, "label": "Full employer 401(k) match", "domain": "finance"},
+        ],
+    })
+
+
+@pytest.mark.asyncio
+async def test_context_panel_scopes_risk_chips_to_focused_domain():
+    """A health-focused turn must NOT surface a finance/career risk chip, but must keep health + any
+    risk that carries no domain (we never drop a real risk just because it lacks a tag)."""
+    rm = _rm(_sb_with_mixed_domain_risks())
+    panel = await rm._context_panel(CTX, focus_domains=["health"])
+    risks = panel["top_risks"]
+    assert "Undetected chronic risk factors" in risks   # the in-domain risk is kept
+    assert "Unknown-domain risk" in risks               # unknown-domain risk is NOT hidden (conservative)
+    assert "Outliving your assets" not in risks         # finance risk is scoped out of a health turn
+    assert "Skill obsolescence" not in risks            # career risk is scoped out of a health turn
+    opps = panel["top_opportunities"]
+    assert "Employer wellness + HSA" in opps and "Full employer 401(k) match" not in opps
+
+
+@pytest.mark.asyncio
+async def test_context_panel_default_orchestrator_keeps_all_risks():
+    """The broad/default advisor (no domain focus) must keep the full whole-life risk list."""
+    rm = _rm(_sb_with_mixed_domain_risks())
+    panel = await rm._context_panel(CTX, focus_domains=None)
+    risks = set(panel["top_risks"])
+    assert {"Undetected chronic risk factors", "Outliving your assets", "Skill obsolescence"} <= risks
+
+
+def test_focus_domains_helper_broad_vs_focused():
+    from app.services.advisor_agents import focus_domains, get_agent
+    # Direct domain advisor → focused to its own domains.
+    assert focus_domains(get_agent("health_advisor"), "how do I get fit?") == ["health"]
+    # Orchestrator + a single-domain message → focused to that subset.
+    assert focus_domains(get_agent("relationship_manager"), "I have knee pain from the gym") == ["health"]
+    # Orchestrator + a broad/ambiguous message (no single domain) → None (sees everything).
+    assert focus_domains(get_agent("relationship_manager"), "what should I do with my life?") is None
+    # No agent → broad.
+    assert focus_domains(None, "anything") is None
+
+
 # ---- Sprint 43: the Discovery Reveal "magic moment" + warmer copy ----
 @pytest.mark.asyncio
 async def test_converse_returns_discovery_reveal():

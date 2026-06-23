@@ -22,12 +22,17 @@ export async function GET() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let rows: any[] = [];
   try {
+    // Align this list with the canonical summary, which counts ALL of a user's accounts
+    // (it does not filter is_active). Previously this filtered is_active=true, so rows with a
+    // null/false is_active were dropped here while still counting in the canonical totals —
+    // the "No accounts connected" vs non-zero Total Assets contradiction (Gap 2). Include any
+    // row that is not explicitly inactive (is_active is true OR null).
     const { data } = await sb
       .schema('finance')
       .from('financial_accounts')
-      .select('id, account_name, account_type, institution_name, current_balance')
+      .select('id, account_name, account_type, institution_name, current_balance, is_active')
       .eq('user_id', user.id)
-      .eq('is_active', true)
+      .or('is_active.is.null,is_active.eq.true')
       .order('current_balance', { ascending: false });
     rows = data || [];
   } catch {
