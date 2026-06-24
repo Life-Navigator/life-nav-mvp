@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,7 +32,11 @@ class Settings(BaseSettings):
     model_provider: str = "ai_studio"
     vertex_project: str = "gen-lang-client-0849161409"  # LifeNav GCP project (Vertex AI). Override via env.
     vertex_region: str = "us-central1"
-    vertex_gemini_model: str = "gemini-2.5-pro"
+    # Accept either VERTEX_GEMINI_MODEL or the shorter VERTEX_MODEL (deploy docs use the latter).
+    vertex_gemini_model: str = Field(
+        default="gemini-2.5-pro",
+        validation_alias=AliasChoices("VERTEX_GEMINI_MODEL", "VERTEX_MODEL", "vertex_gemini_model"),
+    )
 
     # --- Qdrant (grounding vectors) ---
     qdrant_url: str = ""

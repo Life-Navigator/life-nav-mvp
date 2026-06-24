@@ -78,3 +78,11 @@ target/
 # Coverage
 .coverage
 htmlcov/
+
+# GCP service-account keys (NEVER commit; runtime materializes to /tmp only)
+*-sa.json
+gcp-sa.json
+lifenav-model-runtime*.json
+service-account*.json
+*.sa.json
+*.b64
