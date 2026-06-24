@@ -346,7 +346,9 @@ class VertexClaudeAdvisorLLM:
         import httpx  # local import keeps module import-light and mirrors the gemini client's usage
         body = {
             "anthropic_version": "vertex-2023-10-16",
-            "max_tokens": 2048,
+            # 2048 truncated long plans (workout/nutrition/estate) → invalid JSON → fallback. The advisor
+            # JSON with a full plan can run larger; 4096 matches Gemini's effective output headroom.
+            "max_tokens": 4096,
             # NOTE: `temperature` is deprecated/rejected (HTTP 400) by newer Claude models (Opus 4.5+), which
             # manage sampling internally. Older models accepted it; omitting it is safe for all and avoids the
             # 400 → fallback. (Advisor JSON output stays well-formed without an explicit temperature.)
