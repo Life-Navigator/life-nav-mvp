@@ -30,7 +30,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from ..models.common import UserContext
-from .advisor_agents import focus_domains as _focus_domains, get_agent
+from .advisor_agents import ALL_LIFE_DOMAINS, focus_domains as _focus_domains, get_agent, route_domains
 from .advisor_context import AdvisorContextBuilder
 from .advisor_llm import AdvisorLLM, ADVISOR_PROMPT_VERSION
 from .advisor_validator import validate
@@ -175,13 +175,19 @@ def _compose(safe: dict[str, Any]) -> str:
 
 class AdvisorOrchestrator:
     def __init__(self, relationship_manager: Any, context_builder: AdvisorContextBuilder, llm: AdvisorLLM,
-                 *, enabled: bool = True, supabase: Any = None, router: Any = None) -> None:
+                 *, enabled: bool = True, supabase: Any = None, router: Any = None,
+                 hybrid_claude: Any = None, claude_domains: Any = None, claude_high_stakes_only: bool = True) -> None:
         self._rm = relationship_manager
         self._ctx = context_builder
         self._llm = llm
         self._enabled = enabled
         self._sb = supabase  # best-effort advisor-turn persistence (ops.advisor_turns)
         self._router = router  # optional ModelRouter; only used when MODEL_ROUTER_ENABLED (default off)
+        # Opus hybrid (flag-gated): a Claude LLM used as PRIMARY only for finance/health turns, with the
+        # DI Gemini as same-tier fallback. None → unchanged behavior. Default off.
+        self._hybrid_claude = hybrid_claude
+        self._claude_domains = set(claude_domains or ())
+        self._claude_high_stakes_only = claude_high_stakes_only
         self.prompt_version = ADVISOR_PROMPT_VERSION
 
     def _health_safety_check(self, message: str, base: dict[str, Any], tr: dict[str, Any]) -> bool:
@@ -214,8 +220,23 @@ class AdvisorOrchestrator:
                                     "turn_id": tr.get("turn_id"), "violations": violations}))
 
     def _route(self, ctx: UserContext, message: str, context_obj: Any, tr: dict[str, Any]) -> tuple[Any, Any]:
-        """Select (primary_llm, fallback_llm) for this turn. Default (router off) → the DI-provided single LLM,
-        so production behavior is unchanged. Never raises."""
+        """Select (primary_llm, fallback_llm) for this turn. Default → the DI-provided single LLM, so
+        production behavior is unchanged. Never raises."""
+        # Opus hybrid: route clearly finance/health turns to Claude, with Gemini as same-tier fallback.
+        if self._hybrid_claude is not None and self._claude_domains:
+            try:
+                routed = route_domains(message)
+                is_focused = len(routed) < len(ALL_LIFE_DOMAINS)  # a specific (not all-domain) hit
+                hits_claude = bool(set(routed) & self._claude_domains)
+                # high_stakes_only → require a focused finance/health turn (don't send ambiguous turns to Claude)
+                if hits_claude and (is_focused or not self._claude_high_stakes_only):
+                    tr["hybrid_route"] = {"to": "claude", "domains": routed,
+                                          "model": getattr(self._hybrid_claude, "model_name", "")}
+                    log.info(json.dumps({"event": "opus_hybrid_route", "turn_id": tr["turn_id"],
+                                         "domains": routed, "model": getattr(self._hybrid_claude, "model_name", "")}))
+                    return self._hybrid_claude, self._llm  # Claude primary, Gemini same-tier fallback
+            except Exception as e:  # noqa: BLE001 — hybrid routing must never break the turn
+                tr["hybrid_route_error"] = type(e).__name__
         if not (reg.flag("MODEL_ROUTER_ENABLED") and self._router is not None):
             return self._llm, None
         try:

@@ -346,7 +346,27 @@ def get_advisor_orchestrator(
         return None
 
     router = ModelRouter(_llm_factory)
-    return AdvisorOrchestrator(rm, builder, llm, enabled=enabled, supabase=supabase, router=router)
+
+    # Opus 4.8 HYBRID (flag-gated, default OFF): route clearly finance/health turns to Claude on Vertex,
+    # with the Gemini `llm` above as same-tier fallback. Distinct from USE_VERTEX_CLAUDE (whole-advisor swap).
+    hybrid_claude: Any = None
+    claude_domains: set[str] = set()
+    high_stakes_only = os.environ.get("CLAUDE_HIGH_STAKES_ONLY", "true").lower() in ("1", "true", "yes")
+    if os.environ.get("ENABLE_VERTEX_CLAUDE", "false").lower() in ("1", "true", "yes"):
+        from .clients.vertex_auth import AdcTokenProvider
+        static_tok = os.environ.get("VERTEX_ACCESS_TOKEN", "")
+        hybrid_claude = VertexClaudeAdvisorLLM(
+            project=os.environ.get("VERTEX_PROJECT", "") or settings.vertex_project,
+            region=os.environ.get("CLAUDE_REGION", "global"),   # Claude is served only on `global` for this project
+            model=os.environ.get("CLAUDE_MODEL", "claude-opus-4-8"),
+            token=static_tok,
+            token_provider=None if static_tok else AdcTokenProvider(),
+        )
+        claude_domains = {d.strip() for d in os.environ.get("CLAUDE_DOMAINS", "finance,health").split(",") if d.strip()}
+
+    return AdvisorOrchestrator(rm, builder, llm, enabled=enabled, supabase=supabase, router=router,
+                               hybrid_claude=hybrid_claude, claude_domains=claude_domains,
+                               claude_high_stakes_only=high_stakes_only)
 
 
 def get_recommendation_os(
