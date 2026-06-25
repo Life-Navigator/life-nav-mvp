@@ -83,7 +83,10 @@ class DiscoveryCoverageService:
                 "confidence_pct": min(95, coverage_pct) if coverage_pct else 0,
                 "has_objective": has_objective or has_goal,
                 "missing": missing_inputs[:5], "unlocks": spec["unlocks"],
-                "cta": "/dashboard/advisor" if missing_inputs or coverage_pct < 80 else None,
+                # Scope the CTA to the DOMAIN advisor so "Continue health discovery" opens the Health
+                # Advisor, not the generic Arcana orchestrator (CommandCenter reads ?agent=).
+                "cta": (f"/dashboard/advisor?agent={key}_advisor" if (missing_inputs or coverage_pct < 80)
+                        else None),
                 "source": "Advisor Discovery",
             })
 

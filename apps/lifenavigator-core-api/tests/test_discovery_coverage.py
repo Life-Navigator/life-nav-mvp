@@ -36,4 +36,6 @@ async def test_uncovered_domain_is_not_started_with_unlocks():
     out = await svc.coverage(CTX)
     health = next(d for d in out["domains"] if d["domain"] == "health")
     assert health["status"] == "not_started" and health["unlocks"] and health["cta"]
+    # CTA must open the HEALTH advisor (not the generic Arcana orchestrator)
+    assert health["cta"] == "/dashboard/advisor?agent=health_advisor"
     assert out["overall_coverage_pct"] == 0 and out["recommendation_quality"] == "Low"

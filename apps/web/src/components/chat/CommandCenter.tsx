@@ -269,7 +269,16 @@ export default function CommandCenter({
   initialInput?: string;
 }) {
   const [agents, setAgents] = useState<AgentInfo[]>(AGENT_FALLBACK);
-  const [selectedAgent, setSelectedAgent] = useState<string>(RELATIONSHIP_MANAGER);
+  // Honor a domain-scoped entry: /dashboard/advisor?agent=health_advisor (or ?domain=health) opens the
+  // matching domain advisor instead of the generic Arcana orchestrator. Falls back to RM if absent/invalid.
+  const [selectedAgent, setSelectedAgent] = useState<string>(() => {
+    if (typeof window === 'undefined') return RELATIONSHIP_MANAGER;
+    const sp = new URLSearchParams(window.location.search);
+    const dom = sp.get('domain');
+    const cand = sp.get('agent') || (dom ? `${dom}_advisor` : '');
+    const valid = new Set<string>([RELATIONSHIP_MANAGER, ...AGENT_FALLBACK.map((a) => a.id)]);
+    return cand && valid.has(cand) ? cand : RELATIONSHIP_MANAGER;
+  });
   const [projects, setProjects] = useState<Project[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
