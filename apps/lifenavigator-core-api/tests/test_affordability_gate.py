@@ -64,3 +64,20 @@ def test_hedged_affordability_allowed():
     # V4 hedged framing must still pass (not an advice-gate hit)
     for s in ["this looks affordable on your numbers", "this looks like a stretch on your numbers"]:
         assert not _ADVICE.search(s), f"hedged framing should pass: {s}"
+
+
+# ── ADVISOR_USEFULNESS: illustrative percentages must NOT be gated as personal claims ──
+def test_illustrative_raise_pct_allowed():
+    # career paralysis fix: a typical raise % near "pay" is illustrative, not a fabricated personal stat
+    assert "22" not in blk("A new role could lift your pay by about 22%.", [])
+
+def test_illustrative_return_pct_allowed():
+    assert "7" not in blk("A diversified portfolio has historically returned around 7% a year.", [])
+
+def test_withdrawal_rule_pct_allowed():
+    assert "4" not in blk("Many planners use a 4% withdrawal rule for your retirement income.", [])
+
+def test_personal_stat_pct_still_blocked():
+    # the dangerous ones stay gated
+    assert "28" in blk("Your DTI would be 28%.", [])
+    assert "85" in blk("Your retirement success probability is 85%.", [])

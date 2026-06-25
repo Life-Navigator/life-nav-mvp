@@ -125,6 +125,13 @@ _MONEY_CUE = re.compile(
     r"readiness|\bdti\b|debt[- ]to[- ]income)\b",
     re.IGNORECASE,
 )
+# A PERCENTAGE is gated as a fabricated personal stat ONLY when tied to one of these (a claim about the
+# user's own ratio/probability). General rate percentages (a 22% raise, a 7% return, 18% body fat) pass.
+_PERSONAL_STAT_PCT = re.compile(
+    r"\b(dti|debt[- ]to[- ]income|readiness|probabilit\w*|success rate|success probabilit\w*|"
+    r"odds of|chance of|savings rate|likelihood)\b",
+    re.IGNORECASE,
+)
 # A number near these reads as a benchmark or a labeled estimate/scenario (Tier 2/3) — NOT a fabricated
 # statement of the user's actual figure.
 _BENCHMARK_MARK = re.compile(
@@ -241,7 +248,16 @@ def _fabricated_personal_numbers(text: str, allowed: set[str], scenario: set[str
         # closing costs") from being mis-read as personal just because "your savings" is elsewhere in the
         # sentence. Benchmark/second-person cues use the wider window.
         tight = text[max(0, m.start() - _TIGHT_WINDOW): min(len(text), m.end() + _TIGHT_WINDOW)]
-        personal_holding = bool(_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight))
+        # PERCENTAGES are usually rates/illustrative (a 22% raise, a 4% withdrawal rule, 18% body fat, a 7%
+        # return) — NOT fabricated personal dollar totals. Blocking every % strangled useful career/finance/
+        # health guidance ("a new role could lift your pay ~22%"). So a % is gated ONLY when asserted as the
+        # user's personal STAT (DTI / readiness / success probability / savings rate); $-amounts and bare
+        # integers near a money cue stay gated as personal holdings. (ADVISOR_USEFULNESS)
+        is_percent = tok.rstrip().endswith("%")
+        if is_percent:
+            personal_holding = bool(_SECOND_PERSON.search(window) and _PERSONAL_STAT_PCT.search(tight))
+        else:
+            personal_holding = bool(_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight))
         if personal_holding:
             # Tier 1: a claim about the user's own money — must be grounded; a hedge word OR a benchmark
             # derivation does NOT excuse a possessive personal figure ("your tax bill will be $18,200").
@@ -476,7 +492,12 @@ def classify_issues(result: Any, context: AdvisorContext) -> list[dict[str, Any]
                                       f"don't invent one.",
             })
             continue
-        if _SECOND_PERSON.search(window) and _MONEY_CUE.search(tight):
+        # A % is a personal claim only when tied to a personal stat (DTI/readiness/probability); else it's
+        # an illustrative rate and passes. $-amounts/bare integers near a money cue stay gated.
+        _is_pct = tok.rstrip().endswith("%")
+        _personal = (_SECOND_PERSON.search(window) and _PERSONAL_STAT_PCT.search(tight)) if _is_pct \
+            else (_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight))
+        if _personal:
             seen.add(norm)
             issues.append({
                 "type": "unsupported_personal_number", "text": tok,

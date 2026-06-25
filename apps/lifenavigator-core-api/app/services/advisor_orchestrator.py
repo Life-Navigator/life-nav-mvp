@@ -304,10 +304,9 @@ class AdvisorOrchestrator:
     # Showing intake in response to a direct question reads as broken. Replace it with an honest,
     # counsel-framed holding reply and drop the discovery question-pin so the user isn't pinned to it.
     _COUNSEL_FALLBACK = (
-        "I want to give you a grounded answer here — not guess at numbers I can't stand behind. "
-        "The honest gap is that I don't yet have enough verified detail to be specific. Tell me a "
-        "little more about what you're weighing (or share the relevant figures), and I'll walk you "
-        "through the options and the tradeoffs."
+        "Let's get you a concrete answer. Tell me a bit more about what you're weighing — or share the "
+        "key numbers — and I'll lay out the options, the math, and the tradeoffs. I won't invent figures "
+        "I can't stand behind, but I'll give you the most useful read I can from what you provide."
     )
 
     def _apply_counsel_fallback(self, base: dict[str, Any]) -> None:
