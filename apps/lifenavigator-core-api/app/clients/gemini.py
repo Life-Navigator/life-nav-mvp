@@ -131,7 +131,7 @@ class VertexGeminiClient:
     provider = "vertex_gemini"
 
     def __init__(self, *, project: str, region: str, generation_model: str, token_provider: Any,
-                 timeout: float = 45.0) -> None:
+                 timeout: float = 120.0) -> None:
         self._project = project
         self._region = region or "us-central1"
         self._generation_model = generation_model
@@ -145,7 +145,9 @@ class VertexGeminiClient:
             region=settings.vertex_region,
             generation_model=settings.vertex_gemini_model or settings.gemini_generation_model,
             token_provider=token_provider,
-            timeout=max(settings.http_timeout_seconds, 45.0),
+            # Gemini 2.5 Pro is a slow reasoning model; advisor JSON over a large context can take 45-90s.
+            # 45s caused ReadTimeout -> None -> deterministic fallback in prod. 120s gives real headroom.
+            timeout=max(settings.http_timeout_seconds, 120.0),
         )
 
     @property
