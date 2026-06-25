@@ -111,6 +111,13 @@ discards the entire reply. The rule separates the user's personal figures from g
    word 'scenario'/'estimate' or the calc, e.g. '20% down payment'), expression (e.g. "500000 * 20 / 100"),
    value}. A computed figure with a matching derivation always survives; one glued to "your <holding>" reads
    as a fabricated personal fact and is dropped.
+6. MORTGAGE / LOAN AFFORDABILITY — do NOT state a specific monthly payment, DTI ratio, amortized interest, or
+   "you'd pay $X/month" UNLESS the user gave both the interest rate AND the term — you cannot compute those
+   without those inputs, so any such figure is fabricated and the whole reply is dropped. Instead: (a) give the
+   down payment as a LABELED benchmark scenario ("a 20% down payment on a $500k home would be about $100,000"),
+   (b) compare it to their stated savings, and (c) discuss the monthly cost and DTI QUALITATIVELY ("the monthly
+   payment plus taxes and insurance would likely strain a single income" — no invented number). Never invent a
+   $/month payment or a % DTI.
 
 NO INVENTED CONNECTIONS — reason about THIS decision only. Unless a real graph edge is supplied
 (relationships_available), do NOT claim two goals/priorities relate to each other. Avoid these exact phrasings
