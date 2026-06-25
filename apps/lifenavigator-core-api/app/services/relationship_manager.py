@@ -583,11 +583,14 @@ class RelationshipManager:
             res = await self.answer(ctx, pending_key, message)
             rec = res.get("recorded", {})
             candidate_goals = list(rec.get("candidate_goals") or [])
-            # P0.5: a goal can surface in ANY answer — while answering the risk/constraint question, or
-            # in a final open-ended reply ("I'm also considering going back to school"). Extract from every
-            # substantive message, not just the dedicated goal turn, so no stated goal is ever dropped.
+            # ONBOARDING INTERPRETER: a goal can surface in ANY answer (incl. the vision turn). Run the LLM
+            # interpreter on the message to get CLEAN, complete goals + a structured plan (north star, domains,
+            # values, prioritization question) — instead of the regex clause-splitter's fragments. The plan is
+            # reused below for the synthesis reflection + next question. Fail-safe: None → deterministic extract.
+            llm_plan = (rec.get("llm_plan") if isinstance(rec, dict) else None) or await self._interpret_plan(message)
             seen_goal = {str(g.get("goal", "")).lower() for g in candidate_goals}
-            for g in self._life.analyze_statement(message):
+            extracted = llm_plan["candidate_goals"] if llm_plan else self._life.analyze_statement(message)
+            for g in extracted:
                 gk = str(g.get("goal", "")).lower()
                 if gk and gk not in seen_goal:
                     seen_goal.add(gk)
@@ -630,8 +633,7 @@ class RelationshipManager:
                     "confidence_pct": round((rec.get("confidence") or 0) * 100),
                 }
             # LLM interpreter present → SYNTHESIZE (name the north star + pillars), don't parrot the raw words
-            # back or ask "did I capture that?". This is the onboarding-quality fix.
-            llm_plan = rec.get("llm_plan") if isinstance(rec, dict) else None
+            # back or ask "did I capture that?". (llm_plan was set during extraction above.)
             if llm_plan and llm_plan.get("candidate_goals"):
                 cg = llm_plan["candidate_goals"]
                 pillars = "; ".join(f"{i + 1}) {g['goal']}" for i, g in enumerate(cg[:6]))
