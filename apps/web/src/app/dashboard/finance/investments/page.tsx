@@ -301,6 +301,10 @@ export default function InvestmentPage() {
             dayChange?: number;
             dayChangePercent?: number;
             weight?: number;
+            // Optional market data: present only if the holdings source supplies it, else 0 (never faked).
+            peRatio?: number;
+            fiftyTwoWeekHigh?: number;
+            fiftyTwoWeekLow?: number;
           },
           index: number
         ) => ({

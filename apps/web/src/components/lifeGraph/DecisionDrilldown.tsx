@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { X, GitBranch, Loader2, FileText, ShieldCheck, AlertCircle, Sparkles } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 // Renders the REAL decision intelligence graph from /api/decision/graph (Core API
 // /v1/decision/workspace/graph) as an explainable lineage. No mock data — when the user has no decision
@@ -193,15 +194,7 @@ export default function DecisionDrilldown({
   );
 }
 
-function Empty({
-  icon: Icon,
-  title,
-  body,
-}: {
-  icon: React.ElementType;
-  title: string;
-  body: string;
-}) {
+function Empty({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-white/[0.03] ring-1 ring-white/5">
@@ -218,7 +211,7 @@ function prettyType(t: string) {
 }
 
 function group(nodes: RawDNode[]) {
-  const roleOf = (n: RawDNode): { role: string; icon: React.ElementType; color: string } => {
+  const roleOf = (n: RawDNode): { role: string; icon: LucideIcon; color: string } => {
     const t = (n.type || '').toLowerCase();
     if (t.includes('recommend'))
       return { role: 'Recommendations', icon: Sparkles, color: '#c084fc' };
@@ -231,7 +224,7 @@ function group(nodes: RawDNode[]) {
   };
   const map = new Map<
     string,
-    { role: string; icon: React.ElementType; color: string; nodes: RawDNode[] }
+    { role: string; icon: LucideIcon; color: string; nodes: RawDNode[] }
   >();
   for (const n of nodes) {
     const r = roleOf(n);

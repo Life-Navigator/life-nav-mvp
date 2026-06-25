@@ -16,6 +16,7 @@ import {
   Trophy,
   TrendingUp,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import TrustPrompt from '@/components/feedback/TrustPrompt';
 import RecommendationQualityPrompt from '@/components/feedback/RecommendationQualityPrompt';
 import ReturnIntentPrompt from '@/components/feedback/ReturnIntentPrompt';
@@ -89,7 +90,7 @@ function Sec({
   title,
   children,
 }: {
-  icon: React.ElementType;
+  icon: LucideIcon;
   title: string;
   children: React.ReactNode;
 }) {

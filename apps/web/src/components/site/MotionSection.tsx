@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState, type ElementType, type ReactNode } from 'react';
+import {
+  createElement,
+  useEffect,
+  useRef,
+  useState,
+  type ElementType,
+  type ReactNode,
+} from 'react';
 
 /**
  * Scroll-reveal wrapper. CRITICAL: content is VISIBLE by default. We only "arm"
@@ -47,9 +54,11 @@ export default function MotionSection({
     return () => io.disconnect();
   }, []);
 
-  return (
-    <Tag ref={ref} id={id} className={`reveal ${className}`} data-armed={armed} data-shown={shown}>
-      {children}
-    </Tag>
+  // `as` is a polymorphic element; rendering <Tag> directly collapses the full ElementType union's
+  // props to `never`. createElement sidesteps that JSX intersection while staying fully typed.
+  return createElement(
+    Tag,
+    { ref, id, className: `reveal ${className}`, 'data-armed': armed, 'data-shown': shown },
+    children
   );
 }

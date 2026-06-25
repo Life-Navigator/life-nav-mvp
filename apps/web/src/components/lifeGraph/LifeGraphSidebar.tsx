@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard,
   Compass,
@@ -24,7 +25,7 @@ import {
 
 const GROUPS: {
   title: string;
-  items: { label: string; href: string; icon: React.ElementType }[];
+  items: { label: string; href: string; icon: LucideIcon }[];
 }[] = [
   {
     title: 'Overview',
@@ -89,6 +90,7 @@ export default function LifeGraphSidebar({ active = 'Life Graph' }: { active?: s
             <div className="space-y-0.5">
               {g.items.map((it) => {
                 const isActive = it.label === active;
+                const Icon = it.icon;
                 return (
                   <Link
                     key={it.label}
@@ -99,7 +101,7 @@ export default function LifeGraphSidebar({ active = 'Life Graph' }: { active?: s
                         : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
                     }`}
                   >
-                    <it.icon
+                    <Icon
                       className={`h-4 w-4 ${isActive ? 'text-violet-300' : 'text-slate-500 group-hover:text-slate-300'}`}
                     />
                     {it.label}

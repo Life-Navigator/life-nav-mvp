@@ -1,6 +1,7 @@
 'use client';
 
 import { Activity, Link2, Clock, ZoomIn, ZoomOut, Maximize, RotateCcw } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { GraphMetrics } from '@/types/lifeGraph';
 
 function Metric({
@@ -9,7 +10,7 @@ function Metric({
   value,
   sub,
 }: {
-  icon: React.ElementType;
+  icon: LucideIcon;
   label: string;
   value: string;
   sub?: string;

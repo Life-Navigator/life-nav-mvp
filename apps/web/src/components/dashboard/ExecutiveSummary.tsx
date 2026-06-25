@@ -14,6 +14,7 @@ import {
   Heart,
   Loader2,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import ProvenanceBadge, { type Provenance } from '@/components/ui/ProvenanceBadge';
 
 // Executive summary — the trust-first dashboard hero. 100% real data from /api/life/my-life
@@ -39,6 +40,7 @@ interface MyLife {
     risks?: string[];
     opportunities?: string[];
     supporting_objectives?: string[];
+    constraints?: (string | { label: string; detail?: string | null })[];
   };
   life_readiness?: {
     overall?: number | null;
@@ -131,7 +133,7 @@ function SectionHead({
   title,
   tint,
 }: {
-  icon: React.ElementType;
+  icon: LucideIcon;
   title: string;
   tint: string;
 }) {
@@ -204,7 +206,7 @@ export default function ExecutiveSummary() {
   const hasDiscovery = ml?.has_discovery;
   // Constraints — prefer the top-level constraints[] (richest: label+detail); fall back to
   // what_matters_most.constraints. Deduped by label. Defensive: render only when non-empty.
-  const constraints = (
+  const constraints: { label: string; detail?: string | null }[] = (
     Array.isArray(ml?.constraints) && ml!.constraints!.length
       ? ml!.constraints!
       : toLabels(wm.constraints).map((label) => ({ label }))

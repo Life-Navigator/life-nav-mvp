@@ -1,6 +1,7 @@
 'use client';
 
 import { ShieldCheck, GitBranch, Calculator, Database } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type {
   LifeGraphNode,
   GraphRecommendation,
@@ -14,7 +15,7 @@ function Section({
   title,
   children,
 }: {
-  icon: React.ElementType;
+  icon: LucideIcon;
   title: string;
   children: React.ReactNode;
 }) {
