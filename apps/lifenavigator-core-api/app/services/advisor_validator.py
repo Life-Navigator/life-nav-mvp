@@ -14,7 +14,7 @@ import re
 from typing import Any
 
 from .advisor_context import AdvisorContext, _norm
-from .advisor_math import verify_derivations
+from .advisor_math import user_values, verify_derivations
 
 # Connective phrases that assert a relationship between two goals/objectives. If the LLM uses one, it must
 # cite a supporting edge — otherwise it is inventing graph reasoning and we reject it.
@@ -80,6 +80,8 @@ _ADVICE = re.compile(
     r"\btitle (?:the|your) (?:house|home|assets|property)\b|"
     # TAX (specific directives)
     r"\bfor tax purposes,? you should\b|\byou qualify for a tax\b|\byou should claim the\b|\bfile your taxes as\b|"
+    # AFFORDABILITY VERDICTS (definitive lending conclusions the advisor must NOT assert — hedge instead)
+    r"\byou (?:can|could|can't|cannot) afford\b|\byou qualif\w*|\byou(?:'re| are) (?:pre[- ]?)?approved\b|"
     # PRODUCT / SECURITY by name
     r"\binvest in (?:the )?\w+ (?:fund|etf)\b|\bbuy (?:shares of|stock in)\b|\byou should buy [A-Z]{1,5}\b"
     r")",
@@ -119,7 +121,8 @@ _SECOND_PERSON = re.compile(r"\byou(?:r|rs|'[a-z]+)?\b", re.IGNORECASE)
 _MONEY_CUE = re.compile(
     r"\b(net worth|salar(?:y|ies)|incomes?|savings?|saved|portfolio|balances?|retirement|401k|ira|"
     r"debts?|owe|owed|mortgages?|earn(?:ings?|ed)?|assets?|liabilit\w*|wealth|nest egg|cash|"
-    r"spend\w*|spent|budget|net pay|take[- ]home|paycheck|equity|tax(?:es|able)?|tax bill)\b",
+    r"spend\w*|spent|budget|net pay|take[- ]home|paycheck|equity|tax(?:es|able)?|tax bill|"
+    r"readiness|\bdti\b|debt[- ]to[- ]income)\b",
     re.IGNORECASE,
 )
 # A number near these reads as a benchmark or a labeled estimate/scenario (Tier 2/3) — NOT a fabricated
@@ -133,11 +136,60 @@ _BENCHMARK_MARK = re.compile(
 )
 
 
-def _fabricated_personal_numbers(text: str, allowed: set[str], scenario: set[str] | None = None) -> set[str]:
+# ── Bounded benchmark-derivation relaxation (AFFORDABILITY_GATE 2026-06-25) ────────────────────────────
+# A blocked $-figure may be auto-accepted ONLY if it equals a GROUNDED base × an APPROVED benchmark, the
+# math checks out, and the sentence makes no prohibited personal/affordability CLAIM. This lets "a 20% down
+# payment on a $500k home is $100,000" pass while still blocking fabricated mortgage payments / DTI / tax /
+# "you can afford". No broad regex bypass, no arbitrary percentages, no arbitrary math chains.
+_APPROVED_PCT = (20.0, 2.0, 3.0, 4.0, 5.0, 15.0)   # down 20; closing 2-5; withdrawal/match 4; savings target 15
+_FHA_PCT = 3.5                                       # only when "FHA" is in the sentence
+_RESERVE_MONTHS = (3.0, 4.0, 5.0, 6.0)              # emergency fund = months × stated monthly expense
+_PROHIBITED_CLAIM = re.compile(
+    r"\b(mortgage payment|monthly payment|loan payment|debt[- ]to[- ]income|DTI|tax bill|"
+    r"retirement (?:probability|success)|success (?:rate|probability)|readiness|"
+    r"you can afford|you qualif\w*|pre[- ]?approv\w*|\bapproved\b)\b",
+    re.IGNORECASE,
+)
+_MONTHLY_SUFFIX = re.compile(r"^\s*(?:/\s*mo(?:nth)?|per month|a month|monthly)\b", re.IGNORECASE)
+
+
+def _to_float(norm: str):
+    try:
+        return float(norm)
+    except (TypeError, ValueError):
+        return None
+
+
+def _benchmark_derivation_ok(value: float, window: str, after: str, grounded: set[float]) -> bool:
+    """True iff `value` is a bounded benchmark-derived figure of a grounded base — safe to pass."""
+    if _PROHIBITED_CLAIM.search(window):       # affordability/payment/DTI/tax claim → never auto-pass
+        return False
+    if _MONTHLY_SUFFIX.match(after):           # the figure itself is a $/month amount → payment-like → block
+        return False
+    pcts = list(_APPROVED_PCT)
+    if re.search(r"\bFHA\b", window):
+        pcts.append(_FHA_PCT)
+    for base in grounded:
+        if base <= 0:
+            continue
+        for p in pcts:
+            target = base * p / 100.0
+            if abs(value - target) <= max(1.0, target * 0.02):
+                return True
+        for mo in _RESERVE_MONTHS:
+            target = base * mo
+            if abs(value - target) <= max(1.0, target * 0.02):
+                return True
+    return False
+
+
+def _fabricated_personal_numbers(text: str, allowed: set[str], scenario: set[str] | None = None,
+                                 benchmark_out: set[str] | None = None) -> set[str]:
     """Return ungrounded numbers that are FABRICATED PERSONAL figures (the only thing the gate blocks),
     per the three-tier policy above. `allowed` = grounded/strict-verified (bypass all). `scenario` =
     benchmark/scenario-verified values (allowed EXCEPT inside a possessive personal claim)."""
     scenario = scenario or set()
+    grounded = user_values(allowed)  # float values of the user's own/verified numbers (benchmark bases)
     blocked: set[str] = set()
     for m in _FIN_NUM.finditer(text or ""):
         tok = m.group(0)
@@ -163,6 +215,14 @@ def _fabricated_personal_numbers(text: str, allowed: set[str], scenario: set[str
             # prose — the arithmetic checks out against a stated base; allow.
             continue
         elif tok.startswith("$") and not _BENCHMARK_MARK.search(window):
+            # Before blocking: a bounded benchmark-derivation of a grounded base (e.g. 20% of the stated
+            # $500k = $100,000) is safe to pass — math-verified, no prohibited claim. (AFFORDABILITY_GATE)
+            v = _to_float(norm)
+            after = text[m.end(): m.end() + 14]
+            if v is not None and _benchmark_derivation_ok(v, window, after, grounded):
+                if benchmark_out is not None:
+                    benchmark_out.add(norm)
+                continue
             # An unlabeled $ figure not tied to the user's state (e.g. an invented price) — fabricated.
             blocked.add(norm)
         # else: a benchmark (Tier 2), a labeled estimate/scenario (Tier 3), or a general/coaching number → allow
@@ -252,7 +312,8 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     #    they make advice concrete without fabricating the user's personal figures.
     strict_vals, scenario_vals, kept_derivs = verify_derivations(result.get("derivations"), context.allowed_numbers)
     allowed = context.allowed_numbers | strict_vals
-    invented = _fabricated_personal_numbers(visible, allowed, scenario_vals)
+    benchmark_derived: set[str] = set()
+    invented = _fabricated_personal_numbers(visible, allowed, scenario_vals, benchmark_derived)
     if invented:
         reasons.append(f"invented numbers not in context: {sorted(invented)}")
 
@@ -318,6 +379,10 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     # Only keep relationship citations that are real graph edges (the accept-path repair).
     safe["relationships_referenced"] = valid_citations
     safe["derivations"] = kept_derivs  # only the verified-correct computations survive
+    if benchmark_derived:
+        # Metadata (condition 7): figures that passed via the bounded benchmark-derivation relaxation —
+        # marked as benchmark-derived scenarios, NOT proven personal data.
+        safe["benchmark_derived"] = sorted(benchmark_derived)
     safe.setdefault("assumptions", [])
     safe.setdefault("missing_data", [])
     safe.setdefault("warnings", [])
