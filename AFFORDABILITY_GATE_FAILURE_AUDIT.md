@@ -1,0 +1,13 @@
+# AFFORDABILITY_GATE_FAILURE_AUDIT.md — Phase 1
+
+Live in-machine diagnosis (prod orchestrator, owner user). Each finance turn → `validate()` number gate.
+
+| Prompt                       | Blocked numbers                                       | Reason                                                                                                               | Should pass?                                                                                                        |
+| ---------------------------- | ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Can I afford $500k / $60k?   | 100000, 28, 3267 (earlier); 15000, 440000, 5000 (now) | model writes 20%-down ($100k), DTI (28%), monthly payment ($3,267), loan balance ($440k=500k−60k), closing ($15k=3%) | 100000/15000 YES (benchmark of $500k); 3267/28 NO (need rate+term); 440000 YES if labeled (user-number subtraction) |
+| Closing costs on $500k?      | (now passes)                                          | 2-5% of $500k                                                                                                        | YES                                                                                                                 |
+| $60k down vs emergency fund? | (now passes)                                          | qualitative + benchmark                                                                                              | YES                                                                                                                 |
+| What if I put 20% down?      | 400000                                                | loan = $500k−$100k (multi-step: 100k is itself derived)                                                              | borderline — a derivation chain                                                                                     |
+| FHA on $500k?                | 20 (artifact)                                         | stray %                                                                                                              | n/a                                                                                                                 |
+
+**Root causes:** (1) model writes benchmark/loan figures without labeling/derivations; (2) the gate (correctly) blocks ungrounded personal $. Safe to pass: a $-figure = grounded base × approved benchmark %, or a grounded ± grounded subtraction, when not a possessive/affordability claim.
