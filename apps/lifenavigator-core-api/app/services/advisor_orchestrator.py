@@ -160,6 +160,16 @@ def classify_fallback_cause(llm_status: str, last_error: str, reasons: list[str]
     return "repair_loop_exhausted"
 
 
+# The exact persisted columns of analytics.advisor_turns (migration 160_advisor_turns.sql). The insert is
+# whitelisted to these so transient telemetry keys (mode/routing/retries/observability) never 400 the row.
+_ADVISOR_TURNS_COLUMNS = (
+    "turn_id", "conversation_id", "user_id", "timestamp", "prompt_version", "llm_status", "validator_result",
+    "validator_reason", "validator_repairs", "fallback_used", "fallback_reason", "latency_ms", "stages_ms",
+    "prompt_tokens", "completion_tokens", "total_tokens", "graph_edges_available", "relationships_referenced",
+    "confidence", "user_message", "advisor_response", "llm_response_raw",
+)
+
+
 # Latency-aware routing tiers (item 4). DETERMINISTIC + conservative: high-risk turns (finance/health/legal,
 # numeric-sensitive, cross-domain) ALWAYS get the full supervised path; only clearly-trivial conversational
 # turns are eligible for the lighter fast path. Safety/validation is identical across tiers — the tier only
@@ -665,13 +675,13 @@ class AdvisorOrchestrator:
         # dict/list — PostgREST serializes the row to JSON, so they land as jsonb objects/arrays (NOT
         # double-encoded JSON strings).
         if self._sb is not None:
-            # New observability fields live in logs only — keep them OUT of the persisted row so we don't add
-            # columns the advisor_turns table doesn't have (the schema is the log line's, not these extras).
-            _drop = {"fallback_cause", "provider_called", "auth_token_available", "gate_that_blocked",
-                     "route_path", "domains", "llm_last_error", "repair_attempts", "agent", "model", "provider"}
-            row = {k: v for k, v in tr.items() if k not in _drop}
-            row["advisor_response"] = tr["advisor_response"][:4000]
-            row["llm_response_raw"] = (tr["llm_response_raw"] or "")[:8000]
+            # Persist ONLY the columns analytics.advisor_turns actually has (migration 160). tr accumulates
+            # many transient keys (mode, routing, llm_retry, model_fallback, repair_*, agent, model, provider,
+            # the new observability fields) that are NOT columns — inserting them returned 400 and silently
+            # dropped EVERY turn from the durable table. Whitelisting fixes it and survives future tr keys.
+            row = {k: tr.get(k) for k in _ADVISOR_TURNS_COLUMNS if k in tr}
+            row["advisor_response"] = (tr.get("advisor_response") or "")[:4000]
+            row["llm_response_raw"] = (tr.get("llm_response_raw") or "")[:8000]
             try:
                 import asyncio
                 task = asyncio.ensure_future(self._persist(row))
