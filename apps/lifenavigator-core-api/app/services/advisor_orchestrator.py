@@ -33,7 +33,7 @@ from ..models.common import UserContext
 from .advisor_agents import ALL_LIFE_DOMAINS, focus_domains as _focus_domains, get_agent, route_domains
 from .advisor_context import AdvisorContextBuilder
 from .advisor_llm import AdvisorLLM, ADVISOR_PROMPT_VERSION
-from .advisor_validator import validate
+from .advisor_validator import classify_issues, validate
 from . import model_registry as reg
 from .model_router import detect_health_urgent, health_safety_response
 
@@ -95,13 +95,31 @@ def build_constraints(base: dict[str, Any], context: Any) -> dict[str, Any]:
 
 
 def _is_repairable(reasons: list[str]) -> bool:
-    """V6: which validator rejections are worth a single targeted repair-retry. Only grounding misses
-    (ungrounded numbers / unsupported relationship claims) — NOT advice/medical/legal/tax overreach, which
-    must fall back rather than be coaxed into a rephrase."""
+    """Supervised-repair model (2026-06-25): ALL content failures are worth a repair attempt — ungrounded
+    numbers, unsupported relationships, AND advice/clinical/legal/tax/verdict overreach (the model is asked
+    to reframe as a checklist/hedge). Only a structurally malformed (non-JSON) output is not repairable.
+    The validator re-checks every repaired draft, so the trust floor is unchanged — repair never lets unsafe
+    content through; it just gives the model a chance to fix itself before a deterministic fallback."""
     txt = " ".join(reasons).lower()
-    if "advice" in txt or "medical" in txt or "legal" in txt:
+    if "not a json object" in txt:
         return False
-    return ("invented numbers" in txt) or ("relationship" in txt)
+    return bool(txt.strip())
+
+
+def _build_repair_note(issues: list[dict], reasons: list[str]) -> str:
+    """Render structured issues into a precise, per-item repair instruction for the model."""
+    if not issues:
+        return ("Your previous draft failed compliance review for: " + "; ".join(reasons) +
+                ". Keep all grounded content and fix those items, then return the full JSON again.")
+    lines = [f"{i + 1}. [{x['type']}] " + (f'"{x["text"]}": ' if x.get("text") else "") + x["repair_instruction"]
+             for i, x in enumerate(issues)]
+    return (
+        "Your draft was strong but a compliance reviewer flagged the items below. Keep ALL the good content "
+        "and the six-section structure; fix ONLY these specific items and return the full JSON again:\n"
+        + "\n".join(lines)
+        + "\nDo not introduce any new ungrounded personal number. Benchmarks and clearly-labeled scenarios "
+        "are encouraged."
+    )
 
 
 # Discovery/onboarding response contract — the phrases that mark advisor/consultant output. Discovery
@@ -329,30 +347,29 @@ class AdvisorOrchestrator:
                 return
             ok, safe, reasons = validate(out, context)
             lap("validate")
-            if not ok and _is_repairable(reasons):
-                # V6 graceful degradation: rather than drop a near-complete, high-quality reply to the generic
-                # opener over one ungrounded number, give the model ONE targeted chance to remove the specific
-                # offending items and re-validate. The repaired output passes through the SAME validator — this
-                # is resilience (keep the grounded counsel), not a weaker gate.
+            # SUPERVISED REPAIR LOOP (max 2 attempts): the model produced a strong draft; the validator is the
+            # supervisor. On failure we send STRUCTURED, per-issue repair instructions and let the model revise,
+            # re-validating each time. The SAME gate checks every draft, so nothing unsafe slips through — this
+            # turns "block → dumb fallback" into "block → guided fix → safe answer". (ADVISOR_SUPERVISION)
+            _MAX_REPAIRS = 2
+            attempt = 0
+            while (not ok) and _is_repairable(reasons) and attempt < _MAX_REPAIRS:
+                attempt += 1
+                issues = classify_issues(out, context)
                 repair_plan = dict(constraints)
-                repair_plan["repair_note"] = (
-                    "Your previous draft was rejected for: " + "; ".join(reasons) + ". Return the SAME "
-                    "six-section answer, keeping all grounded content, but fix each flagged number ONE of "
-                    "three ways: (a) if it computes from a stated/benchmark figure, add a `derivations` entry "
-                    "{label (include 'scenario'/'estimate' or the calc name, e.g. '20% down payment'), "
-                    "expression (e.g. \"500000 * 20 / 100\"), value}; (b) rephrase it as a STANDALONE labeled "
-                    "illustration with a hedge ('a 20% down payment is about $100,000', 'roughly $21,000/yr') "
-                    "— never glued to a possessive holding like 'your salary, that's $21,000'; or (c) state it "
-                    "qualitatively ('a larger down payment', 'several months of expenses'). Do not assert any "
-                    "figure as the user's actual net worth, payment, tax, or balance unless they gave it.")
-                out2 = await active.generate(context, repair_plan)
-                tr["repair_retry"] = True
-                if out2 is not None:
-                    ok2, safe2, reasons2 = validate(out2, context)
-                    if ok2:
-                        ok, safe, reasons = ok2, safe2, reasons2
-                        tr["validator_result"] = "repaired_retry"
-                lap("repair")
+                repair_plan["repair_note"] = _build_repair_note(issues, reasons)
+                out_r = await active.generate(context, repair_plan)
+                tr["repair_attempts"] = attempt
+                tr["repair_retry"] = True  # back-compat flag
+                if out_r is None:
+                    break
+                out = out_r
+                ok, safe, reasons = validate(out, context)
+                if ok:
+                    tr["validator_result"] = f"repaired_attempt_{attempt}"
+                    tr["llm_response_raw"] = getattr(active, "last_raw", "") or ""
+                    break
+            lap("repair")
             if not ok:
                 base["llm_status"] = "fallback:" + ("; ".join(reasons))[:140]
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"], tr["validator_reason"] = (

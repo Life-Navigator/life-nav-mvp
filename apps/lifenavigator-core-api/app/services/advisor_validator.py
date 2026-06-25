@@ -160,6 +160,42 @@ def _to_float(norm: str):
         return None
 
 
+def _visible_text(result: Any) -> str:
+    """The user-visible prose across all rendered sections — the canonical text the gate inspects."""
+    if not isinstance(result, dict):
+        return ""
+    tradeoffs = result.get("tradeoffs") or []
+    tradeoff_text = " ".join(
+        f"{(t or {}).get('option', '')} {(t or {}).get('benefit', '')} {(t or {}).get('cost', '')}"
+        for t in tradeoffs if isinstance(t, dict)
+    )
+    know = " ".join(str(x) for x in (result.get("what_we_know") or []) if x)
+    need = " ".join(str(x) for x in (result.get("what_we_still_need") or []) if x)
+    return " ".join([
+        str(result.get("decision_frame") or ""), tradeoff_text, know,
+        str(result.get("recommendation") or ""), need, str(result.get("reflection") or ""),
+        str(result.get("next_question") or ""), str(result.get("why_this_question") or ""),
+        str(result.get("summary") or ""),
+    ])
+
+
+def _is_benchmark_fraction(value: float, grounded: set[float]) -> bool:
+    """Pure-math check: is `value` a benchmark fraction/multiple of a grounded base? (No window/claim checks —
+    used to tell the model 'this is benchmark math, just LABEL it' vs 'this is fabricated, remove it')."""
+    for base in grounded:
+        if base <= 0:
+            continue
+        for p in (*_APPROVED_PCT, _FHA_PCT):
+            t = base * p / 100.0
+            if abs(value - t) <= max(1.0, t * 0.02):
+                return True
+        for mo in _RESERVE_MONTHS:
+            t = base * mo
+            if abs(value - t) <= max(1.0, t * 0.02):
+                return True
+    return False
+
+
 def _benchmark_derivation_ok(value: float, window: str, after: str, grounded: set[float]) -> bool:
     """True iff `value` is a bounded benchmark-derived figure of a grounded base — safe to pass."""
     if _PROHIBITED_CLAIM.search(window):       # affordability/payment/DTI/tax claim → never auto-pass
@@ -297,7 +333,8 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     know = " ".join(str(x) for x in (result.get("what_we_know") or []) if x)
     need = " ".join(str(x) for x in (result.get("what_we_still_need") or []) if x)
     recommendation = str(result.get("recommendation") or "").strip()  # V4: grounded advice, still number-gated
-    visible = " ".join([frame, tradeoff_text, know, recommendation, need, reflection, next_q, why_q, summary])
+    visible = _visible_text(result)
+    _ = (frame, tradeoff_text, know, need, reflection, why_q)  # retained for readability; visible is canonical
 
     # 1) No final advice / recommendation / medical-legal-tax overreach.
     if _ADVICE.search(visible):
@@ -387,3 +424,92 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     safe.setdefault("missing_data", [])
     safe.setdefault("warnings", [])
     return True, safe, []
+
+
+def classify_issues(result: Any, context: AdvisorContext) -> list[dict[str, Any]]:
+    """Supervised-repair feedback: structured, per-issue repair instructions for a rejected draft.
+
+    Each issue = {type, text, reason, repair_instruction}. The orchestrator turns these into a precise
+    repair note so the model fixes ONLY the flagged spans (label a scenario, drop an un-computable payment,
+    reframe a verdict) rather than regenerating blind. This does NOT change what the gate blocks — it only
+    explains how to fix it. (ADVISOR_SUPERVISION 2026-06-25)
+    """
+    issues: list[dict[str, Any]] = []
+    visible = _visible_text(result)
+    if _ADVICE.search(visible):
+        issues.append({
+            "type": "advice_or_clinical_boundary", "text": "",
+            "reason": "Contains a clinical/legal/tax directive, a named investment product, or a definitive "
+                      "affordability/lending verdict ('you can afford', 'you qualify', 'approved').",
+            "repair_instruction": "Remove the directive/verdict. Instead give a checklist or a hedged read "
+                                  "('on these numbers this looks like a stretch') and defer the specific "
+                                  "legal/tax/medical/product decision to the right licensed professional.",
+        })
+    strict, scenario, _kept = verify_derivations(result.get("derivations"), context.allowed_numbers)
+    allowed = set(context.allowed_numbers) | strict
+    grounded = user_values(allowed)
+    seen: set[str] = set()
+    for m in _FIN_NUM.finditer(visible):
+        tok = m.group(0)
+        norm = tok.strip().lstrip("$").rstrip("%").replace(",", "")
+        if not norm or norm in allowed or norm in scenario or norm in seen:
+            continue
+        if re.match(r"\(?[kb]\)", visible[m.end(): m.end() + 3], re.IGNORECASE):
+            continue
+        window = visible[max(0, m.start() - _NUM_WINDOW): min(len(visible), m.end() + _NUM_WINDOW)]
+        tight = visible[max(0, m.start() - _TIGHT_WINDOW): min(len(visible), m.end() + _TIGHT_WINDOW)]
+        after = visible[m.end(): m.end() + 14]
+        v = _to_float(norm)
+        # Skip numbers that actually PASS (benchmark-derivation auto-accept).
+        if v is not None and not (_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight)) \
+                and _benchmark_derivation_ok(v, window, after, grounded):
+            continue
+        # Monthly mortgage/loan payment — check FIRST so it gets the precise "needs rate+term" guidance
+        # (even though it's also a possessive personal figure).
+        if tok.startswith("$") and (_MONTHLY_SUFFIX.match(after)
+                                    or re.search(r"\b(?:mortgage|monthly|loan) payment\b", window, re.IGNORECASE)):
+            seen.add(norm)
+            issues.append({
+                "type": "unsupported_monthly_payment", "text": tok,
+                "reason": "A monthly mortgage/loan payment needs an interest RATE and TERM the user didn't give.",
+                "repair_instruction": f"Remove {tok}. Say the monthly payment depends on the rate and term; "
+                                      f"don't invent one.",
+            })
+            continue
+        if _SECOND_PERSON.search(window) and _MONEY_CUE.search(tight):
+            seen.add(norm)
+            issues.append({
+                "type": "unsupported_personal_number", "text": tok,
+                "reason": "Stated as the user's ACTUAL figure (net worth / balance / DTI / readiness / tax) "
+                          "without grounding.",
+                "repair_instruction": f"Do NOT state {tok} as the user's figure. Remove it or reframe "
+                                      f"qualitatively; only assert numbers the user actually gave.",
+            })
+            continue
+        if not tok.startswith("$"):
+            continue  # bare % benchmarks etc. are allowed unless personal (handled above)
+        seen.add(norm)
+        if v is not None and _is_benchmark_fraction(v, grounded):
+            issues.append({
+                "type": "unlabeled_scenario_math", "text": tok,
+                "reason": "This is benchmark math on a stated amount but isn't clearly labeled as a scenario "
+                          "(or sits next to a payment/affordability claim).",
+                "repair_instruction": f"Keep {tok} but present it as a STANDALONE labeled scenario, e.g. "
+                                      f"'as a scenario, 20% down on $500,000 is about {tok}', in its own "
+                                      f"sentence — not glued to a possessive holding or a payment claim.",
+            })
+        else:
+            issues.append({
+                "type": "fabricated_number", "text": tok,
+                "reason": "Ungrounded dollar figure not traceable to the user's own numbers.",
+                "repair_instruction": f"Remove {tok}, or compute it ONLY from the user's own numbers "
+                                      f"(e.g. $500,000 − $60,000) and record that in `derivations`.",
+            })
+    rel_reasons, _valid = _check_relationships(result, context, visible)
+    for r in rel_reasons:
+        issues.append({
+            "type": "unsupported_relationship", "text": "", "reason": r,
+            "repair_instruction": "Only claim a connection between two goals if it's in the user's graph; "
+                                  "otherwise remove the connection and discuss the single decision directly.",
+        })
+    return issues
