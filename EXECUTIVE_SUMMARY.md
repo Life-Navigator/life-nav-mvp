@@ -75,3 +75,34 @@ No deploy performed. Deliverables: VERTEX_ADC_LIVE_VALIDATION · MODEL_RUNTIME_P
 ## Next decision (informed by the live run)
 
 Gemini 2.5 Pro is strong on coaching/qualitative (workout, health) but its finance answers are blocked by the number gate, not by quality. Turning on **Claude via Vertex** would face the _same_ gate, so it is **not** a fix for the finance gap on its own. The finance gap is closed by a gate-policy decision (allow labeled benchmark %/ratios in a personal context) — separate from the model choice. Recommend: (a) approve the finance-gate refinement, then (b) optionally A/B Claude on finance/health for qualitative lift.
+
+---
+
+# Vertex WIF Production Deploy (2026-06-24)
+
+## Status: PRODUCTION LIVE on keyless Workload Identity Federation
+
+The advisor's production model auth now runs on **Vertex AI + Gemini 2.5 Pro via Workload Identity Federation** — **no API key, no service-account key** (org policy blocks both; WIF satisfies it).
+
+### Proven live in the Fly machine
+
+Fly OIDC (`/.fly/api`) → GCP STS → impersonate `lifenav-model-runtime` → Gemini 2.5 Pro → `VERTEX_OK` (`provider=vertex_gemini`). healthz green; rolling deploy healthy.
+
+### Built/created
+
+- WIF pool `lifenav-fly` + OIDC provider `fly-oidc` (issuer `https://oidc.fly.io/timothy-riffe`, audience `lifenav-vertex-prod`, app-scoped attribute condition).
+- SA bound via `roles/iam.workloadIdentityUser` to the app principalSet; 0 keys.
+- Runtime `external_account` bootstrap + Fly-OIDC token minting (`vertex_auth.py`); 657 tests.
+- Deployed core-api (image `deployment-01KVY5JHT5…`); WIF env set; Claude hybrid OFF.
+
+### Security
+
+Keyless, least-privilege, no secrets in git or on disk, loud fallback. SA key creation blocked by org policy (correct) — WIF is the compliant answer.
+
+### Remaining
+
+- Full authenticated UI/domain smoke + screenshots (model path verified; per-surface walk pending).
+- Reconcile branch → main (clean FF) for Vercel/web.
+- Opus 4.8: enable later after quota + streaming + seeded benchmark.
+
+10 deliverables: ENVIRONMENT_DISCOVERY, AUTH_VERIFICATION, WIF_CONFIGURATION, SERVICE_ACCOUNT_CONFIGURATION, VERTEX_RUNTIME_CONFIGURATION, FLY_CONFIGURATION, CLAUDE_HYBRID_VERIFICATION, PRODUCTION_SMOKE_REPORT, SECURITY_AUDIT, EXECUTIVE_SUMMARY.
