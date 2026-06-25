@@ -106,3 +106,19 @@ Keyless, least-privilege, no secrets in git or on disk, loud fallback. SA key cr
 - Opus 4.8: enable later after quota + streaming + seeded benchmark.
 
 10 deliverables: ENVIRONMENT_DISCOVERY, AUTH_VERIFICATION, WIF_CONFIGURATION, SERVICE_ACCOUNT_CONFIGURATION, VERTEX_RUNTIME_CONFIGURATION, FLY_CONFIGURATION, CLAUDE_HYBRID_VERIFICATION, PRODUCTION_SMOKE_REPORT, SECURITY_AUDIT, EXECUTIVE_SUMMARY.
+
+---
+
+# Advisor Supervision Sprint (2026-06-25) — compliance moved to a repair loop
+
+## Status: SUPERVISED_ADVISOR_READY
+
+Replaced "muzzle gate → dumb fallback" with "strong answer → validator supervises → structured 2-attempt repair → safe answer". The validator is unchanged in WHAT it blocks (trust floor intact); it now also explains HOW to fix, and the model revises before any fallback.
+
+- `classify_issues()` → structured per-issue repair instructions (label scenario / drop un-computable payment / reframe verdict / derive-or-remove).
+- Orchestrator: ≤2 guided repairs, re-validated each time; all content failures repairable (advice/verdict included); only malformed output isn't.
+- **Live prod replay: 6/6 ENHANCED** incl. "Can I afford a $500k home" (was always fallback) — self-repaired. 680 tests pass.
+- Trust floor verified intact: fabricated payment/DTI/tax/net-worth, clinical/legal directives, named products, ungrounded relationships still blocked.
+- Tradeoff: repaired turns ~59-77s (extra generation); streaming masks first-text.
+
+12 deliverables: ADVISOR_SUPERVISION_PIPELINE_AUDIT, VALIDATOR_ROLE_DEFINITION, VALIDATION_FAILURE_SCHEMA, ADVISOR_REPAIR_LOOP_IMPLEMENTATION, ADVISOR_PROMPT_REDESIGN, FINANCE/HEALTH/LEGAL_REPAIR_LOOP_VALIDATION, SUPERVISED_RESPONSE_UX_REPORT, SUPERVISION_TEST_REPORT, SUPERVISED_ADVISOR_LIVE_REPLAY, EXECUTIVE_SUMMARY.
