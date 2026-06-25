@@ -11,6 +11,14 @@ export interface SendResult {
   reasoning?: unknown; // {tradeoffs, what_we_know, what_we_still_need} — for the evidence drawer
   goals?: string[]; // relevant goal chips (candidate_goals)
   risks?: string[]; // detected risk chips (context_panel.top_risks)
+  // RELEASE_HARDENING observability passthrough (item 1/2) — lets the live regression + dashboards confirm
+  // the LLM actually ran on the deployed non-root path and attribute any fallback to a cause.
+  model?: string;
+  provider?: string;
+  provider_called?: boolean;
+  fallback_cause?: string;
+  route_path?: string;
+  latency_ms?: number;
 }
 
 /**
@@ -84,5 +92,11 @@ export async function sendAdvisorTurn(args: {
     reasoning,
     goals,
     risks,
+    model: typeof turn.model === 'string' ? turn.model : undefined,
+    provider: typeof turn.provider === 'string' ? turn.provider : undefined,
+    provider_called: typeof turn.provider_called === 'boolean' ? turn.provider_called : undefined,
+    fallback_cause: typeof turn.fallback_cause === 'string' ? turn.fallback_cause : undefined,
+    route_path: typeof turn.route_path === 'string' ? turn.route_path : undefined,
+    latency_ms: typeof turn.latency_ms === 'number' ? turn.latency_ms : undefined,
   };
 }
