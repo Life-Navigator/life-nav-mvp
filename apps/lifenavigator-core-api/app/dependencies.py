@@ -271,8 +271,22 @@ def get_life_bridge(supabase: SupabaseClient = Depends(get_supabase)) -> LifeBri
     return LifeBridgeService(supabase, LifeDiscoveryService(supabase))
 
 
-def get_relationship_manager(supabase: SupabaseClient = Depends(get_supabase)) -> RelationshipManager:
-    return RelationshipManager(supabase, LifeDiscoveryService(supabase), LifeBridgeService(supabase, LifeDiscoveryService(supabase)))
+def get_relationship_manager(supabase: SupabaseClient = Depends(get_supabase),
+                             settings: Settings = Depends(get_settings)) -> RelationshipManager:
+    # Onboarding interpreter LLM — same proven path as the advisor (Vertex/WIF in prod). Optional + fail-safe:
+    # if it can't be built or is unavailable, the RelationshipManager falls back to deterministic extraction.
+    gem = None
+    try:
+        if settings.model_provider.lower() == "vertex":
+            from .clients.gemini import VertexGeminiClient
+            from .clients.vertex_auth import AdcTokenProvider
+            gem = VertexGeminiClient.from_settings(settings, AdcTokenProvider())
+        else:
+            gem = get_gemini(settings)
+    except Exception:  # noqa: BLE001 — interpreter is an enhancement; never block discovery construction
+        gem = None
+    return RelationshipManager(supabase, LifeDiscoveryService(supabase),
+                               LifeBridgeService(supabase, LifeDiscoveryService(supabase)), gemini=gem)
 
 
 def get_advisor_orchestrator(

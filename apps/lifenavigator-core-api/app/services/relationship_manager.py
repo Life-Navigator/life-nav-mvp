@@ -11,6 +11,7 @@ Flow:  Advisor Chat → Relationship Manager Discovery → Supabase (life.*) →
 """
 from __future__ import annotations
 
+import json
 import re
 import uuid
 from typing import Any, Optional
@@ -70,10 +71,11 @@ _GOAL_ROOT_HINT = {"family": "family_stability", "career": "career_growth", "fin
 
 
 class RelationshipManager:
-    def __init__(self, supabase: Any, life: Any, bridge: Any = None) -> None:
+    def __init__(self, supabase: Any, life: Any, bridge: Any = None, gemini: Any = None) -> None:
         self._sb = supabase
         self._life = life          # LifeDiscoveryService — canonical writer
         self._bridge = bridge      # LifeBridge — folds in setup-wizard/persona data
+        self._gemini = gemini      # onboarding interpreter LLM (optional; fail-safe to deterministic extract)
         from app.services.domain_projection import DomainProjectionService
         self._projection = DomainProjectionService(supabase)  # discovery goals → domain tables
 
@@ -167,6 +169,100 @@ class RelationshipManager:
                 "supporting_quote": r.get("supporting_quote"), "confidence": r.get("confidence"),
             })
         return out
+
+    # ── Onboarding INTERPRETER (LLM) — turn a natural-language paragraph into a clean structured plan ─────
+    # Converts intent into: north star, complete human-readable goals (mapped to a domain), values, an
+    # explicit deprioritized list, a synthesis line, and ONE sharp prioritization question. Replaces the
+    # regex clause-splitter (which produced fragments like "get my financial"). Fail-safe: returns None on
+    # any error → callers fall back to the deterministic extractor. NEVER fabricates facts/numbers/goals.
+    _VALID_DOMAINS = {"family", "finance", "health", "career", "education"}
+    _INTERP_SYSTEM = (
+        "You are LifeNavigator's onboarding interpreter. Convert the user's message into a clean, structured "
+        "life plan. RULES: (1) Extract COMPLETE, human-readable goals — never sentence fragments or partial "
+        "clauses (e.g. NOT 'get my financial'; YES 'Build a stronger financial foundation'). (2) Map each goal "
+        "to exactly one domain from: family, finance, health, career, education. (3) Identify the north star "
+        "(one sentence), the time horizon, the core values/drivers, and any domains the user EXPLICITLY "
+        "deprioritized. (4) Write a warm 1-2 sentence synthesis that NAMES the north star and the pillars — do "
+        "NOT echo their raw words back, and do NOT ask 'did I capture that?'. (5) Write ONE sharp prioritization "
+        "question to ask next — not a generic 'what do you want', and not a premature 'which goal would you "
+        "postpone'. Do NOT invent facts, numbers, names, or goals the user didn't state or clearly imply. "
+        "Return STRICT JSON only — no markdown, no prose."
+    )
+
+    @staticmethod
+    def _parse_json(raw: str) -> Optional[dict[str, Any]]:
+        s = (raw or "").strip()
+        if s.startswith("```"):
+            s = re.sub(r"^```[a-zA-Z]*\n?|\n?```$", "", s).strip()
+        i, j = s.find("{"), s.rfind("}")
+        if i == -1 or j == -1 or j < i:
+            return None
+        try:
+            d = json.loads(s[i:j + 1])
+            return d if isinstance(d, dict) else None
+        except Exception:  # noqa: BLE001
+            return None
+
+    async def _interpret_plan(self, statement: str) -> Optional[dict[str, Any]]:
+        g = self._gemini
+        text = (statement or "").strip()
+        if not g or not getattr(g, "configured", False) or len(text.split()) < 6:
+            return None  # no LLM, or too short to be a paragraph → use the deterministic path
+        user = (
+            f'User message:\n"""{text[:1500]}"""\n\nReturn JSON exactly with this shape:\n'
+            '{"north_star": str, "time_horizon": str, '
+            '"goals": [{"goal": "a complete sentence", "domain": "family|finance|health|career|education", '
+            '"status": "active|future", "confidence": 0.0}], '
+            '"values": [str], "deprioritized_domains": ["domain"], "synthesis": str, "next_question": str}'
+        )
+        try:
+            raw, _ = await g.generate_with_usage(self._INTERP_SYSTEM, user, temperature=0.2)
+        except AttributeError:
+            try:
+                raw = await g.generate(self._INTERP_SYSTEM, user, temperature=0.2)
+            except Exception:  # noqa: BLE001
+                return None
+        except Exception:  # noqa: BLE001
+            return None
+        data = self._parse_json(raw)
+        if not data:
+            return None
+        cand: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for go in (data.get("goals") or []):
+            if not isinstance(go, dict):
+                continue
+            label = str(go.get("goal") or "").strip()
+            if len(label.split()) < 2 or label.lower() in seen:
+                continue
+            seen.add(label.lower())
+            dom = str(go.get("domain") or "").strip().lower()
+            if dom in ("wellness", "fitness", "health & wellness", "health and wellness"):
+                dom = "health"
+            if dom not in self._VALID_DOMAINS:
+                dom = _goal_domain(label)
+            try:
+                conf = round(min(1.0, max(0.0, float(go.get("confidence") or 0.7))), 2)
+            except (TypeError, ValueError):
+                conf = 0.7
+            cand.append({
+                "goal": label, "objective": label, "objective_key": None, "confidence": conf,
+                "status": "future_goal" if str(go.get("status", "")).lower().startswith("future") else "active",
+                "supporting_quotes": [text[:300]], "supporting_statements": [text[:300]],
+                "dependencies": [], "domain": dom,
+            })
+        if not cand:
+            return None  # nothing usable → deterministic fallback
+        return {
+            "candidate_goals": cand,
+            "north_star": str(data.get("north_star") or "").strip(),
+            "time_horizon": str(data.get("time_horizon") or "").strip(),
+            "values": [str(v).strip() for v in (data.get("values") or []) if str(v).strip()][:6],
+            "deprioritized_domains": [str(d).strip().lower() for d in (data.get("deprioritized_domains") or [])
+                                      if str(d).strip().lower() in self._VALID_DOMAINS],
+            "synthesis": str(data.get("synthesis") or "").strip(),
+            "next_question": str(data.get("next_question") or "").strip(),
+        }
 
     async def _has_financial_data(self, ctx: UserContext) -> bool:
         """True when the user has connected/persona financial accounts (so we don't re-ask the numbers)."""
@@ -315,15 +411,24 @@ class RelationshipManager:
             written["confidence"] = res.get("confidence")
             # V3 Sprint 2/8: a single answer may hold several goals — capture ALL candidates (each with
             # confidence + conversation-derived dependencies), never collapsed to one.
-            written["candidate_goals"] = self._life.analyze_statement(ans)
-            # Narrative Model: preserve the user's OWN words + a deterministic multi-domain summary,
-            # stored separately from objectives so the story is never collapsed into one objective.
+            # LLM interpreter first (clean, complete goals + a north star). Fall back to the deterministic
+            # clause extractor only if the LLM is unavailable or returns nothing usable.
+            plan = await self._interpret_plan(ans)
+            written["candidate_goals"] = plan["candidate_goals"] if plan else self._life.analyze_statement(ans)
+            written["llm_plan"] = plan
+            # Narrative Model: preserve the user's OWN words + a multi-domain summary (the LLM north star when
+            # available, else a deterministic domain rollup), stored separately so the story isn't collapsed.
             if key == "primary_goal":
-                domains = sorted({_goal_domain(g.get("goal") or "") for g in (written["candidate_goals"] or [])} - {"core"})
-                horizon = "the next 1–2 years" if any(m in ans.lower() for m in
-                          ("year", "month", "wedding", "soon", "promotion")) else None
-                summary = ("You're building across " + ", ".join(domains) if domains
-                           else "You're working toward several goals") + (f" over {horizon}" if horizon else "") + "."
+                if plan and plan.get("north_star"):
+                    summary = plan["north_star"]
+                    if plan.get("time_horizon"):
+                        summary = f"{summary} ({plan['time_horizon']})"
+                else:
+                    domains = sorted({_goal_domain(g.get("goal") or "") for g in (written["candidate_goals"] or [])} - {"core"})
+                    horizon = "the next 1–2 years" if any(m in ans.lower() for m in
+                              ("year", "month", "wedding", "soon", "promotion")) else None
+                    summary = ("You're building across " + ", ".join(domains) if domains
+                               else "You're working toward several goals") + (f" over {horizon}" if horizon else "") + "."
                 await self._update_vision(ctx, prompt_updates={"narrative": ans.strip(), "narrative_summary": summary})
                 written["narrative_summary"] = summary
         elif step["kind"] == "context" and ans:
@@ -438,6 +543,7 @@ class RelationshipManager:
         updates: list[str] = []
         reflection = ""
         reveal = None
+        llm_plan: Optional[dict[str, Any]] = None  # set when the LLM interpreter parsed this turn's paragraph
         candidate_goals: list[dict[str, Any]] = []
         if pending_key and message.strip() and _CORRECTION_RE.search(message):
             # Rule 2: the user is correcting us — apologize, do NOT classify or advance, ask them to
@@ -523,9 +629,24 @@ class RelationshipManager:
                     "recommendations_unlocked": len(deps_revealed),
                     "confidence_pct": round((rec.get("confidence") or 0) * 100),
                 }
+            # LLM interpreter present → SYNTHESIZE (name the north star + pillars), don't parrot the raw words
+            # back or ask "did I capture that?". This is the onboarding-quality fix.
+            llm_plan = rec.get("llm_plan") if isinstance(rec, dict) else None
+            if llm_plan and llm_plan.get("candidate_goals"):
+                cg = llm_plan["candidate_goals"]
+                pillars = "; ".join(f"{i + 1}) {g['goal']}" for i, g in enumerate(cg[:6]))
+                parts = []
+                if llm_plan.get("synthesis"):
+                    parts.append(llm_plan["synthesis"].rstrip())
+                elif llm_plan.get("north_star"):
+                    parts.append(f"Got it — your north star is {llm_plan['north_star'].rstrip('.')}.")
+                parts.append(f"I'm capturing these pillars — {pillars}.")
+                if llm_plan.get("deprioritized_domains"):
+                    parts.append("Deprioritized for now: " + ", ".join(llm_plan["deprioritized_domains"]) + ".")
+                reflection = " ".join(p for p in parts if p) + " "
             # Rule 3: EXTRACT first, classify later — reflect the user's OWN words (the goal text),
             # never an objective label, and ask them to confirm before any classification.
-            if len(candidate_goals) >= 2:
+            elif len(candidate_goals) >= 2:
                 listed = "; ".join(f"{i + 1}) {g.get('goal') or g.get('objective')}" for i, g in enumerate(candidate_goals[:4]))
                 reflection = (
                     f"I'm hearing a few priorities — {listed}. "
@@ -562,11 +683,18 @@ class RelationshipManager:
                 plaid_ack = ""
 
         nq = st.get("next_question")
+        # When the LLM produced a plan, ask ITS sharp prioritization question (overriding the state machine's
+        # generic/premature one) and drop the generic "let's build your plan" opener — the synthesis leads.
+        if llm_plan and llm_plan.get("next_question") and not st.get("complete"):
+            nq = dict(nq or {})
+            nq["prompt"] = llm_plan["next_question"]
+            nq.setdefault("key", "primary_goal_priority")
+            nq["why_it_matters"] = nq.get("why_it_matters") or "It sets the order we build your plan."
         if st.get("complete") or not nq:
             assistant = (reflection + "That's everything I need to start — let's build your life plan. "
                          "Open **My Life** to see your vision, what matters most, your readiness, and your next best action.")
         else:
-            opener = "" if pending_key else (plaid_ack + "Let's build your plan together — I'll ask a few quick questions. ")
+            opener = "" if (pending_key or llm_plan) else (plaid_ack + "Let's build your plan together — I'll ask a few quick questions. ")
             # Rule 7: a brief (non-verbose) reason the question matters.
             why = nq.get("why_it_matters")
             why_line = f"\n\n_Why I ask: {why}_" if why else ""
