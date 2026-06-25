@@ -38,3 +38,13 @@ Run before every deploy that touches the advisor, auth, or the Fly Dockerfile/en
 - Running advisor LLM code in-machine as **root** writes per-uid `/tmp/gcp-*-0.json`; harmless now (per-uid
   paths) but never use a root SSH result as proof of production behavior.
 - `next.config` `typescript.ignoreBuildErrors:!!CI` means Vercel skips typecheck — run tsc locally.
+
+## 7. Durable telemetry (advisor_turns)
+
+- [ ] After a live turn, `analytics.advisor_turns` row count increments and logs show NO
+      "insert advisor_turns failed" (the insert is whitelisted to the table's columns — migration 160).
+
+## 8. Mobile basic (beta usability)
+
+- [ ] iPhone-width: login → dashboard → advisor render; no broken critical layout. (Known: nav drawer opens
+      over content on first load — dismissible; fix tracked before 20-person beta.)
