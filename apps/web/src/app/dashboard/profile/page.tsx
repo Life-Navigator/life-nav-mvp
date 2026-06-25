@@ -423,7 +423,7 @@ export default function ProfilePage() {
                 {profile.name || 'User'}
               </h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">{profile.email}</p>
-              {stats?.career.title && (
+              {stats?.career?.title && (
                 <p className="text-gray-700 dark:text-gray-300 mt-2">
                   {stats.career.title} {stats.career.company && `at ${stats.career.company}`}
                 </p>

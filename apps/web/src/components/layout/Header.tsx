@@ -199,14 +199,16 @@ const Header: FC = () => {
         try {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const sb = supabase as any;
+          // profiles has display_name + avatar_url (full_name/name are NOT columns — selecting
+          // them returned 400 on every page).
           const profileRes = await sb
             .from('profiles')
-            .select('display_name, full_name, name, avatar_url')
+            .select('display_name, avatar_url')
             .eq('id', authUser.id)
             .maybeSingle();
           const p = profileRes?.data ?? null;
           if (p) {
-            name = p.display_name || p.full_name || p.name || name;
+            name = p.display_name || name;
             image = p.avatar_url || image;
           }
         } catch {
