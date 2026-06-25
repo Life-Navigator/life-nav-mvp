@@ -262,6 +262,9 @@ class GeminiAdvisorLLM:
         # Per-request telemetry the orchestrator reads after generate() (fresh instance per request via DI).
         self.last_usage: dict[str, int] = {}
         self.last_raw: str = ""
+        # Why the last generate() returned None (""=success/called-ok). Lets the orchestrator classify the
+        # fallback cause precisely: auth/infra vs provider timeout vs malformed output. (RELEASE_HARDENING)
+        self.last_error: str = ""
 
     @property
     def available(self) -> bool:
@@ -276,27 +279,36 @@ class GeminiAdvisorLLM:
         return getattr(self._g, "model_name", None) or getattr(self._g, "_generation_model", "") or ""
 
     async def generate(self, context: Any, plan: dict[str, Any]) -> Optional[dict[str, Any]]:
-        self.last_usage, self.last_raw = {}, ""
+        self.last_usage, self.last_raw, self.last_error = {}, "", ""
         if not self.available:
+            self.last_error = "not_available"
             return None
         user = json.dumps({"guardrails": context.prompt_dict(), "constraints": plan}, ensure_ascii=False, default=str)
         prompt = f"GUARDRAILS_AND_CONSTRAINTS:\n{user}\n\nReason within these guardrails and return the JSON object now."
         try:
             raw, usage = await self._g.generate_with_usage(ADVISOR_SYSTEM, prompt, temperature=_temperature_for(plan))
             self.last_usage, self.last_raw = usage, raw or ""
-            return parse_advisor_json(raw)
+            out = parse_advisor_json(raw)
+            if out is None:
+                self.last_error = "malformed_output"
+            return out
         except AttributeError:
             # Older Gemini client without generate_with_usage — degrade gracefully (no token telemetry).
             try:
                 raw = await self._g.generate(ADVISOR_SYSTEM, prompt, temperature=_temperature_for(plan))
                 self.last_raw = raw or ""
-                return parse_advisor_json(raw)
+                out = parse_advisor_json(raw)
+                if out is None:
+                    self.last_error = "malformed_output"
+                return out
             except Exception as e:  # noqa: BLE001
+                self.last_error = type(e).__name__
                 log.warning("advisor LLM (%s/%s) failed: %s: %s — falling back",
                             self.provider, self.model_name, type(e).__name__, e)
                 return None
         except Exception as e:  # noqa: BLE001 — the user never sees the error; orchestrator falls back LOUDLY in logs
             # A VertexAuthError (ADC missing/unauthorized) lands here: log it so an auth failure is never silent.
+            self.last_error = type(e).__name__
             log.warning("advisor LLM (%s/%s) failed: %s: %s — falling back",
                         self.provider, self.model_name, type(e).__name__, e)
             return None

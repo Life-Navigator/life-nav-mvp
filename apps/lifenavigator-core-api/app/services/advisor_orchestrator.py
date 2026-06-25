@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import time
 import uuid
 from datetime import datetime, timezone
@@ -120,6 +122,66 @@ def _build_repair_note(issues: list[dict], reasons: list[str]) -> str:
         + "\nDo not introduce any new ungrounded personal number. Benchmarks and clearly-labeled scenarios "
         "are encouraged."
     )
+
+
+# ── RELEASE_HARDENING: observable, classified fallback causes ───────────────────────────────────────────
+# Distinguishable fallback causes (item 2). Maps the raw llm_status / LLM last_error / validator reasons to
+# ONE actionable category so dashboards can tell an auth/socket outage from a trust-spine block from variance.
+_AUTH_ERRORS = ("VertexAuthError", "PermissionError", "not_available")
+_TIMEOUT_ERRORS = ("ReadTimeout", "TimeoutException", "ConnectTimeout", "ConnectError", "PoolTimeout")
+
+
+def classify_fallback_cause(llm_status: str, last_error: str, reasons: list[str]) -> str:
+    s = llm_status or ""
+    if not s.startswith("fallback") and s not in ("safety_fallback",):
+        return ""  # not a fallback
+    if s == "safety_fallback":
+        return "safety_gate"
+    txt = " ".join(reasons or []).lower()
+    if s == "fallback:unavailable" or s == "fallback:error":
+        if any(e in (last_error or "") for e in _AUTH_ERRORS):
+            return "infrastructure_auth"  # the socket/WIF/ADC failure class — the one that hid for a sprint
+        if any(e in (last_error or "") for e in _TIMEOUT_ERRORS):
+            return "provider_timeout"
+        if last_error == "malformed_output":
+            return "malformed_output"
+        return "provider_error"
+    if s == "fallback:empty":
+        return "malformed_output"
+    # validator-rejected content fallbacks
+    if "invented numbers" in txt or "fabricated" in txt:
+        return "trust_spine_block"
+    if "advice" in txt or "medical" in txt or "legal" in txt:
+        return "policy_safety_gate"
+    if "relationship" in txt:
+        return "unsupported_relationship"
+    if "json object" in txt or "malformed" in txt:
+        return "malformed_output"
+    return "repair_loop_exhausted"
+
+
+# Latency-aware routing tiers (item 4). DETERMINISTIC + conservative: high-risk turns (finance/health/legal,
+# numeric-sensitive, cross-domain) ALWAYS get the full supervised path; only clearly-trivial conversational
+# turns are eligible for the lighter fast path. Safety/validation is identical across tiers — the tier only
+# tunes the repair budget (latency), never what the validator blocks.
+_HIGH_RISK_CUE = re.compile(
+    r"\$|%|\b(afford|mortgage|loan|debt|invest\w*|retire\w*|salary|income|tax|insurance|net worth|estate|"
+    r"will|trust|guardian|medic\w*|dose|dosage|symptom|diagnos\w*|trt|testosterone|legal|attorney|lawsuit)\b",
+    re.IGNORECASE,
+)
+_TRIVIAL = re.compile(r"^\s*(hi|hey|hello|thanks|thank you|ok(ay)?|cool|got it|yes|no|sure|what can you do)\b",
+                      re.IGNORECASE)
+
+
+def select_route_path(message: str, domains: list[str] | None) -> str:
+    doms = set(domains or [])
+    if doms & {"finance", "health"} or _HIGH_RISK_CUE.search(message or ""):
+        return "supervised"
+    if len(doms) >= 2:
+        return "supervised"  # cross-domain synthesis → full supervision
+    if _TRIVIAL.match(message or "") and len(message or "") <= 40 and not any(c.isdigit() for c in (message or "")):
+        return "fast"
+    return "standard"
 
 
 # Discovery/onboarding response contract — the phrases that mark advisor/consultant output. Discovery
@@ -278,6 +340,10 @@ class AdvisorOrchestrator:
             "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0,
             "graph_edges_available": 0, "relationships_referenced": [], "confidence": None,
             "llm_response_raw": "", "user_message": (message or "")[:4000], "advisor_response": "",
+            # RELEASE_HARDENING observability (item 2) — logged every turn, distinguishable fallback causes.
+            "fallback_cause": "", "provider_called": False, "auth_token_available": None,
+            "gate_that_blocked": "", "route_path": "", "domains": [], "llm_last_error": "",
+            "repair_attempts": 0, "agent": "", "model": "", "provider": "",
         }
 
     async def _fetch_history(self, ctx: UserContext, conversation_id: Optional[str]) -> list[dict[str, str]]:
@@ -309,8 +375,31 @@ class AdvisorOrchestrator:
         "I can't stand behind, but I'll give you the most useful read I can from what you provide."
     )
 
-    def _apply_counsel_fallback(self, base: dict[str, Any]) -> None:
-        base["assistant_message"] = self._COUNSEL_FALLBACK
+    def _apply_counsel_fallback(self, base: dict[str, Any], *, cause: str = "",
+                                issues: Optional[list[dict[str, Any]]] = None) -> None:
+        """Cause-aware fallback copy (item 3). For a trust-spine number block, say WHAT was blocked, WHY, and
+        WHAT verified input unlocks a precise answer — never a bare 'I want to give you a grounded answer'."""
+        types = {i.get("type") for i in (issues or [])}
+        if cause == "trust_spine_block" and "unsupported_monthly_payment" in types:
+            msg = ("I won't put an exact monthly payment on that yet — that needs the interest rate and loan term, "
+                   "which I don't have. Share the rate and term (or a lender quote) and I'll compute the payment, "
+                   "total interest, and how it fits your budget. I can still talk through the down payment and what "
+                   "to watch for, qualitatively.")
+        elif cause == "trust_spine_block":
+            msg = ("I won't put an exact dollar figure on that yet — a precise number would need your verified "
+                   "income, savings, and monthly expenses, which I don't have on file. Share those (or connect your "
+                   "accounts) and I'll run the real math and the tradeoffs. I'd rather be useful than guess at a "
+                   "number I can't stand behind — tell me the inputs and I'll be specific.")
+        elif cause in ("policy_safety_gate", "safety_gate"):
+            msg = ("This is an area I can't give a definitive ruling on (medical, legal, tax, or a specific "
+                   "product). I can lay out the key considerations, a checklist, and the exact questions to take to "
+                   "the right licensed professional — want me to do that?")
+        elif cause in ("infrastructure_auth", "provider_timeout", "provider_error"):
+            msg = ("I hit a brief issue reaching my reasoning engine, so I won't guess. Try again in a moment and "
+                   "I'll give you the full analysis.")
+        else:
+            msg = self._COUNSEL_FALLBACK
+        base["assistant_message"] = msg
         base["pending_key"] = None
         base["options"] = None
 
@@ -331,6 +420,7 @@ class AdvisorOrchestrator:
             base["citations"] = _citations_from_context(context)
             constraints = build_constraints(base, context)
             lap("plan")
+            tr["provider_called"] = True  # we attempted the provider this turn (item 2 observability)
             out = await active.generate(context, constraints)
             if out is None:
                 # One retry: transient provider failures (502/timeout/truncated JSON) surface as None.
@@ -352,23 +442,33 @@ class AdvisorOrchestrator:
                 usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), usage.get("total_tokens", 0))
             tr["llm_response_raw"] = getattr(active, "last_raw", "") or ""
             tr["graph_edges_available"] = len(getattr(context, "relationship_edges", []) or [])
+            last_error = getattr(active, "last_error", "") or ""
             if out is None:
                 base["llm_status"] = "fallback:unavailable"
+                cause = classify_fallback_cause("fallback:unavailable", last_error, [])
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, "llm_unavailable_or_unparseable", "n/a"
-                self._apply_counsel_fallback(base)  # A3: counsel-framed, not discovery intake
+                tr["fallback_cause"], tr["llm_last_error"] = cause, last_error
+                tr["auth_token_available"] = cause != "infrastructure_auth"
+                tr["gate_that_blocked"] = ""
+                self._apply_counsel_fallback(base, cause=cause)
                 # LOUD: a model/auth failure must never be a silent quality drop (org-policy / ADC visibility).
                 log.warning(json.dumps({"event": "advisor_model_fallback", "turn_id": tr["turn_id"],
-                                        "reason": "llm_unavailable_or_unparseable",
+                                        "reason": "llm_unavailable_or_unparseable", "cause": cause,
+                                        "last_error": last_error,
                                         "provider": tr.get("provider", ""), "model": tr.get("model", "")}))
                 return
+            tr["auth_token_available"] = True  # the provider answered → token was acquired
             ok, safe, reasons = validate(out, context)
             lap("validate")
             # SUPERVISED REPAIR LOOP (max 2 attempts): the model produced a strong draft; the validator is the
             # supervisor. On failure we send STRUCTURED, per-issue repair instructions and let the model revise,
             # re-validating each time. The SAME gate checks every draft, so nothing unsafe slips through — this
             # turns "block → dumb fallback" into "block → guided fix → safe answer". (ADVISOR_SUPERVISION)
-            _MAX_REPAIRS = 2
+            # Route tier tunes the repair BUDGET only (latency), never the validator. Trivial fast-path turns
+            # skip the (expensive) repair loop; standard/supervised keep the full 2-attempt supervision.
+            _MAX_REPAIRS = 0 if tr.get("route_path") == "fast" else 2
             attempt = 0
+            issues: list[dict[str, Any]] = []
             while (not ok) and _is_repairable(reasons) and attempt < _MAX_REPAIRS:
                 attempt += 1
                 issues = classify_issues(out, context)
@@ -388,16 +488,22 @@ class AdvisorOrchestrator:
             lap("repair")
             if not ok:
                 base["llm_status"] = "fallback:" + ("; ".join(reasons))[:140]
+                cause = classify_fallback_cause(base["llm_status"], "", reasons)
+                if attempt >= _MAX_REPAIRS and _MAX_REPAIRS > 0:
+                    cause = cause or "repair_loop_exhausted"
+                issues = issues or classify_issues(out, context)
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"], tr["validator_reason"] = (
                     True, "; ".join(reasons), "rejected", "; ".join(reasons))
-                self._apply_counsel_fallback(base)  # A3: counsel-framed, not discovery intake
+                tr["fallback_cause"], tr["gate_that_blocked"] = cause, "; ".join(reasons)[:120]
+                self._apply_counsel_fallback(base, cause=cause, issues=issues)
                 return
             composed = _compose(safe)
             lap("compose")
             if not composed:
                 base["llm_status"] = "fallback:empty"
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, "empty_composed", "accepted"
-                self._apply_counsel_fallback(base)  # A3: counsel-framed, not discovery intake
+                tr["fallback_cause"] = "malformed_output"
+                self._apply_counsel_fallback(base, cause="malformed_output")
                 return
             # Merge: only the human-facing text changes; all deterministic outcomes are preserved.
             base["assistant_message"] = composed
@@ -442,6 +548,9 @@ class AdvisorOrchestrator:
         # routed domain(s) (a HEALTH turn shouldn't surface finance/career risk chips).
         agent_obj = get_agent(agent) if (mode != "discovery" and agent) else None
         fdoms = _focus_domains(agent_obj, message) if mode != "discovery" else None
+        # Latency-aware routing tier (item 4): logged, and tunes the repair budget — never the safety gates.
+        tr["domains"] = list(fdoms or [])
+        tr["route_path"] = "discovery" if mode == "discovery" else select_route_path(message, fdoms)
         # 1) Deterministic turn — persistence (candidate/rejected goals), canonical writes, safe fallback text.
         base = await self._rm.converse(ctx, message, pending_key, focus_domains=fdoms)
         lap("deterministic_turn")
@@ -487,6 +596,9 @@ class AdvisorOrchestrator:
 
         agent_obj = get_agent(agent) if (mode != "discovery" and agent) else None
         fdoms = _focus_domains(agent_obj, message) if mode != "discovery" else None
+        # Latency-aware routing tier (item 4): logged, and tunes the repair budget — never the safety gates.
+        tr["domains"] = list(fdoms or [])
+        tr["route_path"] = "discovery" if mode == "discovery" else select_route_path(message, fdoms)
         base = await self._rm.converse(ctx, message, pending_key, focus_domains=fdoms)
         lap("deterministic_turn")
         if agent_obj is not None:
@@ -527,11 +639,24 @@ class AdvisorOrchestrator:
         tr["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
         tr["llm_status"] = base.get("llm_status") or tr.get("llm_status") or ""
         tr["advisor_response"] = base.get("assistant_message") or ""
-        # Metadata-only log line (no full message/response/raw → keeps PII out of logs).
+        # Surface key observability fields on the RESPONSE so the live regression (item 1) can assert the LLM
+        # actually ran on the deployed web path (provider_called + model + empty fallback_cause = real LLM turn).
+        base["provider_called"] = tr.get("provider_called", False)
+        base["fallback_cause"] = tr.get("fallback_cause", "")
+        base["route_path"] = tr.get("route_path", "")
+        base["latency_ms"] = tr["latency_ms"]
+        # Structured, metadata-only log (no message/response/raw → no PII). Every fallback is now attributable
+        # to a distinguishable cause (item 2). request_id == turn_id.
         log.info(json.dumps({
-            "event": "advisor_turn", "turn_id": tr["turn_id"], "user": ctx.user_id,
-            "llm_status": tr["llm_status"], "validator_result": tr["validator_result"],
+            "event": "advisor_turn", "turn_id": tr["turn_id"], "request_id": tr["turn_id"], "user": ctx.user_id,
+            "tenant_id": str(getattr(ctx, "tenant_id", "") or ""), "environment": os.environ.get("ENVIRONMENT", ""),
+            "route_path": tr.get("route_path", ""), "domain": tr.get("domains", []), "agent": tr.get("agent", ""),
+            "llm_status": tr["llm_status"], "provider_called": tr.get("provider_called", False),
+            "auth_token_available": tr.get("auth_token_available"), "provider": tr.get("provider", ""),
+            "model": tr.get("model", ""), "validator_result": tr["validator_result"],
             "fallback": tr["fallback_used"], "fallback_reason": tr["fallback_reason"],
+            "fallback_cause": tr.get("fallback_cause", ""), "gate_that_blocked": tr.get("gate_that_blocked", ""),
+            "llm_last_error": tr.get("llm_last_error", ""), "repair_attempts": tr.get("repair_attempts", 0),
             "repairs": tr["validator_repairs"], "latency_ms": tr["latency_ms"], "stages_ms": tr["stages_ms"],
             "tokens": tr["total_tokens"], "edges": tr["graph_edges_available"], "msg_len": len(tr.get("user_message") or ""),
         }))
@@ -540,8 +665,13 @@ class AdvisorOrchestrator:
         # dict/list — PostgREST serializes the row to JSON, so they land as jsonb objects/arrays (NOT
         # double-encoded JSON strings).
         if self._sb is not None:
-            row = {**tr, "advisor_response": tr["advisor_response"][:4000],
-                   "llm_response_raw": (tr["llm_response_raw"] or "")[:8000]}
+            # New observability fields live in logs only — keep them OUT of the persisted row so we don't add
+            # columns the advisor_turns table doesn't have (the schema is the log line's, not these extras).
+            _drop = {"fallback_cause", "provider_called", "auth_token_available", "gate_that_blocked",
+                     "route_path", "domains", "llm_last_error", "repair_attempts", "agent", "model", "provider"}
+            row = {k: v for k, v in tr.items() if k not in _drop}
+            row["advisor_response"] = tr["advisor_response"][:4000]
+            row["llm_response_raw"] = (tr["llm_response_raw"] or "")[:8000]
             try:
                 import asyncio
                 task = asyncio.ensure_future(self._persist(row))

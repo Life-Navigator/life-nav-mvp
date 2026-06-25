@@ -364,10 +364,11 @@ async def test_orchestrator_falls_back_when_llm_unavailable():
     base = _base()
     orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(None))
     out = await orch.converse(_ctx(), "hi")
-    # A3: advisor-mode fallback shows a counsel-framed holding reply, NOT the discovery opener.
-    assert out["assistant_message"] == AdvisorOrchestrator._COUNSEL_FALLBACK
+    # A3 + RELEASE_HARDENING: cause-aware fallback (provider/infra), NOT the discovery opener.
     assert out["assistant_message"] != base["assistant_message"]
     assert out["llm_status"] == "fallback:unavailable"
+    assert out.get("provider_called") is True  # we attempted the provider (observable)
+    assert "reasoning engine" in out["assistant_message"]  # provider/infra cause copy
 
 
 @pytest.mark.asyncio
@@ -376,9 +377,9 @@ async def test_orchestrator_falls_back_on_invalid_llm():
     bad = _good_llm(next_question="You should invest $999,999 now, right?")  # advice + invented number
     orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(bad))
     out = await orch.converse(_ctx(), "what should I do")
-    # A3: counsel-framed fallback, and critically the rejected invented number never leaks.
-    assert out["assistant_message"] == AdvisorOrchestrator._COUNSEL_FALLBACK
+    # Counsel-framed fallback; critically the rejected invented number never leaks, and it's not the opener.
     assert "999999" not in out["assistant_message"]
+    assert out["assistant_message"] != base["assistant_message"]
     assert out["llm_status"].startswith("fallback:")
 
 
@@ -396,7 +397,9 @@ async def test_orchestrator_disabled_returns_rule_based_untouched():
     base = _base()
     orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(_good_llm()), enabled=False)
     out = await orch.converse(_ctx(), "hi")
-    assert out == base and "llm_status" not in out
+    # Disabled → rule-based MESSAGE untouched (no LLM enhancement); response may carry observability metadata.
+    assert out["assistant_message"] == base["assistant_message"]
+    assert out.get("llm_status", "") in ("", "disabled")
 
 
 @pytest.mark.asyncio
@@ -540,8 +543,7 @@ async def test_case5_medical_question_is_refused_via_fallback():
     base = _base()
     out = await _run("Do I have diabetes given my symptoms?",
                      _good_llm(reflection="I diagnose you with diabetes."), base=base)
-    # Medical 'diagnosis' language is rejected → a safe counsel-framed fallback is shown (NO diagnosis).
-    assert out["assistant_message"] == AdvisorOrchestrator._COUNSEL_FALLBACK
+    # Medical 'diagnosis' language is rejected → a safe cause-aware fallback is shown (NO diagnosis).
     assert "diagnos" not in out["assistant_message"].lower() and "diabetes" not in out["assistant_message"].lower()
     assert out["llm_status"].startswith("fallback:")
 
@@ -552,8 +554,7 @@ async def test_case6_how_much_down_gathers_inputs_not_a_number():
     # An invented down-payment figure must be rejected (no number was in context).
     out = await _run("How much should I put down on a house?",
                      _good_llm(next_question="You should put down $90,000, agreed?"), base=base)
-    # Fell back — counsel-framed reply, and the fabricated figure is never shown.
-    assert out["assistant_message"] == AdvisorOrchestrator._COUNSEL_FALLBACK
+    # Fell back — cause-aware reply, and the fabricated figure is never shown.
     assert "90,000" not in out["assistant_message"] and "90000" not in out["assistant_message"]
     assert out["llm_status"].startswith("fallback:")
 
