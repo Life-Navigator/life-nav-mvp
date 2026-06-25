@@ -38,7 +38,7 @@ const GROUPS: {
   {
     title: 'Domains',
     items: [
-      { label: 'Finance', href: '/dashboard/finance', icon: DollarSign },
+      { label: 'Finance', href: '/dashboard/finance/overview', icon: DollarSign },
       { label: 'Career', href: '/dashboard/career', icon: Briefcase },
       { label: 'Education', href: '/dashboard/education', icon: GraduationCap },
       { label: 'Health', href: '/dashboard/wellness', icon: HeartPulse },

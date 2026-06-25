@@ -437,7 +437,7 @@ const navigation = [
   // ── Domains ──
   {
     name: 'Finance',
-    href: '/dashboard/finance',
+    href: '/dashboard/finance/overview',
     icon: CurrencyDollarIcon,
     current: false,
     section: 'Domains',
