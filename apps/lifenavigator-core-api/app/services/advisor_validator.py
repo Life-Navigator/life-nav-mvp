@@ -80,8 +80,12 @@ _ADVICE = re.compile(
     r"\btitle (?:the|your) (?:house|home|assets|property)\b|"
     # TAX (specific directives)
     r"\bfor tax purposes,? you should\b|\byou qualify for a tax\b|\byou should claim the\b|\bfile your taxes as\b|"
-    # AFFORDABILITY VERDICTS (definitive lending conclusions the advisor must NOT assert — hedge instead)
-    r"\byou (?:can|could|can't|cannot) afford\b|\byou qualif\w*|\byou(?:'re| are) (?:pre[- ]?)?approved\b|"
+    # AFFORDABILITY / LENDING VERDICTS (definitive conclusions the advisor must NOT assert — hedge instead).
+    # Scoped to LENDING context so colloquial cross-domain usage passes: "you can afford TO take a pay cut"
+    # (career), "you qualify FOR the senior role / for aid" (career/education) are NOT lending verdicts.
+    r"\byou (?:can|could|can't|cannot) afford\b(?!\s+to\b)|"
+    r"\byou (?:pre[- ]?)?qualif\w*\s+for\b[^.?!]{0,40}\b(?:mortgage|home\s+loan|\bloan\b|heloc|line of credit)\b|"
+    r"\byou(?:'re| are) (?:pre[- ]?)?approved\s+for\b[^.?!]{0,40}\b(?:mortgage|home\s+loan|\bloan\b|heloc|line of credit)\b|"
     # PRODUCT / SECURITY by name
     r"\binvest in (?:the )?\w+ (?:fund|etf)\b|\bbuy (?:shares of|stock in)\b|\byou should buy [A-Z]{1,5}\b"
     r")",

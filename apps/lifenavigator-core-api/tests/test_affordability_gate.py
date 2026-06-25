@@ -81,3 +81,17 @@ def test_personal_stat_pct_still_blocked():
     # the dangerous ones stay gated
     assert "28" in blk("Your DTI would be 28%.", [])
     assert "85" in blk("Your retirement success probability is 85%.", [])
+
+
+# ── ADVISOR_USEFULNESS: affordability/lending verdicts scoped to lending (not colloquial cross-domain) ──
+def test_lending_verdicts_still_blocked():
+    from app.services.advisor_validator import _ADVICE
+    for s in ["you can afford this $500,000 home", "you qualify for a $500,000 mortgage",
+              "you are approved for the loan", "you cannot afford this house"]:
+        assert _ADVICE.search(s), f"lending verdict must block: {s}"
+
+def test_colloquial_afford_qualify_allowed():
+    from app.services.advisor_validator import _ADVICE
+    for s in ["you can afford to take a pay cut", "you qualify for the senior role",
+              "you qualify for tuition aid", "you can afford to be patient here"]:
+        assert not _ADVICE.search(s), f"colloquial cross-domain usage must pass: {s}"
