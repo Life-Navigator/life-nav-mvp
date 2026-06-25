@@ -364,7 +364,9 @@ async def test_orchestrator_falls_back_when_llm_unavailable():
     base = _base()
     orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(None))
     out = await orch.converse(_ctx(), "hi")
-    assert out["assistant_message"] == base["assistant_message"]  # untouched rule-based text
+    # A3: advisor-mode fallback shows a counsel-framed holding reply, NOT the discovery opener.
+    assert out["assistant_message"] == AdvisorOrchestrator._COUNSEL_FALLBACK
+    assert out["assistant_message"] != base["assistant_message"]
     assert out["llm_status"] == "fallback:unavailable"
 
 
@@ -374,7 +376,9 @@ async def test_orchestrator_falls_back_on_invalid_llm():
     bad = _good_llm(next_question="You should invest $999,999 now, right?")  # advice + invented number
     orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()), FakeLLM(bad))
     out = await orch.converse(_ctx(), "what should I do")
-    assert out["assistant_message"] == base["assistant_message"]
+    # A3: counsel-framed fallback, and critically the rejected invented number never leaks.
+    assert out["assistant_message"] == AdvisorOrchestrator._COUNSEL_FALLBACK
+    assert "999999" not in out["assistant_message"]
     assert out["llm_status"].startswith("fallback:")
 
 
@@ -536,8 +540,9 @@ async def test_case5_medical_question_is_refused_via_fallback():
     base = _base()
     out = await _run("Do I have diabetes given my symptoms?",
                      _good_llm(reflection="I diagnose you with diabetes."), base=base)
-    # Medical 'diagnosis' language is rejected → the safe deterministic text is shown instead.
-    assert out["assistant_message"] == base["assistant_message"]
+    # Medical 'diagnosis' language is rejected → a safe counsel-framed fallback is shown (NO diagnosis).
+    assert out["assistant_message"] == AdvisorOrchestrator._COUNSEL_FALLBACK
+    assert "diagnos" not in out["assistant_message"].lower() and "diabetes" not in out["assistant_message"].lower()
     assert out["llm_status"].startswith("fallback:")
 
 
@@ -547,7 +552,9 @@ async def test_case6_how_much_down_gathers_inputs_not_a_number():
     # An invented down-payment figure must be rejected (no number was in context).
     out = await _run("How much should I put down on a house?",
                      _good_llm(next_question="You should put down $90,000, agreed?"), base=base)
-    assert out["assistant_message"] == base["assistant_message"]  # fell back — no fabricated figure shown
+    # Fell back — counsel-framed reply, and the fabricated figure is never shown.
+    assert out["assistant_message"] == AdvisorOrchestrator._COUNSEL_FALLBACK
+    assert "90,000" not in out["assistant_message"] and "90000" not in out["assistant_message"]
     assert out["llm_status"].startswith("fallback:")
 
 

@@ -299,6 +299,22 @@ class AdvisorOrchestrator:
         except Exception:  # noqa: BLE001 — context is an enhancement; never break the turn
             return []
 
+    # A3 (counsel-first): when an ADVISOR-mode turn falls back, the deterministic reply is the
+    # RelationshipManager's discovery opener ("…what would you most like your life to look like…").
+    # Showing intake in response to a direct question reads as broken. Replace it with an honest,
+    # counsel-framed holding reply and drop the discovery question-pin so the user isn't pinned to it.
+    _COUNSEL_FALLBACK = (
+        "I want to give you a grounded answer here — not guess at numbers I can't stand behind. "
+        "The honest gap is that I don't yet have enough verified detail to be specific. Tell me a "
+        "little more about what you're weighing (or share the relevant figures), and I'll walk you "
+        "through the options and the tradeoffs."
+    )
+
+    def _apply_counsel_fallback(self, base: dict[str, Any]) -> None:
+        base["assistant_message"] = self._COUNSEL_FALLBACK
+        base["pending_key"] = None
+        base["options"] = None
+
     async def _enhance(self, base: dict[str, Any], ctx: UserContext, message: str, tr: dict[str, Any], lap,
                        history: Optional[list[dict[str, str]]] = None, llm: Any = None,
                        fallback_llm: Any = None, agent: Any = None) -> None:
@@ -340,6 +356,7 @@ class AdvisorOrchestrator:
             if out is None:
                 base["llm_status"] = "fallback:unavailable"
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, "llm_unavailable_or_unparseable", "n/a"
+                self._apply_counsel_fallback(base)  # A3: counsel-framed, not discovery intake
                 # LOUD: a model/auth failure must never be a silent quality drop (org-policy / ADC visibility).
                 log.warning(json.dumps({"event": "advisor_model_fallback", "turn_id": tr["turn_id"],
                                         "reason": "llm_unavailable_or_unparseable",
@@ -374,12 +391,14 @@ class AdvisorOrchestrator:
                 base["llm_status"] = "fallback:" + ("; ".join(reasons))[:140]
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"], tr["validator_reason"] = (
                     True, "; ".join(reasons), "rejected", "; ".join(reasons))
+                self._apply_counsel_fallback(base)  # A3: counsel-framed, not discovery intake
                 return
             composed = _compose(safe)
             lap("compose")
             if not composed:
                 base["llm_status"] = "fallback:empty"
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, "empty_composed", "accepted"
+                self._apply_counsel_fallback(base)  # A3: counsel-framed, not discovery intake
                 return
             # Merge: only the human-facing text changes; all deterministic outcomes are preserved.
             base["assistant_message"] = composed

@@ -265,7 +265,9 @@ async def test_advisor_does_not_invent_relationship_without_edges():
     out = await _run(EMPTY_GRAPH, _llm(
         reflection="Your retirement goal is connected to your education-funding goal.",
     ))
-    assert out["assistant_message"] == base_msg  # fell back to safe rule-based text
+    # A3: counsel-framed fallback; the unsupported relationship claim never reaches the user.
+    assert out["assistant_message"] == AdvisorOrchestrator._COUNSEL_FALLBACK
+    assert "connected" not in out["assistant_message"].lower()
     assert out["llm_status"].startswith("fallback:")
 
 
@@ -276,7 +278,8 @@ async def test_advisor_unsupported_relationship_triggers_fallback():
         reflection="Your health goal is tied to your career goal.",
         relationships_referenced=[{"from": "Health", "to": "Career", "rel": "shared_node"}],
     ))
-    assert out["assistant_message"] == base_msg
+    assert out["assistant_message"] == AdvisorOrchestrator._COUNSEL_FALLBACK
+    assert "tied to" not in out["assistant_message"].lower()
     assert out["llm_status"].startswith("fallback:")
 
 

@@ -150,6 +150,9 @@ export async function proxy(request: NextRequest) {
       .eq('id', user!.id)
       .single();
 
+    let setupCompleted = !!profile?.setup_completed;
+    let onboardingCompleted = !!profile?.onboarding_completed;
+
     // ONBOARDING_GATE_DECISION — structured log so any reported bypass is diagnosable from prod logs.
     const gate = (decision: string, redirect: string | null) =>
       console.log(
@@ -157,15 +160,49 @@ export async function proxy(request: NextRequest) {
           JSON.stringify({
             user_id: user!.id,
             path,
-            setup_completed: profile?.setup_completed ?? null,
-            onboarding_completed: profile?.onboarding_completed ?? null,
+            setup_completed: setupCompleted,
+            onboarding_completed: onboardingCompleted,
             profile_error: profileError?.message ?? null,
             decision,
             redirect,
           })
       );
 
-    if (profileError || !profile || !profile.setup_completed) {
+    // STALE-FLAG SAFETY NET (A2): a user who already has meaningful data — an activated finance persona
+    // OR a saved goal — is effectively onboarded even if these booleans are stale, so do NOT trap them in
+    // onboarding; repair the flags so the check isn't needed again. This runs ONLY on the would-redirect
+    // path, so already-onboarded users pay nothing, and genuinely-new users (no data) still onboard fully.
+    if (!profileError && profile && (!setupCompleted || !onboardingCompleted)) {
+      let hasMeaningfulData = false;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sb = supabase as any;
+        const [persona, goal] = await Promise.all([
+          sb
+            .from('analytics_user_events')
+            .select('id')
+            .eq('user_id', user!.id)
+            .eq('subject_kind', 'plaid_persona')
+            .limit(1),
+          sb.from('goals').select('id').eq('user_id', user!.id).limit(1),
+        ]);
+        hasMeaningfulData = !!(persona?.data?.length || goal?.data?.length);
+      } catch {
+        hasMeaningfulData = false; // fail safe → fall through to the normal onboarding redirects
+      }
+      if (hasMeaningfulData) {
+        setupCompleted = true;
+        onboardingCompleted = true;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        void (supabase as any)
+          .from('profiles')
+          .update({ setup_completed: true, onboarding_completed: true })
+          .eq('id', user!.id);
+        gate('stale_flags_backfilled→served', null);
+      }
+    }
+
+    if (profileError || !profile || !setupCompleted) {
       // No persona/setup yet → pick a sample financial profile first.
       gate('no_setup→financial_profile', '/onboarding/financial-profile');
       return NextResponse.redirect(new URL('/onboarding/financial-profile', request.url));
@@ -174,7 +211,7 @@ export async function proxy(request: NextRequest) {
     // Persona is set but the advisor onboarding hasn't run (or been skipped):
     // force the user into the advisor before the rest of the dashboard unlocks — except the
     // onboarding-support routes (advisor itself + the document upload page it links to).
-    if (!profile.onboarding_completed && !ONBOARDING_ALLOWED.some((p) => path.startsWith(p))) {
+    if (!onboardingCompleted && !ONBOARDING_ALLOWED.some((p) => path.startsWith(p))) {
       gate('setup_only→advisor', '/dashboard/advisor?onboarding=1');
       return NextResponse.redirect(new URL('/dashboard/advisor?onboarding=1', request.url));
     }
