@@ -63,6 +63,29 @@ interface ProfileStats {
   }>;
 }
 
+// The stats API can return a partial object for sparse users; the render reads stats.<domain>.<field>
+// directly, so default every sub-object here to avoid "Cannot read properties of undefined" crashes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function fillStats(s: any): ProfileStats {
+  s = s || {};
+  return {
+    overview: {
+      daysSinceJoining: 0,
+      profileCompletion: 0,
+      totalAchievements: 0,
+      unreadNotifications: 0,
+      ...(s.overview || {}),
+    },
+    goals: { total: 0, active: 0, ...(s.goals || {}) },
+    finance: { connectedAccounts: 0, totalInvestments: 0, ...(s.finance || {}) },
+    career: { title: null, company: null, connections: 0, skills: 0, ...(s.career || {}) },
+    education: { studyStreak: 0, totalStudyHours: 0, certifications: 0, ...(s.education || {}) },
+    health: { connectedDevices: 0, avgSteps: 0, avgHeartRate: null, ...(s.health || {}) },
+    activity: { eventsLast30Days: 0, ...(s.activity || {}) },
+    achievements: Array.isArray(s.achievements) ? s.achievements : [],
+  };
+}
+
 interface UserProfile {
   id: string;
   email: string;
@@ -203,7 +226,7 @@ export default function ProfilePage() {
         const statsRes = await fetch('/api/user/profile/stats', { headers });
         if (statsRes.ok) {
           const statsData = await statsRes.json();
-          setStats(statsData);
+          setStats(fillStats(statsData));
         }
         setStatsLoading(false);
       } catch (error) {
@@ -341,7 +364,7 @@ export default function ProfilePage() {
       const statsRes = await fetch('/api/user/profile/stats', { headers });
       if (statsRes.ok) {
         const statsData = await statsRes.json();
-        setStats(statsData);
+        setStats(fillStats(statsData));
       }
 
       alert('Profile updated successfully!');
