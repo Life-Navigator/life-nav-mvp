@@ -55,3 +55,44 @@ async def test_interpret_plan_none_without_llm():
 @pytest.mark.asyncio
 async def test_interpret_plan_none_when_too_short():
     assert await _rm(FakeGem())._interpret_plan("hi there") is None
+
+
+# ── P5: deprioritization-only statements are a useful update, not None ──
+class DeprioGem:
+    configured = True
+    async def generate_with_usage(self, system, user, temperature=None):
+        return json.dumps({
+            "north_star": "", "time_horizon": "", "goals": [], "values": [],
+            "deprioritized_domains": ["education"],
+            "synthesis": "I'll mark education as deprioritized for now since your degree is complete.",
+            "next_question": "Which area should we focus on next — finance, health, career, or family?",
+        }), {}
+
+
+@pytest.mark.asyncio
+async def test_deprioritization_only_returns_plan():
+    plan = await _rm(DeprioGem())._interpret_plan("I already have my degree, so education is not a priority.")
+    assert plan is not None  # T3 must NOT fall back to None / fragments
+    assert plan["candidate_goals"] == []          # no fake education goal
+    assert "education" in plan["deprioritized_domains"]
+    assert plan["synthesis"]
+
+
+# ── P7: regression guard — the exact reported bad strings must never be goal titles ──
+_BAD_FRAGMENTS = [
+    "this gives me a year to get my financial",
+    "career foundation built",
+    "but getting back in shape",
+    "i already have my degree",
+    "building my financial profile is",
+]
+
+
+@pytest.mark.asyncio
+async def test_no_broken_fragments_in_goals():
+    plan = await _rm(FakeGem())._interpret_plan(PARA)
+    titles = [g["goal"].lower().strip().rstrip(".") for g in plan["candidate_goals"]]
+    for bad in _BAD_FRAGMENTS:
+        assert bad not in titles, f"fragment leaked as a goal: {bad}"
+    # every goal is a complete phrase (>= 3 words), not a clause shard
+    assert all(len(g["goal"].split()) >= 3 for g in plan["candidate_goals"])

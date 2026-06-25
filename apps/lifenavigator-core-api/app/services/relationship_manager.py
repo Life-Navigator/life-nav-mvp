@@ -251,15 +251,19 @@ class RelationshipManager:
                 "supporting_quotes": [text[:300]], "supporting_statements": [text[:300]],
                 "dependencies": [], "domain": dom,
             })
-        if not cand:
-            return None  # nothing usable → deterministic fallback
+        deprioritized = [str(d).strip().lower() for d in (data.get("deprioritized_domains") or [])
+                         if str(d).strip().lower() in self._VALID_DOMAINS]
+        # T3 fix: a deprioritization-only statement ("degree done, education isn't a priority") has NO goal but
+        # IS a useful update — return the plan so we record the deprioritization instead of falling back to the
+        # fragment extractor. Only truly empty interpretations fall back.
+        if not cand and not deprioritized:
+            return None
         return {
             "candidate_goals": cand,
             "north_star": str(data.get("north_star") or "").strip(),
             "time_horizon": str(data.get("time_horizon") or "").strip(),
             "values": [str(v).strip() for v in (data.get("values") or []) if str(v).strip()][:6],
-            "deprioritized_domains": [str(d).strip().lower() for d in (data.get("deprioritized_domains") or [])
-                                      if str(d).strip().lower() in self._VALID_DOMAINS],
+            "deprioritized_domains": deprioritized,
             "synthesis": str(data.get("synthesis") or "").strip(),
             "next_question": str(data.get("next_question") or "").strip(),
         }
@@ -588,6 +592,16 @@ class RelationshipManager:
             # values, prioritization question) — instead of the regex clause-splitter's fragments. The plan is
             # reused below for the synthesis reflection + next question. Fail-safe: None → deterministic extract.
             llm_plan = (rec.get("llm_plan") if isinstance(rec, dict) else None) or await self._interpret_plan(message)
+            # Persist any explicit deprioritization (merge, never clobber) so the platform can mark e.g.
+            # education "deprioritized / sufficient for now" instead of "not started". (T3 fix)
+            if llm_plan and llm_plan.get("deprioritized_domains"):
+                try:
+                    cur = await self._vision_row(ctx)
+                    existing = set((cur.get("prompts") or {}).get("deprioritized_domains") or [])
+                    merged = sorted(existing | set(llm_plan["deprioritized_domains"]))
+                    await self._update_vision(ctx, prompt_updates={"deprioritized_domains": merged})
+                except Exception:  # noqa: BLE001
+                    pass
             seen_goal = {str(g.get("goal", "")).lower() for g in candidate_goals}
             extracted = llm_plan["candidate_goals"] if llm_plan else self._life.analyze_statement(message)
             for g in extracted:
@@ -634,17 +648,21 @@ class RelationshipManager:
                 }
             # LLM interpreter present → SYNTHESIZE (name the north star + pillars), don't parrot the raw words
             # back or ask "did I capture that?". (llm_plan was set during extraction above.)
-            if llm_plan and llm_plan.get("candidate_goals"):
-                cg = llm_plan["candidate_goals"]
-                pillars = "; ".join(f"{i + 1}) {g['goal']}" for i, g in enumerate(cg[:6]))
+            if llm_plan and (llm_plan.get("candidate_goals") or llm_plan.get("deprioritized_domains")):
+                cg = llm_plan.get("candidate_goals") or []
                 parts = []
                 if llm_plan.get("synthesis"):
                     parts.append(llm_plan["synthesis"].rstrip())
                 elif llm_plan.get("north_star"):
                     parts.append(f"Got it — your north star is {llm_plan['north_star'].rstrip('.')}.")
-                parts.append(f"I'm capturing these pillars — {pillars}.")
+                if cg:
+                    pillars = "; ".join(f"{i + 1}) {g['goal']}" for i, g in enumerate(cg[:6]))
+                    parts.append(f"I'm capturing these pillars — {pillars}.")
                 if llm_plan.get("deprioritized_domains"):
                     parts.append("Deprioritized for now: " + ", ".join(llm_plan["deprioritized_domains"]) + ".")
+                    # T3: deprioritization-only turn (no new goals) → refocus, don't no-op or route to intake.
+                    if not cg and not llm_plan.get("synthesis"):
+                        parts.append("We'll focus the plan on the areas that move the needle next.")
                 reflection = " ".join(p for p in parts if p) + " "
             # Rule 3: EXTRACT first, classify later — reflect the user's OWN words (the goal text),
             # never an objective label, and ask them to confirm before any classification.
