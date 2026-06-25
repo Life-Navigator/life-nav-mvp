@@ -16,3 +16,13 @@
 Residual (low): `GEMINI_API_KEY` secret still present (used by non-advisor embeddings). Remove once embeddings migrate to Vertex. WIF token-source files live only in container tmpfs (0600), 15-min TTL.
 
 ## Verdict: keyless, least-privilege, no committed/disk secrets. PASS.
+
+---
+
+## Addendum 2026-06-24 — session-token exposure (disclosed + remediated)
+
+During the UI-smoke attempt, a Playwright debug line printed the post-magic-link redirect URL, which contained the owner's **session access+refresh token** in the URL hash (own account, ~1h TTL).
+
+- **Remediation:** immediate **global sign-out** (`POST /auth/v1/logout?scope=global` → **HTTP 204**) revoked ALL of the user's refresh tokens (incl. the leaked one). The leaked access token is a stateless JWT (cannot be server-revoked) but **expires ~1h from mint and can no longer be refreshed**.
+- **Cleanup:** local link + token files shredded; login-page screenshots discarded.
+- **Lesson/guard:** never log post-auth URLs/hashes; prefer an owner-provided Playwright `storageState` over admin-minted links for headless smokes. No service-role key or SA credential was exposed (those stayed in the Fly machine).
