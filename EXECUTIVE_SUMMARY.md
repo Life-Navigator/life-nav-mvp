@@ -122,3 +122,17 @@ Replaced "muzzle gate → dumb fallback" with "strong answer → validator super
 - Tradeoff: repaired turns ~59-77s (extra generation); streaming masks first-text.
 
 12 deliverables: ADVISOR_SUPERVISION_PIPELINE_AUDIT, VALIDATOR_ROLE_DEFINITION, VALIDATION_FAILURE_SCHEMA, ADVISOR_REPAIR_LOOP_IMPLEMENTATION, ADVISOR_PROMPT_REDESIGN, FINANCE/HEALTH/LEGAL_REPAIR_LOOP_VALIDATION, SUPERVISED_RESPONSE_UX_REPORT, SUPERVISION_TEST_REPORT, SUPERVISED_ADVISOR_LIVE_REPLAY, EXECUTIVE_SUMMARY.
+
+---
+
+# Launch-Hardening Sprint (2026-06-25)
+
+## Status: CONDITIONAL GO — fix magic-link email, then invite 5
+
+- **Type safety:** 18 → **0 tsc errors** (LucideIcon typing family, polymorphic MotionSection via createElement, finance/profile data-shape types) — no `any`/suppressions. eslint 0 errors. `next build` passes full typecheck. (`9d75034`)
+- **Finance routing:** `/dashboard/finance` → `/dashboard/finance/overview` live; nav direct; legacy estate untouched.
+- **Authenticated UI smoke (real session):** all surfaces load; **fixed** a profile-page crash and 3 every-page console errors (theme null-body, Header `profiles` 400 from bad columns, `/api/email|calendar` 404s). (`d1af04a`)
+- **Finance validated:** honest $0 empty states with no persona; with a persona, Net Worth is consistent and **liabilities render red/negative** (validates the `bucketFor` fix).
+- **Blocker:** Supabase Auth SMTP→Resend (magic-link delivery). App side is correct; needs Management PAT and/or Resend key to finish.
+
+Deliverables: AUTHENTICATED_UI_SMOKE_REPORT, UI_SMOKE_SCREENSHOT_INDEX, FINAL_DEMO_READINESS_REPORT, this summary.
