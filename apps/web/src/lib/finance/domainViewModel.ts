@@ -140,7 +140,15 @@ function moneyAmount(v: unknown): number | null {
 export function bucketFor(t: string | null | undefined): AccountBucket {
   const s = (t ?? '').toLowerCase();
   if (s.includes('invest') || s.includes('retire') || s.includes('brokerage')) return 'investment';
-  if (s.includes('credit') || s.includes('loan')) return 'credit';
+  // Liabilities: credit cards, loans, mortgages, lines of credit, any debt account.
+  if (
+    s.includes('credit') ||
+    s.includes('loan') ||
+    s.includes('mortgage') ||
+    s.includes('debt') ||
+    s.includes('liabilit')
+  )
+    return 'credit';
   return 'banking';
 }
 

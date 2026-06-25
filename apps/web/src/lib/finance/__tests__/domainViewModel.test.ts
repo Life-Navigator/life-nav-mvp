@@ -130,6 +130,8 @@ describe('bucketFor', () => {
     expect(bucketFor('brokerage')).toBe('investment');
     expect(bucketFor('credit card')).toBe('credit');
     expect(bucketFor('loan')).toBe('credit');
+    expect(bucketFor('Jumbo Mortgage')).toBe('credit'); // mortgages are liabilities, not assets
+    expect(bucketFor('mortgage')).toBe('credit');
     expect(bucketFor(null)).toBe('banking');
   });
 });

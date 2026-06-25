@@ -49,6 +49,9 @@ const FinancialDashboard = () => {
       institution: string;
     }[]
   >([]);
+  const [insights, setInsights] = useState<
+    { title: string; description: string; severity?: string }[]
+  >([]);
   const [transactions, setTransactions] = useState<{
     dailySpending: Array<{
       date: string;
@@ -138,6 +141,10 @@ const FinancialDashboard = () => {
           ? d.spending_trends.categories
           : [];
         const recent = Array.isArray(d?.recent_transactions) ? d.recent_transactions : [];
+        // Real insights (month-over-month category changes) — independent of the spending charts.
+        setInsights(
+          Array.isArray(d?.financial_insights?.insights) ? d.financial_insights.insights : []
+        );
         // Only override when analytics actually has transaction data — never blank out a
         // populated legacy payload.
         if (daily.length === 0 && cats.length === 0 && recent.length === 0) return;
@@ -411,7 +418,9 @@ const FinancialDashboard = () => {
               <span>{investments.dayChangePercent.toFixed(2)}% today</span>
             </div>
           ) : (
-            <div className="text-sm text-gray-500 mt-2">Investment &amp; retirement balances</div>
+            <div className="text-sm text-gray-500 mt-2">
+              Brokerage &amp; investment accounts (retirement shown separately)
+            </div>
           )}
         </div>
 
@@ -478,11 +487,19 @@ const FinancialDashboard = () => {
                       <div className="font-medium">{account.name}</div>
                       <div className="text-sm text-gray-500">{account.institution}</div>
                     </div>
-                    <div
-                      className={`font-semibold ${account.balance < 0 ? 'text-red-600' : 'text-gray-900'}`}
-                    >
-                      {formatCurrency(account.balance)}
-                    </div>
+                    {(() => {
+                      // Liability accounts (credit cards, loans, mortgages) store a positive balance but
+                      // are money OWED — render them as a negative red amount so the list reads honestly.
+                      const liability = account.type === 'credit';
+                      const display = liability ? -Math.abs(account.balance) : account.balance;
+                      return (
+                        <div
+                          className={`font-semibold ${display < 0 ? 'text-red-600' : 'text-gray-900'}`}
+                        >
+                          {formatCurrency(display)}
+                        </div>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>
@@ -605,10 +622,11 @@ const FinancialDashboard = () => {
             <div className="flex flex-col items-center justify-center h-[300px] text-center">
               <div className="text-5xl mb-4">💼</div>
               <p className="text-gray-600 dark:text-gray-400 mb-2 font-medium">
-                No Investment Data
+                No performance history yet
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-500 mb-4">
-                Add your investment data to track portfolio performance
+                Your investment balance is shown above. Connect a brokerage to chart performance
+                over time.
               </p>
               <button
                 onClick={() => setShowAddDataModal(true)}
@@ -688,9 +706,25 @@ const FinancialDashboard = () => {
       {/* Financial insights */}
       <div className="bg-white p-6 rounded-lg shadow-md mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">Financial Insights</h2>
-        {hasData ? (
+        {insights.length > 0 ? (
+          <ul className="space-y-3">
+            {insights.map((ins, i) => (
+              <li key={i} className="flex gap-3 p-3 rounded-md bg-gray-50">
+                <span
+                  className={`mt-1 h-2 w-2 shrink-0 rounded-full ${
+                    ins.severity === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'
+                  }`}
+                />
+                <div>
+                  <div className="font-medium text-gray-900">{ins.title}</div>
+                  <div className="text-sm text-gray-600">{ins.description}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : hasData ? (
           <p className="text-gray-600 text-center py-8">
-            Insights will be generated based on your financial data.
+            No notable spending changes yet — insights appear as your transaction history grows.
           </p>
         ) : (
           <div className="text-center py-8">
