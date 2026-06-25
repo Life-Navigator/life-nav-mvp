@@ -18,15 +18,19 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # App.
 COPY app ./app
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
-# Non-root runtime.
+# The `core` user exists for non-root runtime, BUT the container must START as root so the entrypoint can
+# open connect access on Fly's root-owned /.fly/api socket (required for the keyless Vertex/WIF token fetch);
+# the entrypoint then drops to `core` (uid 10001) via setpriv before running uvicorn. Running uvicorn directly
+# as `core` made every Vertex token fetch fail with EACCES on that socket -> the advisor fell back for ALL users.
 RUN useradd --system --uid 10001 core && chown -R core:core /app
-USER core
 
 ENV PORT=8080 \
     LOG_LEVEL=info
 
 EXPOSE 8080
 
-# Liveness is /healthz (configured in fly.toml).
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "2"]
+# Liveness is /healthz (configured in fly.toml). Entrypoint opens the Fly socket then drops to `core`.
+ENTRYPOINT ["./entrypoint.sh"]
