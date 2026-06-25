@@ -27,10 +27,15 @@ log = logging.getLogger("core.vertex_auth")
 
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 _REFRESH_SKEW_S = 300  # refresh 5 min before expiry
-_SA_FILE = "/tmp/gcp-sa.json"  # where a JSON-secret service account is materialized for google.auth
+# Credential scratch files are suffixed with the RUNNING UID so processes never collide on ownership.
+# (The uvicorn worker runs as `core` uid 10001; an in-machine `flyctl ssh` shell runs as root uid 0 —
+# if root wrote /tmp/gcp-*.json first, the worker could not read them and EVERY LLM call fell back.
+# Per-uid paths mean the worker always owns, reads, and refreshes its own files.)
+_UID = os.getuid()
+_SA_FILE = f"/tmp/gcp-sa-{_UID}.json"  # where a JSON-secret service account is materialized for google.auth
 # Workload Identity Federation (keyless): Fly OIDC token → STS exchange → SA impersonation. No key, ever.
-_EXTERNAL_ACCOUNT_FILE = "/tmp/gcp-external-account.json"  # NOT a secret (no key material)
-_FLY_OIDC_TOKEN_FILE = "/tmp/fly-oidc-token"               # short-lived (15 min) Fly JWT, refreshed per exchange
+_EXTERNAL_ACCOUNT_FILE = f"/tmp/gcp-external-account-{_UID}.json"  # NOT a secret (no key material)
+_FLY_OIDC_TOKEN_FILE = f"/tmp/fly-oidc-token-{_UID}"               # short-lived (15 min) Fly JWT, refreshed per exchange
 _FLY_API_SOCKET = "/.fly/api"                              # Fly Machine local API unix socket
 
 
