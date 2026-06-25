@@ -28,6 +28,10 @@ log = logging.getLogger("core.vertex_auth")
 _SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 _REFRESH_SKEW_S = 300  # refresh 5 min before expiry
 _SA_FILE = "/tmp/gcp-sa.json"  # where a JSON-secret service account is materialized for google.auth
+# Workload Identity Federation (keyless): Fly OIDC token → STS exchange → SA impersonation. No key, ever.
+_EXTERNAL_ACCOUNT_FILE = "/tmp/gcp-external-account.json"  # NOT a secret (no key material)
+_FLY_OIDC_TOKEN_FILE = "/tmp/fly-oidc-token"               # short-lived (15 min) Fly JWT, refreshed per exchange
+_FLY_API_SOCKET = "/.fly/api"                              # Fly Machine local API unix socket
 
 
 class VertexAuthError(RuntimeError):
@@ -76,6 +80,83 @@ def materialize_sa_credentials() -> Optional[str]:
     return _SA_FILE
 
 
+def wif_enabled() -> bool:
+    """WIF mode is active when the three keyless-federation env vars are present (set on Fly)."""
+    return bool(
+        os.environ.get("VERTEX_WIF_AUDIENCE")
+        and os.environ.get("VERTEX_WIF_PROVIDER")
+        and os.environ.get("VERTEX_SA_EMAIL")
+    )
+
+
+def fetch_fly_oidc_token(audience: str) -> str:
+    """Mint a fresh Fly OIDC token (15-min JWT) via the Machine's local unix socket. No key involved."""
+    import http.client  # noqa: PLC0415
+    import socket  # noqa: PLC0415
+
+    class _UnixHTTPConnection(http.client.HTTPConnection):
+        def __init__(self, path: str) -> None:
+            super().__init__("localhost")
+            self._unix_path = path
+
+        def connect(self) -> None:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.settimeout(10)
+            s.connect(self._unix_path)
+            self.sock = s
+
+    conn = _UnixHTTPConnection(_FLY_API_SOCKET)
+    try:
+        conn.request("POST", "/v1/tokens/oidc", body=json.dumps({"aud": audience}),
+                     headers={"Content-Type": "application/json"})
+        resp = conn.getresponse()
+        body = resp.read().decode("utf-8")
+        if resp.status != 200:
+            raise VertexAuthError(f"Fly OIDC mint failed: HTTP {resp.status}: {body[:200]}")
+    except OSError as e:
+        raise VertexAuthError(f"Cannot reach Fly OIDC socket {_FLY_API_SOCKET} (not on a Fly Machine?): {e}") from e
+    finally:
+        conn.close()
+    tok = body.strip()
+    if tok.startswith("{"):  # some Fly versions wrap the JWT in JSON
+        try:
+            obj = json.loads(tok)
+            tok = obj.get("token") or obj.get("jwt") or obj.get("id_token") or ""
+        except json.JSONDecodeError:
+            tok = ""
+    if tok.count(".") != 2:
+        raise VertexAuthError("Fly OIDC response was not a JWT.")
+    return tok
+
+
+def refresh_fly_oidc_token() -> None:
+    """Write a fresh Fly OIDC token to the file the external_account credential reads."""
+    tok = fetch_fly_oidc_token(os.environ["VERTEX_WIF_AUDIENCE"])
+    with open(_FLY_OIDC_TOKEN_FILE, "w", encoding="utf-8") as f:
+        f.write(tok)
+    os.chmod(_FLY_OIDC_TOKEN_FILE, stat.S_IRUSR | stat.S_IWUSR)
+
+
+def materialize_external_account_config() -> str:
+    """Write the keyless external_account credential config (no key material) and point ADC at it."""
+    provider = os.environ["VERTEX_WIF_PROVIDER"].lstrip("/")  # projects/NUM/locations/global/workloadIdentityPools/POOL/providers/PROV
+    sa = os.environ["VERTEX_SA_EMAIL"]
+    cfg = {
+        "type": "external_account",
+        "audience": f"//iam.googleapis.com/{provider}",
+        "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+        "token_url": "https://sts.googleapis.com/v1/token",
+        "service_account_impersonation_url":
+            f"https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/{sa}:generateAccessToken",
+        "credential_source": {"file": _FLY_OIDC_TOKEN_FILE, "format": {"type": "text"}},
+    }
+    with open(_EXTERNAL_ACCOUNT_FILE, "w", encoding="utf-8") as f:
+        json.dump(cfg, f)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _EXTERNAL_ACCOUNT_FILE
+    log.info("vertex_auth: WIF external_account config written (provider=%s, sa=%s) — keyless", provider, sa)
+    return _EXTERNAL_ACCOUNT_FILE
+
+
 class AdcTokenProvider:
     """Mints + caches a Google OAuth access token from ADC. Thread-safe; refresh is blocking (network),
     so async callers should invoke `.token()` via asyncio.to_thread. Refreshes happen ~hourly, so the
@@ -95,7 +176,13 @@ class AdcTokenProvider:
             raise VertexAuthError(
                 "google-auth is not installed — add `google-auth` to requirements and pip install it."
             ) from e
-        materialize_sa_credentials()  # bridge a JSON-secret SA to the file google.auth expects (no-op for WIF/user ADC)
+        if wif_enabled():
+            # Keyless: write the external_account config + an initial Fly OIDC token, then let google.auth
+            # build an external_account credential (STS exchange + SA impersonation on each refresh).
+            materialize_external_account_config()
+            refresh_fly_oidc_token()
+        else:
+            materialize_sa_credentials()  # JSON-secret SA → file (no-op for user ADC / metadata)
         try:
             creds, _project = google.auth.default(scopes=[self._scope])
         except Exception as e:  # google.auth.exceptions.DefaultCredentialsError et al.  # noqa: BLE001
@@ -116,6 +203,10 @@ class AdcTokenProvider:
             if self._creds is None:
                 self._creds = self._load_credentials()
             try:
+                if wif_enabled():
+                    # The Fly OIDC subject token expires in 15 min; mint a fresh one immediately before the
+                    # STS exchange so the external_account refresh always has a valid subject token.
+                    refresh_fly_oidc_token()
                 self._creds.refresh(Request())
             except Exception as e:  # noqa: BLE001
                 raise VertexAuthError(f"Failed to refresh ADC token: {e}") from e
