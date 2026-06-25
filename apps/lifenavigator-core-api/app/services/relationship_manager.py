@@ -12,9 +12,12 @@ Flow:  Advisor Chat → Relationship Manager Discovery → Supabase (life.*) →
 from __future__ import annotations
 
 import json
+import logging
 import re
 import uuid
 from typing import Any, Optional
+
+log = logging.getLogger("core.relationship_manager")
 
 # Rule 2: user corrections are authoritative. When the user pushes back, we apologize + ask them to
 # restate — we never re-assert a rejected interpretation.
@@ -75,7 +78,8 @@ class RelationshipManager:
         self._sb = supabase
         self._life = life          # LifeDiscoveryService — canonical writer
         self._bridge = bridge      # LifeBridge — folds in setup-wizard/persona data
-        self._gemini = gemini      # onboarding interpreter LLM (optional; fail-safe to deterministic extract)
+        self._gemini = gemini      # onboarding interpreter LLM (optional; fail-safe to a SAFE clarification)
+        self._interpret_status = ""  # last _interpret_plan outcome: ok|no_llm|skipped_short|llm_failed|parse_failed|empty
         from app.services.domain_projection import DomainProjectionService
         self._projection = DomainProjectionService(supabase)  # discovery goals → domain tables
 
@@ -206,8 +210,12 @@ class RelationshipManager:
     async def _interpret_plan(self, statement: str) -> Optional[dict[str, Any]]:
         g = self._gemini
         text = (statement or "").strip()
-        if not g or not getattr(g, "configured", False) or len(text.split()) < 6:
-            return None  # no LLM, or too short to be a paragraph → use the deterministic path
+        if not g or not getattr(g, "configured", False):
+            self._interpret_status = "no_llm"
+            return None
+        if len(text.split()) < 6:
+            self._interpret_status = "skipped_short"  # too short to be a paragraph (vague answer)
+            return None
         user = (
             f'User message:\n"""{text[:1500]}"""\n\nReturn JSON exactly with this shape:\n'
             '{"north_star": str, "time_horizon": str, '
@@ -221,11 +229,14 @@ class RelationshipManager:
             try:
                 raw = await g.generate(self._INTERP_SYSTEM, user, temperature=0.2)
             except Exception:  # noqa: BLE001
+                self._interpret_status = "llm_failed"
                 return None
         except Exception:  # noqa: BLE001
+            self._interpret_status = "llm_failed"
             return None
         data = self._parse_json(raw)
         if not data:
+            self._interpret_status = "parse_failed"
             return None
         cand: list[dict[str, Any]] = []
         seen: set[str] = set()
@@ -257,7 +268,9 @@ class RelationshipManager:
         # IS a useful update — return the plan so we record the deprioritization instead of falling back to the
         # fragment extractor. Only truly empty interpretations fall back.
         if not cand and not deprioritized:
+            self._interpret_status = "empty"
             return None
+        self._interpret_status = "ok"
         return {
             "candidate_goals": cand,
             "north_star": str(data.get("north_star") or "").strip(),
@@ -418,7 +431,9 @@ class RelationshipManager:
             # LLM interpreter first (clean, complete goals + a north star). Fall back to the deterministic
             # clause extractor only if the LLM is unavailable or returns nothing usable.
             plan = await self._interpret_plan(ans)
-            written["candidate_goals"] = plan["candidate_goals"] if plan else self._life.analyze_statement(ans)
+            # HARDENING: NEVER fall back to the regex clause-splitter for a substantive discovery answer — a
+            # failed interpreter must not corrupt goals with fragments. Goals come ONLY from the semantic plan.
+            written["candidate_goals"] = plan["candidate_goals"] if plan else []
             written["llm_plan"] = plan
             # Narrative Model: preserve the user's OWN words + a multi-domain summary (the LLM north star when
             # available, else a deterministic domain rollup), stored separately so the story isn't collapsed.
@@ -549,6 +564,10 @@ class RelationshipManager:
         reveal = None
         llm_plan: Optional[dict[str, Any]] = None  # set when the LLM interpreter parsed this turn's paragraph
         candidate_goals: list[dict[str, Any]] = []
+        interpret_status = ""        # ok|no_llm|skipped_short|llm_failed|parse_failed|empty (this turn)
+        substantive = False          # ≥6-word discovery message (a real paragraph, not a one-word answer)
+        interpreter_failed = False   # the LLM interpreter errored on a substantive turn → SAFE clarification
+        rejected_count = 0           # goals suppressed because the user previously rejected them
         if pending_key and message.strip() and _CORRECTION_RE.search(message):
             # Rule 2: the user is correcting us — apologize, do NOT classify or advance, ask them to
             # restate in their own words. (We never re-surface the rejected interpretation.)
@@ -591,7 +610,13 @@ class RelationshipManager:
             # interpreter on the message to get CLEAN, complete goals + a structured plan (north star, domains,
             # values, prioritization question) — instead of the regex clause-splitter's fragments. The plan is
             # reused below for the synthesis reflection + next question. Fail-safe: None → deterministic extract.
-            llm_plan = (rec.get("llm_plan") if isinstance(rec, dict) else None) or await self._interpret_plan(message)
+            if isinstance(rec, dict) and rec.get("llm_plan"):
+                llm_plan, interpret_status = rec["llm_plan"], "ok"
+            else:
+                llm_plan = await self._interpret_plan(message)
+                interpret_status = self._interpret_status
+            substantive = len(message.split()) >= 6
+            interpreter_failed = interpret_status in ("llm_failed", "parse_failed")
             # Persist any explicit deprioritization (merge, never clobber) so the platform can mark e.g.
             # education "deprioritized / sufficient for now" instead of "not started". (T3 fix)
             if llm_plan and llm_plan.get("deprioritized_domains"):
@@ -602,8 +627,11 @@ class RelationshipManager:
                     await self._update_vision(ctx, prompt_updates={"deprioritized_domains": merged})
                 except Exception:  # noqa: BLE001
                     pass
+            # HARDENING: goals come ONLY from the semantic plan. The legacy regex clause-splitter is NEVER used
+            # for a substantive discovery turn — a failed/empty interpreter yields NO goals (and, when it failed
+            # on a substantive turn, a safe clarification below), so fragments can never re-enter persistence.
             seen_goal = {str(g.get("goal", "")).lower() for g in candidate_goals}
-            extracted = llm_plan["candidate_goals"] if llm_plan else self._life.analyze_statement(message)
+            extracted = llm_plan["candidate_goals"] if llm_plan else []
             for g in extracted:
                 gk = str(g.get("goal", "")).lower()
                 if gk and gk not in seen_goal:
@@ -613,13 +641,15 @@ class RelationshipManager:
             if candidate_goals:
                 rejected = await self._rejected_norms(ctx)
                 if rejected:
-                    candidate_goals = [
+                    kept = [
                         g for g in candidate_goals
                         if not any(
                             r in (str(g.get("goal", "")) + " " + str(g.get("objective", ""))).lower()
                             for r in rejected
                         )
                     ]
+                    rejected_count = len(candidate_goals) - len(kept)
+                    candidate_goals = kept
             # P0.1: persist every surviving candidate goal so it accumulates across turns (never lost).
             if candidate_goals:
                 await self._persist_candidate_goals(ctx, candidate_goals)
@@ -719,10 +749,49 @@ class RelationshipManager:
             why = nq.get("why_it_matters")
             why_line = f"\n\n_Why I ask: {why}_" if why else ""
             assistant = f"{reflection}{opener}{nq['prompt']}{why_line}"
+        # HARDENING: the interpreter FAILED on a substantive paragraph → nothing was persisted (goals came only
+        # from the semantic plan, which is empty here) and we must NOT legacy-fragment. Return a safe
+        # clarification and let the user restate; re-ask the same step.
+        response_pending = None if (st.get("complete") or not nq) else nq["key"]
+        if interpreter_failed and substantive:
+            assistant = (
+                "I'm having trouble turning that into a clean plan right now, and I don't want to save it "
+                "incorrectly. Let's take it one step at a time: what's the most important thing you want "
+                "LifeNavigator to help you organize first — finances, health, career, family, or something else?"
+            )
+            reveal = None
+            response_pending = pending_key  # re-ask the same step; nothing persisted from raw text
+            log.warning(json.dumps({"event": "onboarding_interpreter_failed", "user": ctx.user_id,
+                                    "status": interpret_status, "msg_len": len(message or "")}))
+        # Response provenance for the onboarding trace (P5).
+        if interpreter_failed and substantive:
+            response_source = "safe_clarification"
+        elif llm_plan and (llm_plan.get("candidate_goals") or llm_plan.get("deprioritized_domains")):
+            response_source = "semantic"
+        elif st.get("complete"):
+            response_source = "complete"
+        else:
+            response_source = "state_machine"
+        onboarding_trace = {
+            "interpreter_used": interpret_status in ("ok", "llm_failed", "parse_failed", "empty"),
+            "interpreter_failed": interpreter_failed,
+            "interpret_status": interpret_status,
+            "semantic_path_used": bool(llm_plan and (llm_plan.get("candidate_goals")
+                                                     or llm_plan.get("deprioritized_domains"))),
+            "legacy_fragment_path_used": False,  # the regex clause-splitter is unreachable in discovery now
+            "fallback_type": ("safe_clarification" if (interpreter_failed and substantive) else ""),
+            "persisted_goals_count": len(candidate_goals),
+            "rejected_goals_count": rejected_count,
+            "response_source": response_source,
+            "reveal_source": "semantic" if reveal else "none",
+            "action_unlock_source": "semantic" if candidate_goals else "none",
+        }
+        if pending_key and substantive:
+            log.info(json.dumps({"event": "onboarding_turn", "user": ctx.user_id, **onboarding_trace}))
         panel = await self._context_panel(ctx, focus_domains)
         return {
             "assistant_message": assistant,
-            "pending_key": None if (st.get("complete") or not nq) else nq["key"],
+            "pending_key": response_pending,
             "options": (nq or {}).get("options"),
             "updates": updates,
             "reveal": reveal,  # the "magic moment" — render it prominently (D2)
@@ -730,4 +799,5 @@ class RelationshipManager:
             "progress": st.get("progress"),
             "complete": st.get("complete", False),
             "context_panel": panel,
+            "onboarding_trace": onboarding_trace,
         }

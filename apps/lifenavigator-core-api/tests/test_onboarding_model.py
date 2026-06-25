@@ -10,7 +10,7 @@ from app.services.discovery_coverage import DiscoveryCoverageService
 from app.services.life_bridge import LifeBridgeService
 from app.services.life_discovery import LifeDiscoveryService, _goal_domain
 from app.services.relationship_manager import RelationshipManager
-from .conftest import FakeSupabase
+from .conftest import FakeSupabase, FakeInterpreterGemini
 
 CTX = UserContext(user_id="11111111-1111-1111-1111-111111111111")
 
@@ -22,7 +22,7 @@ INCIDENT = ("I am currently paying down credit cards in order to get a better tr
 
 def _rm(sb):
     life = LifeDiscoveryService(sb)
-    return RelationshipManager(sb, life, LifeBridgeService(sb, life))
+    return RelationshipManager(sb, life, LifeBridgeService(sb, life), gemini=FakeInterpreterGemini())
 
 
 # ── P0.3: domain classification (every goal carries a real domain, not "core") ──

@@ -157,3 +157,26 @@ def client(make_client):
 @pytest.fixture
 def auth_header():
     return {"Authorization": f"Bearer {make_jwt()}"}
+
+
+class FakeInterpreterGemini:
+    """Onboarding-interpreter LLM test double. Returns a structured plan whose goals mirror the deterministic
+    clause analysis, so discovery tests exercise the PRODUCTION semantic path (interpreter -> candidate_goals)
+    rather than the now-gated legacy fragment fallback. (HARDENING: prod always has an interpreter LLM.)"""
+
+    configured = True
+
+    async def generate_with_usage(self, system, user, temperature=None):  # noqa: ARG002
+        import json as _json
+        import re as _re
+        from app.services.life_discovery import LifeDiscoveryService, _goal_domain
+        m = _re.search(r'"""(.*?)"""', user, _re.S)
+        msg = (m.group(1) if m else user).strip()
+        goals = []
+        for c in LifeDiscoveryService(None).analyze_statement(msg):
+            g = str(c.get("goal") or "").strip()
+            if len(g.split()) >= 2:
+                goals.append({"goal": g[:1].upper() + g[1:], "domain": c.get("domain") or _goal_domain(g),
+                              "status": c.get("status") or "active", "confidence": c.get("confidence") or 0.7})
+        return _json.dumps({"north_star": "", "time_horizon": "", "goals": goals, "values": [],
+                            "deprioritized_domains": [], "synthesis": "", "next_question": ""}), {}

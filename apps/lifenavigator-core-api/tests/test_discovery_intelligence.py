@@ -14,7 +14,7 @@ from app.services.life_discovery import (
 )
 from app.services.relationship_manager import RelationshipManager
 
-from .conftest import FakeSupabase
+from .conftest import FakeSupabase, FakeInterpreterGemini
 
 CTX = UserContext(user_id="22222222-2222-2222-2222-222222222222")
 
@@ -101,7 +101,7 @@ async def test_priority_answer_confirms_and_promotes_objective():
         _obj("financial_independence", confirmed=False, origin="persona_bridge", confidence=0.95),
         _obj("family_stability", confirmed=False, origin="persona_bridge", confidence=0.40),
     ]})
-    rm = RelationshipManager(sb, LifeDiscoveryService(sb))
+    rm = RelationshipManager(sb, LifeDiscoveryService(sb), gemini=FakeInterpreterGemini())
     await rm.answer(CTX, "priority", "Honestly, starting a family and the wedding matter most right now.")
     vision = (await sb.select("life_vision", filters={"user_id": f"eq.{CTX.user_id}"}))[0]
     assert vision["prompts"].get("user_priority_root") == "family_stability"
@@ -113,7 +113,7 @@ async def test_priority_answer_confirms_and_promotes_objective():
 @pytest.mark.asyncio
 async def test_narrative_survives_ontology_conversion():
     sb = FakeSupabase({})
-    rm = RelationshipManager(sb, LifeDiscoveryService(sb))
+    rm = RelationshipManager(sb, LifeDiscoveryService(sb), gemini=FakeInterpreterGemini())
     statement = "Pay off debt, save for a wedding, buy a home, start a family, get promoted, do a Master's, get fit."
     await rm.answer(CTX, "primary_goal", statement)
     vision = (await sb.select("life_vision", filters={"user_id": f"eq.{CTX.user_id}"}))[0]
@@ -155,7 +155,7 @@ async def test_discovery_question_surfaces_tradeoff_when_goals_compete():
             {"user_id": CTX.user_id, "goal_text": "get in shape", "domain": "health"},
         ],
     })
-    rm = RelationshipManager(sb, LifeDiscoveryService(sb))
+    rm = RelationshipManager(sb, LifeDiscoveryService(sb), gemini=FakeInterpreterGemini())
     st = await rm.state(CTX)
     assert st["next_question"]["key"] == "priority"
     assert "postpone" in st["next_question"]["prompt"].lower()   # tradeoff framing, not "timeline for FI"
@@ -190,7 +190,7 @@ async def test_validation_example_family_not_financial_independence():
     assert any(c["root"] == "financial_independence" and c["confirmed"] is False
                for c in snap["candidate_objectives"])  # FI shown as a possible goal, not the focus
     # 2) Next question is the tradeoff/postpone question, not "timeline for financial independence".
-    rm = RelationshipManager(sb, LifeDiscoveryService(sb))
+    rm = RelationshipManager(sb, LifeDiscoveryService(sb), gemini=FakeInterpreterGemini())
     st = await rm.state(CTX)
     assert st["next_question"]["key"] == "priority"
     assert "postpone" in st["next_question"]["prompt"].lower()
@@ -239,7 +239,7 @@ async def test_narrative_validation_end_to_end_clean(name):
     """Phase 9 — full pipeline, pure user narrative: the surfaced theme matches the person's life story."""
     stmt, expected = _PERSONAS[name]
     sb = FakeSupabase({}); life = LifeDiscoveryService(sb)
-    rm = RelationshipManager(sb, life); ctx = UserContext(user_id="u-" + name)
+    rm = RelationshipManager(sb, life, gemini=FakeInterpreterGemini()); ctx = UserContext(user_id="u-" + name)
     cur = await rm.converse(ctx, "", None)
     for _ in range(4):
         pk = cur.get("pending_key")
@@ -259,7 +259,7 @@ async def test_narrative_validation_with_persona_seed(name):
     sb = FakeSupabase({"user_persona_profile": [{"user_id": "u2-" + name,
         "primary_goals": ["retire comfortably", "build wealth"], "display_name": "Sandbox"}]})
     life = LifeDiscoveryService(sb)
-    rm = RelationshipManager(sb, life, LifeBridgeService(sb, life)); ctx = UserContext(user_id="u2-" + name)
+    rm = RelationshipManager(sb, life, LifeBridgeService(sb, life), gemini=FakeInterpreterGemini()); ctx = UserContext(user_id="u2-" + name)
     cur = await rm.converse(ctx, "", None)
     for _ in range(4):
         pk = cur.get("pending_key")
@@ -300,7 +300,7 @@ def test_narrative_not_sticky_legacy_absorbs_vc():
 
 # ── Question quality for the real-user gate (warmth for crisis/burnout; concrete tradeoff otherwise) ──
 async def _next_q(stmt):
-    sb = FakeSupabase({}); life = LifeDiscoveryService(sb); rm = RelationshipManager(sb, life)
+    sb = FakeSupabase({}); life = LifeDiscoveryService(sb); rm = RelationshipManager(sb, life, gemini=FakeInterpreterGemini())
     ctx = UserContext(user_id="qu")
     cur = await rm.converse(ctx, "", None)
     for _ in range(4):

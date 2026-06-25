@@ -7,14 +7,14 @@ from app.models.common import UserContext
 from app.services.life_bridge import LifeBridgeService
 from app.services.life_discovery import LifeDiscoveryService
 from app.services.relationship_manager import RelationshipManager
-from .conftest import FakeSupabase
+from .conftest import FakeSupabase, FakeInterpreterGemini
 
 CTX = UserContext(user_id="11111111-1111-1111-1111-111111111111")
 
 
 def _rm(sb):
     life = LifeDiscoveryService(sb)
-    return RelationshipManager(sb, life, LifeBridgeService(sb, life))
+    return RelationshipManager(sb, life, LifeBridgeService(sb, life), gemini=FakeInterpreterGemini())
 
 
 @pytest.mark.asyncio
