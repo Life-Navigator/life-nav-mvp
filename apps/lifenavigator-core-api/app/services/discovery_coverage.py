@@ -74,6 +74,101 @@ class DiscoveryCoverageService:
                 continue
         return False
 
+    async def _one(self, table: str, schema: str, ctx: UserContext, order: str = "updated_at.desc") -> dict:
+        try:
+            rows = await self._sb.select(table, filters={"user_id": f"eq.{ctx.user_id}"},
+                                         limit=1, order=order, schema=schema)
+            return rows[0] if rows else {}
+        except Exception:  # noqa: BLE001
+            return {}
+
+    async def _count(self, table: str, schema: str, ctx: UserContext) -> int:
+        try:
+            rows = await self._sb.select(table, filters={"user_id": f"eq.{ctx.user_id}"}, limit=50, schema=schema)
+            return len(rows or [])
+        except Exception:  # noqa: BLE001
+            return 0
+
+    async def _domain_facts(self, ctx: UserContext, key: str) -> dict[str, Any]:
+        """Concrete KNOWN values per domain (the dashboard card's primary content — like Financial Overview).
+        Read from the durable domain tables, fail-soft. Human-shaped (no snake_case leaking to the UI)."""
+        f: dict[str, Any] = {}
+        if key == "career":
+            p = await self._one("career_profiles", "public", ctx)
+            g = await self._one("career_goals", "career", ctx)
+            if p.get("current_title"):
+                f["Current role"] = p["current_title"]
+            if p.get("current_company"):
+                f["Company"] = p["current_company"]
+            if p.get("skills"):
+                f["Skills"] = ", ".join(p["skills"][:6])
+            if (p.get("summary") or "").startswith("Focus:"):
+                f["Focus"] = p["summary"][6:].strip()
+            if g.get("target_role"):
+                f["Target role"] = g["target_role"]
+        elif key == "health":
+            p = await self._one("health_profiles", "health", ctx, order="created_at.desc")
+            m = await self._one("body_metrics", "health", ctx, order="created_at.desc")
+            g = await self._one("health_goals", "health", ctx)
+            if p.get("height_cm"):
+                cm = float(p["height_cm"]); ft = int(cm / 30.48); inch = round((cm / 2.54) - ft * 12)
+                f["Height"] = f"{ft}'{inch}\""
+            wkg, bf = m.get("weight_kg"), m.get("body_fat_pct")
+            if wkg:
+                lbs = round(float(wkg) / 0.453592)
+                f["Weight"] = f"{lbs} lbs"
+                if bf:
+                    fat = round(lbs * float(bf) / 100, 1)
+                    f["Body fat"] = f"{float(bf):g}%"
+                    f["Fat mass"] = f"~{fat:g} lbs"
+                    f["Lean mass"] = f"~{round(lbs - fat, 1):g} lbs"
+            elif bf:
+                f["Body fat"] = f"{float(bf):g}%"
+            if g.get("goal_type"):
+                f["Goal"] = (g.get("title") or g["goal_type"])
+        elif key == "education":
+            recs = await self._count("education_records", "public", ctx)
+            certs = await self._count("certifications", "education", ctx)
+            prof = await self._one("education_profiles", "education", ctx)
+            latest = await self._one("education_records", "public", ctx, order="created_at.desc")
+            if prof.get("highest_level") or latest.get("degree_type"):
+                lvl = prof.get("highest_level") or latest.get("degree_type")
+                fld = latest.get("field_of_study")
+                f["Highest education"] = f"{lvl} in {fld}" if fld else lvl
+            if latest.get("institution_name"):
+                f["School"] = latest["institution_name"]
+            if recs:
+                f["Degrees / records"] = recs
+            if certs:
+                f["Certificates"] = certs
+        elif key == "family":
+            p = await self._one("family_profiles", "family", ctx)
+            if p.get("relationship_status"):
+                f["Status"] = p["relationship_status"]
+            if p.get("wedding_timeline"):
+                f["Wedding"] = p["wedding_timeline"]
+            goals = list(p.get("family_goals") or [])
+            if not goals:
+                goals = [g for g, on in (("Buy a first home", p.get("home_goal")),
+                                         ("Start a family", p.get("children_goal"))) if on]
+            if goals:
+                f["Goals"] = ", ".join(goals[:4])
+        elif key == "finance":
+            rows = []
+            try:
+                rows = await self._sb.select("financial_planning_goals", filters={"user_id": f"eq.{ctx.user_id}"},
+                                             limit=20, schema="finance")
+            except Exception:  # noqa: BLE001
+                rows = []
+            for r in rows or []:
+                if r.get("goal_type") == "financial_foundation":
+                    f["Primary priority"] = r.get("label") or "Financial foundation"
+                elif r.get("goal_type") == "home_price_range":
+                    lo, hi = r.get("amount_min"), r.get("amount_max")
+                    if lo or hi:
+                        f["Home range"] = f"${int(lo or 0) // 1000}K–${int(hi or 0) // 1000}K"
+        return f
+
     async def coverage(self, ctx: UserContext) -> dict[str, Any]:
         vis = await self._sb.select("life_vision", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema="life")
         prompts0 = (vis[0].get("prompts") or {}) if vis else {}
@@ -130,9 +225,11 @@ class DiscoveryCoverageService:
             status = ("deprioritized" if is_deprioritized else
                       "complete" if coverage_pct >= 80 else "partial" if coverage_pct >= 40
                       else "started" if coverage_pct > 0 else "not_started")
+            facts = await self._domain_facts(ctx, key) if (has_records or has_goal) else {}
             domains.append({
                 "domain": key, "label": spec["label"], "coverage_pct": coverage_pct, "status": status,
                 "confidence_pct": min(95, coverage_pct) if coverage_pct else 0,
+                "facts": facts,  # concrete KNOWN values — the card's primary content (like Financial Overview)
                 "has_objective": has_objective or has_data,
                 "missing": missing_inputs[:5], "unlocks": spec["unlocks"],
                 # Scope the CTA to the DOMAIN advisor so "Continue health discovery" opens the Health

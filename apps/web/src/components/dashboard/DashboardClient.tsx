@@ -673,7 +673,9 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                 </h3>
               </Link>
               <WorkingToward objective={dashboardData?.health.lifeObjective} />
-              {dashboardData?.health.hasData ? (
+              {coverage['health']?.facts && Object.keys(coverage['health'].facts).length ? (
+                <DomainCoverage data={coverage['health']} fallbackHref="/dashboard/healthcare" />
+              ) : dashboardData?.health.hasData ? (
                 <>
                   {dashboardData.health.nextAppointment && (
                     <div className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
@@ -724,7 +726,9 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                 </h3>
               </Link>
               <WorkingToward objective={dashboardData?.career.lifeObjective} />
-              {careerProfileSaved ? (
+              {coverage['career']?.facts && Object.keys(coverage['career'].facts).length ? (
+                <DomainCoverage data={coverage['career']} fallbackHref="/dashboard/career" />
+              ) : careerProfileSaved ? (
                 // Canonical career profile (same source as the Career domain page) — never "Not started".
                 <>
                   <div className="mb-3">
@@ -794,7 +798,9 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                 </h3>
               </Link>
               <WorkingToward objective={dashboardData?.education.lifeObjective} />
-              {dashboardData?.education.hasData ? (
+              {coverage['education']?.facts && Object.keys(coverage['education'].facts).length ? (
+                <DomainCoverage data={coverage['education']} fallbackHref="/dashboard/education" />
+              ) : dashboardData?.education.hasData ? (
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Active Courses</p>
@@ -831,14 +837,16 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                 </h3>
               </Link>
               <WorkingToward objective={dashboardData?.family?.lifeObjective} />
-              {familyCounts &&
-              familyCounts.dependents +
-                familyCounts.beneficiaries +
-                familyCounts.emergency +
-                familyCounts.advisors +
-                (familyCounts.members ?? 0) +
-                (familyCounts.pets ?? 0) >
-                0 ? (
+              {coverage['family']?.facts && Object.keys(coverage['family'].facts).length ? (
+                <DomainCoverage data={coverage['family']} fallbackHref="/dashboard/family" />
+              ) : familyCounts &&
+                familyCounts.dependents +
+                  familyCounts.beneficiaries +
+                  familyCounts.emergency +
+                  familyCounts.advisors +
+                  (familyCounts.members ?? 0) +
+                  (familyCounts.pets ?? 0) >
+                  0 ? (
                 <div className="grid grid-cols-3 gap-3 text-center">
                   {[
                     ['Members', familyCounts.members],

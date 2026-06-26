@@ -11,8 +11,9 @@ export interface DomainCoverageData {
   domain: string;
   label: string;
   coverage_pct: number;
-  status: 'not_started' | 'started' | 'partial' | 'complete';
+  status: 'not_started' | 'started' | 'partial' | 'complete' | 'deprioritized';
   confidence_pct: number;
+  facts?: Record<string, string | number>;
   missing: string[];
   unlocks: string[];
   cta: string | null;
@@ -20,8 +21,9 @@ export interface DomainCoverageData {
 
 const STATUS: Record<string, { label: string; color: string }> = {
   complete: { label: 'Complete', color: 'bg-emerald-500' },
-  partial: { label: 'Partial', color: 'bg-amber-500' },
+  partial: { label: 'In progress', color: 'bg-amber-500' },
   started: { label: 'Started', color: 'bg-sky-500' },
+  deprioritized: { label: 'Sufficient for now', color: 'bg-gray-400' },
   not_started: { label: 'Not started', color: 'bg-gray-300' },
 };
 
@@ -50,39 +52,49 @@ export default function DomainCoverage({
   }
 
   const st = STATUS[data.status] || STATUS.not_started;
-  const topMissing = data.missing?.[0]?.replace(/_/g, ' ');
+  const factEntries = Object.entries(data.facts || {}).filter(([, v]) => v != null && v !== '');
+  const hasFacts = factEntries.length > 0;
+  const missing = (data.missing || []).map((m) => m.replace(/_/g, ' ')).slice(0, 4);
 
   return (
-    <div className="py-2">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-gray-500 dark:text-gray-400">Coverage</span>
-        <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-          <span className={`w-2 h-2 rounded-full ${st.color}`} /> {st.label} · {data.coverage_pct}%
-          {data.confidence_pct ? ` · ${data.confidence_pct}% conf` : ''}
-        </span>
-      </div>
-      <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-        <div className="h-full bg-indigo-500" style={{ width: `${data.coverage_pct}%` }} />
-      </div>
-      {topMissing && (
-        <p className="mt-2 text-xs text-gray-600 dark:text-gray-300">
-          <span className="text-rose-600 font-semibold">Missing:</span> {topMissing}
+    <div className="py-1">
+      {/* PRIMARY: concrete known facts (like Financial Overview) — not a progress bar. */}
+      {hasFacts ? (
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+          {factEntries.slice(0, 6).map(([k, v]) => (
+            <div key={k}>
+              <dt className="text-xs text-gray-500 dark:text-gray-400">{k}</dt>
+              <dd className="text-sm font-semibold text-gray-900 dark:text-white">{String(v)}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+          <div className="h-full bg-indigo-500" style={{ width: `${data.coverage_pct}%` }} />
+        </div>
+      )}
+
+      {missing.length > 0 && (
+        <p className="mt-3 text-xs text-gray-600 dark:text-gray-300">
+          <span className="text-rose-600 font-semibold">Missing:</span> {missing.join(' · ')}
         </p>
       )}
-      {data.unlocks?.length > 0 && (
-        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
-          <span className="text-emerald-600 font-semibold">Unlocks:</span>{' '}
-          {data.unlocks.slice(0, 2).join(' · ')}
-        </p>
-      )}
+
       {data.cta && (
         <Link
           href={data.cta}
-          className="mt-3 inline-block text-sm text-indigo-600 dark:text-indigo-400 font-medium"
+          className="mt-3 inline-block text-sm font-medium text-indigo-600 dark:text-indigo-400"
         >
-          Continue {data.label} discovery →
+          {hasFacts ? `View ${data.label} details →` : `Continue ${data.label} discovery →`}
         </Link>
       )}
+
+      {/* SECONDARY: coverage/confidence as small metadata, not the headline. */}
+      <div className="mt-3 flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+        <span className={`w-1.5 h-1.5 rounded-full ${st.color}`} /> {st.label}
+        {data.coverage_pct ? ` · ${data.coverage_pct}%` : ''}
+        {data.confidence_pct ? ` · ${data.confidence_pct}% conf` : ''}
+      </div>
     </div>
   );
 }

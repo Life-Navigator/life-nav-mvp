@@ -43,3 +43,18 @@ async def test_empty_domain_is_still_not_started():
     sb = FakeSupabase({})
     edu = _dom(await _cov(sb).coverage(CTX), "education")
     assert edu["status"] == "not_started" and edu["coverage_pct"] == 0  # truly empty → honest not_started
+
+
+@pytest.mark.asyncio
+async def test_coverage_returns_concrete_facts():
+    sb = FakeSupabase({})
+    await sb.insert("education_records", {"id": "e1", "user_id": CTX.user_id, "degree_type": "bachelor",
+                                          "field_of_study": "Business Administration",
+                                          "institution_name": "Cal State Bakersfield"}, schema="public")
+    await sb.insert("career_profiles", {"id": "c1", "user_id": CTX.user_id, "current_title": "Senior Architect",
+                                        "current_company": "Persistent Systems"}, schema="public")
+    cov = await _cov(sb).coverage(CTX)
+    edu = _dom(cov, "education")["facts"]
+    assert edu.get("School") == "Cal State Bakersfield" and "Business Administration" in edu.get("Highest education", "")
+    car = _dom(cov, "career")["facts"]
+    assert car.get("Current role") == "Senior Architect" and car.get("Company") == "Persistent Systems"
