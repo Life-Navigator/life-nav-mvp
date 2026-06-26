@@ -204,10 +204,48 @@ async def test_baseline_capture_advances_then_completes():
     rm = _rm(sb, FakeInterpreterGemini())
     o1 = await rm.converse(CTX, MISSING, pending_key="final_topics")
     assert o1["pending_key"] == "baseline_health" and o1["complete"] is False
-    o2 = await rm.converse(CTX, "I want to lose fat and build muscle; I'm at 18% body fat now.", pending_key="baseline_health")
-    assert o2["pending_key"] == "baseline_career" and o2["complete"] is False  # health captured, career next
-    o3 = await rm.converse(CTX, "I'm a software engineer aiming for a senior/staff role.", pending_key="baseline_career")
-    assert o3["complete"] is True and o3["pending_key"] is None
+    # Health answer → synthesis + ONE health follow-up (stays on health), NOT an immediate finance/career jump.
+    o2 = await rm.converse(CTX, "I'm 6 ft, 210 lbs, want to stay this weight but cut fat and add muscle, 18% body fat, better cardio.", pending_key="baseline_health")
+    assert o2["pending_key"] == "baseline_health" and o2["complete"] is False
+    assert "training" in o2["assistant_message"].lower() or "injuries" in o2["assistant_message"].lower()
+    # follow-up answer → advance to career
+    o3 = await rm.converse(CTX, "3 days lifting, 2 days cardio, no injuries, ~7h sleep.", pending_key="baseline_health")
+    assert o3["pending_key"] == "baseline_career" and o3["complete"] is False
+    o4 = await rm.converse(CTX, "I'm a software engineer aiming for a senior/staff role.", pending_key="baseline_career")
+    assert o4["complete"] is True and o4["pending_key"] is None
+
+
+# ---- P1: health baseline produces recomposition + fat/lean synthesis BEFORE moving on ----
+@pytest.mark.asyncio
+async def test_health_baseline_synthesis_recomp_and_mass():
+    sb = FakeSupabase({})
+    rm = _rm(sb, FakeInterpreterGemini())
+    await rm.converse(CTX, "We haven't discussed what getting in shape means.", pending_key="final_topics")
+    out = await rm.converse(CTX, ("I am 6 ft tall and 210 lbs. I want to stay this weight but cut significant "
+        "fat and increase muscle. I am about 18% body fat now. I also want much better cardio."),
+        pending_key="baseline_health")
+    msg = out["assistant_message"].lower()
+    assert "recomposition" in msg
+    assert "37.8" in out["assistant_message"] and "172.2" in out["assistant_message"]  # fat/lean mass
+    assert "financially ready" not in msg  # must NOT jump straight to finance
+    assert out["pending_key"] == "baseline_health"  # health follow-up, not finance
+
+
+# ---- P2: a credential fact is persisted + briefly acknowledged, no cross-domain monologue ----
+@pytest.mark.asyncio
+async def test_education_credential_brief_no_monologue():
+    sb = FakeSupabase({})
+    rm = _rm(sb, FakeInterpreterGemini())
+    out = await rm.converse(CTX, "I have a BS in Business Administration from Cal State Bakersfield.", pending_key=None)
+    msg = out["assistant_message"]
+    assert "BS in Business Administration from Cal State Bakersfield" in msg
+    assert "sufficient for now" in msg.lower()
+    assert len(msg) < 400  # brief, not a monologue
+    assert "balance sheet" not in msg.lower() and "home" not in msg.lower() and "primary engine" not in msg.lower()
+    vis = await sb.select("life_vision", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
+    assert "education" in ((vis[0].get("prompts") if vis else {}) or {}).get("deprioritized_domains", [])
+    # the general onboarding paragraph (mentions "degree" but no "from <school>") is NOT treated as a credential
+    assert rm._is_credential_fact("I already have my degree so that isn't a priority, but getting in shape is.") is False
 
 
 @pytest.mark.asyncio

@@ -280,6 +280,36 @@ class AdvisorOrchestrator:
         self._claude_high_stakes_only = claude_high_stakes_only
         self.prompt_version = ADVISOR_PROMPT_VERSION
 
+    # A bare money figure ("$500K - $750K", "500k") signals finance even when keyword routing misses it.
+    _MONEY_SIGNAL = re.compile(
+        r"\$\s?\d|\b\d{2,3}\s?k\b|\bdown[\s-]?payment|home (?:price|range|budget)|house (?:price|cost)", re.I)
+
+    def _out_of_domain_handoff(self, agent_obj: Any, message: str) -> Optional[str]:
+        """A direct domain advisor offers a handoff when the message clearly belongs to ANOTHER domain.
+
+        Conservative: fires only when the detected domain(s) are non-empty, exclude this advisor's own
+        domain(s), and aren't 'everything' (an all-domain hit means let the advisor answer). Returns the
+        handoff copy, or None to proceed normally."""
+        if agent_obj is None or getattr(agent_obj, "is_orchestrator", False):
+            return None
+        adoms = {d for d in (getattr(agent_obj, "domains", ()) or ())}
+        routed = {d for d in (route_domains(message) or []) if d != "core"}
+        # route_domains returns ALL domains when nothing specific matches → that's "no specific signal", not
+        # "every domain". Only a strict subset is a real routing hit.
+        detected = routed if (routed and routed < set(ALL_LIFE_DOMAINS)) else set()
+        if self._MONEY_SIGNAL.search(message or ""):
+            detected.add("finance")
+        if not detected or (detected & adoms):
+            return None
+        target = next((d for d in ("finance", "health", "career", "family", "education") if d in detected),
+                      sorted(detected)[0])
+        target_agent = get_agent(f"{target}_advisor")
+        target_name = target_agent.name if target_agent else f"{target.title()} Advisor"
+        caps = ", ".join((getattr(agent_obj, "capabilities", ()) or ())[:3]) or "this area"
+        return (f"That looks like it belongs under {target_name} — I won’t answer it as the "
+                f"{agent_obj.name}, so I don’t give you the wrong read. I can hand it to the {target_name} "
+                f"or save it there. Here, I focus on {caps}. Want me to route it?")
+
     def _health_safety_check(self, message: str, base: dict[str, Any], tr: dict[str, Any]) -> bool:
         """Deterministic urgent-care safety net (no LLM). If triggered, overwrite the reply with a safety-first
         response and return True so the caller skips the LLM entirely. Gated by HEALTH_SAFETY_FALLBACK_ENABLED
@@ -569,6 +599,17 @@ class AdvisorOrchestrator:
             tr["agent"] = agent_obj.id
         # Health urgent-care safety net runs BEFORE any model (deterministic, no LLM) — wins in EVERY mode.
         if self._health_safety_check(message, base, tr):
+            return self._finish(ctx, base, tr, t0, trace)
+        # Out-of-domain guard: a DIRECT domain advisor (e.g. Education) must NOT answer a question that clearly
+        # belongs to another domain (e.g. "$500K–$750K" → finance). Offer a handoff instead of letting the
+        # number-gate emit a generic finance-flavored fallback under the wrong advisor label.
+        handoff = self._out_of_domain_handoff(agent_obj, message)
+        if handoff:
+            base["assistant_message"] = handoff
+            base["reveal"] = None
+            base["llm_status"] = "handoff"
+            tr["llm_status"] = "handoff"
+            tr["fallback_cause"] = "out_of_domain"
             return self._finish(ctx, base, tr, t0, trace)
         # Discovery/onboarding mode: keep the RelationshipManager's conversational reply verbatim — NO LLM
         # enhancement, NO six-section advisor template, NO advice disclaimer, NO objective-as-fact. This is

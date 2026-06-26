@@ -766,3 +766,29 @@ async def test_health_safety_wins_before_discovery_mode(monkeypatch):
     out = await orch.converse(_ctx(), "I'm having severe chest pain and can't breathe", mode="discovery")
     assert out["llm_status"] == "safety_fallback"
     assert out["assistant_message"] != base["assistant_message"]   # replaced by the safety response
+
+
+# --------------------------------------------------------------------------- #
+# Domain-advisor routing / isolation — a direct advisor hands off out-of-domain input
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_education_advisor_hands_off_finance_input():
+    """Education Advisor + '$500K - $750K' must offer a Finance handoff — NOT answer as a finance advisor."""
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_good_llm()))
+    out = await orch.converse(_ctx(), "$500K - $750K", agent="education_advisor")
+    assert out["llm_status"] == "handoff"
+    msg = out["assistant_message"].lower()
+    assert "finance" in msg and ("route" in msg or "hand it" in msg or "save it" in msg)
+    assert "verified income" not in msg  # did NOT fall through to the finance number-gate fallback
+
+
+@pytest.mark.asyncio
+async def test_education_advisor_answers_in_domain():
+    """An in-domain education question is NOT handed off."""
+    base = _base()
+    orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_good_llm()))
+    out = await orch.converse(_ctx(), "Should I pursue an MBA or a data certificate next?", agent="education_advisor")
+    assert out["llm_status"] != "handoff"

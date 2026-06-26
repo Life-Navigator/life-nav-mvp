@@ -39,6 +39,16 @@ _BASELINE_Q = {
     "education": ("Anything you’ll want from education later — a certificate, a degree, or specific "
                   "skills? We can keep it deprioritized for now."),
 }
+_HEALTH_FOLLOWUP = ("The next useful baseline is training and recovery — how many days a week are you "
+                    "currently lifting or doing cardio, and any injuries or sleep issues I should account for?")
+# A standalone credential FACT ("I have a BS in Business Administration from Cal State Bakersfield") — note it
+# briefly and persist it; do NOT run the full interpreter (which spins a cross-domain life-strategy monologue).
+_CREDENTIAL_RE = re.compile(
+    r"\b(b\.?s\.?|b\.?a\.?|m\.?s\.?|m\.?a\.?|m\.?b\.?a\.?|ph\.?\s?d|bachelor'?s?|master'?s?|associate'?s?|"
+    r"doctorate|degree|diploma|certificate|certification)\b", re.I)
+_CREDENTIAL_LEADIN = re.compile(
+    r"^(you never asked,?\s*but\s*|btw,?\s*|by the way,?\s*|also,?\s*|"
+    r"i\s*(?:have|have got|'ve got|hold|earned|got|did|already have|already got)\s*(?:a|an|my)?\s*)", re.I)
 _GATE_BASELINE_KEYS = {f"baseline_{d}" for d in _BASELINE_Q}
 # Health first (it gates energy/consistency), then career, finance, family, education.
 _BASELINE_ORDER = ["health", "career", "finance", "family", "education"]
@@ -392,9 +402,11 @@ class RelationshipManager:
         cur = await self._vision_row(ctx)
         prompts = (cur.get("prompts") or {})
         pending_baselines: list[str] = list(prompts.get("pending_baselines") or [])
+        followup_done = set(prompts.get("baseline_followup_done") or [])
         asked_gate = bool(prompts.get("completion_gate_asked"))
         depri = set(prompts.get("deprioritized_domains") or [])
         updates: list[str] = []
+        synth = ""  # a domain-SPECIFIC acknowledgment of the answer the user just gave
         if pending_key in _GATE_BASELINE_KEYS:
             dom = pending_key[len("baseline_"):]
             if msg:
@@ -405,6 +417,21 @@ class RelationshipManager:
                     "supporting_quotes": [msg[:300]], "supporting_statements": [msg[:300]], "dependencies": [],
                 }])
                 updates = [f"✓ Captured your {_DOMAIN_LABEL.get(dom, dom)} baseline"]
+                synth = self._baseline_synthesis(dom, msg)
+                # Health earns ONE follow-up (training/recovery) before we advance — never jump straight to
+                # finance after a health answer. (P1: respond to the health baseline before moving on.)
+                if dom == "health" and dom not in followup_done:
+                    followup_done.add(dom)
+                    await self._update_vision(ctx, prompt_updates={
+                        "pending_baselines": pending_baselines,
+                        "baseline_followup_done": sorted(followup_done), "completion_gate_asked": True})
+                    panel = await self._context_panel(ctx, focus_domains)
+                    cands = await self._load_candidate_goals(ctx)
+                    st = await self.state(ctx)
+                    return {"assistant_message": (synth + "\n\n" + _HEALTH_FOLLOWUP).strip(),
+                            "pending_key": "baseline_health", "options": None, "updates": updates,
+                            "reveal": None, "candidate_goals": cands, "progress": st.get("progress"),
+                            "complete": False, "context_panel": panel}
             pending_baselines = [d for d in pending_baselines if d != dom]
         else:  # final_topics
             if msg and not _NO_GAP_RE.search(msg):
@@ -414,28 +441,100 @@ class RelationshipManager:
             else:
                 pending_baselines = []  # "nothing else" → ready to complete
         await self._update_vision(ctx, prompt_updates={
-            "pending_baselines": pending_baselines, "completion_gate_asked": True})
+            "pending_baselines": pending_baselines, "baseline_followup_done": sorted(followup_done),
+            "completion_gate_asked": True})
         panel = await self._context_panel(ctx, focus_domains)
         cands = await self._load_candidate_goals(ctx)
         st = await self.state(ctx)
         if pending_baselines:
             nxt = pending_baselines[0]
-            if not asked_gate:
+            nxt_label = _DOMAIN_LABEL.get(nxt, nxt)
+            if synth:
+                # We just synthesized the captured domain → natural transition to the next one.
+                lead = f"{synth}\n\nNow let’s define {nxt_label.lower()}.\n\n"
+            elif not asked_gate:
                 labels = " and ".join(_DOMAIN_LABEL.get(d, d) for d in pending_baselines)
-                ack = (f"You’re right — we shouldn’t open the dashboard yet. We still need a baseline on "
-                       f"{labels}. Let’s start with {_DOMAIN_LABEL.get(nxt, nxt).lower()} because it shapes "
-                       f"your energy and consistency.\n\n")
+                lead = (f"You’re right — we shouldn’t open the dashboard yet. We still need a baseline on "
+                        f"{labels}. Let’s start with {nxt_label.lower()} because it shapes your energy and "
+                        f"consistency.\n\n")
             else:
-                ack = ""
-            return {"assistant_message": ack + _BASELINE_Q[nxt], "pending_key": f"baseline_{nxt}",
+                lead = ""
+            return {"assistant_message": lead + _BASELINE_Q[nxt], "pending_key": f"baseline_{nxt}",
                     "options": None, "updates": updates, "reveal": None, "candidate_goals": cands,
                     "progress": st.get("progress"), "complete": False, "context_panel": panel}
-        return {"assistant_message": ("Perfect — that’s everything I need to start. Let’s build your life plan. "
-                                      "Open **My Life** to see your vision, what matters most, your readiness, "
-                                      "and your next best action."),
+        closing = (synth + "\n\n") if synth else ""
+        return {"assistant_message": (closing + "Perfect — that’s everything I need to start. Let’s build your "
+                                      "life plan. Open **My Life** to see your vision, what matters most, your "
+                                      "readiness, and your next best action."),
                 "pending_key": None, "options": None, "updates": updates, "reveal": None,
                 "candidate_goals": cands, "progress": st.get("progress"), "complete": True,
                 "context_panel": panel}
+
+    @staticmethod
+    def _is_credential_fact(message: str) -> bool:
+        """A short, standalone credential statement (degree/cert + 'from <school>') — not a multi-goal
+        paragraph. The 'from' marker keeps the general onboarding paragraph ('I already have my degree…')
+        from matching."""
+        m = (message or "").strip()
+        return bool(_CREDENTIAL_RE.search(m) and re.search(r"\bfrom\b", m, re.I) and len(m.split()) <= 40)
+
+    async def _handle_credential_fact(self, ctx: UserContext, message: str,
+                                      focus_domains: Optional[list[str]]) -> dict[str, Any]:
+        cred = message.strip()
+        cred = _CREDENTIAL_LEADIN.sub("", cred).rstrip(". ").strip() or cred
+        await self._persist_candidate_goals(ctx, [{
+            "goal": f"Holds {cred}", "objective": cred, "objective_key": None, "confidence": 0.9,
+            "status": "active", "domain": "education",
+            "supporting_quotes": [message[:300]], "supporting_statements": [message[:300]], "dependencies": [],
+        }])
+        try:  # education is sufficient for now (merge, never clobber)
+            curp = (await self._vision_row(ctx)).get("prompts") or {}
+            depri = sorted(set(curp.get("deprioritized_domains") or []) | {"education"})
+            await self._update_vision(ctx, prompt_updates={"deprioritized_domains": depri})
+        except Exception:  # noqa: BLE001
+            pass
+        panel = await self._context_panel(ctx, focus_domains)
+        cands = await self._load_candidate_goals(ctx)
+        st = await self.state(ctx)
+        return {"assistant_message": (
+                    f"Got it — I’ll mark education as sufficient for now: {cred}. That supports your career "
+                    "track, but education doesn’t need to be a priority unless you later want certifications, "
+                    "graduate school, or a credential plan."),
+                "pending_key": None, "options": None, "updates": ["✓ Education credential saved"],
+                "reveal": None, "candidate_goals": cands, "progress": st.get("progress"),
+                "complete": st.get("complete", False), "context_panel": panel}
+
+    @staticmethod
+    def _baseline_synthesis(domain: str, msg: str) -> str:
+        """A domain-SPECIFIC acknowledgment of a captured baseline (never a generic 'got it')."""
+        if domain == "health":
+            return RelationshipManager._health_synthesis(msg)
+        label = _DOMAIN_LABEL.get(domain, domain)
+        return f"Good — that gives us your {label.lower()} baseline."
+
+    @staticmethod
+    def _health_synthesis(msg: str) -> str:
+        """Interpret a health baseline: fat/lean mass from height-weight-bodyfat + recomposition detection."""
+        m = (msg or "").lower()
+        wt = re.search(r"(\d{2,3})\s*(?:lb|lbs|pound)", m)
+        bf = re.search(r"(\d{1,2}(?:\.\d)?)\s*%", m) or re.search(r"(\d{1,2}(?:\.\d)?)\s*(?:percent|body ?fat)", m)
+        weight = float(wt.group(1)) if wt else None
+        bfp = float(bf.group(1)) if bf else None
+        recomp = (bool(re.search(r"(stay|maintain|keep|same).{0,25}(weight|lbs|pounds)", m))
+                  and "fat" in m and ("muscle" in m or "lean" in m))
+        parts: list[str] = []
+        if recomp:
+            parts.append("Good — that makes the health goal much clearer. You’re not trying to simply lose "
+                         "weight; you’re aiming for recomposition: hold roughly your current weight while cutting "
+                         "fat and adding muscle, plus improving cardio capacity.")
+        else:
+            parts.append("Good — that gives us a much clearer health baseline.")
+        if weight and bfp:
+            fat = round(weight * bfp / 100, 1)
+            lean = round(weight - fat, 1)
+            parts.append(f"At {int(weight)} lbs and {bfp:g}% body fat, that’s roughly {fat:g} lbs of fat and "
+                         f"{lean:g} lbs of lean mass.")
+        return " ".join(parts)
 
     async def _has_financial_data(self, ctx: UserContext) -> bool:
         """True when the user has connected/persona financial accounts (so we don't re-ask the numbers)."""
@@ -784,6 +883,10 @@ class RelationshipManager:
         # completing. (P1/P2/P6: the advisor must listen when the user says something important is missing.)
         if pending_key in (_FINAL_TOPICS_KEY, *_GATE_BASELINE_KEYS) and message.strip():
             return await self._handle_completion_gate(ctx, message, pending_key, focus_domains)
+        # A volunteered credential fact ("I have a BS … from …") is persisted + briefly acknowledged — never run
+        # through the interpreter (which would generate a long cross-domain monologue). (P2)
+        if not pending_key and message.strip() and self._is_credential_fact(message):
+            return await self._handle_credential_fact(ctx, message, focus_domains)
         if pending_key and message.strip():
             res = await self.answer(ctx, pending_key, message)
             rec = res.get("recorded", {})
