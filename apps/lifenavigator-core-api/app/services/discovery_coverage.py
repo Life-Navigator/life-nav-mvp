@@ -8,9 +8,56 @@ per-domain view. No new intelligence.
 """
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from ..models.common import UserContext
+
+# Degree labeling — never "doctorate in Juris Doctorate"; JD/MBA/MD get their proper names, others "BS in X".
+_DEGREE_ORDER = {"high_school": 1, "certificate": 1, "bootcamp": 1, "associate": 2, "bachelor": 3,
+                 "master": 4, "mba": 4, "jd": 5, "juris": 5, "doctorate": 5, "phd": 5, "md": 5}
+
+
+def _degree_label(degree_type: Any, field: Any) -> str:
+    dt = str(degree_type or "").strip().lower()
+    fl = str(field or "").strip()
+    blob = f"{dt} {fl}".lower()
+    if "juris" in blob or dt == "jd":
+        return "Juris Doctor (JD)"
+    if "mba" in blob:
+        return "MBA"
+    if dt == "md" or "doctor of medicine" in blob:
+        return "MD"
+    abbr = {"bachelor": "BS", "associate": "Associate's", "master": "MS", "doctorate": "PhD", "phd": "PhD",
+            "high_school": "High school diploma", "certificate": "Certificate", "bootcamp": "Bootcamp"}
+    base = abbr.get(dt, dt.title() if dt else "Degree")
+    if base in ("High school diploma", "Certificate", "Bootcamp") or not fl:
+        return base
+    return f"{base} in {fl}"
+
+
+def _degree_rank(degree_type: Any) -> int:
+    dt = str(degree_type or "").strip().lower()
+    return next((v for kw, v in _DEGREE_ORDER.items() if kw in dt), 0)
+
+
+def _parse_date(s: Any) -> Any:
+    try:
+        return date.fromisoformat(str(s)[:10]) if s else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _is_planned(r: dict[str, Any]) -> bool:
+    """A future/in-progress education record (e.g. a JD starting Aug 2026) — NOT a completed credential."""
+    status = str(r.get("status") or "").strip().lower()
+    if status == "completed":
+        return False
+    if status in ("in_progress", "planned", "enrolled"):
+        return True
+    today = date.today()
+    return any((_parse_date(r.get(k)) or today) > today for k in ("start_date", "graduation_date", "end_date")
+               if r.get(k))
 
 # Each domain: the advisor question(s) that cover it, keyword match for a canonical objective, and
 # what completing discovery unlocks. Education has no advisor question yet (honest: coverage caps).
@@ -127,22 +174,29 @@ class DiscoveryCoverageService:
             if g.get("goal_type"):
                 f["Goal"] = (g.get("title") or g["goal_type"])
         elif key == "education":
-            recs = await self._count("education_records", "public", ctx)
             certs = await self._count("certifications", "education", ctx)
             prof = await self._one("education_profiles", "education", ctx)
-            latest = await self._one("education_records", "public", ctx, order="created_at.desc")
-            # credential can live in public.education_records (the page) OR education_profiles.existing_credentials
-            # (the advisor sync) — read both so the card shows the full degree + school either way.
-            cred0 = (prof.get("existing_credentials") or [{}])[0] if prof.get("existing_credentials") else {}
-            lvl = prof.get("highest_level") or latest.get("degree_type") or cred0.get("highest_level")
-            fld = latest.get("field_of_study") or cred0.get("field")
-            school = latest.get("institution_name") or cred0.get("school")
-            if lvl:
-                f["Highest education"] = f"{lvl} in {fld}" if fld else lvl
-            if school:
-                f["School"] = school
-            if recs:
-                f["Degrees / records"] = recs
+            try:
+                rows = await self._sb.select("education_records", filters={"user_id": f"eq.{ctx.user_id}"},
+                                             limit=20, schema="public") or []
+            except Exception:  # noqa: BLE001
+                rows = []
+            # credential can also live in education_profiles.existing_credentials (advisor sync)
+            for c in (prof.get("existing_credentials") or []):
+                rows.append({"degree_type": c.get("highest_level"), "field_of_study": c.get("field"),
+                             "institution_name": c.get("school"), "status": "completed"})
+            completed, planned = [], []
+            for r in rows:
+                lbl = _degree_label(r.get("degree_type"), r.get("field_of_study"))
+                school = r.get("institution_name")
+                disp = f"{lbl}, {school}" if school else lbl
+                (planned if _is_planned(r) else completed).append((_degree_rank(r.get("degree_type")), disp))
+            if completed:
+                f["Highest completed"] = max(completed, key=lambda x: x[0])[1]
+            if planned:  # JD/MBA-in-progress shown SEPARATELY, never as highest completed
+                f["Planned / in progress"] = planned[0][1]
+            if rows:
+                f["Records"] = f"{len(rows)} {'degree' if len(rows) == 1 else 'degrees'}"
             if certs:
                 f["Certificates"] = certs
         elif key == "family":

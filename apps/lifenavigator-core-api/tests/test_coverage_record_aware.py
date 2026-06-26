@@ -55,6 +55,24 @@ async def test_coverage_returns_concrete_facts():
                                         "current_company": "Persistent Systems"}, schema="public")
     cov = await _cov(sb).coverage(CTX)
     edu = _dom(cov, "education")["facts"]
-    assert edu.get("School") == "Cal State Bakersfield" and "Business Administration" in edu.get("Highest education", "")
+    assert "Business Administration" in edu.get("Highest completed", "") and "Cal State Bakersfield" in edu.get("Highest completed", "")
     car = _dom(cov, "career")["facts"]
     assert car.get("Current role") == "Senior Architect" and car.get("Company") == "Persistent Systems"
+
+
+@pytest.mark.asyncio
+async def test_education_jd_labeling_completed_vs_planned():
+    sb = FakeSupabase({})
+    # completed BS + a FUTURE JD (Aug 2026) — must be separated, JD labeled correctly
+    await sb.insert("education_records", {"id": "bs", "user_id": CTX.user_id, "degree_type": "bachelor",
+        "field_of_study": "Business Administration", "institution_name": "University of Phoenix",
+        "status": "completed"}, schema="public")
+    await sb.insert("education_records", {"id": "jd", "user_id": CTX.user_id, "degree_type": "doctorate",
+        "field_of_study": "Juris Doctorate", "institution_name": "Syracuse Law School",
+        "status": "in_progress", "start_date": "2026-08-01", "graduation_date": "2030-12-15"}, schema="public")
+    f = _dom(await _cov(sb).coverage(CTX), "education")["facts"]
+    assert "BS in Business Administration" in f.get("Highest completed", "")     # completed = BS, not JD
+    assert "University of Phoenix" in f.get("Highest completed", "")
+    assert f.get("Planned / in progress") == "Juris Doctor (JD), Syracuse Law School"  # JD separate + labeled
+    blob = " ".join(f.values()) if all(isinstance(v, str) for v in f.values()) else str(f)
+    assert "doctorate in Juris Doctorate" not in blob
