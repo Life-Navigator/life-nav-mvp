@@ -55,6 +55,29 @@ class LifeReadinessEngine:
         self._sb = supabase
         self._planning = planning  # optional FinancialPlanningEngine — enriches Finance readiness
 
+    async def _enrich_shared(self, ctx: UserContext, readinesses: list[dict[str, Any]]) -> None:
+        """Fact-aware blockers for health + education, sourced from the shared domain summary (one truth)."""
+        try:
+            from .discovery_coverage import DiscoveryCoverageService
+            from .domain_summary import domain_summary
+            from .life_discovery import LifeDiscoveryService
+            cov = DiscoveryCoverageService(LifeDiscoveryService(self._sb), self._sb)
+        except Exception:  # noqa: BLE001
+            return
+        for r in readinesses:
+            if r.get("domain") not in ("health", "education"):
+                continue
+            try:
+                s = await domain_summary(cov, ctx, r["domain"])
+            except Exception:  # noqa: BLE001
+                continue
+            if s.get("facts"):  # the platform knows something → never "no data / get started"
+                r["progress"] = max(int(r.get("progress") or 0), int(s.get("coverage_pct") or 0), 30)
+                r["status"] = _status_from(r["progress"])
+                if s.get("blockers"):
+                    r["gap"] = s["blockers"][0]
+                r["missing"] = s.get("missing_items") or r.get("missing")
+
     async def assess(self, ctx: UserContext) -> dict[str, Any]:
         # The domain summaries are INDEPENDENT — run them concurrently instead of serially (this is the
         # dashboard/roadmap latency bottleneck). A failing domain reads as "needs attention", never breaks
@@ -85,6 +108,9 @@ class LifeReadinessEngine:
         # Runs after the gather because it reads/mutates the finance entry.
         if self._planning is not None:
             await self._enrich_finance(ctx, readinesses)
+        # SHARED CONTRACT: health/education readiness + blockers reflect advisor-captured facts (one truth) —
+        # never "no data / get started" when the dashboard already shows body comp / a degree.
+        await self._enrich_shared(ctx, readinesses)
 
         index_score = round(sum(_WEIGHTS.get(r["domain"], 0.0) * r["progress"] for r in readinesses))
         worst = min((r["status"] for r in readinesses), key=lambda s: _ORDER[s], default=GREEN)

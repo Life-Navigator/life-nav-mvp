@@ -12,6 +12,7 @@ from datetime import date
 from typing import Any
 
 from ..models.common import UserContext
+from .domain_summary import missing_for
 
 # Degree labeling — never "doctorate in Juris Doctorate"; JD/MBA/MD get their proper names, others "BS in X".
 _DEGREE_ORDER = {"high_school": 1, "certificate": 1, "bootcamp": 1, "associate": 2, "bachelor": 3,
@@ -269,11 +270,15 @@ class DiscoveryCoverageService:
             if has_data:
                 coverage_pct = max(coverage_pct, 30)
             is_deprioritized = key in deprioritized
+            facts = await self._domain_facts(ctx, key) if has_data else {}
             # MISSING labels (P3): say what's actually missing — never "X goal" once we already know the domain.
             if is_deprioritized:
                 missing_inputs = []  # the user explicitly set this aside (e.g. education: degree complete)
+            elif facts and key in ("health", "education"):
+                # SHARED CONTRACT: education/health derive specific missing items from the known facts (waist/
+                # lifts/cardio/sleep; JD cost/financing/career-objective) — one truth for card+page+readiness.
+                missing_inputs = missing_for(key, facts)
             elif has_data:
-                # we already know the domain → what's missing is BASELINE detail / next target, not "a goal"
                 missing_inputs = list(spec.get("baseline_missing", [])) if coverage_pct < 80 else []
             else:
                 # nothing known in this domain → name the missing goal (+ finance: resolved-input gaps)
@@ -283,7 +288,6 @@ class DiscoveryCoverageService:
             status = ("deprioritized" if is_deprioritized else
                       "complete" if coverage_pct >= 80 else "partial" if coverage_pct >= 40
                       else "started" if coverage_pct > 0 else "not_started")
-            facts = await self._domain_facts(ctx, key) if (has_records or has_goal) else {}
             domains.append({
                 "domain": key, "label": spec["label"], "coverage_pct": coverage_pct, "status": status,
                 "confidence_pct": min(95, coverage_pct) if coverage_pct else 0,

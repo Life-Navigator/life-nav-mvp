@@ -153,6 +153,16 @@ async def advisor_welcome(user: AuthenticatedUser = Depends(authenticated),
     return await build_welcome(coverage, life, _ctx(user), agent or None)
 
 
+@router.get("/domain-summary")
+async def domain_summary_route(user: AuthenticatedUser = Depends(authenticated),
+                               domain: str = "",
+                               coverage=Depends(get_discovery_coverage)):
+    """The SHARED domain summary contract — one truth consumed by the dashboard card, the domain page snapshot,
+    the readiness blockers, and the advisor's missing-baseline prompt. Education + Health first."""
+    from ..services.domain_summary import domain_summary
+    return await domain_summary(coverage, _ctx(user), domain or "education")
+
+
 @router.post("/advisor/chat")
 async def advisor_chat(user: AuthenticatedUser = Depends(authenticated), svc=Depends(get_advisor_orchestrator),
                        message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True),
