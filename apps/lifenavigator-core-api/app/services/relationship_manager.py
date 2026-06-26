@@ -476,10 +476,11 @@ class RelationshipManager:
         paragraph. The 'from' marker keeps the general onboarding paragraph ('I already have my degree…')
         from matching."""
         m = (message or "").strip()
-        return bool(_CREDENTIAL_RE.search(m) and re.search(r"\bfrom\b", m, re.I) and len(m.split()) <= 40)
+        return bool(_CREDENTIAL_RE.search(m) and re.search(r"\bfrom\b", m, re.I) and len(m.split()) <= 25)
 
     async def _handle_credential_fact(self, ctx: UserContext, message: str,
-                                      focus_domains: Optional[list[str]]) -> dict[str, Any]:
+                                      focus_domains: Optional[list[str]],
+                                      pending_key: Optional[str] = None) -> dict[str, Any]:
         cred = message.strip()
         cred = _CREDENTIAL_LEADIN.sub("", cred).rstrip(". ").strip() or cred
         await self._persist_candidate_goals(ctx, [{
@@ -496,13 +497,22 @@ class RelationshipManager:
         panel = await self._context_panel(ctx, focus_domains)
         cands = await self._load_candidate_goals(ctx)
         st = await self.state(ctx)
-        return {"assistant_message": (
-                    f"Got it — I’ll mark education as sufficient for now: {cred}. That supports your career "
-                    "track, but education doesn’t need to be a priority unless you later want certifications, "
-                    "graduate school, or a credential plan."),
-                "pending_key": None, "options": None, "updates": ["✓ Education credential saved"],
+        ack = (f"Got it — I’ll mark education as sufficient for now: {cred}. That supports your career "
+               "track, but education doesn’t need to be a priority unless you later want certifications, "
+               "graduate school, or a credential plan.")
+        # If a baseline was in progress, the credential was an aside — keep that baseline pending and re-ask it
+        # so the flow resumes (don't drop it, don't complete early).
+        resume_pending = pending_key if pending_key in _GATE_BASELINE_KEYS else None
+        if resume_pending:
+            dom = resume_pending[len("baseline_"):]
+            ack = ack + "\n\nBack to where we were — " + _BASELINE_Q.get(dom, "")
+            complete = False
+        else:
+            complete = st.get("complete", False)
+        return {"assistant_message": ack,
+                "pending_key": resume_pending, "options": None, "updates": ["✓ Education credential saved"],
                 "reveal": None, "candidate_goals": cands, "progress": st.get("progress"),
-                "complete": st.get("complete", False), "context_panel": panel}
+                "complete": complete, "context_panel": panel}
 
     @staticmethod
     def _baseline_synthesis(domain: str, msg: str) -> str:
@@ -881,12 +891,14 @@ class RelationshipManager:
         # COMPLETION GATE: the "what haven't I asked?" answer (and any follow-up baseline answers) are handled
         # here, BEFORE the normal flow — so a user who names missing topics keeps discovery open instead of
         # completing. (P1/P2/P6: the advisor must listen when the user says something important is missing.)
+        # A volunteered credential fact ("I have a BS … from …") is persisted + briefly acknowledged BEFORE the
+        # gate — even if a baseline is pending — so it's never silently consumed as a baseline answer or run
+        # through the interpreter (which would generate a long cross-domain monologue). The one exception is
+        # baseline_education, where the credential IS the expected answer. (P2)
+        if message.strip() and pending_key != "baseline_education" and self._is_credential_fact(message):
+            return await self._handle_credential_fact(ctx, message, focus_domains, pending_key)
         if pending_key in (_FINAL_TOPICS_KEY, *_GATE_BASELINE_KEYS) and message.strip():
             return await self._handle_completion_gate(ctx, message, pending_key, focus_domains)
-        # A volunteered credential fact ("I have a BS … from …") is persisted + briefly acknowledged — never run
-        # through the interpreter (which would generate a long cross-domain monologue). (P2)
-        if not pending_key and message.strip() and self._is_credential_fact(message):
-            return await self._handle_credential_fact(ctx, message, focus_domains)
         if pending_key and message.strip():
             res = await self.answer(ctx, pending_key, message)
             rec = res.get("recorded", {})
