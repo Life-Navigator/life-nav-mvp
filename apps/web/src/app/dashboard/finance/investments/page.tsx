@@ -330,7 +330,11 @@ export default function InvestmentPage() {
         })
       );
 
-      setHoldings(transformedHoldings);
+      // TRUST: suppress placeholder/model rows (no real shares AND no market value) so we never render
+      // "Vanguard · 0 shares · $0" as a position or count them in Total Positions. If nothing real remains,
+      // holdings is empty → the account-balance-only state renders (balance shown, holdings "Not available").
+      const realHoldings = transformedHoldings.filter((h) => h.shares > 0 || h.marketValue > 0);
+      setHoldings(realHoldings);
 
       // Transform portfolio metrics
       if (data.portfolioMetrics) {
@@ -683,74 +687,132 @@ export default function InvestmentPage() {
   };
 
   // Empty state component
-  const renderEmptyState = () => (
-    <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-      <div className="mx-auto w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center mb-6">
-        <svg
-          className="w-12 h-12 text-indigo-600"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={1.5}
-            d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-          />
-        </svg>
-      </div>
-      <h3 className="text-xl font-semibold text-gray-900 mb-2">No Investment Holdings Yet</h3>
-      <p className="text-gray-500 mb-6 max-w-md mx-auto">
-        Start tracking your investments by adding holdings manually, importing from a CSV file, or
-        connecting your brokerage accounts through Plaid.
-      </p>
-      {canonicalInvestment != null && canonicalInvestment > 0 && (
-        <p className="text-sm text-indigo-700 bg-indigo-50 rounded-lg p-3 mb-6 max-w-md mx-auto">
-          Account-level investment balance (${canonicalInvestment.toLocaleString()}) is available.
-          Position-level holdings are not available for this sandbox persona.
+  const renderEmptyState = () => {
+    // ACCOUNT-BALANCE-ONLY: a connected account reports a balance but no position-level holdings. Show the
+    // balance honestly; mark holdings/performance/cost-basis/dividends "Not available" (NEVER $0 / 0.00%).
+    if (canonicalInvestment != null && canonicalInvestment > 0) {
+      const naRows: [string, string][] = [
+        ['Position-level holdings', 'Not available'],
+        ['Performance', 'Not available'],
+        ['Cost basis', 'Not available'],
+        ['Dividend income', 'Not available'],
+      ];
+      return (
+        <div className="space-y-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-lg font-bold text-gray-900">Investment Portfolio</h2>
+            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <div>
+                <p className="text-xs text-gray-500">Account-level investment balance</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  ${canonicalInvestment.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Source</p>
+                <p className="text-sm font-semibold text-gray-700">
+                  {sourceLabel(canonicalSource)}
+                </p>
+              </div>
+              {naRows.map(([k, v]) => (
+                <div key={k}>
+                  <p className="text-xs text-gray-500">{k}</p>
+                  <p className="text-sm font-semibold text-gray-400">{v}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-4 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-800">
+              Your connected account reports an investment balance of $
+              {canonicalInvestment.toLocaleString()}. Position-level holdings, cost basis, and
+              performance are not available from this source yet.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                onClick={() => setShowAddHoldingModal(true)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+              >
+                Add holdings manually
+              </button>
+              <a
+                href="/dashboard/finance/overview"
+                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium"
+              >
+                View Financial Overview
+              </a>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+        <div className="mx-auto w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center mb-6">
+          <svg
+            className="w-12 h-12 text-indigo-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+            />
+          </svg>
+        </div>
+        <h3 className="text-xl font-semibold text-gray-900 mb-2">No Investment Holdings Yet</h3>
+        <p className="text-gray-500 mb-6 max-w-md mx-auto">
+          Start tracking your investments by adding holdings manually, importing from a CSV file, or
+          connecting your brokerage accounts through Plaid.
         </p>
-      )}
-      <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-        <button
-          onClick={() => setShowAddHoldingModal(true)}
-          className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
-        >
-          + Add Holding Manually
-        </button>
-        <PlaidLinkButton
-          buttonText="Connect Brokerage (Plaid)"
-          className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium !bg-white hover:!bg-gray-50"
-          onSuccess={async () => {
-            // After connecting, sync investments from Plaid
-            try {
-              await fetch('/api/plaid/investments', { method: 'POST' });
-              fetchAnalyticsData(); // Refresh data
-            } catch (error) {
-              console.error('Failed to sync investments:', error);
-            }
-          }}
-        />
-      </div>
-      <div className="mt-8 pt-8 border-t border-gray-200">
-        <h4 className="text-sm font-medium text-gray-900 mb-4">Popular holdings to track:</h4>
-        <div className="flex flex-wrap gap-2 justify-center">
-          {['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'VTI', 'VOO', 'SPY'].map((ticker) => (
-            <button
-              key={ticker}
-              onClick={() => {
-                setNewHolding((prev) => ({ ...prev, ticker }));
-                setShowAddHoldingModal(true);
-              }}
-              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200"
-            >
-              {ticker}
-            </button>
-          ))}
+        {canonicalInvestment != null && canonicalInvestment > 0 && (
+          <p className="text-sm text-indigo-700 bg-indigo-50 rounded-lg p-3 mb-6 max-w-md mx-auto">
+            Account-level investment balance (${canonicalInvestment.toLocaleString()}) is available.
+            Position-level holdings are not available for this sandbox persona.
+          </p>
+        )}
+        <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+          <button
+            onClick={() => setShowAddHoldingModal(true)}
+            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
+          >
+            + Add Holding Manually
+          </button>
+          <PlaidLinkButton
+            buttonText="Connect Brokerage (Plaid)"
+            className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium !bg-white hover:!bg-gray-50"
+            onSuccess={async () => {
+              // After connecting, sync investments from Plaid
+              try {
+                await fetch('/api/plaid/investments', { method: 'POST' });
+                fetchAnalyticsData(); // Refresh data
+              } catch (error) {
+                console.error('Failed to sync investments:', error);
+              }
+            }}
+          />
+        </div>
+        <div className="mt-8 pt-8 border-t border-gray-200">
+          <h4 className="text-sm font-medium text-gray-900 mb-4">Popular holdings to track:</h4>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'VTI', 'VOO', 'SPY'].map((ticker) => (
+              <button
+                key={ticker}
+                onClick={() => {
+                  setNewHolding((prev) => ({ ...prev, ticker }));
+                  setShowAddHoldingModal(true);
+                }}
+                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-full text-sm hover:bg-gray-200"
+              >
+                {ticker}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Add Holding Modal
   const renderAddHoldingModal = () =>
