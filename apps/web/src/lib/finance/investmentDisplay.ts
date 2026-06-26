@@ -5,10 +5,12 @@ export type InvestmentStatus =
   | 'account_balance_only'
   | 'no_investment_data';
 
-/** A holding is REAL only if it has shares or a market value. Placeholder/model rows (N/A · 0 shares · $0)
- *  are NOT positions and must be suppressed. */
+/** A holding is a REAL position only if it has SHARES. A row with a market value but 0 shares is an
+ *  account-level balance synthesized as a pseudo-holding (no cost basis, no performance) — NOT a position,
+ *  so it's suppressed and shown at the account level instead. Placeholder/model rows (N/A · 0 shares · $0)
+ *  are likewise suppressed. */
 export function isRealHolding(h: { shares?: number | null; marketValue?: number | null }): boolean {
-  return (Number(h?.shares) || 0) > 0 || (Number(h?.marketValue) || 0) > 0;
+  return (Number(h?.shares) || 0) > 0;
 }
 
 export function investmentStatus(

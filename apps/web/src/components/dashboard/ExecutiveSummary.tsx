@@ -551,6 +551,8 @@ export default function ExecutiveSummary() {
                       }}
                     />
                   </div>
+                  {/* Fact-aware blocker from the shared domain summary (specific missing items, not "No data yet"). */}
+                  {d.gap && <p className="mt-1 text-xs text-gray-500">{d.gap}</p>}
                 </li>
               ))}
             </ul>
