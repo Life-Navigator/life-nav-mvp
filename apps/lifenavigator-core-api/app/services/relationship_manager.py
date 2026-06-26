@@ -56,6 +56,15 @@ _BASELINE_ORDER = ["health", "career", "finance", "family", "education"]
 _NO_GAP_RE = re.compile(
     r"^\s*(no|nope|nah|none|nothing( else)?|that'?s (all|it|everything)|all good|i'?m good|we'?re good|"
     r"that covers it|all set|good to go|nothing comes to mind)\b", re.I)
+# The user explicitly opts out of filling more baselines → open a PARTIAL dashboard (gaps marked honestly).
+_PARTIAL_RE = re.compile(
+    r"\b(partial( dashboard)?|skip( (it|this|for now|the rest))?|show( me)? (the |my )?dashboard|open (the |my )?"
+    r"dashboard|just (show|build|open)|that'?s (fine|enough|ok|okay) for now|build it now|good enough|"
+    r"finish( up)?|i'?m done|let'?s stop|do(n'?t| not) ask)\b", re.I)
+# The user wants to keep filling gaps → continue collecting baselines.
+_CONTINUE_RE = re.compile(
+    r"\b(continue|keep going|keep asking|ask me|let'?s fill|fill (them|it|those)|go on|next|sure|yes|yeah|ok let'?s)\b",
+    re.I)
 _GAP_DOMAIN_KEYWORDS = {
     "health": ("shape", "fit", "fitness", "weight", "body", "muscle", "gym", "health", "exercise",
                "stamina", "training", "diet", "nutrition", "sleep", "physical", "strength", "cardio"),
@@ -285,8 +294,13 @@ class RelationshipManager:
         "like a trusted advisor, NOT a schema; do NOT echo raw words or ask 'did I capture that?'. (7) next_question: "
         "ONE sharp question that advances the MAIN priority in measurable terms (e.g. for financial security: "
         "'what would make you feel financially ready in a year — cash saved, debt down, income up, or a down "
-        "payment started?'); do NOT jump to a supporting lever's next step. Do NOT invent facts/numbers/names/"
-        "goals the user didn't state or clearly imply. Return STRICT JSON only — no markdown, no prose."
+        "payment started?'); do NOT jump to a supporting lever's next step. (8) captured_baselines: list the "
+        "domains for which the user gave CONCRETE current baseline data (not just a goal) — e.g. health if they "
+        "stated height/weight/body-fat/current routine, career if they stated their current role/company, "
+        "finance if they stated a specific target/reserve/debt number, family if they gave a specific wedding "
+        "date/timeline. A bare goal ('get in shape', 'want a promotion') is NOT a captured baseline. "
+        "Do NOT invent facts/numbers/names/goals the user didn't state or clearly imply. Return STRICT JSON "
+        "only — no markdown, no prose."
     )
 
     @staticmethod
@@ -318,6 +332,7 @@ class RelationshipManager:
             '"goals": [{"goal": "a complete sentence", "domain": "family|finance|health|career|education", '
             '"status": "active|future", "confidence": 0.0}], '
             '"values": [str], "deprioritized_domains": ["domain"], "main_priority": str, '
+            '"captured_baselines": ["domain"], '
             '"dependencies": ["short plan-specific lever"], "synthesis": str, "next_question": str}'
         )
         try:
@@ -361,6 +376,8 @@ class RelationshipManager:
             })
         deprioritized = [str(d).strip().lower() for d in (data.get("deprioritized_domains") or [])
                          if str(d).strip().lower() in self._VALID_DOMAINS]
+        captured_baselines = [str(d).strip().lower() for d in (data.get("captured_baselines") or [])
+                              if str(d).strip().lower() in self._VALID_DOMAINS]
         # T3 fix: a deprioritization-only statement ("degree done, education isn't a priority") has NO goal but
         # IS a useful update — return the plan so we record the deprioritization instead of falling back to the
         # fragment extractor. Only truly empty interpretations fall back.
@@ -376,6 +393,7 @@ class RelationshipManager:
             "time_horizon": str(data.get("time_horizon") or "").strip(),
             "values": [str(v).strip() for v in (data.get("values") or []) if str(v).strip()][:6],
             "deprioritized_domains": deprioritized,
+            "captured_baselines": captured_baselines,
             "main_priority": main_priority,
             "dependencies": deps,
             "synthesis": str(data.get("synthesis") or "").strip(),
@@ -388,6 +406,21 @@ class RelationshipManager:
         m = (message or "").lower()
         return [d for d in _BASELINE_ORDER
                 if any(kw in m for kw in _GAP_DOMAIN_KEYWORDS[d])]
+
+    async def _missing_baselines(self, ctx: UserContext,
+                                 llm_plan: Optional[dict[str, Any]] = None) -> list[str]:
+        """Domains (in baseline order) still missing a minimum useful baseline. A domain is COVERED if it's
+        deprioritized/sufficient or its baseline has been captured (via the gate, or given inline in this
+        turn's plan). This is the depth gate's source of truth — onboarding can't complete while it's non-empty
+        unless the user chose a partial dashboard."""
+        cur = await self._vision_row(ctx)
+        prompts = (cur.get("prompts") or {})
+        depri = set(prompts.get("deprioritized_domains") or [])
+        captured = set(prompts.get("baselines_captured") or [])
+        if llm_plan:
+            depri |= {str(d).lower() for d in (llm_plan.get("deprioritized_domains") or [])}
+            captured |= {str(d).lower() for d in (llm_plan.get("captured_baselines") or [])}
+        return [d for d in _BASELINE_ORDER if d not in depri and d not in captured]
 
     async def _handle_completion_gate(self, ctx: UserContext, message: str, pending_key: str,
                                       focus_domains: Optional[list[str]]) -> dict[str, Any]:
@@ -405,8 +438,24 @@ class RelationshipManager:
         followup_done = set(prompts.get("baseline_followup_done") or [])
         asked_gate = bool(prompts.get("completion_gate_asked"))
         depri = set(prompts.get("deprioritized_domains") or [])
+        captured_set = set(prompts.get("baselines_captured") or [])
         updates: list[str] = []
         synth = ""  # a domain-SPECIFIC acknowledgment of the answer the user just gave
+        # PARTIAL DASHBOARD: the user explicitly opts out of filling more gaps → complete now and mark the
+        # remaining baselines honestly (never silently). "continue/keep going" overrides a stray "skip".
+        if msg and _PARTIAL_RE.search(msg) and not _CONTINUE_RE.search(msg):
+            remaining = [d for d in pending_baselines if d not in depri and d not in captured_set]
+            await self._update_vision(ctx, prompt_updates={"pending_baselines": [], "completion_gate_asked": True})
+            panel = await self._context_panel(ctx, focus_domains)
+            cands = await self._load_candidate_goals(ctx)
+            st = await self.state(ctx)
+            gaps = ", ".join(_DOMAIN_LABEL.get(d, d) for d in remaining)
+            note = (f" I’ve marked these as still open so the dashboard stays honest about them: {gaps}. "
+                    "You can fill them in anytime by talking to the relevant advisor." if gaps else "")
+            return {"assistant_message": "Opening your dashboard now." + note,
+                    "pending_key": None, "options": None, "updates": ["✓ Partial dashboard opened"],
+                    "reveal": None, "candidate_goals": cands, "progress": st.get("progress"),
+                    "complete": True, "context_panel": panel}
         if pending_key in _GATE_BASELINE_KEYS:
             dom = pending_key[len("baseline_"):]
             if msg:
@@ -417,13 +466,30 @@ class RelationshipManager:
                     "supporting_quotes": [msg[:300]], "supporting_statements": [msg[:300]], "dependencies": [],
                 }])
                 updates = [f"✓ Captured your {_DOMAIN_LABEL.get(dom, dom)} baseline"]
+                captured_set.add(dom)
                 synth = self._baseline_synthesis(dom, msg)
+                # CROSS-DOMAIN (Part 7): the answer may carry baselines for OTHER domains — capture them and
+                # drop them from the queue so we never re-ask or lose them.
+                try:
+                    xplan = await self._interpret_plan(msg)
+                except Exception:  # noqa: BLE001
+                    xplan = None
+                if xplan:
+                    if xplan.get("candidate_goals"):
+                        await self._persist_candidate_goals(ctx, xplan["candidate_goals"])
+                    for cb in (xplan.get("captured_baselines") or []):
+                        captured_set.add(str(cb).lower())
+                    for dd in (xplan.get("deprioritized_domains") or []):
+                        depri.add(str(dd).lower())
                 # Health earns ONE follow-up (training/recovery) before we advance — never jump straight to
                 # finance after a health answer. (P1: respond to the health baseline before moving on.)
                 if dom == "health" and dom not in followup_done:
                     followup_done.add(dom)
+                    pending_baselines = [d for d in pending_baselines
+                                         if d not in captured_set and d not in depri]
                     await self._update_vision(ctx, prompt_updates={
-                        "pending_baselines": pending_baselines,
+                        "pending_baselines": pending_baselines, "baselines_captured": sorted(captured_set),
+                        "deprioritized_domains": sorted(depri),
                         "baseline_followup_done": sorted(followup_done), "completion_gate_asked": True})
                     panel = await self._context_panel(ctx, focus_domains)
                     cands = await self._load_candidate_goals(ctx)
@@ -432,16 +498,19 @@ class RelationshipManager:
                             "pending_key": "baseline_health", "options": None, "updates": updates,
                             "reveal": None, "candidate_goals": cands, "progress": st.get("progress"),
                             "complete": False, "context_panel": panel}
-            pending_baselines = [d for d in pending_baselines if d != dom]
+            pending_baselines = [d for d in pending_baselines
+                                 if d != dom and d not in captured_set and d not in depri]
         else:  # final_topics
             if msg and not _NO_GAP_RE.search(msg):
                 # Trust the user: any domain they name as undiscussed becomes a baseline to capture (unless
                 # they explicitly deprioritized it). The user telling us it's missing IS the signal.
-                pending_baselines = [d for d in self._detect_gap_domains(msg) if d not in depri]
+                pending_baselines = [d for d in self._detect_gap_domains(msg)
+                                     if d not in depri and d not in captured_set]
             else:
                 pending_baselines = []  # "nothing else" → ready to complete
         await self._update_vision(ctx, prompt_updates={
             "pending_baselines": pending_baselines, "baseline_followup_done": sorted(followup_done),
+            "baselines_captured": sorted(captured_set), "deprioritized_domains": sorted(depri),
             "completion_gate_asked": True})
         panel = await self._context_panel(ctx, focus_domains)
         cands = await self._load_candidate_goals(ctx)
@@ -924,6 +993,10 @@ class RelationshipManager:
                     if llm_plan.get("deprioritized_domains"):
                         existing = set(prompts.get("deprioritized_domains") or [])
                         upd["deprioritized_domains"] = sorted(existing | set(llm_plan["deprioritized_domains"]))
+                    # Remember which domains the user already gave a concrete baseline for (depth gate won't re-ask).
+                    if llm_plan.get("captured_baselines"):
+                        cb = set(prompts.get("baselines_captured") or [])
+                        upd["baselines_captured"] = sorted(cb | set(llm_plan["captured_baselines"]))
                     # Persist the SEMANTIC north star + main priority so the panel/reveal reflect the real plan
                     # across turns (not the objective-ranking template). Never clobber with empties.
                     if llm_plan.get("north_star"):
@@ -1058,6 +1131,7 @@ class RelationshipManager:
             nq["prompt"] = llm_plan["next_question"]
             nq.setdefault("key", "primary_goal_priority")
             nq["why_it_matters"] = nq.get("why_it_matters") or "It sets the order we build your plan."
+        wants_partial = bool(_PARTIAL_RE.search(message or ""))
         if st.get("complete") or not nq:
             assistant = (reflection + "That's everything I need to start — let's build your life plan. "
                          "Open **My Life** to see your vision, what matters most, your readiness, and your next best action.")
@@ -1106,6 +1180,34 @@ class RelationshipManager:
         }
         if pending_key and substantive:
             log.info(json.dumps({"event": "onboarding_turn", "user": ctx.user_id, **onboarding_trace}))
+        # DEPTH GATE: after a substantive opening paragraph, don't complete or ask the generic prioritization
+        # question while minimum domain baselines are missing — summarize what we captured, then collect
+        # baselines one at a time and offer a partial dashboard. Subsequent baseline answers route through
+        # _handle_completion_gate (pending_key=baseline_<domain>). Skipped if the user opted for partial.
+        if substantive and llm_plan and not wants_partial:
+            missing = await self._missing_baselines(ctx, llm_plan)
+            if missing:
+                first = missing[0]
+                try:
+                    await self._update_vision(ctx, prompt_updates={
+                        "pending_baselines": missing, "completion_gate_asked": True})
+                except Exception:  # noqa: BLE001
+                    pass
+                lead = reflection.rstrip()
+                lead = (lead + "\n\n") if (lead and lead != "Thanks — got it.") else ""
+                gate_msg = (lead
+                            + "I have enough to start, but before I build the dashboard, I'd like to fill a few "
+                            "important gaps so it's actually useful.\n\n" + _BASELINE_Q[first]
+                            + "\n\n_Prefer to skip ahead? Say “partial dashboard” and I’ll open it now with these "
+                            "gaps marked._")
+                panel = await self._context_panel(ctx, focus_domains)
+                return {
+                    "assistant_message": gate_msg, "pending_key": f"baseline_{first}", "options": None,
+                    "updates": updates, "reveal": reveal, "candidate_goals": candidate_goals,
+                    "progress": st.get("progress"), "complete": False, "context_panel": panel,
+                    "onboarding_trace": {**onboarding_trace, "depth_gate": "baselines_pending",
+                                         "missing_baselines": missing},
+                }
         panel = await self._context_panel(ctx, focus_domains)
         return {
             "assistant_message": assistant,

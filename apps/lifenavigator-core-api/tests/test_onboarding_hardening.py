@@ -162,16 +162,17 @@ async def test_two_turn_finance_primary_not_career_collapse():
     assert {"finance", "health", "career", "family"} <= goal_domains
     # P4: response reads naturally (no "1) ...; 2) ...;" schema wording)
     assert "1)" not in t1["assistant_message"] and "I'm capturing these pillars" not in t1["assistant_message"]
+    # DEPTH GATE: the broad paragraph does NOT complete onboarding — finance stays the main priority and the
+    # advisor now collects a baseline (health first) and offers a partial dashboard.
+    assert t1["complete"] is False
+    assert t1["pending_key"] == "baseline_health"
+    assert t1["context_panel"].get("main_priority", "").lower().startswith("financial")
+    assert "partial dashboard" in t1["assistant_message"].lower()
 
-    # Turn 2: user clarifies finance is the main goal, career is the engine
-    t2 = await rm.converse(CTX, ("The strong financial foundation is the main one. Advancing career is for that "
-        "purpose, and that helps with stress and will allow me to eat well, take supplements, and stay healthier."),
-        pending_key=t1.get("pending_key"))
-    # P3/P5: finance becomes the main priority; next question defines financial readiness, not a career step
+    # Turn 2: user opts for a partial dashboard → onboarding completes, remaining gaps marked honestly.
+    t2 = await rm.converse(CTX, "Let's just open a partial dashboard for now.", pending_key=t1.get("pending_key"))
+    assert t2["complete"] is True and t2["pending_key"] is None
     assert t2["context_panel"].get("main_priority", "").lower().startswith("financial")
-    msg2 = t2["assistant_message"].lower()
-    assert "next step in your career" not in msg2 and "step in your career" not in msg2
-    assert "financially ready" in msg2 or "down payment" in msg2 or "debt" in msg2 or "cash" in msg2
 
 
 # ---- Completion gate: the advisor must LISTEN when the user says something important is missing ----

@@ -1197,14 +1197,21 @@ export default function InvestmentPage() {
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="text-sm text-gray-500">Risk Level</div>
             <div className="flex items-center gap-2 mt-1">
-              <span
-                className={`text-xl font-bold px-3 py-1 rounded-full ${getRiskColor(riskMetrics?.riskLevel || 'Moderate')}`}
-              >
-                {riskMetrics?.riskLevel || 'Moderate'}
-              </span>
+              {/* No fabricated default: risk level only when real allocation/risk data exists. */}
+              {riskMetrics?.riskLevel ? (
+                <span
+                  className={`text-xl font-bold px-3 py-1 rounded-full ${getRiskColor(riskMetrics.riskLevel)}`}
+                >
+                  {riskMetrics.riskLevel}
+                </span>
+              ) : (
+                <span className="text-lg font-semibold text-gray-400">Not available</span>
+              )}
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              Beta: {riskMetrics?.beta?.toFixed(2) || '1.00'}
+              {riskMetrics?.beta != null
+                ? `Beta: ${riskMetrics.beta.toFixed(2)}`
+                : 'Needs holdings / allocation'}
             </div>
           </div>
         </div>
