@@ -44,11 +44,35 @@ DOMAINS: dict[str, dict[str, Any]] = {
 }
 
 
+# Authoritative domain RECORD tables. If the user already has REAL records here, the dashboard card must
+# NEVER say "not started" / "0%" — the platform knows something, so the card cannot pretend it knows nothing.
+# (table, schema), counted fail-soft. Service-role reads bypass RLS (incl. the health feature gate).
+_RECORD_SOURCES: dict[str, list[tuple[str, str]]] = {
+    "finance": [("financial_accounts", "finance"), ("assets", "finance")],
+    "career": [("career_profiles", "public"), ("career_goals", "career")],
+    "education": [("education_records", "public"), ("certifications", "education"), ("programs", "education")],
+    "health": [("health_profiles", "health"), ("body_metrics", "health")],
+    "family": [("family_profiles", "family"), ("family_members", "family"), ("family_members", "public")],
+}
+
+
 class DiscoveryCoverageService:
     def __init__(self, life: Any, supabase: Any, resolver: Any = None) -> None:
         self._life = life
         self._sb = supabase
         self._resolver = resolver
+
+    async def _has_records(self, ctx: UserContext, key: str) -> bool:
+        """True if the user has any REAL record in this domain's authoritative tables (fail-soft)."""
+        for table, schema in _RECORD_SOURCES.get(key, []):
+            try:
+                rows = await self._sb.select(table, filters={"user_id": f"eq.{ctx.user_id}"},
+                                             limit=1, schema=schema)
+                if rows:
+                    return True
+            except Exception:  # noqa: BLE001 — missing table / RLS / locked domain → just skip
+                continue
+        return False
 
     async def coverage(self, ctx: UserContext) -> dict[str, Any]:
         vis = await self._sb.select("life_vision", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema="life")
@@ -83,18 +107,23 @@ class DiscoveryCoverageService:
             coverage_pct = round(100 * got / total_signals)
             if not spec["advisor_keys"] and not has_objective and not has_goal:
                 coverage_pct = 0  # no path to cover this domain yet (e.g. education with no stated goal)
-            # P0.3: a stated goal floors coverage at "started" — a domain the user named is never 0%.
-            if has_goal:
+            # READ-PATH FIX: the dashboard card and the domain page must agree. If the domain has REAL records
+            # (degrees, a career profile, accounts, …) the card is never "not started", even with no discovery
+            # goal/objective. "If the platform knows something, the card cannot pretend it knows nothing."
+            has_records = await self._has_records(ctx, key)
+            has_data = has_goal or has_records
+            # P0.3: any real data floors coverage at "started" — a domain we know something about is never 0%.
+            if has_data:
                 coverage_pct = max(coverage_pct, 30)
             is_deprioritized = key in deprioritized
-            # MISSING labels (P3): say what's actually missing — never "X goal" once the user named a goal.
+            # MISSING labels (P3): say what's actually missing — never "X goal" once we already know the domain.
             if is_deprioritized:
                 missing_inputs = []  # the user explicitly set this aside (e.g. education: degree complete)
-            elif has_goal:
-                # they named a goal → what's missing is BASELINE detail, not "a goal"
+            elif has_data:
+                # we already know the domain → what's missing is BASELINE detail / next target, not "a goal"
                 missing_inputs = list(spec.get("baseline_missing", [])) if coverage_pct < 80 else []
             else:
-                # no goal yet in this domain → name the missing goal (+ finance: resolved-input gaps)
+                # nothing known in this domain → name the missing goal (+ finance: resolved-input gaps)
                 missing_inputs = [spec.get("goal_missing", f"{key} goal")]
                 if key == "finance" and fin_missing:
                     missing_inputs += [m["input"] for m in fin_missing]
@@ -104,7 +133,7 @@ class DiscoveryCoverageService:
             domains.append({
                 "domain": key, "label": spec["label"], "coverage_pct": coverage_pct, "status": status,
                 "confidence_pct": min(95, coverage_pct) if coverage_pct else 0,
-                "has_objective": has_objective or has_goal,
+                "has_objective": has_objective or has_data,
                 "missing": missing_inputs[:5], "unlocks": spec["unlocks"],
                 # Scope the CTA to the DOMAIN advisor so "Continue health discovery" opens the Health
                 # Advisor, not the generic Arcana orchestrator (CommandCenter reads ?agent=).

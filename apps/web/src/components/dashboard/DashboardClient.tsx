@@ -100,7 +100,7 @@ interface DashboardClientProps {
 
 export default function DashboardClient({ initialSession, firstInsight }: DashboardClientProps) {
   const currentSession = initialSession;
-  const [userName, setUserName] = useState<string>('User');
+  const [userName, setUserName] = useState<string>('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -242,34 +242,34 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
     },
   ];
 
-  // Fetch user profile from Supabase session
+  // Resolve the greeting name from the CANONICAL profile (public.profiles.display_name) — never from
+  // user_metadata alone, which can carry a seeded persona value (the "John Doe" bug). Falls back to the
+  // email local-part, then to a neutral greeting (no name) — never a hardcoded "User"/"John Doe".
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      // Use Supabase session user name if available via useSession hook
-      if (currentSession?.user) {
-        const user = currentSession.user as any;
-        const name = user.user_metadata?.name || user.email || 'User';
-        setUserName(name);
-        return;
-      }
-
-      // Fallback: get from Supabase client directly
+    const resolveName = async () => {
       try {
         const { getSupabaseClient } = await import('@/lib/supabase/client');
         const supabase = getSupabaseClient();
-        if (!supabase) return;
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (user) {
-          setUserName(user.user_metadata?.name || user.email || 'User');
+        let user: any = (currentSession?.user as any) || null;
+        if (!user && supabase) user = (await supabase.auth.getUser()).data.user;
+        if (!user) return;
+        let name = '';
+        if (supabase) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('display_name')
+            .eq('id', user.id)
+            .maybeSingle();
+          name = String((data as { display_name?: string } | null)?.display_name || '').trim();
         }
+        if (!name) name = String(user.user_metadata?.name || '').trim();
+        if (!name && user.email) name = String(user.email).split('@')[0];
+        setUserName(name);
       } catch (err) {
-        console.error('Error fetching user profile:', err);
+        console.error('Error resolving profile name:', err);
       }
     };
-
-    fetchUserProfile();
+    resolveName();
   }, [currentSession]);
 
   // Fetch dashboard data
@@ -532,7 +532,7 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
         {/* Welcome Section */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-1 text-gray-900 dark:text-white">
-            Welcome back, {userName}!
+            Welcome back{userName ? `, ${userName}` : ''}!
           </h1>
           <p className="text-base text-gray-600 dark:text-gray-400">
             Here's your life overview for today
