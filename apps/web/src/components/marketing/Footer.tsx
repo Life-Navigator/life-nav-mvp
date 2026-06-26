@@ -27,7 +27,7 @@ const footerLinks = {
 export default function Footer() {
   return (
     <footer className="relative border-t border-white/10 bg-[#06060a]">
-      <div className="mx-auto max-w-7xl px-6 py-16">
+      <div className="mx-auto max-w-[1600px] px-6 py-16">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-5">
           <div className="col-span-2 md:col-span-1">
             <Logo markClassName="h-7 w-7" size={28} />

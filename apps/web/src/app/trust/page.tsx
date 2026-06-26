@@ -51,7 +51,7 @@ export default function TrustPage() {
       </section>
 
       <section className="px-6 pb-20">
-        <div className="mx-auto grid max-w-6xl gap-px overflow-hidden rounded-2xl border border-[var(--brand-line)] bg-[var(--brand-line)] sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mx-auto grid max-w-[1600px] gap-px overflow-hidden rounded-2xl border border-[var(--brand-line)] bg-[var(--brand-line)] sm:grid-cols-2 lg:grid-cols-3">
           {PILLARS.map((p) => (
             <div key={p.t} className="bg-[var(--brand-paper)] p-7">
               <h3 className="font-semibold">{p.t}</h3>

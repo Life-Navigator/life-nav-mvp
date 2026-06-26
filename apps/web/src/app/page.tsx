@@ -251,7 +251,7 @@ export default function LandingPage() {
 
       {/* Stats credibility band */}
       <MotionSection as="section" className="px-6">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] sm:grid-cols-4">
+        <div className="mx-auto grid max-w-[1600px] grid-cols-2 gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] sm:grid-cols-4">
           {STATS.map(([n, l]) => (
             <div key={l} className="bg-[#06060a]/40 px-6 py-7 backdrop-blur-sm">
               <div className="font-display text-3xl font-medium tracking-tight text-white">{n}</div>
@@ -263,7 +263,7 @@ export default function LandingPage() {
 
       {/* 2 · Connected data layer — bento */}
       <MotionSection as="section" className="px-6 py-24">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1600px]">
           <SectionHead
             center
             eyebrow="Your connected data layer"
@@ -331,7 +331,7 @@ export default function LandingPage() {
 
       {/* 3 · Built for real life — photo collage */}
       <MotionSection as="section" className="px-6 py-24">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1600px]">
           <SectionHead
             center
             eyebrow="Built for real life"
@@ -353,7 +353,7 @@ export default function LandingPage() {
 
       {/* 4 · Decision domains */}
       <MotionSection as="section" id="product" className="px-6 py-24">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1600px]">
           <SectionHead
             eyebrow="Decision domains"
             title={
@@ -373,7 +373,7 @@ export default function LandingPage() {
 
       {/* Feature rows with imagery */}
       <MotionSection as="section" className="px-6 py-20">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1600px]">
           <FeatureRow
             eyebrow="Financial intelligence"
             title="Your money, finally in context."
@@ -389,7 +389,7 @@ export default function LandingPage() {
         </div>
       </MotionSection>
       <MotionSection as="section" className="px-6 py-20">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1600px]">
           <FeatureRow
             reverse
             eyebrow="Career & education"
@@ -408,7 +408,7 @@ export default function LandingPage() {
 
       {/* 5 · How it works */}
       <MotionSection as="section" className="px-6 py-24">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1600px]">
           <SectionHead
             eyebrow="How it works"
             title={
@@ -440,7 +440,7 @@ export default function LandingPage() {
 
       {/* 6 · Trust architecture */}
       <MotionSection as="section" id="trust" className="px-6 py-24">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1600px]">
           <SectionHead
             eyebrow="Trust architecture"
             title={
@@ -471,7 +471,7 @@ export default function LandingPage() {
 
       {/* 7 · Beta sample profiles */}
       <MotionSection as="section" className="px-6 py-24">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1600px]">
           <SectionHead
             eyebrow="The beta experience"
             title={
@@ -537,7 +537,7 @@ export default function LandingPage() {
 
       {/* 8 · Security */}
       <MotionSection as="section" className="px-6 py-24">
-        <div className="mx-auto max-w-6xl">
+        <div className="mx-auto max-w-[1600px]">
           <SectionHead
             eyebrow="Security & privacy"
             title={

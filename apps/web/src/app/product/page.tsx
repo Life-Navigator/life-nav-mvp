@@ -115,7 +115,7 @@ export default function ProductPage() {
       {/* capability deep-dives */}
       {CAPS.map((c, i) => (
         <MotionSection key={c.title} as="section" className="border-t border-white/10 px-6 py-20">
-          <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
+          <div className="mx-auto grid max-w-[1600px] items-center gap-12 lg:grid-cols-2">
             <div className={i % 2 ? 'lg:order-2' : ''}>
               <Eyebrow>{c.title}</Eyebrow>
               <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">{c.title}</h2>
@@ -147,7 +147,7 @@ export default function ProductPage() {
       ))}
 
       <MotionSection as="section" className="border-t border-white/10 px-6 py-24">
-        <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-2">
+        <div className="mx-auto grid max-w-[1600px] items-center gap-14 lg:grid-cols-2">
           <div>
             <Eyebrow>One private graph</Eyebrow>
             <h2 className="mt-3 font-display text-3xl font-semibold sm:text-4xl">

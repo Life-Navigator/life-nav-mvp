@@ -67,7 +67,7 @@ export default function HeroScene() {
         }}
       />
 
-      <div className="relative mx-auto max-w-6xl px-6 pt-36 pb-24 text-center sm:pt-40">
+      <div className="relative mx-auto max-w-[1600px] px-6 pt-36 pb-24 text-center sm:pt-40">
         <div className="mx-auto mb-8 inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-3.5 py-1.5 text-[13px] text-white/70 backdrop-blur-sm rise">
           <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-[#2dd4bf]" />
           Invite-only beta · Decision Intelligence Platform

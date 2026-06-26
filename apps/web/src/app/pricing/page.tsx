@@ -216,7 +216,7 @@ export default function PricingPage() {
       <ParallaxBackdrop />
       <Navbar />
 
-      <div className="mx-auto max-w-6xl px-6 pt-36 pb-20 sm:pt-40">
+      <div className="mx-auto max-w-[1600px] px-6 pt-36 pb-20 sm:pt-40">
         {/* Header */}
         <div className="text-center">
           <Eyebrow>Pricing</Eyebrow>

@@ -36,7 +36,7 @@ export default function Logo({
     <span className={`inline-flex items-center gap-2 ${className}`}>
       <Mark className={markClassName} size={size} />
       {wordmark && (
-        <span className="text-[1.05rem] font-semibold tracking-[-0.02em] text-[var(--brand-ink)] dark:text-[var(--brand-paper)]">
+        <span className="text-[1.05rem] font-semibold tracking-[-0.02em] text-[var(--brand-ink)]">
           LifeNavigator
         </span>
       )}
