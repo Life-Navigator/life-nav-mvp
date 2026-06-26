@@ -638,8 +638,9 @@ class AdvisorOrchestrator:
         # answering agent's domain(s) when known. Provenance stays in life.facts; this is the normalized state.
         if message and self._sb is not None:
             try:
+                gem = getattr(self._rm, "_gemini", None)  # reuse the discovery interpreter's LLM
                 synced = await fact_domain_sync.sync_from_message(
-                    self._sb, ctx, message, domains=set(fdoms) if fdoms else None, source="advisor_chat")
+                    self._sb, gem, ctx, message, domains=set(fdoms) if fdoms else None, source="advisor_chat")
                 if synced:
                     tr["domain_sync"] = [{"domain": s["domain"], "updated": s["fields_updated"]} for s in synced]
             except Exception:  # noqa: BLE001 — sync must never break the turn
