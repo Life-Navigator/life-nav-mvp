@@ -328,9 +328,18 @@ class FinanceService(DomainService):
             ctx,
             {
                 "total": _money(total),
+                # REAL position-level holdings: pass through shares/cost_basis/symbol/price so the page can
+                # render the full holdings table + analysis. Unknown fields stay None (rendered "Not
+                # available") — NEVER coerced to 0. (The account-fallback path above carries no shares, so it
+                # reads as account-balance-only.)
                 "holdings": [
                     {"id": h.get("id"), "name": h.get("name") or h.get("symbol"),
+                     "symbol": h.get("symbol"),
                      "value": _money(self._bal(h)),
+                     "shares": h.get("quantity"),
+                     "cost_basis": h.get("cost_basis"),
+                     "current_price": h.get("current_price"),
+                     "sector": h.get("sector"),
                      "share_pct": round(self._bal(h) / total * 100, 1) if total else None}
                     for h in holdings
                 ],

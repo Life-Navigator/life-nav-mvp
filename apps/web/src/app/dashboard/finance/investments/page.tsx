@@ -2,7 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import FinancialResolverPanel from '@/components/finance/FinancialResolverPanel';
-import { isRealHolding } from '@/lib/finance/investmentDisplay';
+import {
+  isRealHolding,
+  computeDisplayMetrics,
+  reconciliationNote,
+  type RawMetrics,
+} from '@/lib/finance/investmentDisplay';
 // PlaidLinkButton removed during Supabase migration
 const PlaidLinkButton = ({ className }: any) => (
   <button className={className} disabled>
@@ -203,6 +208,8 @@ export default function InvestmentPage() {
   // position-level holdings are unavailable for the persona — no fake holdings.
   const [canonicalInvestment, setCanonicalInvestment] = useState<number | null>(null);
   const [canonicalSource, setCanonicalSource] = useState<string | null>(null);
+  // Un-coerced performance/dividend inputs — so the overview can show "Not available" (never $0/0.00%).
+  const [rawMetrics, setRawMetrics] = useState<RawMetrics | null>(null);
   useEffect(() => {
     fetch('/api/finance/canonical-summary')
       .then((r) => (r.ok ? r.json() : null))
@@ -267,17 +274,26 @@ export default function InvestmentPage() {
       // the (untyped) response so the page's other optional reads keep degrading gracefully.
       const vmHoldings: Array<{
         name?: string;
+        symbol?: string;
         value?: { amount?: number } | number;
         share_pct?: number;
+        shares?: number | null;
+        cost_basis?: number | null;
+        current_price?: number | null;
+        sector?: string | null;
       }> = data?.data?.holdings || [];
+      // Pass through REAL position fields when present (investment_holdings); account-level fallback rows
+      // carry no shares (shares=0) → suppressed downstream as account-balance-only. cost_basis is the TOTAL
+      // position cost basis (not per-share). Unknown stays 0/undefined and is treated as "not available".
       data.holdings = vmHoldings.map((h) => ({
         name: h.name || 'Investment account',
+        symbol: h.symbol,
         marketValue: (typeof h.value === 'object' ? h.value?.amount : h.value) ?? 0,
         weight: h.share_pct ?? 0,
-        shares: 0,
-        costBasis: 0,
-        currentPrice: 0,
-        sector: 'Other',
+        shares: h.shares ?? 0,
+        costBasisTotal: h.cost_basis ?? null,
+        currentPrice: h.current_price ?? 0,
+        sector: h.sector ?? 'Other',
         dividendYield: 0,
         beta: 0,
       }));
@@ -292,6 +308,7 @@ export default function InvestmentPage() {
             name: string;
             shares: number;
             costBasis: number;
+            costBasisTotal?: number | null;
             currentPrice: number;
             marketValue?: number;
             unrealizedGain?: number;
@@ -313,7 +330,8 @@ export default function InvestmentPage() {
           symbol: h.ticker || h.symbol || 'N/A',
           name: h.name || 'Unknown',
           shares: h.shares || 0,
-          costBasis: (h.costBasis || 0) * (h.shares || 0),
+          // Total position cost basis (passed through from investment_holdings); 0 = unknown → "Not available".
+          costBasis: h.costBasisTotal ?? 0,
           currentPrice: h.currentPrice || 0,
           marketValue: h.marketValue || (h.shares || 0) * (h.currentPrice || 0),
           gainLoss: h.unrealizedGain || 0,
@@ -336,6 +354,19 @@ export default function InvestmentPage() {
       // holdings is empty → the account-balance-only state renders (balance shown, holdings "Not available").
       const realHoldings = transformedHoldings.filter(isRealHolding);
       setHoldings(realHoldings);
+
+      // Keep the raw performance/dividend inputs (un-coerced) for the null-aware overview.
+      setRawMetrics(
+        data.portfolioMetrics
+          ? {
+              ytdReturn: data.portfolioMetrics.ytdReturn,
+              oneYearReturn: data.portfolioMetrics.oneYearReturn,
+              threeYearReturn: data.portfolioMetrics.threeYearReturn,
+              fiveYearReturn: data.portfolioMetrics.fiveYearReturn,
+              annualDividendIncome: data.portfolioMetrics.annualDividendIncome,
+            }
+          : null
+      );
 
       // Transform portfolio metrics
       if (data.portfolioMetrics) {
@@ -1070,6 +1101,14 @@ export default function InvestmentPage() {
       return renderEmptyState();
     }
 
+    // Metrics derived from REAL holdings; unknown cost basis / performance / dividends → "Not available"
+    // (never $0 / 0.00%). Real holdings always render regardless of what's missing.
+    const dm = computeDisplayMetrics(holdings, rawMetrics);
+    const reconNote = reconciliationNote(canonicalInvestment, dm.totalValue);
+    const naC = (v: number | null) => (v == null ? 'Not available' : formatCurrency(v));
+    const naP = (v: number | null) => (v == null ? 'Not available' : formatPercent(v));
+    const gain = dm.totalGainLoss;
+
     return (
       <div className="space-y-6">
         {/* Sprint 45C — canonical, source-labeled truth (resolver) above the analytics */}
@@ -1077,61 +1116,51 @@ export default function InvestmentPage() {
           title="What we know (from your data)"
           keys={['investment_balance', 'cash_balance']}
         />
+        {reconNote && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            {reconNote}
+          </div>
+        )}
         {/* Portfolio Value Hero */}
         <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-xl p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-medium opacity-90">Total Portfolio Value</h2>
-              <div className="text-4xl font-bold mt-1">
-                {formatCurrency(portfolioMetrics?.totalValue || 0)}
-              </div>
-              <div className="flex items-center gap-4 mt-2">
-                <span
-                  className={`text-sm ${(portfolioMetrics?.dayChangePercent || 0) >= 0 ? 'text-green-300' : 'text-red-300'}`}
-                >
-                  {formatCurrency(portfolioMetrics?.dayChange || 0)} (
-                  {formatPercent(portfolioMetrics?.dayChangePercent || 0)}) Today
-                </span>
+              <div className="text-4xl font-bold mt-1">{formatCurrency(dm.totalValue)}</div>
+              <div className="mt-2 text-sm opacity-75">
+                From {holdings.length} {holdings.length === 1 ? 'position' : 'positions'}
               </div>
             </div>
             <div className="text-right">
               <div className="text-sm opacity-75">Total Gain/Loss</div>
               <div
-                className={`text-2xl font-bold ${(portfolioMetrics?.totalGainLoss || 0) >= 0 ? 'text-green-300' : 'text-red-300'}`}
+                className={`text-2xl font-bold ${gain == null ? 'text-white/80' : gain >= 0 ? 'text-green-300' : 'text-red-300'}`}
               >
-                {formatCurrency(portfolioMetrics?.totalGainLoss || 0)}
+                {naC(gain)}
               </div>
               <div
-                className={`text-sm ${(portfolioMetrics?.totalGainLossPercent || 0) >= 0 ? 'text-green-300' : 'text-red-300'}`}
+                className={`text-sm ${dm.totalGainLossPercent == null ? 'text-white/70' : dm.totalGainLossPercent >= 0 ? 'text-green-300' : 'text-red-300'}`}
               >
-                {formatPercent(portfolioMetrics?.totalGainLossPercent || 0)}
+                {naP(dm.totalGainLossPercent)}
               </div>
             </div>
           </div>
           <div className="mt-6 grid grid-cols-4 gap-4">
             <div>
               <div className="text-sm opacity-75">YTD Return</div>
-              <div className="font-semibold text-lg">
-                {formatPercent(portfolioMetrics?.ytdReturnPercent || 0)}
-              </div>
+              <div className="font-semibold text-lg">{naP(dm.ytdReturnPercent)}</div>
             </div>
             <div>
               <div className="text-sm opacity-75">1 Year</div>
-              <div className="font-semibold text-lg">
-                {formatPercent(portfolioMetrics?.oneYearReturn || 0)}
-              </div>
+              <div className="font-semibold text-lg">{naP(dm.oneYearReturn)}</div>
             </div>
             <div>
               <div className="text-sm opacity-75">3 Year</div>
-              <div className="font-semibold text-lg">
-                {formatPercent(portfolioMetrics?.threeYearReturn || 0)}
-              </div>
+              <div className="font-semibold text-lg">{naP(dm.threeYearReturn)}</div>
             </div>
             <div>
               <div className="text-sm opacity-75">5 Year</div>
-              <div className="font-semibold text-lg">
-                {formatPercent(portfolioMetrics?.fiveYearReturn || 0)}
-              </div>
+              <div className="font-semibold text-lg">{naP(dm.fiveYearReturn)}</div>
             </div>
           </div>
         </div>
@@ -1140,10 +1169,10 @@ export default function InvestmentPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="text-sm text-gray-500">Cost Basis</div>
-            <div className="text-2xl font-bold text-gray-900">
-              {formatCurrency(portfolioMetrics?.totalCostBasis || 0)}
+            <div className="text-2xl font-bold text-gray-900">{naC(dm.totalCostBasis)}</div>
+            <div className="text-xs text-gray-500 mt-1">
+              {dm.totalCostBasis == null ? 'Needs cost basis' : 'Total invested'}
             </div>
-            <div className="text-xs text-gray-500 mt-1">Total invested</div>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="text-sm text-gray-500">Cash Balance</div>
@@ -1155,10 +1184,14 @@ export default function InvestmentPage() {
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="text-sm text-gray-500">Dividend Income</div>
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(portfolioMetrics?.dividendIncome || 0)}/yr
+              {dm.dividendIncome == null
+                ? 'Not available'
+                : `${formatCurrency(dm.dividendIncome)}/yr`}
             </div>
             <div className="text-xs text-gray-500 mt-1">
-              {formatCurrency((portfolioMetrics?.dividendIncome || 0) / 12)}/mo
+              {dm.dividendIncome == null
+                ? 'Needs dividend data'
+                : `${formatCurrency(dm.dividendIncome / 12)}/mo`}
             </div>
           </div>
           <div className="bg-white rounded-lg border border-gray-200 p-4">

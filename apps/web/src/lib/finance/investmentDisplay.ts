@@ -21,3 +21,67 @@ export function investmentStatus(
   if (accountBalance != null && accountBalance > 0) return 'account_balance_only';
   return 'no_investment_data';
 }
+
+// ---- Position-level metrics: derived from REAL holdings, null where unknown (NEVER coerced to 0) --------
+export interface RawMetrics {
+  ytdReturn?: number | null;
+  oneYearReturn?: number | null;
+  threeYearReturn?: number | null;
+  fiveYearReturn?: number | null;
+  annualDividendIncome?: number | null;
+}
+export interface DisplayMetrics {
+  totalValue: number; // always known for real holdings (sum of market value)
+  totalCostBasis: number | null; // known only if EVERY real holding has a cost basis
+  totalGainLoss: number | null; // requires cost basis
+  totalGainLossPercent: number | null;
+  ytdReturnPercent: number | null; // only if performance data exists
+  oneYearReturn: number | null;
+  threeYearReturn: number | null;
+  fiveYearReturn: number | null;
+  dividendIncome: number | null;
+}
+
+const _pct = (v: number | null | undefined): number | null => (v == null ? null : v * 100);
+
+/** Compute the overview metrics from REAL holdings. A missing cost basis / performance / dividend yields
+ *  `null` (rendered as "Not available") — it NEVER hides the holdings and NEVER shows a fake $0 / 0.00%. */
+export function computeDisplayMetrics(
+  realHoldings: { marketValue?: number | null; costBasis?: number | null }[],
+  raw?: RawMetrics | null
+): DisplayMetrics {
+  const totalValue = realHoldings.reduce((s, h) => s + (Number(h.marketValue) || 0), 0);
+  const haveAllCost =
+    realHoldings.length > 0 && realHoldings.every((h) => (Number(h.costBasis) || 0) > 0);
+  const totalCostBasis = haveAllCost
+    ? realHoldings.reduce((s, h) => s + (Number(h.costBasis) || 0), 0)
+    : null;
+  const totalGainLoss = totalCostBasis != null ? totalValue - totalCostBasis : null;
+  const totalGainLossPercent =
+    totalCostBasis != null && totalCostBasis > 0 ? (totalGainLoss! / totalCostBasis) * 100 : null;
+  return {
+    totalValue,
+    totalCostBasis,
+    totalGainLoss,
+    totalGainLossPercent,
+    ytdReturnPercent: _pct(raw?.ytdReturn),
+    oneYearReturn: _pct(raw?.oneYearReturn),
+    threeYearReturn: _pct(raw?.threeYearReturn),
+    fiveYearReturn: _pct(raw?.fiveYearReturn),
+    dividendIncome: raw?.annualDividendIncome == null ? null : raw.annualDividendIncome,
+  };
+}
+
+/** Reconciliation note when the connected account balance and the position details total disagree. */
+export function reconciliationNote(
+  accountBalance: number | null | undefined,
+  holdingsTotal: number
+): string | null {
+  if (accountBalance == null || accountBalance <= 0 || holdingsTotal <= 0) return null;
+  if (Math.abs(accountBalance - holdingsTotal) < 1) return null; // they match
+  return (
+    `Connected account balance: $${Math.round(accountBalance).toLocaleString()}. ` +
+    `Position details total: $${Math.round(holdingsTotal).toLocaleString()}. ` +
+    `Difference may reflect cash, pending data, or unavailable holdings.`
+  );
+}
