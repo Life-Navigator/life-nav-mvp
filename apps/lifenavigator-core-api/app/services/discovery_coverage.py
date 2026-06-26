@@ -131,12 +131,16 @@ class DiscoveryCoverageService:
             certs = await self._count("certifications", "education", ctx)
             prof = await self._one("education_profiles", "education", ctx)
             latest = await self._one("education_records", "public", ctx, order="created_at.desc")
-            if prof.get("highest_level") or latest.get("degree_type"):
-                lvl = prof.get("highest_level") or latest.get("degree_type")
-                fld = latest.get("field_of_study")
+            # credential can live in public.education_records (the page) OR education_profiles.existing_credentials
+            # (the advisor sync) — read both so the card shows the full degree + school either way.
+            cred0 = (prof.get("existing_credentials") or [{}])[0] if prof.get("existing_credentials") else {}
+            lvl = prof.get("highest_level") or latest.get("degree_type") or cred0.get("highest_level")
+            fld = latest.get("field_of_study") or cred0.get("field")
+            school = latest.get("institution_name") or cred0.get("school")
+            if lvl:
                 f["Highest education"] = f"{lvl} in {fld}" if fld else lvl
-            if latest.get("institution_name"):
-                f["School"] = latest["institution_name"]
+            if school:
+                f["School"] = school
             if recs:
                 f["Degrees / records"] = recs
             if certs:
