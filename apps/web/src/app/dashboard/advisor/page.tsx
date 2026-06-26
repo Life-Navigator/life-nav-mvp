@@ -33,6 +33,9 @@ import {
 interface Panel {
   life_vision?: string | null;
   primary_objective?: string | null;
+  north_star?: string | null;
+  main_priority?: string | null;
+  deprioritized_domains?: string[];
   top_themes?: string[];
   top_risks?: string[];
   top_constraints?: string[];
@@ -47,6 +50,9 @@ interface Reveal {
   dependencies: string[];
   recommendations_unlocked: number;
   confidence_pct: number;
+  north_star?: string | null;
+  main_priority?: string | null;
+  deprioritized?: string[];
 }
 interface Turn {
   assistant_message: string;
@@ -533,14 +539,18 @@ function OnboardingAdvisor() {
                     <div className="mt-1 text-sm text-gray-600">
                       You said: <span className="text-indigo-950">“{m.reveal.you_said}”</span>
                     </div>
-                    <div className="text-sm text-gray-600">
-                      What I&apos;m hearing (does this sound right?):{' '}
-                      <span className="text-lg font-bold text-indigo-950">
-                        {m.reveal.we_discovered}
-                      </span>
+                    <div className="mt-1 text-sm text-gray-700">
+                      <span className="font-semibold text-indigo-900">What I learned:</span>{' '}
+                      <span className="text-indigo-950">{m.reveal.we_discovered}</span>
                     </div>
+                    {m.reveal.main_priority && (
+                      <div className="mt-1 text-sm text-gray-700">
+                        <span className="font-semibold text-indigo-900">Main priority:</span>{' '}
+                        <span className="font-bold text-indigo-950">{m.reveal.main_priority}</span>
+                      </div>
+                    )}
                     <div className="mt-2 text-[11px] uppercase tracking-wide text-gray-600 font-semibold">
-                      What it depends on
+                      What this plan depends on
                     </div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       {m.reveal.dependencies.map((d) => (
@@ -552,6 +562,11 @@ function OnboardingAdvisor() {
                         </span>
                       ))}
                     </div>
+                    {m.reveal.deprioritized && m.reveal.deprioritized.length > 0 && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        Deprioritized for now: {m.reveal.deprioritized.join(', ')}
+                      </div>
+                    )}
                     <div className="mt-2 flex gap-4 text-sm">
                       <span className="text-emerald-700 font-semibold">
                         {m.reveal.recommendations_unlocked} actions unlocked
@@ -802,9 +817,23 @@ function OnboardingAdvisor() {
           {panel.primary_objective && (
             <div className="mt-3">
               <div className="text-[11px] uppercase text-gray-600 font-semibold">
-                Primary objective
+                {panel.north_star ? 'North star' : 'Primary objective'}
               </div>
               <div className="text-sm font-semibold text-gray-900">{panel.primary_objective}</div>
+            </div>
+          )}
+          {panel.main_priority && (
+            <div className="mt-3">
+              <div className="text-[11px] uppercase text-indigo-600 font-semibold">
+                Main priority
+              </div>
+              <div className="text-sm font-semibold text-gray-900">{panel.main_priority}</div>
+            </div>
+          )}
+          {panel.deprioritized_domains && panel.deprioritized_domains.length > 0 && (
+            <div className="mt-3">
+              <div className="text-[11px] uppercase text-gray-500 font-semibold">Deprioritized</div>
+              <div className="text-sm text-gray-600">{panel.deprioritized_domains.join(', ')}</div>
             </div>
           )}
           {panel.top_constraints && panel.top_constraints.length > 0 && (

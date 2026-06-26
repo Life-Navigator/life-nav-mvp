@@ -19,6 +19,12 @@ from typing import Any, Optional
 
 log = logging.getLogger("core.relationship_manager")
 
+# Human, advisor-voice labels for the onboarding synthesis bullets (no schema-ish "1) …; 2) …;").
+_DOMAIN_LABEL = {
+    "finance": "Financial security", "health": "Health & performance", "career": "Career momentum",
+    "family": "Family & home", "education": "Education",
+}
+
 # Rule 2: user corrections are authoritative. When the user pushes back, we apologize + ask them to
 # restate — we never re-assert a rejected interpretation.
 _CORRECTION_RE = re.compile(
@@ -186,11 +192,20 @@ class RelationshipManager:
         "clauses (e.g. NOT 'get my financial'; YES 'Build a stronger financial foundation'). (2) Map each goal "
         "to exactly one domain from: family, finance, health, career, education. (3) Identify the north star "
         "(one sentence), the time horizon, the core values/drivers, and any domains the user EXPLICITLY "
-        "deprioritized. (4) Write a warm 1-2 sentence synthesis that NAMES the north star and the pillars — do "
-        "NOT echo their raw words back, and do NOT ask 'did I capture that?'. (5) Write ONE sharp prioritization "
-        "question to ask next — not a generic 'what do you want', and not a premature 'which goal would you "
-        "postpone'. Do NOT invent facts, numbers, names, or goals the user didn't state or clearly imply. "
-        "Return STRICT JSON only — no markdown, no prose."
+        "deprioritized. (4) Set main_priority to the ONE domain the user is organizing around (the north star's "
+        "engine) when they imply it (e.g. financial security); else \"\". When the user frames a domain as a "
+        "MEANS to another (e.g. 'career is for the financial foundation'), the END is the main_priority and the "
+        "means is a supporting lever — do NOT promote the means to the main goal. (5) dependencies: 4-8 SHORT, "
+        "plan-SPECIFIC levers/inputs this plan actually depends on (e.g. 'Emergency fund', 'Monthly cash flow', "
+        "'Debt level', 'Wedding budget', 'Home down-payment target', 'Promotion / income path', 'Health routine "
+        "& recovery', 'Family-planning timeline') — NEVER generic template items like 'In-demand skills' or "
+        "'Compensation benchmarking' unless the user is purely career-focused. (6) Write a warm 1-2 sentence "
+        "synthesis that NAMES the north star, the main priority, and how the other pillars support it — spoken "
+        "like a trusted advisor, NOT a schema; do NOT echo raw words or ask 'did I capture that?'. (7) next_question: "
+        "ONE sharp question that advances the MAIN priority in measurable terms (e.g. for financial security: "
+        "'what would make you feel financially ready in a year — cash saved, debt down, income up, or a down "
+        "payment started?'); do NOT jump to a supporting lever's next step. Do NOT invent facts/numbers/names/"
+        "goals the user didn't state or clearly imply. Return STRICT JSON only — no markdown, no prose."
     )
 
     @staticmethod
@@ -221,7 +236,8 @@ class RelationshipManager:
             '{"north_star": str, "time_horizon": str, '
             '"goals": [{"goal": "a complete sentence", "domain": "family|finance|health|career|education", '
             '"status": "active|future", "confidence": 0.0}], '
-            '"values": [str], "deprioritized_domains": ["domain"], "synthesis": str, "next_question": str}'
+            '"values": [str], "deprioritized_domains": ["domain"], "main_priority": str, '
+            '"dependencies": ["short plan-specific lever"], "synthesis": str, "next_question": str}'
         )
         try:
             raw, _ = await g.generate_with_usage(self._INTERP_SYSTEM, user, temperature=0.2)
@@ -271,12 +287,16 @@ class RelationshipManager:
             self._interpret_status = "empty"
             return None
         self._interpret_status = "ok"
+        main_priority = str(data.get("main_priority") or "").strip()
+        deps = [str(d).strip() for d in (data.get("dependencies") or []) if str(d).strip()][:8]
         return {
             "candidate_goals": cand,
             "north_star": str(data.get("north_star") or "").strip(),
             "time_horizon": str(data.get("time_horizon") or "").strip(),
             "values": [str(v).strip() for v in (data.get("values") or []) if str(v).strip()][:6],
             "deprioritized_domains": deprioritized,
+            "main_priority": main_priority,
+            "dependencies": deps,
             "synthesis": str(data.get("synthesis") or "").strip(),
             "next_question": str(data.get("next_question") or "").strip(),
         }
@@ -534,11 +554,24 @@ class RelationshipManager:
         nar = snap.get("dominant_narrative") or {}
         # P0.2: the confirmation renders THESE accumulated goals (the user's own words), not a stale label.
         cands = await self._load_candidate_goals(ctx)
+        # The SEMANTIC north star + main priority (persisted by the LLM interpreter) are the source of truth for
+        # the "What I learned" panel — NOT the objective-ranking template (which collapses to "Advance your
+        # career"). Fall back to the ranked objective only when there is no semantic plan yet.
+        learned: dict[str, Any] = {}
+        try:
+            learned = (await self._vision_row(ctx)).get("prompts") or {}
+        except Exception:  # noqa: BLE001
+            learned = {}
+        north_star = (learned.get("north_star") or "").strip() or None
+        main_priority = (learned.get("main_priority") or "").strip() or None
         return {"life_vision": snap.get("life_vision"),
                 # Narrative-first: the surfaced THEME is the life story, not a single objective.
                 "dominant_narrative": nar.get("summary"), "narrative_theme": nar.get("label"),
                 "goal_portfolio": snap.get("goal_portfolio"), "emotional_signals": snap.get("emotional_signals"),
-                "primary_objective": po.get("title"),
+                "primary_objective": north_star or po.get("title"),
+                "north_star": north_star,
+                "main_priority": main_priority,
+                "deprioritized_domains": learned.get("deprioritized_domains") or [],
                 "candidate_goals": cands,
                 "priorities_i_heard": [c["goal"] for c in cands],
                 "domains_touched": sorted({c["domain"] for c in cands if c["domain"] != "core"}),
@@ -619,12 +652,22 @@ class RelationshipManager:
             interpreter_failed = interpret_status in ("llm_failed", "parse_failed")
             # Persist any explicit deprioritization (merge, never clobber) so the platform can mark e.g.
             # education "deprioritized / sufficient for now" instead of "not started". (T3 fix)
-            if llm_plan and llm_plan.get("deprioritized_domains"):
+            if llm_plan:
                 try:
                     cur = await self._vision_row(ctx)
-                    existing = set((cur.get("prompts") or {}).get("deprioritized_domains") or [])
-                    merged = sorted(existing | set(llm_plan["deprioritized_domains"]))
-                    await self._update_vision(ctx, prompt_updates={"deprioritized_domains": merged})
+                    prompts = (cur.get("prompts") or {})
+                    upd: dict[str, Any] = {}
+                    if llm_plan.get("deprioritized_domains"):
+                        existing = set(prompts.get("deprioritized_domains") or [])
+                        upd["deprioritized_domains"] = sorted(existing | set(llm_plan["deprioritized_domains"]))
+                    # Persist the SEMANTIC north star + main priority so the panel/reveal reflect the real plan
+                    # across turns (not the objective-ranking template). Never clobber with empties.
+                    if llm_plan.get("north_star"):
+                        upd["north_star"] = llm_plan["north_star"]
+                    if llm_plan.get("main_priority"):
+                        upd["main_priority"] = llm_plan["main_priority"]
+                    if upd:
+                        await self._update_vision(ctx, prompt_updates=upd)
                 except Exception:  # noqa: BLE001
                     pass
             # HARDENING: goals come ONLY from the semantic plan. The legacy regex clause-splitter is NEVER used
@@ -667,7 +710,21 @@ class RelationshipManager:
             # The "magic moment" (D2): surface goal → discovered objective → confidence. We no longer
             # fabricate archetype dependencies, so the reveal celebrates the discovered objective itself
             # (requirements/recommendations surface later from real evidence, not from the objective).
-            if rec.get("objective"):
+            # SEMANTIC reveal takes precedence: the north star + plan-SPECIFIC levers, not the objective template.
+            if llm_plan and (llm_plan.get("candidate_goals") or llm_plan.get("deprioritized_domains")):
+                cg = llm_plan.get("candidate_goals") or []
+                deps = llm_plan.get("dependencies") or [str(g.get("goal")) for g in cg[:6]]
+                reveal = {
+                    "you_said": (message or "")[:300],
+                    "we_discovered": (llm_plan.get("synthesis") or llm_plan.get("north_star") or "").rstrip(),
+                    "dependencies": deps,
+                    "recommendations_unlocked": len(deps),
+                    "confidence_pct": 90,
+                    "north_star": llm_plan.get("north_star") or "",
+                    "main_priority": llm_plan.get("main_priority") or "",
+                    "deprioritized": llm_plan.get("deprioritized_domains") or [],
+                }
+            elif rec.get("objective"):
                 deps_revealed = rec.get("dependencies") or []
                 reveal = {
                     "you_said": rec.get("surface_goal"),
@@ -676,24 +733,21 @@ class RelationshipManager:
                     "recommendations_unlocked": len(deps_revealed),
                     "confidence_pct": round((rec.get("confidence") or 0) * 100),
                 }
-            # LLM interpreter present → SYNTHESIZE (name the north star + pillars), don't parrot the raw words
-            # back or ask "did I capture that?". (llm_plan was set during extraction above.)
+            # SYNTHESIZE the chat reply in natural advisor voice: the LLM's synthesis sentence, then clean
+            # domain-labeled bullets (NOT "1) …; 2) …;"). (llm_plan was set during extraction above.)
             if llm_plan and (llm_plan.get("candidate_goals") or llm_plan.get("deprioritized_domains")):
                 cg = llm_plan.get("candidate_goals") or []
-                parts = []
-                if llm_plan.get("synthesis"):
-                    parts.append(llm_plan["synthesis"].rstrip())
-                elif llm_plan.get("north_star"):
-                    parts.append(f"Got it — your north star is {llm_plan['north_star'].rstrip('.')}.")
-                if cg:
-                    pillars = "; ".join(f"{i + 1}) {g['goal']}" for i, g in enumerate(cg[:6]))
-                    parts.append(f"I'm capturing these pillars — {pillars}.")
+                lead = (llm_plan.get("synthesis") or "").rstrip()
+                if not lead and llm_plan.get("north_star"):
+                    lead = f"Here's the foundation I'm hearing — {llm_plan['north_star'].rstrip('.')}."
+                bullets = []
+                for g in cg[:6]:
+                    lbl = _DOMAIN_LABEL.get(g.get("domain"), str(g.get("domain") or "").title())
+                    bullets.append(f"- {lbl} — {str(g['goal']).rstrip('.')}")
                 if llm_plan.get("deprioritized_domains"):
-                    parts.append("Deprioritized for now: " + ", ".join(llm_plan["deprioritized_domains"]) + ".")
-                    # T3: deprioritization-only turn (no new goals) → refocus, don't no-op or route to intake.
-                    if not cg and not llm_plan.get("synthesis"):
-                        parts.append("We'll focus the plan on the areas that move the needle next.")
-                reflection = " ".join(p for p in parts if p) + " "
+                    dl = ", ".join(_DOMAIN_LABEL.get(d, str(d).title()) for d in llm_plan["deprioritized_domains"])
+                    bullets.append(f"- {dl} — deprioritized for now")
+                reflection = (lead + ("\n\n" + "\n".join(bullets) if bullets else "")).rstrip() + "\n\n"
             # Rule 3: EXTRACT first, classify later — reflect the user's OWN words (the goal text),
             # never an objective label, and ask them to confirm before any classification.
             elif len(candidate_goals) >= 2:

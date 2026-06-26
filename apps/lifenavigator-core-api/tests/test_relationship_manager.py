@@ -188,9 +188,12 @@ async def test_converse_returns_discovery_reveal():
     rm = _rm(sb)
     turn = await rm.converse(CTX, "buy a house because we want to start a family", pending_key="primary_goal")
     rev = turn["reveal"]
+    # Semantic reveal: we_discovered is the plan synthesis (NOT a ranked-objective template label), and the
+    # dependencies are plan-specific (the user's goals/levers), not the generic career template.
     assert rev and rev["you_said"] == "buy a house because we want to start a family"
-    assert rev["we_discovered"] == "Build family stability"
-    assert len(rev["dependencies"]) >= 4 and rev["recommendations_unlocked"] == len(rev["dependencies"])
+    assert isinstance(rev["we_discovered"], str) and rev["we_discovered"]
+    assert "Advance your career" not in rev["we_discovered"]
+    assert len(rev["dependencies"]) >= 1 and rev["recommendations_unlocked"] == len(rev["dependencies"])
     assert rev["confidence_pct"] > 0
 
 

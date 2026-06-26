@@ -178,5 +178,10 @@ class FakeInterpreterGemini:
             if len(g.split()) >= 2:
                 goals.append({"goal": g[:1].upper() + g[1:], "domain": c.get("domain") or _goal_domain(g),
                               "status": c.get("status") or "active", "confidence": c.get("confidence") or 0.7})
-        return _json.dumps({"north_star": "", "time_horizon": "", "goals": goals, "values": [],
-                            "deprioritized_domains": [], "synthesis": "", "next_question": ""}), {}
+        doms = sorted({g["domain"] for g in goals})
+        synthesis = ("Here's the foundation I'm hearing — a plan across "
+                     + (", ".join(doms) if doms else "your goals") + ".") if goals else ""
+        return _json.dumps({"north_star": synthesis, "time_horizon": "", "goals": goals, "values": [],
+                            "deprioritized_domains": [], "main_priority": "",
+                            "dependencies": [g["goal"] for g in goals][:6],
+                            "synthesis": synthesis, "next_question": ""}), {}
