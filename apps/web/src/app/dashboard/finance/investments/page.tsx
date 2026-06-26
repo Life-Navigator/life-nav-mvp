@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import FinancialResolverPanel from '@/components/finance/FinancialResolverPanel';
+import { isRealHolding } from '@/lib/finance/investmentDisplay';
 // PlaidLinkButton removed during Supabase migration
 const PlaidLinkButton = ({ className }: any) => (
   <button className={className} disabled>
@@ -333,7 +334,7 @@ export default function InvestmentPage() {
       // TRUST: suppress placeholder/model rows (no real shares AND no market value) so we never render
       // "Vanguard · 0 shares · $0" as a position or count them in Total Positions. If nothing real remains,
       // holdings is empty → the account-balance-only state renders (balance shown, holdings "Not available").
-      const realHoldings = transformedHoldings.filter((h) => h.shares > 0 || h.marketValue > 0);
+      const realHoldings = transformedHoldings.filter(isRealHolding);
       setHoldings(realHoldings);
 
       // Transform portfolio metrics
