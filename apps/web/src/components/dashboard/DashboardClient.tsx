@@ -253,6 +253,18 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
         let user: any = (currentSession?.user as any) || null;
         if (!user && supabase) user = (await supabase.auth.getUser()).data.user;
         if (!user) return;
+        // Accept only HUMAN-looking names. Rejects UUIDs, random auth slugs ("xyccggrekvctxvofxp"),
+        // all-consonant gibberish, and digit-laden ids. Empty → neutral "Welcome back" (no name).
+        const looksHuman = (raw: string): string => {
+          const t = String(raw || '').trim();
+          if (!t) return '';
+          if (/[0-9_]/.test(t) || /[0-9a-f]{8}-[0-9a-f]{4}/i.test(t)) return ''; // ids / uuids
+          const first = t.split(/[.\-\s]+/)[0].toLowerCase();
+          if (!/^[a-z]{2,15}$/.test(first)) return ''; // too long/short or non-alpha → not a name
+          if (!/[aeiou]/.test(first)) return ''; // no vowel → gibberish
+          if (/[bcdfghjklmnpqrstvwxz]{4,}/.test(first)) return ''; // 4+ consecutive consonants → random
+          return first.charAt(0).toUpperCase() + first.slice(1);
+        };
         let name = '';
         if (supabase) {
           const { data } = await supabase
@@ -262,9 +274,9 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
             .maybeSingle();
           name = String((data as { display_name?: string } | null)?.display_name || '').trim();
         }
-        if (!name) name = String(user.user_metadata?.name || '').trim();
-        if (!name && user.email) name = String(user.email).split('@')[0];
-        setUserName(name);
+        if (!name) name = looksHuman(user.user_metadata?.full_name || user.user_metadata?.name);
+        if (!name && user.email) name = looksHuman(String(user.email).split('@')[0]);
+        setUserName(name); // '' → neutral greeting
       } catch (err) {
         console.error('Error resolving profile name:', err);
       }

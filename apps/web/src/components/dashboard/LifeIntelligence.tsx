@@ -88,12 +88,26 @@ export default function LifeIntelligence() {
   }, []);
 
   if (!loaded || !s || !s.objectives?.length) return null; // no discovery yet → MissionControl handles onboarding
-  const po = s.primary_objective;
+  // Defense-in-depth: NEVER render internal-model leakage (snake_case enums like "peak_earning", the persona
+  // bridge vision, or the classifier's "your reasons are motivation, not the objective" explanation).
+  const isInternal = (x?: string | null): boolean =>
+    !!x && (/_/.test(x) || /peak_earning|build security and progress through/i.test(x));
+  const isClassifierLeak = (x?: string | null): boolean =>
+    !!x && /defines the objective|treated as motivation|whose own domain|shouldn'?t guess/i.test(x);
+  const po = s.primary_objective
+    ? {
+        ...s.primary_objective,
+        title: isInternal(s.primary_objective.title) ? '' : s.primary_objective.title,
+        reasoning: isClassifierLeak(s.primary_objective.reasoning)
+          ? undefined
+          : s.primary_objective.reasoning,
+      }
+    : null;
   // Grounding gate: never surface archetype-template opportunities as if they were personalized.
   const groundedOpps = (s.top_opportunities || []).filter(
     (o) => !ARCHETYPE_RISK_OPP.has(String(o).toLowerCase())
   );
-  const visionConfirmed = !!(s.vision_authored && s.life_vision);
+  const visionConfirmed = !!(s.vision_authored && s.life_vision && !isInternal(s.life_vision));
 
   return (
     <div className="mb-6">
@@ -111,11 +125,11 @@ export default function LifeIntelligence() {
             <div className="text-sm text-gray-700 italic">“{s.life_vision}”</div>
           ) : (
             <div className="text-sm text-gray-600">
-              Your life model is still forming{po ? ` — currently pointing toward ${po.title}` : ''}
-              .
+              Your life model is still forming
+              {po && po.title ? ` — currently pointing toward ${po.title}` : ''}.
             </div>
           )}
-          {po && (
+          {po && po.title && (
             <div className="mt-3">
               <div className="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">
                 Primary objective{' '}

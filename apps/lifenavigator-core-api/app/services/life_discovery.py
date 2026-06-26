@@ -892,24 +892,57 @@ class LifeDiscoveryService:
         portfolio = [{"goal": g.get("goal_text") or g.get("goal"), "domain": g.get("domain"),
                       "confidence": g.get("confidence"), "status": g.get("status") or "candidate"}
                      for g in cand_goals]
+        # NO INTERNAL-MODEL LEAKAGE: the My Life north star is the SEMANTIC one the user stated, never an
+        # objective-template enum ("peak_earning"), a persona-bridge synthetic vision, or the classifier's
+        # "your stated reasons are motivation, not the objective" explanation.
+        north_star = (prompts.get("north_star") or "").strip()
+        main_priority = (prompts.get("main_priority") or "").strip()
+        raw_vision = v0.get("vision_text") if v0 else None
+
+        def _looks_internal(s: Any) -> bool:
+            return bool(s) and ("_" in str(s) or "Build security and progress through" in str(s))
+
+        clean_vision = north_star or (None if _looks_internal(raw_vision) else raw_vision)
+
+        def _clean_reasoning(r: Any) -> Any:
+            r = str(r or "")
+            if not r or any(p in r for p in ("defines the objective", "treated as motivation",
+                                             "whose own domain", "we shouldn't guess")):
+                return None
+            return r
+
+        if north_star:
+            primary_obj: Optional[dict[str, Any]] = {
+                "title": north_star, "confidence": 0.9,
+                "reasoning": (f"Career growth is a key income lever toward this." if main_priority
+                              and "financ" in main_priority.lower() else None),
+                "alternatives": [], "themes": {}, "confirmed": True}
+        elif primary:
+            primary_obj = {"title": primary["title"], "confidence": primary.get("confidence"),
+                           "reasoning": _clean_reasoning(primary.get("reasoning")),
+                           "alternatives": primary.get("alternatives"), "themes": primary.get("themes"),
+                           "updated_at": primary.get("updated_at"), "confirmed": True}
+        else:
+            primary_obj = None
         return {
+            "north_star": north_star or None,
+            "main_priority": main_priority or None,
+            "deprioritized_domains": prompts.get("deprioritized_domains") or [],
             "dominant_narrative": narrative,   # the life story; the surfaced "theme" (not an objective)
             # "Why Arcana believes this" — the explainability behind the narrative (None until one exists).
             "narrative_explanation": narrative_explanation(narrative, portfolio),
             "goal_portfolio": portfolio,       # all stated goals, coexisting
             "emotional_signals": narrative.get("signals") if narrative else [],
-            "life_vision": v0.get("vision_text") if v0 else None,
-            # Authored = the user actually stated it (via the advisor). persona_bridge visions are
-            # synthesized from onboarding and must NOT be presented as a confirmed north star.
+            "life_vision": clean_vision,
+            # Authored = the user actually stated it. A semantic north_star OR a non-persona vision counts;
+            # a persona_bridge / internal-label vision does NOT.
             "vision_source": vsource or None,
-            "vision_authored": bool(v0 and v0.get("vision_text") and vsource != "persona_bridge"),
+            "vision_authored": bool(north_star or (raw_vision and not _looks_internal(raw_vision)
+                                                   and vsource != "persona_bridge")),
             # The user's own narrative, kept separate from the ontology objectives (never collapsed to one).
             "narrative": prompts.get("narrative") or None,
             "user_priority": prompts.get("user_priority") or None,
-            "primary_objective": ({"title": primary["title"], "confidence": primary.get("confidence"),
-                                   "reasoning": primary.get("reasoning"), "alternatives": primary.get("alternatives"),
-                                   "themes": primary.get("themes"), "updated_at": primary.get("updated_at"),
-                                   "confirmed": True} if primary else None),
+            "primary_objective": primary_obj,
             # Possible (unconfirmed) goals — shown as candidates, NEVER as the confirmed primary.
             "candidate_objectives": [{"title": o["title"], "root": o.get("root_objective_key"),
                                       "surface_goal": o.get("surface_goal"), "origin": o.get("origin"),
