@@ -2,6 +2,7 @@
 // answers the same questions: what we know, what we're missing, why it matters, next action, source,
 // confidence, last updated. No domain hand-rolls its own overview.
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 import {
   CoverageCard,
   ConfidenceCard,
@@ -22,15 +23,27 @@ export function DomainOverview({
   children?: ReactNode;
 }) {
   const hasData = model.coverage_pct > 0 || model.known.length > 0;
+  // Open this domain's specialist advisor (correct agent + domain context, fresh thread).
+  const agentDomain =
+    ({ healthcare: 'health' } as Record<string, string>)[config.key] || config.key;
+  const advisorHref = `/dashboard/advisor?agent=${agentDomain}_advisor`;
   return (
     <div className="space-y-5 p-6">
-      <div>
-        <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-          {config.label} Snapshot
-        </h2>
-        {model.last_updated && (
-          <p className="text-xs text-gray-400">Last updated: {model.last_updated}</p>
-        )}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            {config.label} Snapshot
+          </h2>
+          {model.last_updated && (
+            <p className="text-xs text-gray-400">Last updated: {model.last_updated}</p>
+          )}
+        </div>
+        <Link
+          href={advisorHref}
+          className="shrink-0 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+        >
+          Talk to {config.label} Advisor
+        </Link>
       </div>
 
       {!hasData ? (

@@ -284,6 +284,27 @@ export default function CommandCenter({
     const valid = new Set<string>([RELATIONSHIP_MANAGER, ...AGENT_FALLBACK.map((a) => a.id)]);
     return cand && valid.has(cand) ? cand : RELATIONSHIP_MANAGER;
   });
+  // Domain-aware, fact-grounded welcome (title/subtitle/message/known facts/missing/chips) for the entry state.
+  const [welcomeData, setWelcomeData] = useState<{
+    title?: string;
+    subtitle?: string;
+    message?: string;
+    known_facts?: string[];
+    missing?: string[];
+    chips?: string[];
+  } | null>(null);
+  useEffect(() => {
+    let on = true;
+    fetch(`/api/advisor/welcome?agent=${encodeURIComponent(selectedAgent)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (on) setWelcomeData(d);
+      })
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, [selectedAgent]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -477,12 +498,13 @@ export default function CommandCenter({
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-3 py-2">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-gray-900">
-            {agentName(selectedAgent, agents)}
+            {welcomeData?.title || agentName(selectedAgent, agents)}
           </div>
           <div className="text-[11px] text-gray-500">
-            {selectedAgent === RELATIONSHIP_MANAGER
-              ? 'Coordinates your domain advisors'
-              : 'Direct agent'}
+            {welcomeData?.subtitle ||
+              (selectedAgent === RELATIONSHIP_MANAGER
+                ? 'Your cross-domain planning advisor'
+                : 'Direct agent')}
           </div>
         </div>
         {agentSelector}
@@ -490,11 +512,28 @@ export default function CommandCenter({
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3" data-testid="cc-messages">
         {showEmpty && (
-          <div className="mx-auto mt-6 max-w-md text-center text-sm text-gray-600">
-            <p>{welcome}</p>
+          <div className="mx-auto mt-6 max-w-md text-sm text-gray-700">
+            {/* Fact-grounded welcome (real known facts; never fabricated). Falls back to the static copy. */}
+            <p className="text-center">{welcomeData?.message || welcome}</p>
+            {welcomeData?.known_facts && welcomeData.known_facts.length > 0 && (
+              <ul className="mt-3 space-y-1 rounded-lg bg-indigo-50 px-3 py-2 text-left text-xs text-gray-700">
+                {welcomeData.known_facts.map((kf) => (
+                  <li key={kf}>• {kf}</li>
+                ))}
+              </ul>
+            )}
+            {welcomeData?.missing && welcomeData.missing.length > 0 && (
+              <p className="mt-2 text-left text-xs text-gray-500">
+                <span className="font-semibold text-rose-600">Open gaps:</span>{' '}
+                {welcomeData.missing.join(' · ')}
+              </p>
+            )}
             {onboardingComplete !== false && (
               <div className="mt-4 flex flex-wrap justify-center gap-2">
-                {STARTERS.map((s) => (
+                {(welcomeData?.chips && welcomeData.chips.length > 0
+                  ? welcomeData.chips
+                  : STARTERS
+                ).map((s) => (
                   <button
                     key={s}
                     type="button"

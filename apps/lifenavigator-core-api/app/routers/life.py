@@ -142,6 +142,17 @@ async def advisor_agents(user: AuthenticatedUser = Depends(authenticated)):
     return {"agents": agent_catalog()}
 
 
+@router.get("/advisor/welcome")
+async def advisor_welcome(user: AuthenticatedUser = Depends(authenticated),
+                          agent: str = "",
+                          coverage=Depends(get_discovery_coverage),
+                          life: LifeDiscoveryService = Depends(get_life_discovery)):
+    """Domain-aware, fact-grounded welcome state for the advisor entry (dashboard or a domain page).
+    Built from the SAME shared facts that drive the dashboard cards — advisor + dashboard agree."""
+    from ..services.advisor_welcome import build_welcome
+    return await build_welcome(coverage, life, _ctx(user), agent or None)
+
+
 @router.post("/advisor/chat")
 async def advisor_chat(user: AuthenticatedUser = Depends(authenticated), svc=Depends(get_advisor_orchestrator),
                        message: str = Body(default="", embed=True), pending_key: str = Body(default="", embed=True),
