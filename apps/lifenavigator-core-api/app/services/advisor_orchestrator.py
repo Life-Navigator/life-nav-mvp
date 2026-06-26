@@ -36,6 +36,7 @@ from .advisor_agents import ALL_LIFE_DOMAINS, focus_domains as _focus_domains, g
 from .advisor_context import AdvisorContextBuilder
 from .advisor_llm import AdvisorLLM, ADVISOR_PROMPT_VERSION
 from .advisor_validator import classify_issues, validate
+from . import fact_domain_sync
 from . import model_registry as reg
 from .model_router import detect_health_urgent, health_safety_response
 
@@ -632,6 +633,17 @@ class AdvisorOrchestrator:
         if agent_obj is not None:
             base["agent"] = agent_obj.id
             tr["agent"] = agent_obj.id
+        # FACT→DOMAIN SYNC: normalize durable facts in this message into the existing domain profile tables the
+        # dashboard reads (career.career_profiles / education.education_profiles). Fail-soft, scoped to the
+        # answering agent's domain(s) when known. Provenance stays in life.facts; this is the normalized state.
+        if message and self._sb is not None:
+            try:
+                synced = await fact_domain_sync.sync_from_message(
+                    self._sb, ctx, message, domains=set(fdoms) if fdoms else None, source="advisor_chat")
+                if synced:
+                    tr["domain_sync"] = [{"domain": s["domain"], "updated": s["fields_updated"]} for s in synced]
+            except Exception:  # noqa: BLE001 — sync must never break the turn
+                pass
         # Health urgent-care safety net runs BEFORE any model (deterministic, no LLM) — wins in EVERY mode.
         if self._health_safety_check(message, base, tr):
             return self._finish(ctx, base, tr, t0, trace)
