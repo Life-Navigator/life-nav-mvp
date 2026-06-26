@@ -240,7 +240,9 @@ function OnboardingAdvisor() {
       ...(t ? [{ role: 'user' as const, text: t }] : []),
     ]);
     setFinalAsked(true);
-    if (t) await send(t, pending);
+    // Send the answer tagged as 'final_topics' so the backend completion gate runs: if the user names missing
+    // topics (e.g. health/career), it keeps discovery open and asks a baseline question instead of completing.
+    if (t) await send(t, 'final_topics');
   };
 
   // Apply a VALIDATED/APPROVED final turn: append the message and reconcile panel state. The compliance
@@ -640,7 +642,7 @@ function OnboardingAdvisor() {
                       onChange={(e) => setInput(e.target.value)}
                       disabled={busy}
                       placeholder="Anything else that matters to you…"
-                      className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                      className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 caret-indigo-600 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400"
                     />
                     <button
                       type="submit"
@@ -693,7 +695,7 @@ function OnboardingAdvisor() {
                     }}
                     rows={1}
                     placeholder="Type your answer…  (Enter to send · Shift+Enter for a new line)"
-                    className="max-h-32 flex-1 resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    className="max-h-32 flex-1 resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 caret-indigo-600 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400"
                   />
                   {generating ? (
                     <button

@@ -172,3 +172,57 @@ async def test_two_turn_finance_primary_not_career_collapse():
     msg2 = t2["assistant_message"].lower()
     assert "next step in your career" not in msg2 and "step in your career" not in msg2
     assert "financially ready" in msg2 or "down payment" in msg2 or "debt" in msg2 or "cash" in msg2
+
+
+# ---- Completion gate: the advisor must LISTEN when the user says something important is missing ----
+MISSING = "We haven't discussed what getting in shape means, what the current starting point is, what my career is."
+
+
+@pytest.mark.asyncio
+async def test_completion_gate_blocks_when_user_names_missing_topics():
+    sb = FakeSupabase({})
+    out = await _rm(sb, FakeInterpreterGemini()).converse(CTX, MISSING, pending_key="final_topics")
+    assert out["complete"] is False
+    assert "everything i need to start" not in out["assistant_message"].lower()
+    assert out["pending_key"] == "baseline_health"  # health first
+    assert "dashboard" in out["assistant_message"].lower()  # "we shouldn't open the dashboard yet"
+    vis = await sb.select("life_vision", filters={"user_id": f"eq.{CTX.user_id}"}, schema="life")
+    pb = ((vis[0].get("prompts") if vis else {}) or {}).get("pending_baselines") or []
+    assert "health" in pb and "career" in pb
+
+
+@pytest.mark.asyncio
+async def test_completion_gate_completes_when_nothing_missing():
+    sb = FakeSupabase({})
+    out = await _rm(sb, FakeInterpreterGemini()).converse(CTX, "No, that's everything.", pending_key="final_topics")
+    assert out["complete"] is True and out["pending_key"] is None
+
+
+@pytest.mark.asyncio
+async def test_baseline_capture_advances_then_completes():
+    sb = FakeSupabase({})
+    rm = _rm(sb, FakeInterpreterGemini())
+    o1 = await rm.converse(CTX, MISSING, pending_key="final_topics")
+    assert o1["pending_key"] == "baseline_health" and o1["complete"] is False
+    o2 = await rm.converse(CTX, "I want to lose fat and build muscle; I'm at 18% body fat now.", pending_key="baseline_health")
+    assert o2["pending_key"] == "baseline_career" and o2["complete"] is False  # health captured, career next
+    o3 = await rm.converse(CTX, "I'm a software engineer aiming for a senior/staff role.", pending_key="baseline_career")
+    assert o3["complete"] is True and o3["pending_key"] is None
+
+
+@pytest.mark.asyncio
+async def test_duplicate_goals_consolidated_distinct_kept():
+    sb = FakeSupabase({})
+    rm = _rm(sb, FakeInterpreterGemini())
+    await rm._persist_candidate_goals(CTX, [
+        {"goal": "Create a solid financial foundation", "objective": "x", "domain": "finance", "confidence": 0.8, "status": "active", "supporting_quotes": []},
+        {"goal": "Build a strong financial foundation", "objective": "x", "domain": "finance", "confidence": 0.9, "status": "active", "supporting_quotes": []},
+        {"goal": "Work towards a promotion", "objective": "x", "domain": "career", "confidence": 0.8, "status": "active", "supporting_quotes": []},
+        {"goal": "Advance in my career", "objective": "x", "domain": "career", "confidence": 0.7, "status": "active", "supporting_quotes": []},
+        {"goal": "Buy a house", "objective": "x", "domain": "family", "confidence": 0.8, "status": "active", "supporting_quotes": []},
+        {"goal": "Start a family", "objective": "x", "domain": "family", "confidence": 0.8, "status": "active", "supporting_quotes": []},
+    ])
+    loaded = await rm._load_candidate_goals(CTX)
+    assert len([g for g in loaded if g["domain"] == "finance"]) == 1  # near-identical merged
+    assert len([g for g in loaded if g["domain"] == "career"]) == 1   # promotion≈advance merged
+    assert len([g for g in loaded if g["domain"] == "family"]) == 2   # distinct goals survive

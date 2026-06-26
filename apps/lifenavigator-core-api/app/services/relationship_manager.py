@@ -25,6 +25,36 @@ _DOMAIN_LABEL = {
     "family": "Family & home", "education": "Education",
 }
 
+# COMPLETION GATE: when the advisor asks "what haven't I asked?" and the user names missing topics, we must
+# NOT finish — we capture a baseline for each named domain first. One focused question at a time.
+_FINAL_TOPICS_KEY = "final_topics"
+_BASELINE_Q = {
+    "health": ("When you say “get in shape,” what matters most right now — losing fat, building "
+               "muscle, stamina, strength, or energy? And roughly where are you starting from?"),
+    "career": "What’s your current role, and what promotion or next role are you aiming for?",
+    "finance": ("What would make you feel financially ready in a year — a cash reserve, less debt, higher "
+                "income, or a home down-payment started?"),
+    "family": ("What’s the rough timeline — your wedding date, when you’d want to buy a home, and "
+               "when you’d hope to start a family?"),
+    "education": ("Anything you’ll want from education later — a certificate, a degree, or specific "
+                  "skills? We can keep it deprioritized for now."),
+}
+_GATE_BASELINE_KEYS = {f"baseline_{d}" for d in _BASELINE_Q}
+# Health first (it gates energy/consistency), then career, finance, family, education.
+_BASELINE_ORDER = ["health", "career", "finance", "family", "education"]
+# "nothing else / that's all" → the user confirms no missing topic → onboarding may complete.
+_NO_GAP_RE = re.compile(
+    r"^\s*(no|nope|nah|none|nothing( else)?|that'?s (all|it|everything)|all good|i'?m good|we'?re good|"
+    r"that covers it|all set|good to go|nothing comes to mind)\b", re.I)
+_GAP_DOMAIN_KEYWORDS = {
+    "health": ("shape", "fit", "fitness", "weight", "body", "muscle", "gym", "health", "exercise",
+               "stamina", "training", "diet", "nutrition", "sleep", "physical", "strength", "cardio"),
+    "career": ("career", "job", "promotion", "work", "role", "income", "salary", "profession", "manager"),
+    "finance": ("financ", "money", "saving", "debt", "budget", "invest", "cash", "wealth", "afford"),
+    "family": ("family", "wedding", "marriage", "house", "home", "kid", "child", "fiance", "spouse", "marry"),
+    "education": ("education", "degree", "school", "study", "course", "certif", "learn", "master"),
+}
+
 # Rule 2: user corrections are authoritative. When the user pushes back, we apologize + ask them to
 # restate — we never re-assert a rejected interpretation.
 _CORRECTION_RE = re.compile(
@@ -160,25 +190,66 @@ class RelationshipManager:
             except Exception:  # noqa: BLE001
                 pass
 
+    # Generic verbs/adjectives that carry no concept — stripped before comparing goals so that
+    # "Create a solid financial foundation" and "Build a strong financial foundation" read as the SAME goal.
+    _GOAL_STOP = {
+        "a", "an", "the", "my", "our", "to", "and", "for", "of", "in", "on", "at", "i", "we", "it", "that",
+        "this", "towards", "toward", "more", "better", "strong", "stronger", "solid", "good", "great", "be",
+        "build", "building", "create", "creating", "get", "getting", "improve", "improving", "make", "have",
+        "want", "need", "keep", "work", "working", "into", "with", "so", "can", "will", "up", "out", "is",
+    }
+    # Synonym canonicalization for the few common onboarding overlaps (promotion≈advance, shape≈fitness).
+    _GOAL_SYNONYM = {
+        "advance": "advancement", "advancement": "advancement", "advancing": "advancement",
+        "promotion": "advancement", "promote": "advancement", "raise": "advancement",
+        "shape": "fitness", "fit": "fitness", "fitness": "fitness", "physical": "fitness",
+        "financial": "finances", "finance": "finances", "financially": "finances", "money": "finances",
+    }
+
+    @classmethod
+    def _goal_signature(cls, text: str) -> frozenset[str]:
+        words = re.findall(r"[a-z]+", (text or "").lower())
+        sig = {cls._GOAL_SYNONYM.get(w, w) for w in words if w not in cls._GOAL_STOP and len(w) > 2}
+        return frozenset(sig)
+
     async def _load_candidate_goals(self, ctx: UserContext) -> list[dict[str, Any]]:
-        """All goals heard across the whole conversation (for the final confirmation — never stale labels)."""
+        """All goals heard across the whole conversation (for the final confirmation — never stale labels).
+
+        Consolidates near-duplicate goals that accumulated across turns (e.g. a turn-1 'create a solid
+        financial foundation' + a turn-2 'build a strong financial foundation') by content signature, within
+        the same domain — keeping the highest-confidence (then longest) phrasing. Distinct goals in a domain
+        (e.g. family: wedding / house / kids) survive because their signatures don't overlap."""
         try:
             rows = await self._sb.select("candidate_goals", filters={"user_id": f"eq.{ctx.user_id}"},
                                          limit=50, schema=LIFE)
         except Exception:  # noqa: BLE001
             return []
         rejected = await self._rejected_norms(ctx)
-        out = []
+        items = []
         for r in rows:
             blob = (str(r.get("goal_text", "")) + " " + str(r.get("objective_label") or "")).lower()
             if rejected and any(x in blob for x in rejected):
                 continue  # P0.3: a goal the user rejected never appears in the final model
-            out.append({
+            items.append({
                 "goal": r.get("goal_text"), "objective": r.get("objective_label") or r.get("goal_text"),
                 "domain": r.get("domain") or "core", "status": r.get("status") or "active",
-                "supporting_quote": r.get("supporting_quote"), "confidence": r.get("confidence"),
+                "supporting_quote": r.get("supporting_quote"), "confidence": r.get("confidence") or 0.5,
             })
-        return out
+        # Highest-confidence (then longest) first, so that's the phrasing we keep for each concept.
+        items.sort(key=lambda g: (float(g.get("confidence") or 0), len(str(g.get("goal") or ""))), reverse=True)
+        kept: list[dict[str, Any]] = []
+        kept_sigs: list[tuple[str, frozenset[str]]] = []
+        for g in items:
+            sig = self._goal_signature(str(g.get("goal") or ""))
+            dom = g.get("domain")
+            dup = any(
+                d == dom and sig and ks and len(sig & ks) / len(sig | ks) >= 0.5
+                for d, ks in kept_sigs)
+            if dup:
+                continue
+            kept.append(g)
+            kept_sigs.append((dom, sig))
+        return kept
 
     # ── Onboarding INTERPRETER (LLM) — turn a natural-language paragraph into a clean structured plan ─────
     # Converts intent into: north star, complete human-readable goals (mapped to a domain), values, an
@@ -300,6 +371,71 @@ class RelationshipManager:
             "synthesis": str(data.get("synthesis") or "").strip(),
             "next_question": str(data.get("next_question") or "").strip(),
         }
+
+    @staticmethod
+    def _detect_gap_domains(message: str) -> list[str]:
+        """Domains the user names when asked 'what haven't I asked?' — kept in baseline order."""
+        m = (message or "").lower()
+        return [d for d in _BASELINE_ORDER
+                if any(kw in m for kw in _GAP_DOMAIN_KEYWORDS[d])]
+
+    async def _handle_completion_gate(self, ctx: UserContext, message: str, pending_key: str,
+                                      focus_domains: Optional[list[str]]) -> dict[str, Any]:
+        """Gate onboarding completion on the user's 'what haven't I asked?' answer + per-domain baselines.
+
+        - final_topics: if the user names missing domains, queue a baseline for each (skip deprioritized) and
+          ask the first — do NOT complete. If they say "nothing else", complete.
+        - baseline_<domain>: persist the answer as a domain-tagged note, drop that domain from the queue, then
+          ask the next baseline or complete.
+        """
+        msg = (message or "").strip()
+        cur = await self._vision_row(ctx)
+        prompts = (cur.get("prompts") or {})
+        pending_baselines: list[str] = list(prompts.get("pending_baselines") or [])
+        asked_gate = bool(prompts.get("completion_gate_asked"))
+        depri = set(prompts.get("deprioritized_domains") or [])
+        updates: list[str] = []
+        if pending_key in _GATE_BASELINE_KEYS:
+            dom = pending_key[len("baseline_"):]
+            if msg:
+                # Persist the baseline as a real, domain-tagged candidate goal (never a fragment).
+                await self._persist_candidate_goals(ctx, [{
+                    "goal": msg[:200], "objective": msg[:200], "objective_key": None,
+                    "confidence": 0.8, "status": "active", "domain": dom,
+                    "supporting_quotes": [msg[:300]], "supporting_statements": [msg[:300]], "dependencies": [],
+                }])
+                updates = [f"✓ Captured your {_DOMAIN_LABEL.get(dom, dom)} baseline"]
+            pending_baselines = [d for d in pending_baselines if d != dom]
+        else:  # final_topics
+            if msg and not _NO_GAP_RE.search(msg):
+                # Trust the user: any domain they name as undiscussed becomes a baseline to capture (unless
+                # they explicitly deprioritized it). The user telling us it's missing IS the signal.
+                pending_baselines = [d for d in self._detect_gap_domains(msg) if d not in depri]
+            else:
+                pending_baselines = []  # "nothing else" → ready to complete
+        await self._update_vision(ctx, prompt_updates={
+            "pending_baselines": pending_baselines, "completion_gate_asked": True})
+        panel = await self._context_panel(ctx, focus_domains)
+        cands = await self._load_candidate_goals(ctx)
+        st = await self.state(ctx)
+        if pending_baselines:
+            nxt = pending_baselines[0]
+            if not asked_gate:
+                labels = " and ".join(_DOMAIN_LABEL.get(d, d) for d in pending_baselines)
+                ack = (f"You’re right — we shouldn’t open the dashboard yet. We still need a baseline on "
+                       f"{labels}. Let’s start with {_DOMAIN_LABEL.get(nxt, nxt).lower()} because it shapes "
+                       f"your energy and consistency.\n\n")
+            else:
+                ack = ""
+            return {"assistant_message": ack + _BASELINE_Q[nxt], "pending_key": f"baseline_{nxt}",
+                    "options": None, "updates": updates, "reveal": None, "candidate_goals": cands,
+                    "progress": st.get("progress"), "complete": False, "context_panel": panel}
+        return {"assistant_message": ("Perfect — that’s everything I need to start. Let’s build your life plan. "
+                                      "Open **My Life** to see your vision, what matters most, your readiness, "
+                                      "and your next best action."),
+                "pending_key": None, "options": None, "updates": updates, "reveal": None,
+                "candidate_goals": cands, "progress": st.get("progress"), "complete": True,
+                "context_panel": panel}
 
     async def _has_financial_data(self, ctx: UserContext) -> bool:
         """True when the user has connected/persona financial accounts (so we don't re-ask the numbers)."""
@@ -564,7 +700,14 @@ class RelationshipManager:
             learned = {}
         north_star = (learned.get("north_star") or "").strip() or None
         main_priority = (learned.get("main_priority") or "").strip() or None
-        return {"life_vision": snap.get("life_vision"),
+        # P4: the final "life vision" must be a HUMAN synthesis (the semantic north star), never an internal
+        # classifier/objective label leaked from the persona bridge (e.g. "Build security and progress through
+        # peak_earning") or any snake_case token. Prefer north_star; drop label-looking raw visions.
+        raw_vision = snap.get("life_vision")
+        looks_internal = bool(raw_vision) and (
+            "_" in str(raw_vision) or "Build security and progress through" in str(raw_vision))
+        life_vision = north_star or (None if looks_internal else raw_vision)
+        return {"life_vision": life_vision,
                 # Narrative-first: the surfaced THEME is the life story, not a single objective.
                 "dominant_narrative": nar.get("summary"), "narrative_theme": nar.get("label"),
                 "goal_portfolio": snap.get("goal_portfolio"), "emotional_signals": snap.get("emotional_signals"),
@@ -601,7 +744,8 @@ class RelationshipManager:
         substantive = False          # ≥6-word discovery message (a real paragraph, not a one-word answer)
         interpreter_failed = False   # the LLM interpreter errored on a substantive turn → SAFE clarification
         rejected_count = 0           # goals suppressed because the user previously rejected them
-        if pending_key and message.strip() and _CORRECTION_RE.search(message):
+        if (pending_key and pending_key not in (_FINAL_TOPICS_KEY, *_GATE_BASELINE_KEYS)
+                and message.strip() and _CORRECTION_RE.search(message)):
             # Rule 2: the user is correcting us — apologize, do NOT classify or advance, ask them to
             # restate in their own words. (We never re-surface the rejected interpretation.)
             # P0.2: PERSIST the rejected concept so it never resurfaces — even in a future session.
@@ -635,6 +779,11 @@ class RelationshipManager:
                 "complete": False,
                 "context_panel": panel0,
             }
+        # COMPLETION GATE: the "what haven't I asked?" answer (and any follow-up baseline answers) are handled
+        # here, BEFORE the normal flow — so a user who names missing topics keeps discovery open instead of
+        # completing. (P1/P2/P6: the advisor must listen when the user says something important is missing.)
+        if pending_key in (_FINAL_TOPICS_KEY, *_GATE_BASELINE_KEYS) and message.strip():
+            return await self._handle_completion_gate(ctx, message, pending_key, focus_domains)
         if pending_key and message.strip():
             res = await self.answer(ctx, pending_key, message)
             rec = res.get("recorded", {})
