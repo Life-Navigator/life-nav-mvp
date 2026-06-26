@@ -284,25 +284,60 @@ class AdvisorOrchestrator:
     _MONEY_SIGNAL = re.compile(
         r"\$\s?\d|\b\d{2,3}\s?k\b|\bdown[\s-]?payment|home (?:price|range|budget)|house (?:price|cost)", re.I)
 
-    def _out_of_domain_handoff(self, agent_obj: Any, message: str) -> Optional[str]:
-        """A direct domain advisor offers a handoff when the message clearly belongs to ANOTHER domain.
+    # RICH, domain-aware vocab for the handoff decision — deliberately broader than route_domains (which has
+    # false positives like legal "will" matching the auxiliary verb, and misses plurals/training terms). Used
+    # ONLY here: a STRONG in-domain signal keeps the turn in the current advisor; a STRONG other-domain signal
+    # (with no in-domain signal) offers a handoff. Ambiguous → answer in the current domain.
+    _HANDOFF_VOCAB: dict[str, "re.Pattern[str]"] = {
+        "health": re.compile(
+            r"\b(workout|exercis\w*|gym|train\w*|lift\w*|cardio|stamina|endurance|conditioning|muscl\w*|"
+            r"tendon\w*|ligament\w*|joint\w*|knee\w*|shoulder\w*|mobility|prehab|rehab|recover\w*|sore\w*|"
+            r"injur\w*|sleep|supplement\w*|vitamin\w*|nutrition|protein|macro\w*|calorie\w*|diet|body ?fat|"
+            r"lean mass|recomp\w*|strength|stronger|squat\w*|bench|deadlift\w*|pull[- ]?up\w*|reps?|sets?|"
+            r"rpe|reps in reserve|max effort|to failure|boxing|wrestl\w*|muay thai|jiu[- ]?jitsu|martial|"
+            r"fitness|fat loss|weight loss|testosterone|hormone\w*|stretch\w*|warm[- ]?up|acclimat\w*)\b", re.I),
+        "finance": re.compile(
+            r"\b(money|afford\w*|debt|loan\w*|savings?|budget\w*|invest\w*|income|salary|cash flow|"
+            r"expenses?|mortgage|retire\w*|401k|ira|roth|pension|tax(es)?|down ?payment|credit|portfolio|"
+            r"stocks?|wealth|net worth|emergency fund|premium\w*)\b", re.I),
+        "career": re.compile(
+            r"\b(job|career|promotion\w*|promote\w*|raise|employer|employee|resume|interview\w*|manager|"
+            r"compensation|offer letter|workplace|coworker\w*|negotiat\w*|new role|layoff|performance review|"
+            r"principal|architect\w*|engineer\w*)\b", re.I),
+        "education": re.compile(
+            r"\b(school|degree\w*|college|universit\w*|certificat\w*|course\w*|studies|mba|masters?|"
+            r"bachelor\w*|phd|doctorate|tuition|student|curriculum|enroll\w*|bootcamp)\b", re.I),
+        "family": re.compile(
+            r"\b(wedding|marriage|married|marry|spouse|wife|husband|fianc\w*|kids?|child\w*|baby|babies|"
+            r"pregnan\w*|guardian\w*|custody|dependents?|estate plan\w*|beneficiar\w*|inheritance|"
+            r"household|elderly|life insurance|start a family)\b", re.I),
+    }
 
-        Conservative: fires only when the detected domain(s) are non-empty, exclude this advisor's own
-        domain(s), and aren't 'everything' (an all-domain hit means let the advisor answer). Returns the
-        handoff copy, or None to proceed normally."""
+    def _domain_signal(self, message: str, domains: "set[str]") -> bool:
+        m = message or ""
+        return any(self._HANDOFF_VOCAB[d].search(m) for d in domains if d in self._HANDOFF_VOCAB)
+
+    def _out_of_domain_handoff(self, agent_obj: Any, message: str) -> Optional[str]:
+        """A direct domain advisor offers a handoff ONLY when the message clearly belongs to another domain.
+
+        Domain-aware + conservative: (1) any STRONG signal for the advisor's OWN domain → answer here (a
+        Health turn about tendons/ligaments/max-effort stays in Health). (2) Otherwise, hand off only when a
+        STRONG signal for a single OTHER domain (or a bare money figure → finance) is present. (3) Ambiguous /
+        no clear signal → answer in the current domain. Returns the handoff copy, or None to proceed."""
         if agent_obj is None or getattr(agent_obj, "is_orchestrator", False):
             return None
         adoms = {d for d in (getattr(agent_obj, "domains", ()) or ())}
-        routed = {d for d in (route_domains(message) or []) if d != "core"}
-        # route_domains returns ALL domains when nothing specific matches → that's "no specific signal", not
-        # "every domain". Only a strict subset is a real routing hit.
-        detected = routed if (routed and routed < set(ALL_LIFE_DOMAINS)) else set()
-        if self._MONEY_SIGNAL.search(message or ""):
-            detected.add("finance")
-        if not detected or (detected & adoms):
+        # (1) clear in-domain context → never hand off
+        if self._domain_signal(message, adoms):
             return None
-        target = next((d for d in ("finance", "health", "career", "family", "education") if d in detected),
-                      sorted(detected)[0])
+        # (2) strong other-domain signal(s)
+        others = {d for d in self._HANDOFF_VOCAB if d not in adoms and self._domain_signal(message, {d})}
+        if "finance" not in adoms and self._MONEY_SIGNAL.search(message or ""):
+            others.add("finance")
+        if not others:
+            return None  # ambiguous → answer in the current advisor domain
+        target = next((d for d in ("finance", "health", "career", "family", "education") if d in others),
+                      sorted(others)[0])
         target_agent = get_agent(f"{target}_advisor")
         target_name = target_agent.name if target_agent else f"{target.title()} Advisor"
         caps = ", ".join((getattr(agent_obj, "capabilities", ()) or ())[:3]) or "this area"

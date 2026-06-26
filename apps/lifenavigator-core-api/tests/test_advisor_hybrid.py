@@ -792,3 +792,36 @@ async def test_education_advisor_answers_in_domain():
                                FakeLLM(_good_llm()))
     out = await orch.converse(_ctx(), "Should I pursue an MBA or a data certificate next?", agent="education_advisor")
     assert out["llm_status"] != "handoff"
+
+
+# --------------------------------------------------------------------------- #
+# Handoff detector — domain-aware + conservative (in-domain stays; only strong other-domain hands off)
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_health_advisor_keeps_tendon_training_context():
+    """Regression: tendons/ligaments/max-effort is health — must NOT route to Family (the 'will' false hit)."""
+    orch = AdvisorOrchestrator(FakeRM(_base()), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_good_llm()))
+    msg = ("It will also be starting slow enough to allow the tendons and ligaments to get strong enough since "
+           "my muscles will get bigger and stronger faster, I will have to start slower than max effort for the "
+           "first month or so.")
+    out = await orch.converse(_ctx(), msg, agent="health_advisor")
+    assert out["llm_status"] != "handoff"
+    assert "Family Advisor" not in out["assistant_message"]
+
+
+@pytest.mark.asyncio
+async def test_health_advisor_keeps_supplements_nutrition():
+    orch = AdvisorOrchestrator(FakeRM(_base()), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_good_llm()))
+    out = await orch.converse(_ctx(), "I want supplements and nutrition for testosterone, stamina, and muscle.",
+                              agent="health_advisor")
+    assert out["llm_status"] != "handoff"
+
+
+@pytest.mark.asyncio
+async def test_health_advisor_hands_off_life_insurance_for_kids():
+    orch = AdvisorOrchestrator(FakeRM(_base()), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_good_llm()))
+    out = await orch.converse(_ctx(), "I need life insurance for future kids.", agent="health_advisor")
+    assert out["llm_status"] == "handoff"
