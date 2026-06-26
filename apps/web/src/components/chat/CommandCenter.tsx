@@ -102,6 +102,7 @@ interface ActionProposal {
   message: string;
   impact: string[];
   fields: ActionField[];
+  prefill?: Record<string, string>;
   domain: string;
 }
 
@@ -116,7 +117,11 @@ function ActionCard({
   onApprove: (fields: Record<string, string>) => void;
   onCancel: () => void;
 }) {
-  const [fields, setFields] = useState<Record<string, string>>({});
+  // Prefill from advisor-captured values (e.g. title = "Principal Architect") so the user doesn't retype and
+  // the submit button isn't dead on arrival.
+  const [fields, setFields] = useState<Record<string, string>>(() => ({
+    ...(proposal.prefill || {}),
+  }));
   const canApprove = proposal.fields
     .filter((f) => !f.optional)
     .every((f) => (fields[f.key] || '').trim());

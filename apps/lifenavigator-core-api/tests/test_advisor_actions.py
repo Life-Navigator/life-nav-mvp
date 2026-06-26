@@ -81,3 +81,26 @@ async def test_apply_is_idempotent_keyed():
     await A.apply(ing, CTX, "health_goal", {"goal": "lose 30 lbs"})
     keys = [p["idempotency_key"] for _u, p in ing.calls]
     assert keys == ["action:health_goal:health.goal"]
+
+
+def test_promotion_prefills_title_and_salary_optional():
+    """Dead-button fix: title prefills from the captured message; comp is optional so submit enables."""
+    from app.services import advisor_actions as A
+    p = A.proposal("promotion", "I'm a Senior Architect. The next promotion is Principal Architect. Big pay increase.")
+    assert p["prefill"].get("title") == "Principal Architect"
+    fmap = {f["key"]: f for f in p["fields"]}
+    assert fmap["salary"]["optional"] is True          # was required → caused the dead button
+    assert fmap["title"]["optional"] is False
+    # only the (prefilled) title is required → the approve button is enabled on arrival
+    required = [f["key"] for f in p["fields"] if not f["optional"]]
+    assert required == ["title"]
+
+
+@pytest.mark.asyncio
+async def test_promotion_apply_persists_title_without_salary():
+    """A promotion goal can be saved with just the title (no comp numbers yet) — no dead end on missing comp."""
+    ing = FakeIngestion()
+    out = await A.apply(ing, CTX, "promotion", {"title": "Principal Architect"})
+    types = [payload.get("fact_type") for _uid, payload in ing.calls]
+    assert "promotion.title" in types
+    assert out["ok"] is True

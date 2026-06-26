@@ -54,7 +54,9 @@ ACTIONS: dict[str, Action] = {
         impact=("Compensation", "Retirement projections", "Taxes", "Home-purchase timeline"),
         fields=(
             Field("title", "New title"),
-            Field("salary", "New base salary", "number"),
+            # Comp is optional — a user can save the promotion goal (the title) before they know the numbers.
+            # This is what made the action card's submit button "dead": salary was required + never prefilled.
+            Field("salary", "New base salary", "number", optional=True),
             Field("bonus", "Annual bonus", "number", optional=True),
             Field("equity", "Equity grant", "number", optional=True),
         ),
@@ -170,8 +172,33 @@ def detect(message: str) -> Optional[str]:
     return None
 
 
+# Pull the target title out of the triggering message so the action card PREFILLS it (the user shouldn't
+# retype "Principal Architect"). E.g. "The next promotion is Principal Architect." → "Principal Architect".
+_TITLE_PATS = (
+    re.compile(r"promotion is\s+(?:a\s+|an\s+|to\s+)?([A-Z][A-Za-z0-9/&+.\- ]{2,40})"),
+    re.compile(r"promoted to\s+(?:a\s+|an\s+)?([A-Z][A-Za-z0-9/&+.\- ]{2,40})"),
+    re.compile(r"next (?:role|title|position) is\s+(?:a\s+|an\s+)?([A-Z][A-Za-z0-9/&+.\- ]{2,40})"),
+    re.compile(r"become (?:a\s+|an\s+|the\s+)?([A-Z][A-Za-z0-9/&+.\- ]{2,40})"),
+)
+
+
+def _prefill(key: str, message: str) -> dict[str, str]:
+    pre: dict[str, str] = {}
+    if key == "promotion" and message:
+        for pat in _TITLE_PATS:
+            m = pat.search(message)
+            if m:
+                title = re.split(r"[.,;:!?]", m.group(1))[0]  # stop at sentence punctuation
+                title = re.split(r"\s+\b(?:that|which|and|so|because|since|would|will)\b", title, flags=re.I)[0]
+                title = title.strip()
+                if 2 < len(title) <= 40:
+                    pre["title"] = title
+                break
+    return pre
+
+
 def proposal(key: str, message: str = "") -> Optional[dict[str, Any]]:
-    """The impact preview + fields to collect — shown BEFORE any write. No write happens here."""
+    """The impact preview + fields to collect (+ any prefill) — shown BEFORE any write. No write happens here."""
     a = ACTIONS.get(key)
     if not a:
         return None
@@ -181,6 +208,7 @@ def proposal(key: str, message: str = "") -> Optional[dict[str, Any]]:
         "message": a.confirm,
         "impact": list(a.impact),
         "fields": [{"key": f.key, "label": f.label, "type": f.type, "optional": f.optional} for f in a.fields],
+        "prefill": _prefill(key, message),
         "domain": a.domain,
     }
 
