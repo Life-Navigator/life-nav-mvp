@@ -89,6 +89,33 @@ function toCoverageModel(counts: Counts | null): CoverageModel {
   };
 }
 
+// Map the shared domain-summary contract → the universal CoverageModel (one truth across surfaces).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function summaryToModel(s: any): CoverageModel {
+  const facts = s.facts || {};
+  const known: string[] =
+    s.known_items && s.known_items.length
+      ? s.known_items
+      : Object.entries(facts).map(([k, v]) => `${k}: ${v}`);
+  return {
+    coverage_pct: s.coverage_pct ?? 0,
+    confidence_pct: s.confidence_pct ?? 0,
+    known,
+    missing: s.missing_items || [],
+    unlocks: EDUCATION_UNLOCKS,
+    next_action: s.next_best_action
+      ? { label: s.next_best_action.label, href: s.next_best_action.href }
+      : { label: 'Discuss education', href: '/dashboard/advisor?agent=education_advisor' },
+    last_updated: s.last_updated || 'Today',
+    source: {
+      source: 'Your education records',
+      updated: s.last_updated || 'Today',
+      confidence: (s.confidence_pct ?? 0) >= 40 ? 'medium' : 'low',
+    },
+    status: s.status,
+  };
+}
+
 async function countOf(path: string): Promise<number> {
   try {
     const r = await fetch(path);
@@ -105,10 +132,18 @@ export default function EducationOverviewPage() {
   const [counts, setCounts] = useState<Counts | null>(null);
   const [snapshot, setSnapshot] = useState<EduSnapshotVM | null>(null);
   const [readiness, setReadiness] = useState<ReadinessResult | null>(null);
+  // Shared summary contract — the SAME truth that drives the dashboard card / readiness / advisor, so the
+  // page top snapshot cannot contradict the dashboard.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [summary, setSummary] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    fetch('/api/life/domain-summary?domain=education', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSummary(d))
+      .catch(() => {});
     fetch('/api/education/overview')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => d && setSnapshot(d))
@@ -159,7 +194,12 @@ export default function EducationOverviewPage() {
       </div>
     );
 
-  const model = toCoverageModel(counts);
+  // Prefer the SHARED contract for the top snapshot (known/missing/status/next) so the page agrees with the
+  // dashboard card; fall back to local counts only when the contract has nothing.
+  const model =
+    summary && summary.facts && Object.keys(summary.facts).length > 0
+      ? summaryToModel(summary)
+      : toCoverageModel(counts);
 
   const degreeHero = snapshot?.topDegree
     ? `${DEGREE_LABEL[snapshot.topDegree.degreeType || ''] || 'Degree'}${

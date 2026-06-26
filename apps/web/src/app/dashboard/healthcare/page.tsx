@@ -113,8 +113,18 @@ function BetaSafety() {
 
 export default function HealthOverviewPage() {
   const [vm, setVm] = useState<HealthVM | null>(null);
+  // Shared summary contract — same truth as the dashboard card / readiness / advisor (body-comp baseline).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [summary, setSummary] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/life/domain-summary?domain=health', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setSummary(d))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -161,13 +171,59 @@ export default function HealthOverviewPage() {
       </div>
     );
 
-  const model = toCoverageModel(vm);
+  const sFacts: Record<string, string> = (summary && summary.facts) || {};
+  const hasBodyComp = Object.keys(sFacts).length > 0;
+  // Prefer the SHARED contract (body-comp baseline + specific missing) so the page agrees with the dashboard.
+  const model: CoverageModel = hasBodyComp
+    ? {
+        coverage_pct: summary.coverage_pct ?? 0,
+        confidence_pct: summary.confidence_pct ?? 0,
+        known: summary.known_items?.length
+          ? summary.known_items
+          : Object.entries(sFacts).map(([k, v]) => `${k}: ${v}`),
+        missing: summary.missing_items || [],
+        next_action: summary.next_best_action
+          ? { label: summary.next_best_action.label, href: summary.next_best_action.href }
+          : { label: 'Add progress metrics', href: '/dashboard/advisor?agent=health_advisor' },
+        last_updated: summary.last_updated || 'Today',
+        source: {
+          source: 'Advisor capture',
+          updated: summary.last_updated || 'Today',
+          confidence: 'medium',
+        },
+        status: summary.status,
+      }
+    : toCoverageModel(vm);
   const recs = vm?.recommendations ?? [];
 
   return (
     <div>
       <BetaSafety />
       <DomainOverview config={healthDomain} model={model}>
+        {/* Body Composition / Fitness Baseline — from the shared health summary (advisor-captured facts). */}
+        {hasBodyComp && (
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              Body Composition / Fitness Baseline
+            </div>
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+              {Object.entries(sFacts).map(([k, v]) => (
+                <div key={k}>
+                  <dt className="text-xs text-gray-500 dark:text-gray-400">{k}</dt>
+                  <dd className="text-sm font-semibold text-gray-900 dark:text-white">
+                    {String(v)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            {summary.missing_items?.length > 0 && (
+              <p className="mt-3 text-xs text-gray-600 dark:text-gray-300">
+                <span className="font-semibold text-indigo-600">Progress metrics to add:</span>{' '}
+                {summary.missing_items.join(' · ')}
+              </p>
+            )}
+          </div>
+        )}
         {/* 9. Related Recommendations (health-specific, labeled) */}
         <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
