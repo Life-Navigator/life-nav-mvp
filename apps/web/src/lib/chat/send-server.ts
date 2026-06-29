@@ -8,6 +8,7 @@ export interface SendResult {
   citations: unknown[];
   agent: string | null;
   llm_status?: string;
+  handoff?: unknown; // cross-agent in-chat handoff metadata (from → target advisor)
   reasoning?: unknown; // {tradeoffs, what_we_know, what_we_still_need} — for the evidence drawer
   goals?: string[]; // relevant goal chips (candidate_goals)
   risks?: string[]; // detected risk chips (context_panel.top_risks)
