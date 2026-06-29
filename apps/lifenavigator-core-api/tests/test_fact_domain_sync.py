@@ -106,9 +106,11 @@ async def test_sync_family_profile():
     res = await S.sync_family(sb, CTX, {"relationship_status": "engaged", "wedding_timeline": "next June",
                                         "home_goal": True, "children_goal": True,
                                         "family_goals": ["buy first home"], "confidence": 0.9})
-    assert {"relationship_status", "wedding_timeline", "home_goal"} <= set(res["fields_updated"])
+    # marital_status is a real column; planning facts live in the metadata JSONB (deployed schema, no migration)
+    assert {"marital_status", "wedding_timeline", "home_goal"} <= set(res["fields_updated"])
     prof = await sb.select("family_profiles", filters={"user_id": f"eq.{CTX.user_id}"}, schema="family")
-    assert prof[0]["relationship_status"] == "engaged" and prof[0]["home_goal"] is True
+    assert prof[0]["marital_status"] == "engaged"
+    assert prof[0]["metadata"]["home_goal"] is True and prof[0]["metadata"]["wedding_timeline"] == "next June"
 
 
 @pytest.mark.asyncio

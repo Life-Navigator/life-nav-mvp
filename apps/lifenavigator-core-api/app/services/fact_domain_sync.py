@@ -333,33 +333,33 @@ async def sync_family(sb: Any, ctx: UserContext, facts: dict[str, Any], *,
     except Exception as e:  # noqa: BLE001
         res["errors"].append(f"read:{str(e)[:100]}"); existing = []
     cur = existing[0] if existing else {}
-    row: dict[str, Any] = dict(cur)
-    row.update({"user_id": ctx.user_id, "id": cur.get("id") or _det_id(ctx.user_id, "family_profile"),
-                "source": source, "confidence": confidence})
+    # The deployed table has columns: id, user_id, marital_status, household_size, num_dependents, metadata.
+    # Write the relationship to marital_status (real column); keep the planning facts (wedding_timeline,
+    # home_goal, children_goal, family_goals, planning_priorities) in the metadata JSONB — NO migration needed.
+    meta: dict[str, Any] = dict(cur.get("metadata") or {})
+    row: dict[str, Any] = {"user_id": ctx.user_id,
+                           "id": cur.get("id") or _det_id(ctx.user_id, "family_profile")}
     changed = False
-
-    def fill(col: str, val: Any) -> None:
-        nonlocal changed
-        if not val:
-            return
-        if cur.get(col) and str(cur.get(col)).strip():
-            res["fields_skipped"].append(col); return
-        row[col] = val; res["fields_updated"].append(col); changed = True
-
-    fill("relationship_status", facts.get("relationship_status"))
-    fill("wedding_timeline", facts.get("wedding_timeline"))
-    for col, key in (("home_goal", "home_goal"), ("children_goal", "children_goal")):
-        if facts.get(key) and not cur.get(col):
-            row[col] = True; res["fields_updated"].append(col); changed = True
-    for col, key in (("family_goals", "family_goals"), ("planning_priorities", "planning_priorities")):
+    rel = facts.get("relationship_status")
+    if rel and not str(cur.get("marital_status") or "").strip():
+        row["marital_status"] = rel; res["fields_updated"].append("marital_status"); changed = True
+    if facts.get("wedding_timeline") and not meta.get("wedding_timeline"):
+        meta["wedding_timeline"] = _str(facts.get("wedding_timeline"), 60)
+        res["fields_updated"].append("wedding_timeline"); changed = True
+    for key in ("home_goal", "children_goal"):
+        if facts.get(key) and not meta.get(key):
+            meta[key] = True; res["fields_updated"].append(key); changed = True
+    for key in ("family_goals", "planning_priorities"):
         if facts.get(key):
-            ex = list(cur.get(col) or [])
+            ex = list(meta.get(key) or [])
             merged = list(dict.fromkeys([*ex, *facts[key]]))
             if merged != ex:
-                row[col] = merged; res["fields_updated"].append(col); changed = True
+                meta[key] = merged; res["fields_updated"].append(key); changed = True
     if changed:
-        try:
-            await sb.upsert("family_profiles", row, schema="family", on_conflict="user_id")
+        meta["source"] = source; meta["confidence"] = confidence
+        row["metadata"] = meta
+        try:  # on_conflict=id (PK → always unique); deterministic id reuses the existing row.
+            await sb.upsert("family_profiles", row, schema="family", on_conflict="id")
         except Exception as e:  # noqa: BLE001
             res["errors"].append(f"profile:{str(e)[:100]}")
     return res

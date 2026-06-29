@@ -201,15 +201,21 @@ class DiscoveryCoverageService:
             if certs:
                 f["Certificates"] = certs
         elif key == "family":
+            # The deployed family.family_profiles uses marital_status + a metadata JSONB (the planning facts
+            # — wedding_timeline/home_goal/children_goal/family_goals — live in metadata, not as columns).
             p = await self._one("family_profiles", "family", ctx)
-            if p.get("relationship_status"):
-                f["Status"] = p["relationship_status"]
-            if p.get("wedding_timeline"):
-                f["Wedding"] = p["wedding_timeline"]
-            goals = list(p.get("family_goals") or [])
+            meta = p.get("metadata") or {}
+            status = p.get("marital_status") or p.get("relationship_status") or meta.get("relationship_status")
+            if status:
+                f["Status"] = status
+            wedding = meta.get("wedding_timeline") or p.get("wedding_timeline")
+            if wedding:
+                f["Wedding"] = wedding
+            goals = list(meta.get("family_goals") or p.get("family_goals") or [])
             if not goals:
-                goals = [g for g, on in (("Buy a first home", p.get("home_goal")),
-                                         ("Start a family", p.get("children_goal"))) if on]
+                goals = [g for g, on in (("Buy a first home", meta.get("home_goal") or p.get("home_goal")),
+                                         ("Start a family", meta.get("children_goal") or p.get("children_goal")))
+                         if on]
             if goals:
                 f["Goals"] = ", ".join(goals[:4])
         elif key == "finance":
