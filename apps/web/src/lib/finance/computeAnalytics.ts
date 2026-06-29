@@ -273,9 +273,11 @@ export function computeAnalytics(txns: any[], assetRows: any[], accountRows: any
     if (invest > 0)
       balInsights.push({
         title: 'Investment and retirement balances are significant',
-        description: `${money(invest)} is invested — keep the allocation aligned with your timeline and risk capacity.`,
+        description: `${money(invest)} is held across investment and retirement accounts. Position-level holdings may be needed to analyze allocation, concentration, and risk capacity.`,
         severity: 'info',
         source_data: ['finance.financial_accounts'],
+        next_action:
+          'Add or connect holdings on the Investment Portfolio page to analyze allocation.',
       });
   }
   if (!expenseTxAny)

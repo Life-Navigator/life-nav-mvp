@@ -21,11 +21,17 @@ from typing import Any
 
 from ..models.common import UserContext
 
-_SUPPORTED = ("education", "health")
+_SUPPORTED = ("education", "health", "career", "family", "finance")
+
+
+def _present(facts: dict[str, Any], *keywords: str) -> bool:
+    """True if any keyword appears in the fact keys or values (so a KNOWN field is never 'missing')."""
+    blob = " ".join([str(k) for k in facts] + [str(v) for v in facts.values()]).lower()
+    return any(kw in blob for kw in keywords)
 
 
 def missing_for(domain: str, facts: dict[str, Any]) -> list[str]:
-    """Specific missing items derived from which facts are already known."""
+    """Specific missing items derived from which facts are already known — a KNOWN field is NEVER listed."""
     fk = {str(k).lower() for k in facts}
     if domain == "health":
         cand = [("waist measurement", "waist"), ("training routine", "training"),
@@ -39,6 +45,33 @@ def missing_for(domain: str, facts: dict[str, Any]) -> list[str]:
         if facts:  # completed record(s) only → optional next steps, never "missing a goal"
             return ["certifications / licenses (if relevant)", "ROI / cost only if planning more study"]
         return ["highest completed education", "current or planned program"]
+    if domain == "career":
+        if not facts:
+            return ["current role", "target role", "key skills"]
+        # role/company/skills/target are KNOWN → ask only for the ADVANCED promotion inputs.
+        cand = [("promotion criteria", ("criteria",)), ("manager expectations", ("manager",)),
+                ("compensation target", ("compensation", "salary")),
+                ("evidence / key projects", ("evidence", "project")),
+                ("promotion timeline milestones", ("milestone",))]
+        return [label for label, kws in cand if not _present(facts, *kws)][:5]
+    if domain == "family":
+        if not facts:
+            return ["relationship / family status", "wedding / home / family rough timeline"]
+        # rough timelines KNOWN → ask only for the exact details, never "wedding/house/family timeline".
+        cand = [("exact wedding date", ("exact date",)), ("wedding budget", ("budget",)),
+                ("home purchase target date", ("purchase date", "home target")),
+                ("children timeline details", ("children timeline",)),
+                ("insurance / estate / emergency contacts", ("insurance", "estate", "emergency"))]
+        return [label for label, kws in cand if not _present(facts, *kws)][:5]
+    if domain == "finance":
+        if not facts:
+            return ["primary financial priority", "savings / debt targets"]
+        # priorities KNOWN → ask only for EXACT amounts, never generic "financial readiness target".
+        cand = [("exact emergency fund target", ("emergency fund target",)),
+                ("exact down payment target", ("down payment target",)),
+                ("wedding / honeymoon budget", ("wedding budget", "honeymoon")),
+                ("monthly savings target", ("monthly savings",))]
+        return [label for label, kws in cand if not _present(facts, *kws)][:5]
     return []
 
 
@@ -73,12 +106,9 @@ def _blockers(domain: str, facts: dict[str, Any], missing: list[str]) -> list[st
 
 
 def _next_best(domain: str, facts: dict[str, Any], missing: list[str]) -> dict[str, Any] | None:
-    if domain == "health":
-        return {"label": "Add progress metrics" if facts else "Build your health baseline",
-                "href": "/dashboard/advisor?agent=health_advisor"}
-    if domain == "education":
-        return {"label": "Discuss education plan" if facts else "Add your education record",
-                "href": "/dashboard/advisor?agent=education_advisor"}
+    if domain in ("health", "education", "career", "family", "finance"):
+        return {"label": ("Refine your plan" if facts else f"Build your {domain} baseline"),
+                "href": f"/dashboard/advisor?agent={domain}_advisor"}
     return None
 
 
@@ -90,12 +120,18 @@ async def domain_summary(coverage_svc: Any, ctx: UserContext, domain: str) -> di
     missing = missing_for(domain, facts) if domain in _SUPPORTED else (d.get("missing") or [])
     status = d.get("status") or ("started" if facts else "not_started")
     cta = (_next_best(domain, facts, missing) or {}).get("href") or d.get("cta")
+    # Fact-aware coverage: rich captured facts should read as real progress, not a flat 30%. Each known fact
+    # adds ~12% over the started floor (capped at 85% until exact targets/details are added). Keeps the card,
+    # review screen, and advisor in agreement on "how complete is this domain".
+    base_cov = int(d.get("coverage_pct", 0) or 0)
+    coverage_pct = (min(85, max(base_cov, 30 + 12 * len(facts)))
+                    if (facts and domain in _SUPPORTED) else base_cov)
     return {
         "domain": domain,
         "status": status,
-        "coverage_pct": d.get("coverage_pct", 0),
-        "confidence_pct": d.get("confidence_pct", 0),
-        "readiness_score": d.get("coverage_pct", 0),
+        "coverage_pct": coverage_pct,
+        "confidence_pct": max(int(d.get("confidence_pct", 0) or 0), coverage_pct if facts else 0),
+        "readiness_score": coverage_pct,
         "facts": facts,
         "known_items": known_items_for(domain, facts),
         "missing_items": missing,

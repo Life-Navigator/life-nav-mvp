@@ -70,3 +70,25 @@ async def test_empty_health_is_honest_not_started():
     s = await domain_summary(_cov(sb), CTX, "health")
     assert s["status"] == "not_started" and not s["facts"]
     assert s["blockers"] and "height" in s["blockers"][0].lower()
+
+
+def test_missing_for_career_drops_known_basics():
+    facts = {"Current role": "Senior Architect", "Company": "Persistent Systems",
+             "Skills": "Python, C++", "Target role": "Principal Architect"}
+    m = missing_for("career", facts)
+    assert "current role" not in m and "target promotion" not in m and "company" not in m
+    assert any("criteria" in x or "manager" in x or "compensation" in x for x in m)
+
+
+def test_missing_for_family_drops_rough_timeline_when_known():
+    facts = {"Status": "engaged", "Wedding": "next June", "Goals": "first home; children"}
+    m = missing_for("family", facts)
+    assert "wedding timeline" not in m and "house timeline" not in m and "family timeline" not in m
+    assert any("exact wedding date" in x or "budget" in x for x in m)
+
+
+def test_missing_for_finance_specific_not_generic():
+    facts = {"Primary priority": "financial foundation", "Home range": "$500k+"}
+    m = missing_for("finance", facts)
+    assert "financial readiness target" not in m and "savings/debt priorities" not in m
+    assert any("emergency fund" in x or "down payment" in x or "monthly savings" in x for x in m)

@@ -274,10 +274,13 @@ class DiscoveryCoverageService:
             # MISSING labels (P3): say what's actually missing — never "X goal" once we already know the domain.
             if is_deprioritized:
                 missing_inputs = []  # the user explicitly set this aside (e.g. education: degree complete)
-            elif facts and key in ("health", "education"):
-                # SHARED CONTRACT: education/health derive specific missing items from the known facts (waist/
-                # lifts/cardio/sleep; JD cost/financing/career-objective) — one truth for card+page+readiness.
+            elif facts and key in ("health", "education", "career", "family", "finance"):
+                # SHARED CONTRACT: every domain derives SPECIFIC missing items from the known facts — never the
+                # generic baseline list ("current role", "wedding timeline") once those facts are captured.
+                # One truth for the dashboard card, onboarding review, readiness, and advisor.
                 missing_inputs = missing_for(key, facts)
+                if coverage_pct < 60:  # rich captured facts read as real progress, not a flat 30%
+                    coverage_pct = min(85, 30 + 12 * len(facts))
             elif has_data:
                 missing_inputs = list(spec.get("baseline_missing", [])) if coverage_pct < 80 else []
             else:
