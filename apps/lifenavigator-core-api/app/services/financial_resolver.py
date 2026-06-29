@@ -134,6 +134,12 @@ class FinancialInputResolver:
         def _sum(types: tuple[str, ...]) -> float:
             return round(sum(_num(a.get("current_balance")) or 0 for a in accounts if a.get("account_type") in types), 2)
 
+        # Liabilities sign-robust: a debt counts as a positive liability whether the source stores its balance
+        # positive (Plaid convention) or negative (some manual/connected sources) — so net worth = assets −
+        # |liabilities| is always correct, never assets + |liabilities|.
+        def _labsum(types: tuple[str, ...]) -> float:
+            return round(sum(abs(_num(a.get("current_balance")) or 0) for a in accounts if a.get("account_type") in types), 2)
+
         # --- Accounts: canonical source for cash / investment / retirement ---
         cash = _sum(("checking", "savings", "cash"))
         bank_total = cash
@@ -177,11 +183,11 @@ class FinancialInputResolver:
         investment_total = round(investment_accounts_total + investment_assets, 2)
 
         # --- Liabilities, classified (liability accounts carry positive Plaid balances) ---
-        credit_card_debt = _sum(("credit_card",))
-        loan_debt = _sum(("loan",))
-        mortgage_debt = _sum(("mortgage",))
-        student_loan_debt = _sum(("student_loan", "student"))
-        auto_loan_debt = _sum(("auto_loan",))
+        credit_card_debt = _labsum(("credit_card",))
+        loan_debt = _labsum(("loan",))
+        mortgage_debt = _labsum(("mortgage",))
+        student_loan_debt = _labsum(("student_loan", "student"))
+        auto_loan_debt = _labsum(("auto_loan",))
         other_debt = 0.0
         total_liabilities = round(
             credit_card_debt + loan_debt + mortgage_debt + student_loan_debt + auto_loan_debt + other_debt, 2
