@@ -1,6 +1,7 @@
 'use client';
 
 import { humanName } from '@/lib/identity/humanName';
+import { filterDisplayGoals } from '@/lib/goals/displayGoals';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/ui/loaders/LoadingSpinner';
@@ -125,6 +126,20 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
   // Distinguish loading / error / empty so the card NEVER shows "No financial data yet"
   // while the fetch is still in flight or after a transient failure.
   const [financeStatus, setFinanceStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  // Captured/normalized goals (canonical read-path, deduped) — so Active Goals shows onboarding goals even
+  // before they're committed in Scenario Lab. Raw paragraphs are filtered out (title length guard).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [capturedGoals, setCapturedGoals] = useState<any[]>([]);
+  useEffect(() => {
+    fetch('/api/life/canonical-goals', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const goals = Array.isArray(d?.goals) ? d.goals : [];
+        // Never render a raw onboarding paragraph as a goal (clean, concise titles only).
+        setCapturedGoals(filterDisplayGoals(goals));
+      })
+      .catch(() => {});
+  }, []);
   // Per-domain discovery coverage — ONE source (/api/life/discovery-coverage, same as My Discovery).
   // Drives the domain cards' coverage %, missing inputs, unlocks, and next-action CTA.
   const [coverage, setCoverage] = useState<Record<string, DomainCoverageData>>({});
@@ -1014,7 +1029,7 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 shadow-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">Active Goals</h3>
-              {calendarTasks.length > 0 && (
+              {(calendarTasks.length > 0 || capturedGoals.length > 0) && (
                 <Link
                   href="/dashboard/goals"
                   className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
@@ -1029,6 +1044,39 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                 <div className="text-center py-8">
                   <LoadingSpinner size="medium" />
                 </div>
+              ) : calendarTasks.length === 0 && capturedGoals.length > 0 ? (
+                // Captured-from-onboarding goals (not yet committed in Scenario Lab) — still real goals.
+                capturedGoals
+                  .slice(0, 7)
+                  .map(
+                    (
+                      goal: {
+                        title: string;
+                        domain?: string;
+                        timeframe?: string;
+                        confirmation?: string;
+                      },
+                      i
+                    ) => (
+                      <div
+                        key={i}
+                        className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                      >
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                          {goal.title}
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                          {goal.domain && <span className="capitalize">{goal.domain}</span>}
+                          {goal.timeframe && <span>· {goal.timeframe}</span>}
+                          <span className="rounded-full bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
+                            {goal.confirmation === 'confirmed'
+                              ? 'Active'
+                              : 'Captured from onboarding'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  )
               ) : calendarTasks.length === 0 ? (
                 <div className="text-center py-8">
                   <span className="text-5xl mb-2 block">🎯</span>

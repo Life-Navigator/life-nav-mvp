@@ -86,10 +86,14 @@ export default function PinnedScenarioWidget() {
 
   const getStatusColor = (status: string) => {
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('ahead')) return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30';
-    if (statusLower.includes('track')) return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30';
-    if (statusLower.includes('behind')) return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30';
-    if (statusLower.includes('risk')) return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30';
+    if (statusLower.includes('ahead'))
+      return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30';
+    if (statusLower.includes('track'))
+      return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30';
+    if (statusLower.includes('behind'))
+      return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30';
+    if (statusLower.includes('risk'))
+      return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30';
     return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800';
   };
 
@@ -157,14 +161,14 @@ export default function PinnedScenarioWidget() {
               Pin a Goal to Your Dashboard
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              Track progress on your most important goal from Scenario Lab. Pin any goal from a
-              committed scenario to see daily updates.
+              Track progress on one of your captured goals. You can pin a goal from onboarding or a
+              committed Scenario Lab plan.
             </p>
             <Link
-              href="/dashboard/scenario-lab"
+              href="/dashboard/goals"
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Go to Scenario Lab
+              Manage Goals
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
@@ -214,9 +218,7 @@ export default function PinnedScenarioWidget() {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
               {pin.goalId}
             </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-500">
-              from {pin.scenarioName}
-            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-500">from {pin.scenarioName}</p>
           </div>
           {pin.snapshot && (
             <span
@@ -235,9 +237,7 @@ export default function PinnedScenarioWidget() {
                 <div className="text-3xl font-bold text-gray-900 dark:text-white">
                   {formatCurrency(pin.snapshot.p50)}
                 </div>
-                <div className="text-sm text-gray-500 dark:text-gray-500">
-                  expected (P50)
-                </div>
+                <div className="text-sm text-gray-500 dark:text-gray-500">expected (P50)</div>
               </div>
               <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                 <span>Range: {formatCurrency(pin.snapshot.p10)}</span>
@@ -258,12 +258,7 @@ export default function PinnedScenarioWidget() {
                   </span>
                 </div>
                 <div className="flex justify-center">
-                  <ProbabilitySparkline
-                    data={pin.trend}
-                    width={280}
-                    height={60}
-                    color="#3B82F6"
-                  />
+                  <ProbabilitySparkline data={pin.trend} width={280} height={60} color="#3B82F6" />
                 </div>
               </div>
             )}
@@ -331,9 +326,7 @@ export default function PinnedScenarioWidget() {
           </>
         ) : (
           <div className="text-center py-8">
-            <p className="text-sm text-gray-500 dark:text-gray-500">
-              No simulation data available
-            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-500">No simulation data available</p>
             <Link
               href={`/dashboard/scenario-lab/${pin.scenarioId}`}
               className="text-sm text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block"
