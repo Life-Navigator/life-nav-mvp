@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { privateBetaEnabled, isBetaAccessAllowed, blockedReason } from '@/lib/auth/betaAccess';
 
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = new Set([
@@ -9,6 +10,8 @@ const PUBLIC_ROUTES = new Set([
   '/features',
   '/security',
   '/waitlist',
+  '/private-beta',
+  '/request-access',
   '/auth',
   '/auth/login',
   '/auth/register',
@@ -37,6 +40,13 @@ function isProtectedRoute(path: string): boolean {
     path.startsWith('/dashboard') ||
     path.startsWith('/onboarding') ||
     path.startsWith('/admin') ||
+    path.startsWith('/my-life') ||
+    path.startsWith('/advisor') ||
+    path.startsWith('/chat') ||
+    path.startsWith('/life-graph') ||
+    path.startsWith('/documents') ||
+    path.startsWith('/goals') ||
+    path.startsWith('/settings') ||
     (path.startsWith('/api/') && !path.startsWith('/api/auth'))
   );
 }
@@ -114,6 +124,22 @@ export async function proxy(request: NextRequest) {
     loginUrl.searchParams.set('mode', 'signin');
     loginUrl.searchParams.set('next', path);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // ---- PRIVATE-BETA ALLOWLIST GATE (server-side; runs BEFORE any profile/onboarding init) ----
+  // When PRIVATE_BETA_ENABLED=true, only founder/admin + allowlisted + synthetic-beta emails reach protected
+  // app surfaces. Blocked → 403 for APIs (no data), /private-beta for pages. Never logs tokens/allowlist.
+  if (isAuthenticated && privateBetaEnabled() && isProtectedRoute(path)) {
+    if (!isBetaAccessAllowed(user!.email)) {
+      const { masked, reason } = blockedReason(user!.email);
+      console.log(
+        'PRIVATE_BETA_BLOCK ' + JSON.stringify({ path, masked, reason, user_id: user!.id })
+      );
+      if (path.startsWith('/api/')) {
+        return NextResponse.json({ error: 'private_beta_access_required' }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL('/private-beta', request.url));
+    }
   }
 
   // ---- Onboarding gate (advisor-first) ----
