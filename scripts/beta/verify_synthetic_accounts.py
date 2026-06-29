@@ -21,26 +21,26 @@ H = {"apikey": K, "Authorization": "Bearer " + K, "Content-Type": "application/j
 PW = os.environ.get("BETA_GATE_PW", "BetaGate2026verify")
 
 PERSONAS = [
-    ("beta1@lifenav-beta.test", "Avery", "family_foundation",
+    ("beta1@lifenav-beta.example.com", "Avery", "family_foundation",
      "I'm engaged, wedding next June, saving a down payment for our first home and want to start a family. "
      "I'm a Senior Architect at Acme on embedded AI with Python, C++, and Rust, targeting Principal Architect "
      "in 2 years. I'm 6ft 205lbs 18% body fat, body recomposition goal. I have a BS in Business Administration "
      "from State University and am deferring more school.",
      [("Executive Checking","checking",58200),("Money Market","checking",145000),("Investment Portfolio","investment",920000),("Jumbo Mortgage","mortgage",-1240000)]),
-    ("beta2@lifenav-beta.test", "Jordan", "young_professional",
+    ("beta2@lifenav-beta.example.com", "Jordan", "young_professional",
      "I'm a single Software Engineer at Globex aiming for a Senior promotion. I want to build a 6-month "
      "emergency fund and start investing. I'm 5'10 170lbs and want to run a half marathon. BA in Computer "
      "Science from City College.",
      [("Checking","checking",8200),("Savings","savings",14000),("Roth IRA","retirement",22000)]),
-    ("beta3@lifenav-beta.test", "Sam", "pre_retirement",
+    ("beta3@lifenav-beta.example.com", "Sam", "pre_retirement",
      "I'm 58 and married, planning to retire at 65. Our home is paid off. I want to protect the nest egg and "
      "plan healthcare costs. I'm a Director at Initech with an MBA from Booth.",
      [("Checking","checking",30000),("Brokerage","investment",1100000),("401k","retirement",890000)]),
-    ("beta4@lifenav-beta.test", "Riley", "new_parent",
+    ("beta4@lifenav-beta.example.com", "Riley", "new_parent",
      "We just had our first child. I want to start a college fund and get life insurance, and balance my "
      "Marketing Manager role with family. I'm 5'6 140lbs. BA in Marketing from Northwestern.",
      [("Checking","checking",12000),("Savings","savings",30000),("529 Plan","investment",5000)]),
-    ("beta5@lifenav-beta.test", "Casey", "career_change",
+    ("beta5@lifenav-beta.example.com", "Casey", "career_change",
      "I'm switching from teaching to data science. I'm paying off student debt and pursuing a data "
      "certification. I'm single, 30, and want to get fit. I have a BS in Education from State.",
      [("Checking","checking",4000),("Savings","savings",6000),("Student Loan","loan",-28000)]),

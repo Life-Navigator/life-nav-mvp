@@ -6,17 +6,22 @@ user data, no real Plaid/document connections.
 
 ## Accounts (synthetic, test-only)
 
-| #   | email                   | persona            | display |
-| --- | ----------------------- | ------------------ | ------- |
-| 1   | beta1@lifenav-beta.test | family_foundation  | Avery   |
-| 2   | beta2@lifenav-beta.test | young_professional | Jordan  |
-| 3   | beta3@lifenav-beta.test | pre_retirement     | Sam     |
-| 4   | beta4@lifenav-beta.test | new_parent         | Riley   |
-| 5   | beta5@lifenav-beta.test | career_change      | Casey   |
+| #   | email                          | persona            | display |
+| --- | ------------------------------ | ------------------ | ------- |
+| 1   | beta1@lifenav-beta.example.com | family_foundation  | Avery   |
+| 2   | beta2@lifenav-beta.example.com | young_professional | Jordan  |
+| 3   | beta3@lifenav-beta.example.com | pre_retirement     | Sam     |
+| 4   | beta4@lifenav-beta.example.com | new_parent         | Riley   |
+| 5   | beta5@lifenav-beta.example.com | career_change      | Casey   |
 
 Each is created with auth `user_metadata.is_synthetic = true` + `persona` → the dashboard shows a persistent
-**"Synthetic beta profile — test data only"** banner. **Reset each password before distribution** (the harness
-sets a shared verification password; do not ship it).
+**"Synthetic beta profile — test data only"** banner (renders whenever `is_synthetic` is set; gate-confirmed
+True for all five).
+
+**Access = magic link (the established beta auth), NOT password.** The harness sets a password only so the
+automated gate can run (service-role checks); testers/founder sign in via a Supabase magic/invite link
+(admin `generate_link`). Supabase rejects password-grant/login for these admin-created synthetic addresses and
+non-routable TLDs (`.test`) — so verify login via magic link, not a password form.
 
 ## Run the gate
 
