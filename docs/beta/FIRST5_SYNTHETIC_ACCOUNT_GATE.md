@@ -82,3 +82,12 @@ Send an account to a tester ONLY after: automated gate PASS + founder manual pas
 - **My Life / Life Brief / Domain readiness** still read `readiness.py` + the discovery snapshot, not the
   shared `domain_summary` — they can disagree with the dashboard cards (separate P0 to unify).
 - **5% body-fat safety flag** not yet implemented (health goal framing).
+
+## Allowlist activation (server-side, deployed)
+
+Enforced in `proxy.ts` (active Next-16 middleware) via `lib/auth/betaAccess.ts`. To CLOSE public access set on
+Vercel (web project): `PRIVATE_BETA_ENABLED=true`, `PRIVATE_BETA_ADMIN_EMAILS=<founder email>` (optionally
+`PRIVATE_BETA_ALLOWED_EMAILS=<reviewer emails>`). The five `@lifenav-beta.example.com` synthetic accounts are
+allowed by default. Blocked authenticated users → `/private-beta` (pages) or `403 {"error":
+"private_beta_access_required"}` (APIs); blocked attempts log a masked email + reason only. Tested (9 unit +
+integration). **Live activation requires setting the env (not done from here).**
