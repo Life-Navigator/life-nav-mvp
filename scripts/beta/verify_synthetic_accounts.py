@@ -62,13 +62,16 @@ def _req(method, path, body=None, headers=None, schema=None):
 
 
 def mk_user(email, display, persona):
-    # delete any prior
-    s, d = _req("GET", f"/auth/v1/admin/users?email={email}")
-    for usr in (d or {}).get("users", []) if isinstance(d, dict) else []:
-        _req("DELETE", f"/auth/v1/admin/users/{usr['id']}")
+    # NOTE: the GoTrue admin `?email=` filter is IGNORED in this environment (returns the first page of users
+    # regardless of the email), so we must NOT "delete prior by email" — that deleted random users. Create the
+    # account and keep the UID returned by the POST as the single source of truth (verify by THIS uid, never by
+    # an email re-query). Duplicate-email creates are reported, not silently retried.
     s, d = _req("POST", "/auth/v1/admin/users",
                 {"email": email, "password": PW, "email_confirm": True,
                  "user_metadata": {"is_synthetic": True, "persona": persona, "display_name": display}})
+    if not isinstance(d, dict) or "id" not in d:
+        print(f"WARN create {email}: {d}")  # e.g. email already exists — resolve/cleanup needs a working admin API
+        return None
     uid = d["id"]
     _req("PATCH", f"/rest/v1/profiles?id=eq.{uid}",
          {"setup_completed": True, "onboarding_completed": True, "display_name": display},
@@ -84,6 +87,8 @@ async def main():
     for email, display, persona, broad, accts in PERSONAS:
         checks = {}
         uid = mk_user(email, display, persona); uids[email] = uid
+        if not uid:
+            report.append((email, persona, None, {"create": "FAILED (email may already exist — admin API cannot resolve)"})); continue
         # seed synthetic financial accounts (Plaid-persona equivalent)
         for name, typ, bal in accts:
             _req("POST", "/rest/v1/financial_accounts",

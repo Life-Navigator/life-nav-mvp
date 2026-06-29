@@ -83,11 +83,42 @@ Send an account to a tester ONLY after: automated gate PASS + founder manual pas
   shared `domain_summary` — they can disagree with the dashboard cards (separate P0 to unify).
 - **5% body-fat safety flag** not yet implemented (health goal framing).
 
-## Allowlist activation (server-side, deployed)
+## Allowlist activation (server-side, deployed) — EXACT-ACCOUNT ONLY
 
-Enforced in `proxy.ts` (active Next-16 middleware) via `lib/auth/betaAccess.ts`. To CLOSE public access set on
-Vercel (web project): `PRIVATE_BETA_ENABLED=true`, `PRIVATE_BETA_ADMIN_EMAILS=<founder email>` (optionally
-`PRIVATE_BETA_ALLOWED_EMAILS=<reviewer emails>`). The five `@lifenav-beta.example.com` synthetic accounts are
-allowed by default. Blocked authenticated users → `/private-beta` (pages) or `403 {"error":
-"private_beta_access_required"}` (APIs); blocked attempts log a masked email + reason only. Tested (9 unit +
-integration). **Live activation requires setting the env (not done from here).**
+Enforced in `proxy.ts` (active Next-16 middleware) via `lib/auth/betaAccess.ts`, BEFORE any profile/onboarding
+init. **Policy (first-5): exact email allowlist only — NO domain wildcard.** Allowed iff the email is in
+`PRIVATE_BETA_ADMIN_EMAILS` or `PRIVATE_BETA_ALLOWED_EMAILS`. The `@lifenav-beta.example.com` domain is allowed
+ONLY when `PRIVATE_BETA_ALLOW_SYNTHETIC_DOMAIN=true` (internal-demo opt-in; **default false**). So
+`beta99@lifenav-beta.example.com` (same domain, not listed) is **blocked**. Blocked authenticated users →
+`/private-beta` (pages) or `403 {"error":"private_beta_access_required"}` (APIs); attempts log a masked email +
+reason only (no tokens/allowlist). Tested: 20 unit + integration.
+
+### Exact Vercel env to set (web project, Production) — founder action
+
+```
+PRIVATE_BETA_ENABLED=true
+PRIVATE_BETA_ADMIN_EMAILS=timothy@riffeandassociates.com
+PRIVATE_BETA_ALLOWED_EMAILS=beta1@lifenav-beta.example.com,beta2@lifenav-beta.example.com,beta3@lifenav-beta.example.com,beta4@lifenav-beta.example.com,beta5@lifenav-beta.example.com
+# leave PRIVATE_BETA_ALLOW_SYNTHETIC_DOMAIN unset (false)
+```
+
+Redeploy if the project doesn't pick up env changes automatically. **Activation + live smoke (founder/admin
+access, approved beta access, beta99/random blocked, API 403) require this env to be set — cannot be done from
+the build environment, so it is the founder's step.** Until then the gate is inert (open) by design.
+
+## Known environment caveat — GoTrue admin API (blocks scripted UID re-verify)
+
+In this Fly/Supabase environment the **GoTrue admin `?email=` filter is ignored** (returns the first ~50 users
+for any email) and list pagination caps/repeats — so a script CANNOT reliably resolve a beta email → UID, nor
+enumerate all users, from here. Consequences + handling:
+
+- The gate harness now creates each account and trusts the **UID returned by the POST** as the source of truth
+  (verify by that UID in the same run; never re-query by email). The harmful "delete prior by `?email=`" step
+  was removed (it was deleting random users).
+- Per-account persona persistence was confirmed **in-run by creation UID** (distinct: e.g. `pre_retirement`
+  has no health facts by design; goal counts vary 3–5), read back through `domain_summary`/`canonical_goals`
+  (the real user-scoped services) — not mock. Mock-fallback audit: PASS.
+- **Open:** a clean per-UID re-verify of the _currently distributable_ five accounts (and cleanup of duplicate
+  beta rows accumulated under the old harness bug) needs a working admin path (Supabase dashboard, a Management
+  PAT, or `DATABASE_URL`) — none available from the build env. Founder should resolve the 5 canonical UIDs via
+  the Supabase dashboard before distribution.
