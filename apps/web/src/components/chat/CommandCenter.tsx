@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import StreamingText from '@/components/ui/StreamingText';
+import { StreamedAdvisorMessage } from '@/components/chat/AdvisorMessage';
 import {
   chatClient,
   type Project,
@@ -552,12 +552,14 @@ export default function CommandCenter({
         {messages.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
             <div
-              className={`inline-block max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${
-                m.role === 'user' ? 'bg-gray-900 text-white' : 'bg-indigo-50 text-gray-800'
+              className={`inline-block rounded-2xl px-4 py-2 text-sm ${
+                m.role === 'user'
+                  ? 'max-w-[88%] whitespace-pre-wrap bg-gray-900 text-white'
+                  : 'max-w-[94%] bg-indigo-50 text-gray-800 dark:bg-gray-800 dark:text-gray-100'
               }`}
             >
               {m.role === 'assistant' ? (
-                <StreamingText text={m.content} animate={i === messages.length - 1} />
+                <StreamedAdvisorMessage text={m.content} animate={i === messages.length - 1} />
               ) : (
                 m.content
               )}
