@@ -103,6 +103,8 @@ interface DashboardClientProps {
 export default function DashboardClient({ initialSession, firstInsight }: DashboardClientProps) {
   const currentSession = initialSession;
   const [userName, setUserName] = useState<string>('');
+  // Synthetic beta profile marker → persistent banner (test data only; real connections gated).
+  const [synthetic, setSynthetic] = useState<{ persona?: string } | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -283,6 +285,11 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
         if (!name) name = humanName(user.user_metadata?.full_name || user.user_metadata?.name);
         if (!name && user.email) name = humanName(String(user.email).split('@')[0]);
         setUserName(name); // '' → neutral greeting
+        // Synthetic-beta marker (set by the verification harness via auth user_metadata) → show the banner so
+        // testers always know this is a test profile with synthetic data (private-beta Rule).
+        const md = (user.user_metadata || {}) as { is_synthetic?: boolean; persona?: string };
+        const am = (user.app_metadata || {}) as { is_synthetic?: boolean };
+        if (md.is_synthetic || am.is_synthetic) setSynthetic({ persona: md.persona });
       } catch (err) {
         console.error('Error resolving profile name:', err);
       }
@@ -558,6 +565,22 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="py-6 px-6 max-w-[1400px] mx-auto">
+        {/* Synthetic beta banner — every test profile clearly signals it is synthetic, test-data only. */}
+        {synthetic && (
+          <div
+            data-testid="synthetic-beta-banner"
+            className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200"
+          >
+            <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-900 dark:bg-amber-800 dark:text-amber-100">
+              Synthetic beta profile
+            </span>
+            <span>
+              Test data only{synthetic.persona ? ` · persona: ${synthetic.persona}` : ''}. Real
+              bank, document, and personal-data connections are disabled or warning-gated during
+              private beta.
+            </span>
+          </div>
+        )}
         {/* Welcome Section */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-1 text-gray-900 dark:text-white">
@@ -1046,37 +1069,35 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                 </div>
               ) : calendarTasks.length === 0 && capturedGoals.length > 0 ? (
                 // Captured-from-onboarding goals (not yet committed in Scenario Lab) — still real goals.
-                capturedGoals
-                  .slice(0, 7)
-                  .map(
-                    (
-                      goal: {
-                        title: string;
-                        domain?: string;
-                        timeframe?: string;
-                        confirmation?: string;
-                      },
-                      i
-                    ) => (
-                      <div
-                        key={i}
-                        className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                      >
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
-                          {goal.title}
-                        </h4>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                          {goal.domain && <span className="capitalize">{goal.domain}</span>}
-                          {goal.timeframe && <span>· {goal.timeframe}</span>}
-                          <span className="rounded-full bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
-                            {goal.confirmation === 'confirmed'
-                              ? 'Active'
-                              : 'Captured from onboarding'}
-                          </span>
-                        </div>
+                capturedGoals.slice(0, 7).map(
+                  (
+                    goal: {
+                      title: string;
+                      domain?: string;
+                      timeframe?: string;
+                      confirmation?: string;
+                    },
+                    i
+                  ) => (
+                    <div
+                      key={i}
+                      className="p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    >
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+                        {goal.title}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                        {goal.domain && <span className="capitalize">{goal.domain}</span>}
+                        {goal.timeframe && <span>· {goal.timeframe}</span>}
+                        <span className="rounded-full bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 text-[10px] font-medium text-indigo-700 dark:text-indigo-300">
+                          {goal.confirmation === 'confirmed'
+                            ? 'Active'
+                            : 'Captured from onboarding'}
+                        </span>
                       </div>
-                    )
+                    </div>
                   )
+                )
               ) : calendarTasks.length === 0 ? (
                 <div className="text-center py-8">
                   <span className="text-5xl mb-2 block">🎯</span>
