@@ -47,6 +47,17 @@ export interface Reasoning {
   what_we_still_need?: string[];
 }
 
+export interface Handoff {
+  response_type: 'handoff' | 'handoff_choice';
+  from_agent?: string;
+  from_name?: string;
+  target_agent?: string;
+  target_name?: string;
+  target_domain?: string;
+  reason?: string;
+  options?: string[];
+}
+
 export interface SendResult {
   assistant_message: string;
   citations: Citation[];
@@ -56,6 +67,7 @@ export interface SendResult {
   reasoning?: Reasoning | null;
   goals?: string[];
   risks?: string[];
+  handoff?: Handoff | null;
 }
 
 async function jsonOrThrow<T>(res: Response): Promise<T> {

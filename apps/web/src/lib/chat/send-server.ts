@@ -53,6 +53,11 @@ export async function sendAdvisorTurn(args: {
   const citations = Array.isArray(turn.citations) ? (turn.citations as unknown[]) : [];
   const answeredAgent = (typeof turn.agent === 'string' ? turn.agent : args.agent) ?? null;
   const llm_status = typeof turn.llm_status === 'string' ? turn.llm_status : undefined;
+  // Cross-agent in-chat handoff metadata (from → target advisor) so the UI can show the routing chip.
+  const handoff =
+    turn.handoff && typeof turn.handoff === 'object'
+      ? (turn.handoff as Record<string, unknown>)
+      : undefined;
   // Surfacing payloads for the premium chat UI (drawer + chips) — never injected into the message text.
   const reasoning =
     turn.reasoning && typeof turn.reasoning === 'object' ? turn.reasoning : undefined;
@@ -89,6 +94,7 @@ export async function sendAdvisorTurn(args: {
     citations,
     agent: answeredAgent,
     llm_status,
+    handoff,
     reasoning,
     goals,
     risks,

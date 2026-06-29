@@ -18,6 +18,7 @@ import {
   type Thread,
   type Citation,
   type Reasoning,
+  type Handoff,
 } from '@/lib/chat/client';
 import { AGENT_FALLBACK, RELATIONSHIP_MANAGER, agentName, type AgentInfo } from '@/lib/chat/agents';
 import { ADVISOR_WELCOME, ADVISOR_INCOMPLETE_ONBOARDING, ADVISOR_ERROR } from '@/lib/chat/advisor';
@@ -64,6 +65,7 @@ interface UiMessage {
   reasoning?: Reasoning | null;
   goals?: string[];
   risks?: string[];
+  handoff?: Handoff | null;
 }
 
 // Friendly labels for citation source tables → human source chips ("Offer Letter", "Life Insurance").
@@ -420,8 +422,14 @@ export default function CommandCenter({
           reasoning: res.reasoning,
           goals: res.goals,
           risks: res.risks,
+          handoff: res.handoff,
         },
       ]);
+      // Cross-agent handoff: the answer came from a different specialist — switch the active advisor so the
+      // user "continues with" them (no retype). handoff_choice (ambiguous) leaves the agent unchanged.
+      if (res.handoff?.response_type === 'handoff' && res.handoff.target_agent) {
+        setSelectedAgent(res.handoff.target_agent);
+      }
       // Advisor Action Loop: did the user mention a life change? Propose it (no write until approval).
       try {
         const det = (await fetch('/api/chat/action', {
@@ -551,6 +559,16 @@ export default function CommandCenter({
 
         {messages.map((m, i) => (
           <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
+            {/* Cross-agent handoff chip: shows the routing (e.g. Career → Finance) above the answer. */}
+            {m.role === 'assistant' && m.handoff?.response_type === 'handoff' && (
+              <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                <span>{agentName(m.handoff.from_agent || '', agents)}</span>
+                <span aria-hidden>→</span>
+                <span>
+                  {m.handoff.target_name || agentName(m.handoff.target_agent || '', agents)}
+                </span>
+              </div>
+            )}
             <div
               className={`inline-block rounded-2xl px-4 py-2 text-sm ${
                 m.role === 'user'

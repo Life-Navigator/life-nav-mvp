@@ -778,10 +778,11 @@ async def test_education_advisor_hands_off_finance_input():
     orch = AdvisorOrchestrator(FakeRM(base), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
                                FakeLLM(_good_llm()))
     out = await orch.converse(_ctx(), "$500K - $750K", agent="education_advisor")
-    assert out["llm_status"] == "handoff"
-    msg = out["assistant_message"].lower()
-    assert "finance" in msg and ("route" in msg or "hand it" in msg or "save it" in msg)
-    assert "verified income" not in msg  # did NOT fall through to the finance number-gate fallback
+    # Cross-agent in-chat handoff: routes to Finance and answers AS Finance in the same thread.
+    assert out["handoff"]["response_type"] == "handoff"
+    assert out["handoff"]["from_agent"] == "education_advisor"
+    assert out["handoff"]["target_agent"] == "finance_advisor"
+    assert out["agent"] == "finance_advisor"  # the responding advisor is now Finance
 
 
 @pytest.mark.asyncio
@@ -824,4 +825,39 @@ async def test_health_advisor_hands_off_life_insurance_for_kids():
     orch = AdvisorOrchestrator(FakeRM(_base()), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
                                FakeLLM(_good_llm()))
     out = await orch.converse(_ctx(), "I need life insurance for future kids.", agent="health_advisor")
-    assert out["llm_status"] == "handoff"
+    assert out["handoff"]["target_agent"] == "family_advisor"
+    assert out["agent"] == "family_advisor"
+
+
+# --------------------------------------------------------------------------- #
+# Cross-agent in-chat handoff — auto-route + answer in the same thread
+# --------------------------------------------------------------------------- #
+@pytest.mark.asyncio
+async def test_career_advisor_routes_down_payment_to_finance_in_thread():
+    """The reported case: Career Advisor + 'target down payment' → routes to Finance and Finance answers."""
+    orch = AdvisorOrchestrator(FakeRM(_base()), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_good_llm()))
+    out = await orch.converse(_ctx(), "tell me what the target down payment should be?", agent="career_advisor")
+    assert out["handoff"]["response_type"] == "handoff"
+    assert out["handoff"]["from_agent"] == "career_advisor"
+    assert out["handoff"]["target_agent"] == "finance_advisor"
+    assert out["agent"] == "finance_advisor"  # Finance is the responding advisor
+    assert out["assistant_message"]  # an answer was generated in-thread (not a dead 'want me to route it?')
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_handoff_asks_which_angle():
+    orch = AdvisorOrchestrator(FakeRM(_base()), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_good_llm()))
+    out = await orch.converse(_ctx(), "I need life insurance and a mortgage.", agent="health_advisor")
+    assert out["handoff"]["response_type"] == "handoff_choice"
+    assert "which angle" in out["assistant_message"].lower()
+    assert set(out["handoff"]["options"]) == {"finance_advisor", "family_advisor"}
+
+
+@pytest.mark.asyncio
+async def test_in_domain_turn_has_no_handoff():
+    orch = AdvisorOrchestrator(FakeRM(_base()), AdvisorContextBuilder(FakeSupabase(), coverage=FakeCoverage()),
+                               FakeLLM(_good_llm()))
+    out = await orch.converse(_ctx(), "Should I pursue an MBA or a data certificate next?", agent="education_advisor")
+    assert out.get("handoff") is None

@@ -318,33 +318,31 @@ class AdvisorOrchestrator:
         m = message or ""
         return any(self._HANDOFF_VOCAB[d].search(m) for d in domains if d in self._HANDOFF_VOCAB)
 
-    def _out_of_domain_handoff(self, agent_obj: Any, message: str) -> Optional[str]:
-        """A direct domain advisor offers a handoff ONLY when the message clearly belongs to another domain.
+    def _detect_handoff(self, agent_obj: Any, message: str) -> Optional[dict[str, Any]]:
+        """Decide whether a direct domain advisor should ROUTE this turn to another specialist.
 
         Domain-aware + conservative: (1) any STRONG signal for the advisor's OWN domain → answer here (a
-        Health turn about tendons/ligaments/max-effort stays in Health). (2) Otherwise, hand off only when a
-        STRONG signal for a single OTHER domain (or a bare money figure → finance) is present. (3) Ambiguous /
-        no clear signal → answer in the current domain. Returns the handoff copy, or None to proceed."""
+        Health turn about tendons/ligaments/max-effort stays in Health). (2) Otherwise route when a STRONG
+        signal for another domain (or a bare money figure → finance) is present. (3) No clear signal → answer
+        here. Returns {target, target_agent_obj, target_name, from_name, reason, ambiguous, options} or None."""
         if agent_obj is None or getattr(agent_obj, "is_orchestrator", False):
             return None
         adoms = {d for d in (getattr(agent_obj, "domains", ()) or ())}
-        # (1) clear in-domain context → never hand off
-        if self._domain_signal(message, adoms):
+        if self._domain_signal(message, adoms):  # (1) clear in-domain context → never hand off
             return None
-        # (2) strong other-domain signal(s)
         others = {d for d in self._HANDOFF_VOCAB if d not in adoms and self._domain_signal(message, {d})}
         if "finance" not in adoms and self._MONEY_SIGNAL.search(message or ""):
             others.add("finance")
         if not others:
-            return None  # ambiguous → answer in the current advisor domain
-        target = next((d for d in ("finance", "health", "career", "family", "education") if d in others),
-                      sorted(others)[0])
-        target_agent = get_agent(f"{target}_advisor")
-        target_name = target_agent.name if target_agent else f"{target.title()} Advisor"
-        caps = ", ".join((getattr(agent_obj, "capabilities", ()) or ())[:3]) or "this area"
-        return (f"That looks like it belongs under {target_name} — I won’t answer it as the "
-                f"{agent_obj.name}, so I don’t give you the wrong read. I can hand it to the {target_name} "
-                f"or save it there. Here, I focus on {caps}. Want me to route it?")
+            return None
+        ordered = [d for d in ("finance", "health", "career", "family", "education") if d in others]
+        target = ordered[0]
+        ta = get_agent(f"{target}_advisor")
+        return {"target": target, "target_agent_obj": ta,
+                "target_name": ta.name if ta else f"{target.title()} Advisor",
+                "from_name": getattr(agent_obj, "name", "your advisor"),
+                "reason": f"This looks like a {target} question, so I'm bringing in the {ta.name if ta else target}.",
+                "ambiguous": len(ordered) >= 2, "options": ordered[:2]}
 
     def _health_safety_check(self, message: str, base: dict[str, Any], tr: dict[str, Any]) -> bool:
         """Deterministic urgent-care safety net (no LLM). If triggered, overwrite the reply with a safety-first
@@ -648,17 +646,36 @@ class AdvisorOrchestrator:
         # Health urgent-care safety net runs BEFORE any model (deterministic, no LLM) — wins in EVERY mode.
         if self._health_safety_check(message, base, tr):
             return self._finish(ctx, base, tr, t0, trace)
-        # Out-of-domain guard: a DIRECT domain advisor (e.g. Education) must NOT answer a question that clearly
-        # belongs to another domain (e.g. "$500K–$750K" → finance). Offer a handoff instead of letting the
-        # number-gate emit a generic finance-flavored fallback under the wrong advisor label.
-        handoff = self._out_of_domain_handoff(agent_obj, message)
-        if handoff:
-            base["assistant_message"] = handoff
-            base["reveal"] = None
-            base["llm_status"] = "handoff"
-            tr["llm_status"] = "handoff"
-            tr["fallback_cause"] = "out_of_domain"
-            return self._finish(ctx, base, tr, t0, trace)
+        # CROSS-AGENT IN-CHAT HANDOFF: a direct domain advisor must NOT answer out-of-domain — but instead of
+        # stopping, it ROUTES the turn to the correct specialist and that advisor answers in the same thread
+        # (no retype, no page switch). High-confidence → auto-route; ambiguous (2+ domains) → ask which angle.
+        hinfo = self._detect_handoff(agent_obj, message)
+        if hinfo:
+            if hinfo["ambiguous"]:
+                opts = [get_agent(f"{d}_advisor") for d in hinfo["options"]]
+                names = [o.name if o else d.title() for o, d in zip(opts, hinfo["options"])]
+                base["assistant_message"] = (
+                    f"I can route this to {names[0]} or {names[1]} — which angle do you want first?")
+                base["reveal"] = None
+                base["llm_status"] = "handoff_choice"
+                tr["llm_status"] = "handoff_choice"
+                base["handoff"] = {"response_type": "handoff_choice", "from_agent": agent_obj.id,
+                                   "options": [o.id if o else f"{d}_advisor"
+                                               for o, d in zip(opts, hinfo["options"])]}
+                return self._finish(ctx, base, tr, t0, trace)
+            # High-confidence → switch persona to the target and answer as that advisor below (_enhance).
+            base["handoff"] = {
+                "response_type": "handoff", "from_agent": agent_obj.id, "from_name": hinfo["from_name"],
+                "target_agent": hinfo["target_agent_obj"].id if hinfo["target_agent_obj"] else f"{hinfo['target']}_advisor",
+                "target_name": hinfo["target_name"], "target_domain": hinfo["target"], "reason": hinfo["reason"],
+            }
+            tr["handoff"] = base["handoff"]
+            tr["fallback_cause"] = "cross_agent_handoff"
+            if hinfo["target_agent_obj"] is not None:
+                agent_obj = hinfo["target_agent_obj"]
+                fdoms = {hinfo["target"]}
+                base["agent"] = agent_obj.id
+                tr["agent"] = agent_obj.id
         # Discovery/onboarding mode: keep the RelationshipManager's conversational reply verbatim — NO LLM
         # enhancement, NO six-section advisor template, NO advice disclaimer, NO objective-as-fact. This is
         # the fix for advisor-mode contaminating onboarding. Advisor mode (default) is unchanged below.
