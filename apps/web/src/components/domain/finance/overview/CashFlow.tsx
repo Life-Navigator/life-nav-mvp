@@ -22,6 +22,7 @@ export function CashFlow() {
         net_cash_flow: number | null;
         savings_amount: number | null;
         savings_rate: number | null;
+        note?: string;
         missing_state?: { reason: string };
       }
     | undefined;
@@ -90,9 +91,10 @@ export function CashFlow() {
       <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
         <span className="text-sm text-slate-500 dark:text-slate-400">Savings Rate</span>
         <span className="text-lg font-medium dark:text-white">
-          {cf.savings_rate == null ? '—' : `${cf.savings_rate}%`}
+          {cf.savings_rate == null ? 'Not available' : `${cf.savings_rate}%`}
         </span>
       </div>
+      {cf.note && <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">{cf.note}</p>}
     </div>
   );
 }

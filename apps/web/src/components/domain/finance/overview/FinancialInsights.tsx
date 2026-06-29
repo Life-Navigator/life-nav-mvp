@@ -44,8 +44,7 @@ export function FinancialInsights() {
         <div className="text-center py-8">
           <LightBulbIcon className="w-12 h-12 mx-auto text-slate-400 mb-4" />
           <p className="text-slate-500 dark:text-slate-400 mb-4">
-            No notable month-over-month changes yet — insights appear as your transaction history
-            grows.
+            Insights appear once account balances or transactions are connected.
           </p>
           <Link
             href="/dashboard/finance/accounts"

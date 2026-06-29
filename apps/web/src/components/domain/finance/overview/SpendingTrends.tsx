@@ -61,7 +61,7 @@ export function SpendingTrends() {
         <div className="text-center py-8">
           <ChartBarIcon className="w-12 h-12 mx-auto text-slate-400 mb-4" />
           <p className="text-slate-500 dark:text-slate-400 mb-4">
-            {st?.missing_state?.reason || 'No spending in the last 30 days.'}
+            {st?.missing_state?.reason || 'Spending trends need transaction history.'}
           </p>
           <Link
             href="/dashboard/finance/accounts"

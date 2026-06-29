@@ -46,8 +46,7 @@ export function UpcomingBills() {
         <div className="text-center py-8">
           <CalendarDaysIcon className="w-12 h-12 mx-auto text-slate-400 mb-4" />
           <p className="text-slate-500 dark:text-slate-400 mb-4">
-            {ub?.missing_state?.reason ||
-              'No recurring bills detected from your recent transactions.'}
+            {ub?.missing_state?.reason || 'Recurring bills need recent transaction history.'}
           </p>
           <Link
             href="/dashboard/finance/accounts"
