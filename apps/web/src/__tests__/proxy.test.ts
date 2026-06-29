@@ -234,8 +234,9 @@ describe('Proxy (private-beta allowlist gate)', () => {
     expect(redirects).not.toContain('/private-beta');
   });
 
-  it('gate ON → synthetic beta account allowed through', async () => {
+  it('gate ON → EXACT-allowlisted beta account allowed through (no domain wildcard)', async () => {
     process.env.PRIVATE_BETA_ENABLED = 'true';
+    process.env.PRIVATE_BETA_ALLOWED_EMAILS = 'beta1@lifenav-beta.example.com';
     mockGetUser.mockResolvedValue({
       data: { user: { id: 'u', email: 'beta1@lifenav-beta.example.com' } },
     });
@@ -249,5 +250,16 @@ describe('Proxy (private-beta allowlist gate)', () => {
     await proxy(createMockRequest('/dashboard'));
     const redirects = (NextResponse.redirect as jest.Mock).mock.calls.map((c) => c[0]?.pathname);
     expect(redirects).not.toContain('/private-beta');
+  });
+
+  it('gate ON → unlisted synthetic-domain email (beta99) is BLOCKED → /private-beta', async () => {
+    process.env.PRIVATE_BETA_ENABLED = 'true';
+    process.env.PRIVATE_BETA_ALLOWED_EMAILS = 'beta1@lifenav-beta.example.com';
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'u', email: 'beta99@lifenav-beta.example.com' } },
+    });
+    await proxy(createMockRequest('/dashboard'));
+    const last = (NextResponse.redirect as jest.Mock).mock.calls.pop()[0];
+    expect(last.pathname).toBe('/private-beta');
   });
 });
