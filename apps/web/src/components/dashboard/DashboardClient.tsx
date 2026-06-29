@@ -1,5 +1,6 @@
 'use client';
 
+import { humanName } from '@/lib/identity/humanName';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/ui/loaders/LoadingSpinner';
@@ -253,18 +254,8 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
         let user: any = (currentSession?.user as any) || null;
         if (!user && supabase) user = (await supabase.auth.getUser()).data.user;
         if (!user) return;
-        // Accept only HUMAN-looking names. Rejects UUIDs, random auth slugs ("xyccggrekvctxvofxp"),
-        // all-consonant gibberish, and digit-laden ids. Empty → neutral "Welcome back" (no name).
-        const looksHuman = (raw: string): string => {
-          const t = String(raw || '').trim();
-          if (!t) return '';
-          if (/[0-9_]/.test(t) || /[0-9a-f]{8}-[0-9a-f]{4}/i.test(t)) return ''; // ids / uuids
-          const first = t.split(/[.\-\s]+/)[0].toLowerCase();
-          if (!/^[a-z]{2,15}$/.test(first)) return ''; // too long/short or non-alpha → not a name
-          if (!/[aeiou]/.test(first)) return ''; // no vowel → gibberish
-          if (/[bcdfghjklmnpqrstvwxz]{4,}/.test(first)) return ''; // 4+ consecutive consonants → random
-          return first.charAt(0).toUpperCase() + first.slice(1);
-        };
+        // Accept only HUMAN-looking names (humanName lib). display_name can be a seeded persona slug
+        // ("xyccggrekvctxvofxp") → it MUST pass the same gate as metadata/email, never trusted raw.
         let name = '';
         if (supabase) {
           const { data } = await supabase
@@ -272,10 +263,10 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
             .select('display_name')
             .eq('id', user.id)
             .maybeSingle();
-          name = String((data as { display_name?: string } | null)?.display_name || '').trim();
+          name = humanName(String((data as { display_name?: string } | null)?.display_name || ''));
         }
-        if (!name) name = looksHuman(user.user_metadata?.full_name || user.user_metadata?.name);
-        if (!name && user.email) name = looksHuman(String(user.email).split('@')[0]);
+        if (!name) name = humanName(user.user_metadata?.full_name || user.user_metadata?.name);
+        if (!name && user.email) name = humanName(String(user.email).split('@')[0]);
         setUserName(name); // '' → neutral greeting
       } catch (err) {
         console.error('Error resolving profile name:', err);
@@ -471,7 +462,18 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
         if (!r.ok) throw new Error(`canonical-summary ${r.status}`);
         const d = await r.json();
         if (cancelled) return;
-        setCanonicalFinance(d && typeof d.net_worth === 'number' ? d : null);
+        // Only treat as real finance data when accounts/assets actually exist (has_data). A no-accounts
+        // profile returns net_worth:0 + source "Missing" — render the honest empty state, NEVER fake $0.
+        const real =
+          d && d.has_data === true && typeof d.net_worth === 'number'
+            ? d
+            : d &&
+                typeof d.net_worth === 'number' &&
+                (Number(d.accounts_count) > 0 ||
+                  (d.source && String(d.source).toLowerCase() !== 'missing'))
+              ? d
+              : null;
+        setCanonicalFinance(real);
         setFinanceStatus('ready');
       })
       .catch(() => {

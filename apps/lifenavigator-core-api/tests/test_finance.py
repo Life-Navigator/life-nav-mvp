@@ -92,6 +92,42 @@ async def test_investments_falls_back_to_investment_accounts():
 
 
 @pytest.mark.asyncio
+async def test_synthetic_seed_holdings_suppressed_no_provenance():
+    """P0: persona-seed holdings (no account_id, empty metadata) are synthetic and must NOT render as a real
+    portfolio — they fall through to the account-balance-only state."""
+    svc = FinanceService(supabase=FakeSupabase({
+        "investment_holdings": [
+            {"id": "h1", "symbol": "VTI", "quantity": 2059.7, "current_value": 552000, "cost_basis": 268, "account_id": None, "metadata": {}},
+            {"id": "h2", "symbol": "VFIFX", "quantity": 8541.6, "current_value": 410000, "cost_basis": 48, "account_id": None, "metadata": {}},
+        ],
+        "financial_accounts": [
+            {"id": "a1", "account_name": "Investment Portfolio", "account_type": "investment", "current_balance": 920000, "is_active": True},
+        ],
+    }))
+    vm = await svc.investments(UserContext(user_id="u-1"))
+    # synthetic holdings suppressed → account-balance-only ($920k), NOT a $1.33M fake portfolio with shares
+    assert len(vm.data["holdings"]) == 1
+    assert vm.data["holdings"][0]["name"] == "Investment Portfolio"
+    assert vm.data["holdings"][0].get("shares") is None
+
+
+@pytest.mark.asyncio
+async def test_real_holding_with_account_provenance_renders():
+    """A holding linked to an account (provenance) renders with shares/cost_basis."""
+    svc = FinanceService(supabase=FakeSupabase({
+        "investment_holdings": [
+            {"id": "h1", "symbol": "AAPL", "name": "Apple", "quantity": 20, "current_value": 4000, "cost_basis": 3000, "account_id": "a1", "metadata": {}},
+        ],
+        "financial_accounts": [
+            {"id": "a1", "account_name": "Brokerage", "account_type": "investment", "current_balance": 4000, "is_active": True},
+        ],
+    }))
+    vm = await svc.investments(UserContext(user_id="u-1"))
+    assert len(vm.data["holdings"]) == 1
+    assert vm.data["holdings"][0]["shares"] == 20
+
+
+@pytest.mark.asyncio
 async def test_retirement_falls_back_to_retirement_accounts():
     svc = FinanceService(supabase=FakeSupabase({
         "retirement_plans": [],

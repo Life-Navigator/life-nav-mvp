@@ -94,4 +94,13 @@ describe('investment display contract', () => {
     expect(reconciliationNote(920000, 920000)).toBeNull(); // match → no note
     expect(reconciliationNote(null, 875000)).toBeNull();
   });
+
+  it('implausible cost basis (per-share mis-stored as total) → gain/loss UNAVAILABLE, no impossible return', () => {
+    // VTI-like: $552,000 value but cost basis stored as a per-share 268 → ratio 0.0005 → suppressed
+    const m = computeDisplayMetrics([{ shares: 2059.7, marketValue: 552000, costBasis: 268 }], {});
+    expect(m.totalValue).toBe(552000);
+    expect(m.totalCostBasis).toBeNull();
+    expect(m.totalGainLoss).toBeNull();
+    expect(m.totalGainLossPercent).toBeNull();
+  });
 });

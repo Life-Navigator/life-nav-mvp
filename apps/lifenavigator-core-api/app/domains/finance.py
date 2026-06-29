@@ -302,8 +302,24 @@ class FinanceService(DomainService):
             sources=[_src("asset_loans")], missing=[], basis="complete",
         )
 
+    # Real position only if it's linked to an account OR carries a real source. Persona-seed rows
+    # (account_id NULL + empty metadata, identical across users) are synthetic and must NEVER render as a
+    # real portfolio (the P0 fake-$1.33M-holdings regression).
+    _REAL_HOLDING_SOURCES = {
+        "plaid", "plaid_investment_holdings", "manual", "manual_holding",
+        "uploaded_statement_extraction", "verified_brokerage", "connected_account",
+    }
+
+    @classmethod
+    def _holding_has_provenance(cls, h: dict[str, Any]) -> bool:
+        if h.get("account_id"):
+            return True
+        src = str(((h.get("metadata") or {}) if isinstance(h.get("metadata"), dict) else {}).get("source") or "").lower()
+        return src in cls._REAL_HOLDING_SOURCES
+
     async def investments(self, ctx: UserContext) -> DomainViewModel:
-        holdings = await self._rows("investment_holdings", ctx)
+        all_holdings = await self._rows("investment_holdings", ctx)
+        holdings = [h for h in all_holdings if self._holding_has_provenance(h)]
         if not holdings:
             # Holding-level detail (investment_holdings) is rarely populated; the user's real money lives
             # in connected investment/brokerage ACCOUNTS (finance.financial_accounts). Surface those so the

@@ -53,9 +53,17 @@ export function computeDisplayMetrics(
   const totalValue = realHoldings.reduce((s, h) => s + (Number(h.marketValue) || 0), 0);
   const haveAllCost =
     realHoldings.length > 0 && realHoldings.every((h) => (Number(h.costBasis) || 0) > 0);
-  const totalCostBasis = haveAllCost
+  const rawCostBasis = haveAllCost
     ? realHoldings.reduce((s, h) => s + (Number(h.costBasis) || 0), 0)
     : null;
+  // SAFETY: a cost basis that is implausibly small vs market value (e.g. per-share value mis-stored as a
+  // total, or a placeholder) would yield an impossible gain (+295,455%). Treat it as UNAVAILABLE rather than
+  // compute a fake gain/loss. Real cost basis is normally a meaningful fraction of market value.
+  const plausibleCost =
+    rawCostBasis != null && totalValue > 0
+      ? rawCostBasis / totalValue >= 0.05
+      : rawCostBasis != null;
+  const totalCostBasis = plausibleCost ? rawCostBasis : null;
   const totalGainLoss = totalCostBasis != null ? totalValue - totalCostBasis : null;
   const totalGainLossPercent =
     totalCostBasis != null && totalCostBasis > 0 ? (totalGainLoss! / totalCostBasis) * 100 : null;
