@@ -1,5 +1,24 @@
 # First-5 Beta — Final Launch Gate Report
 
+## UPDATE 2026-06-30 (founder provided a Supabase Management PAT — used for this session, then deleted; PLEASE ROTATE IT)
+
+With temporary DB access I completed the parts that were previously founder-blocked:
+
+- **Finance planning migration: APPLIED + verified.** `finance.financial_planning_goals` exists, RLS enabled, 2
+  policies (`users_own_fin_planning` authenticated + `service_fin_planning` service_role), 16 cols. Write path
+  proven end-to-end: **13 planning goals already persisted** from onboarding (previously 404'd). Balances untouched.
+- **CRITICAL FINDING → FIXED:** the 5 synthetic accounts **did not exist** in production (0 `lifenav-beta`
+  emails, 0 `is_synthetic` users — wiped by the old harness delete-by-email bug). Recreated all 5 cleanly with
+  the fixed harness. **Verified by UID:** no duplicates (1 each), `is_synthetic=true`, correct personas, finance
+  accounts + career + family_profiles + goals (3–5) present, household records seeded (beta1 partner+pet+
+  beneficiary; beta3 spouse+2 beneficiaries; beta4 child+beneficiary), beta3 health = expected gap.
+- **Finance reconciliation: all PASS** — net worth/cash/debt match the documented ranges, all labeled
+  "Synthetic Beta Persona": beta1 +293.2k, beta2 +12.2k, beta3 +2.02M, beta4 +47k, beta5 −18k.
+
+**Remaining founder steps: (1) set Vercel env, (4) live magic-link smoke + manual pass.** Steps 2 & 3 are now DONE.
+
+---
+
 **Date:** 2026-06-30 · **Recommendation: NO-GO until the 4 founder/infra steps below are completed** (the code
 
 - docs are done and deployed; the remaining gates are actions I cannot perform from the build environment).
