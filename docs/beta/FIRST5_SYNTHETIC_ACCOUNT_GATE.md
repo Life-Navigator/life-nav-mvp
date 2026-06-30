@@ -106,6 +106,27 @@ Redeploy if the project doesn't pick up env changes automatically. **Activation 
 access, approved beta access, beta99/random blocked, API 403) require this env to be set — cannot be done from
 the build environment, so it is the founder's step.** Until then the gate is inert (open) by design.
 
+## Step: verify the 5 personas by UID in the Supabase SQL editor (READ-ONLY)
+
+Because the GoTrue admin API can't resolve beta emails → UIDs here (see caveat below), verify persisted persona
+data directly in the database. Paste **`scripts/beta/cleanup_and_verify_first5.sql`** into the Supabase SQL
+editor and run it.
+
+- **It is 100% read-only** — only `SELECT`s; no `DELETE/UPDATE/INSERT/TRUNCATE/ALTER`, nothing touches
+  `auth.users`. It detects duplicates and **prints a recommended cleanup plan but performs no cleanup** (a
+  separate, reviewed cleanup script is required for any mutation).
+- **What it returns:** Section 0 = table-presence matrix; Sections 2–5 = beta auth users, duplicates, missing,
+  and the **suggested canonical UID per email**; Sections 6–12 = persisted profile/finance/career/education/
+  family/health/goals facts per UID (Section 12 flags **raw-paragraph goals**); Section 13 = null-owner leakage
+  check; **Section 14 = the PASS/WARN/FAIL/EXPECTED_GAP summary** (one row per beta email).
+- **How to read the summary:** every account should be **PASS** across `synthetic_flag_ok, persona_ok,
+profile_ok, finance_ok, career_ok, goals_ok`. `education_ok`/`family_ok` may be `WARN` if that profile row
+  isn't present yet. `health_ok = EXPECTED_GAP` is correct **only for beta3 (pre_retirement)**; a `FAIL` there
+  for any other account is a real gap. `duplicate_warning`/`raw_goal_warning = WARN` must be resolved first.
+- **Do NOT distribute** an account until its summary row is **all PASS** (or a `WARN`/`EXPECTED_GAP` is
+  explicitly documented as acceptable). If duplicates appear, resolve them via a separate reviewed cleanup
+  script (Section 15 plan) before sending.
+
 ## Known environment caveat — GoTrue admin API (blocks scripted UID re-verify)
 
 In this Fly/Supabase environment the **GoTrue admin `?email=` filter is ignored** (returns the first ~50 users
