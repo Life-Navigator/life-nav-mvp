@@ -46,6 +46,37 @@ PERSONAS = [
      [("Checking","checking",4000),("Savings","savings",6000),("Student Loan","loan",-28000)]),
 ]
 
+# Per-persona household records (family schema) so the Family page "at a glance" metrics are coherent with the
+# story (Part 3 fix). Keyed by persona. Each entry: (table, row). All carry metadata.source='synthetic_beta'.
+HOUSEHOLD = {
+    "family_foundation": [
+        ("family_members", {"name": "Jenny Doe", "relationship": "partner", "lives_in_household": True}),
+        ("pets", {"name": "Thor", "species": "dog", "breed": "Labrador"}),
+        ("beneficiaries", {"name": "Jenny Doe", "relationship": "partner", "allocation_pct": 100}),
+        ("emergency_contacts", {"name": "Jenny Doe", "relationship": "partner", "phone": "555-0101"}),
+        ("trusted_advisors", {"name": "Morgan Lee", "advisor_type": "financial_advisor", "firm": "Lee Wealth"}),
+    ],
+    "new_parent": [
+        ("family_members", {"name": "Baby R.", "relationship": "child", "is_dependent": True, "lives_in_household": True}),
+        ("beneficiaries", {"name": "Spouse", "relationship": "spouse", "allocation_pct": 100}),
+        ("emergency_contacts", {"name": "Spouse", "relationship": "spouse", "phone": "555-0102"}),
+        ("trusted_advisors", {"name": "Pat Rivera", "advisor_type": "insurance_agent", "firm": "Guardian"}),
+    ],
+    "pre_retirement": [
+        ("family_members", {"name": "Spouse", "relationship": "spouse", "lives_in_household": True}),
+        ("beneficiaries", {"name": "Spouse", "relationship": "spouse", "allocation_pct": 50}),
+        ("beneficiaries", {"name": "Adult Child", "relationship": "child", "allocation_pct": 50}),
+        ("emergency_contacts", {"name": "Spouse", "relationship": "spouse", "phone": "555-0103"}),
+        ("trusted_advisors", {"name": "Jordan Estate Law", "advisor_type": "attorney", "firm": "Booth & Co"}),
+    ],
+    "young_professional": [
+        ("emergency_contacts", {"name": "Parent", "relationship": "parent", "phone": "555-0104"}),
+    ],
+    "career_change": [
+        ("emergency_contacts", {"name": "Sibling", "relationship": "sibling", "phone": "555-0105"}),
+    ],
+}
+
 
 def _req(method, path, body=None, headers=None, schema=None):
     h = dict(headers or H)
@@ -97,6 +128,10 @@ async def main():
                  {"user_id": uid, "account_name": name, "account_type": typ, "current_balance": bal,
                   "is_manual": True, "is_active": True, "metadata": {"source": "synthetic_beta"}},
                  headers={**H, "Prefer": "return=minimal"}, schema="finance")
+        # seed household records (family schema) so the Family "at a glance" metrics match the story (Part 3).
+        for tbl, row in HOUSEHOLD.get(persona, []):
+            body = {"user_id": uid, **row, "metadata": {"source": "synthetic_beta"}}
+            _req("POST", f"/rest/v1/{tbl}", body, headers={**H, "Prefer": "return=minimal"}, schema="family")
         # run onboarding (syncs domain facts + creates normalized goals)
         ctx = UserContext(user_id=uid, email=email)
         try:
