@@ -102,3 +102,22 @@ async def test_canonical_summary_matches_accounts():
     s = await FinancialInputResolver(sb).summary(CTX)
     assert s["cash_balance"] == 203200 and s["investment_balance"] == 1330000 and s["total_debt"] == 12000
     assert s["net_worth"] == 203200 + 1330000 - 12000 and s["has_data"] and s["accounts_count"] == 3
+
+
+# ---- First-5 Plaid/synthetic source-label honesty ----
+def test_acct_source_labels_honestly():
+    from app.services.financial_resolver import _acct_source, PLAID, SYNTHETIC, MANUAL, MISSING
+    # real Plaid marker → Plaid (never anything else)
+    assert _acct_source([{"plaid_account_id": "abc", "account_type": "checking"}]) == PLAID
+    assert _acct_source([{"metadata": {"source": "connected_account"}}]) == PLAID
+    # synthetic-beta seed → Synthetic (NOT Plaid, NOT generic user-entered)
+    assert _acct_source([{"metadata": {"source": "synthetic_beta"}, "account_type": "checking"}]) == SYNTHETIC
+    # plain manual rows → user-entered
+    assert _acct_source([{"account_type": "checking", "is_manual": True}]) == MANUAL
+    # no accounts → missing (never a fake source)
+    assert _acct_source([]) == MISSING
+    # mixed synthetic + a real plaid account → Plaid wins (a real connection is present)
+    assert _acct_source([{"metadata": {"source": "synthetic_beta"}}, {"plaid_account_id": "x"}]) == PLAID
+    # synthetic is NOT labeled plaid and plaid is NOT labeled synthetic
+    assert _acct_source([{"metadata": {"source": "synthetic_beta"}}]) != PLAID
+    assert _acct_source([{"plaid_account_id": "x"}]) != SYNTHETIC

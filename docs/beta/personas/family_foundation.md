@@ -5,7 +5,7 @@ pre-seeded with this persona's data — explore it; do not enter your real infor
 
 **Who you are:** Avery, an engaged professional building a foundation before marriage.
 **Career:** Senior Architect at Acme working on Embedded AI (Python, C++, Rust). You want Principal Architect within 2 years.
-**Financial picture (synthetic):** strong liquidity (checking + money market), a large investment account, and a mortgage — do not connect a real bank.
+**Financial picture (synthetic — "Synthetic Beta Persona" on the dashboard, NOT a real bank):** strong assets — ~$203K cash (checking + money market), ~$920K investments, ~$410K retirement (401k) — against a ~$1.24M mortgage, so net worth is roughly **+$290K**. Do not connect a real bank. Your planning question: sequence wedding cash, emergency reserve, and the first-home down payment without overextending against the mortgage.
 **Health:** 6'0", 205 lbs, ~18% body fat; body recomposition (maintain weight, build muscle, lose fat).
 **Education:** BS in Business Administration from State University; deferring more school until after the wedding/family.
 **Family:** engaged, wedding next June, want a first home (down payment), and children after marriage/home.

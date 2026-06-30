@@ -4,7 +4,7 @@ You are **not** testing as yourself. Role-play this synthetic user; your account
 
 **Who you are:** Jordan, early-career and single, getting serious about money.
 **Career:** Software Engineer at Globex, aiming for a Senior promotion.
-**Financial picture (synthetic):** modest checking + savings + a small Roth IRA; student-loan/budget pressure is the theme — no real bank.
+**Financial picture (synthetic — "Synthetic Beta Persona", NOT a real bank):** ~$22K cash (checking + savings), a small ~$22K Roth IRA, and a ~$32K student loan — net worth roughly **−$10K**. Early-career, debt-and-budget pressure is the theme. Do not connect a real bank.
 **Health:** 5'10", 170 lbs; training for a half marathon.
 **Education:** BA in Computer Science from City College.
 

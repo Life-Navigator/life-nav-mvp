@@ -362,3 +362,66 @@ ORDER BY e.email;
 -- ----------------------------------------------------------------------------
 SELECT 'Cleanup is intentionally NOT performed by this read-only script. '
     || 'See Section 15 comments for the reviewed-cleanup plan.' AS cleanup_notice;
+
+
+-- ----------------------------------------------------------------------------
+-- SECTION 16 — FINANCE / SOURCE RECONCILIATION (Plaid vs synthetic) + expected-range PASS/WARN/FAIL
+-- Proves the dashboard Financial Overview will match the persona story: correct source label, account mix,
+-- and net worth / cash / debt inside the documented range (see docs/beta/FIRST5_PLAID_PERSONA_MAPPING.md).
+-- Liabilities (mortgage/loan/credit_card/student_loan/auto_loan) are abs-summed; net worth = assets − |debt|.
+-- ----------------------------------------------------------------------------
+WITH expected(email, persona, plaid_persona, nw_min, nw_max, cash_min, cash_max, debt_min, debt_max, min_accts) AS (
+  VALUES
+    ('beta1@lifenav-beta.example.com', 'family_foundation',  'Synthetic Beta Persona',  200000, 400000,  150000, 260000, 1100000, 1350000, 5),
+    ('beta2@lifenav-beta.example.com', 'young_professional', 'Synthetic Beta Persona',  -60000,  60000,   10000,  40000,   20000,   45000, 4),
+    ('beta3@lifenav-beta.example.com', 'pre_retirement',     'Synthetic Beta Persona', 1700000,2300000,   10000,  60000,       0,       0, 3),
+    ('beta4@lifenav-beta.example.com', 'new_parent',         'Synthetic Beta Persona',   10000,  90000,   20000,  70000,       0,   30000, 3),
+    ('beta5@lifenav-beta.example.com', 'career_change',      'Synthetic Beta Persona',  -60000,  30000,    3000,  25000,   20000,   40000, 3)
+),
+canon AS (
+  SELECT DISTINCT ON (lower(u.email)) lower(u.email) AS email, u.id AS uid
+  FROM auth.users u
+  WHERE lower(u.email) LIKE 'beta_@lifenav-beta.example.com'
+  ORDER BY lower(u.email),
+           (u.raw_user_meta_data->>'is_synthetic' = 'true') DESC,
+           (u.raw_user_meta_data->>'persona' IS NOT NULL) DESC, u.created_at DESC
+),
+fin AS (
+  SELECT c.email, c.uid,
+         count(a.*) AS account_count,
+         coalesce(sum(a.current_balance) FILTER (WHERE a.account_type NOT IN ('mortgage','loan','credit_card','student_loan','auto_loan')),0) AS assets,
+         coalesce(abs(sum(a.current_balance) FILTER (WHERE a.account_type IN ('mortgage','loan','credit_card','student_loan','auto_loan'))),0) AS debt,
+         coalesce(sum(a.current_balance) FILTER (WHERE a.account_type IN ('checking','savings')),0) AS cash,
+         -- honest source: Plaid only with a real marker; synthetic-beta seed labeled distinctly; else user-entered
+         CASE
+           WHEN bool_or(a.plaid_account_id IS NOT NULL OR (a.metadata->>'source') = 'connected_account') THEN 'Plaid sandbox persona'
+           WHEN count(a.*) > 0 AND bool_and((a.metadata->>'source') = 'synthetic_beta') THEN 'Synthetic Beta Persona'
+           WHEN count(a.*) > 0 THEN 'User-entered'
+           ELSE 'Missing'
+         END AS source_label
+  FROM canon c
+  LEFT JOIN finance.financial_accounts a ON a.user_id = c.uid
+  GROUP BY c.email, c.uid
+)
+SELECT
+  e.email AS beta_email,
+  e.persona AS expected_persona,
+  e.plaid_persona AS expected_source,
+  coalesce(f.source_label,'Missing') AS actual_source,
+  coalesce(f.account_count,0) AS account_count,
+  coalesce(f.assets,0) AS total_assets,
+  coalesce(f.debt,0) AS total_liabilities,
+  coalesce(f.assets,0) - coalesce(f.debt,0) AS net_worth,
+  coalesce(f.cash,0) AS cash,
+  CASE WHEN f.source_label = e.plaid_persona THEN 'PASS'
+       WHEN f.source_label = 'Plaid sandbox persona' THEN 'FAIL: labeled Plaid but seed is synthetic'
+       WHEN f.source_label IS NULL OR f.source_label = 'Missing' THEN 'WARN: no accounts'
+       ELSE 'WARN: re-seed for synthetic label' END AS source_label_check,
+  CASE WHEN coalesce(f.account_count,0) >= e.min_accts THEN 'PASS' ELSE 'WARN' END AS account_count_check,
+  CASE WHEN (coalesce(f.assets,0)-coalesce(f.debt,0)) BETWEEN e.nw_min AND e.nw_max THEN 'PASS' ELSE 'FAIL' END AS net_worth_range,
+  CASE WHEN coalesce(f.cash,0) BETWEEN e.cash_min AND e.cash_max THEN 'PASS' ELSE 'WARN' END AS cash_range,
+  CASE WHEN coalesce(f.debt,0) BETWEEN e.debt_min AND e.debt_max THEN 'PASS' ELSE 'WARN' END AS debt_range
+FROM expected e
+LEFT JOIN fin f ON f.email = e.email
+ORDER BY e.email;
+

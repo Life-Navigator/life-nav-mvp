@@ -4,7 +4,7 @@ You are **not** testing as yourself. Role-play this synthetic user; your account
 
 **Who you are:** Sam, 58 and married, approaching retirement.
 **Career:** Director at Initech.
-**Financial picture (synthetic):** paid-off home, a large taxable brokerage and a 401k — no real bank.
+**Financial picture (synthetic — "Synthetic Beta Persona", NOT a real bank):** paid-off home (no debt), ~$30K cash, a ~$1.1M taxable brokerage and a ~$890K 401k — net worth roughly **+$2.0M**. Do not connect a real bank.
 **Health:** _intentionally not provided_ — you have not given body-composition metrics (expected gap; the Health surface should ask, not invent).
 **Education:** MBA from Booth.
 

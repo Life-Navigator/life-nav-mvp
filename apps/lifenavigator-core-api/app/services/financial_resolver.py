@@ -17,7 +17,21 @@ PLAID = "Plaid sandbox persona"
 DOC = "Uploaded document"
 ADVISOR = "Advisor onboarding"
 MANUAL = "User-entered"
+SYNTHETIC = "Synthetic beta persona"
 MISSING = "Missing"
+
+
+def _acct_source(accounts: list) -> str:
+    """ONE honest source label for finance accounts. Plaid ONLY when a real plaid/connected marker exists;
+    synthetic-beta seeds (metadata.source == 'synthetic_beta') are labeled as such — never falsely 'Plaid';
+    other rows are user-entered; no rows = missing. Used for both the resolver and the analytics path."""
+    if not accounts:
+        return MISSING
+    if any((a.get("plaid_account_id") or (a.get("metadata") or {}).get("source") == "connected_account") for a in accounts):
+        return PLAID
+    if all((a.get("metadata") or {}).get("source") == "synthetic_beta" for a in accounts):
+        return SYNTHETIC
+    return MANUAL
 
 
 def _num(v: Any) -> Optional[float]:
@@ -62,7 +76,7 @@ class FinancialInputResolver:
         vis = await self._rows("life_vision", "life", uid=uid)
 
         # how each finance row got here (persona connect vs manual)
-        acct_source = PLAID if any((a.get("plaid_account_id") or (a.get("metadata") or {}).get("source") == "connected_account") for a in accounts) else (MANUAL if accounts else MISSING)
+        acct_source = _acct_source(accounts)  # honest: Plaid only with a real marker; synthetic-beta labeled distinctly
 
         cash = sum(_num(a.get("current_balance")) or 0 for a in accounts if a.get("account_type") in ("checking", "savings"))
         # P0 fix: investment/retirement balances come from BOTH the canonical accounts (account_type)
@@ -203,7 +217,7 @@ class FinancialInputResolver:
         possible_home_equity_gap = mortgage_debt > 0 and real_estate_total <= 0
         missing = [k for k, v in (("investment_balance", investment_total), ("retirement_balance", retirement_accounts_total)) if v <= 0]
         last_updated = next((a.get("last_synced_at") for a in accounts if a.get("last_synced_at")), None)
-        source = PLAID if any((a.get("plaid_account_id") or (a.get("metadata") or {}).get("source") == "connected_account") for a in accounts) else (MANUAL if accounts else MISSING)
+        source = _acct_source(accounts)
         return {
             # cash / bank
             "cash_balance": cash, "bank_accounts_total": bank_total,

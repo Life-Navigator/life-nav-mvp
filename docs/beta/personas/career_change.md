@@ -4,7 +4,7 @@ You are **not** testing as yourself. Role-play this synthetic user; your account
 
 **Who you are:** Casey, 30 and single, pivoting careers.
 **Career:** switching from teaching to data science.
-**Financial picture (synthetic):** small checking + savings and a student loan — no real bank.
+**Financial picture (synthetic — "Synthetic Beta Persona", NOT a real bank):** ~$10K cash (checking + savings) and a ~$28K student loan — net worth roughly **−$18K**. Limited runway while changing careers. Do not connect a real bank.
 **Health:** wants to get fit (no detailed metrics yet — expected gap).
 **Education:** BS in Education from State; pursuing a data-science certification.
 

@@ -26,12 +26,12 @@ PERSONAS = [
      "I'm a Senior Architect at Acme on embedded AI with Python, C++, and Rust, targeting Principal Architect "
      "in 2 years. I'm 6ft 205lbs 18% body fat, body recomposition goal. I have a BS in Business Administration "
      "from State University and am deferring more school.",
-     [("Executive Checking","checking",58200),("Money Market","checking",145000),("Investment Portfolio","investment",920000),("Jumbo Mortgage","mortgage",-1240000)]),
+     [("Executive Checking","checking",58200),("Money Market","checking",145000),("Investment Portfolio","investment",920000),("401k","retirement",410000),("Jumbo Mortgage","mortgage",-1240000)]),
     ("beta2@lifenav-beta.example.com", "Jordan", "young_professional",
-     "I'm a single Software Engineer at Globex aiming for a Senior promotion. I want to build a 6-month "
-     "emergency fund and start investing. I'm 5'10 170lbs and want to run a half marathon. BA in Computer "
-     "Science from City College.",
-     [("Checking","checking",8200),("Savings","savings",14000),("Roth IRA","retirement",22000)]),
+     "I'm a single Software Engineer at Globex aiming for a Senior promotion. I'm paying down my student loans, "
+     "want to build a 6-month emergency fund, and start investing. I'm 5'10 170lbs and want to run a half "
+     "marathon. BA in Computer Science from City College.",
+     [("Checking","checking",8200),("Savings","savings",14000),("Roth IRA","retirement",22000),("Student Loan","student_loan",-32000)]),
     ("beta3@lifenav-beta.example.com", "Sam", "pre_retirement",
      "I'm 58 and married, planning to retire at 65. Our home is paid off. I want to protect the nest egg and "
      "plan healthcare costs. I'm a Director at Initech with an MBA from Booth.",
@@ -89,11 +89,14 @@ async def main():
         uid = mk_user(email, display, persona); uids[email] = uid
         if not uid:
             report.append((email, persona, None, {"create": "FAILED (email may already exist — admin API cannot resolve)"})); continue
-        # seed synthetic financial accounts (Plaid-persona equivalent)
+        # seed SYNTHETIC finance accounts. These are NOT Plaid — they are seeded directly in the DB. We mark
+        # metadata.source = 'synthetic_beta' so the resolver labels them "Synthetic beta persona" (never falsely
+        # "Plaid sandbox persona"). is_manual stays True (no Plaid link).
         for name, typ, bal in accts:
             _req("POST", "/rest/v1/financial_accounts",
                  {"user_id": uid, "account_name": name, "account_type": typ, "current_balance": bal,
-                  "is_manual": True, "is_active": True}, headers={**H, "Prefer": "return=minimal"}, schema="finance")
+                  "is_manual": True, "is_active": True, "metadata": {"source": "synthetic_beta"}},
+                 headers={**H, "Prefer": "return=minimal"}, schema="finance")
         # run onboarding (syncs domain facts + creates normalized goals)
         ctx = UserContext(user_id=uid, email=email)
         try:

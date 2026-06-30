@@ -4,7 +4,7 @@ You are **not** testing as yourself. Role-play this synthetic user; your account
 
 **Who you are:** Riley, a new parent balancing family and career.
 **Career:** Marketing Manager.
-**Financial picture (synthetic):** checking + savings + a small 529 college-savings account — no real bank.
+**Financial picture (synthetic — "Synthetic Beta Persona", NOT a real bank):** ~$42K cash (checking + savings) and a small ~$5K 529 college-savings account, no debt — net worth roughly **+$47K**. Budget pressure as a new parent. Do not connect a real bank.
 **Health:** 5'6", 140 lbs.
 **Education:** BA in Marketing from Northwestern.
 **Family:** just had your first child.

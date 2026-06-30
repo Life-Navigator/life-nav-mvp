@@ -666,6 +666,7 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
                       {(() => {
                         const s = (canonicalFinance.source || '').toString().toLowerCase();
                         if (s.includes('plaid')) return 'Plaid Sandbox Persona';
+                        if (s.includes('synthetic')) return 'Synthetic Beta Persona';
                         if (s.includes('manual') || s.includes('user')) return 'User Entered';
                         if (s.includes('document')) return 'Uploaded Document';
                         if (s.includes('tool')) return 'Deterministic Tool';
