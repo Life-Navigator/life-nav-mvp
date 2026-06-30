@@ -564,7 +564,8 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="py-6 px-6 max-w-[1400px] mx-auto">
+      {/* Full-width content: fill the area between the sidebar and the right edge (no centered max-width cap). */}
+      <div className="py-6 px-6 w-full">
         {/* Synthetic beta banner — every test profile clearly signals it is synthetic, test-data only. */}
         {synthetic && (
           <div
