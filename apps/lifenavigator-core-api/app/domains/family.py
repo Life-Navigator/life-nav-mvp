@@ -84,6 +84,14 @@ class FamilyService(DomainService):
     async def _rows(self, table: str, ctx: UserContext, *, schema: str = FAMILY, limit: int = 200, order: Optional[str] = None) -> list[dict]:
         return await self._sb.select(table, columns="*", filters={"user_id": f"eq.{ctx.user_id}"}, limit=limit, order=order, schema=schema)
 
+    async def _safe_rows(self, table: str, ctx: UserContext, **kw: Any) -> list[dict]:
+        """Read a table that may not exist in every environment (planning-side tables) without breaking the
+        summary — a missing table reads as "no rows", never an error."""
+        try:
+            return await self._rows(table, ctx, **kw)
+        except Exception:  # noqa: BLE001
+            return []
+
     async def _context(self, ctx: UserContext) -> dict[str, Any]:
         dependents = await self._rows("dependents", ctx, limit=50)
         insurance = await self._rows("insurance_profiles", ctx, limit=1, order="updated_at.desc")
@@ -102,12 +110,26 @@ class FamilyService(DomainService):
         cov = _num((insurance[0] if insurance else {}).get("life_coverage"))
         income_med = income.median if income else None
         need = (income_med * _INCOME_MULTIPLE + total_debt) if income_med is not None else None
+        # FAMILY-PLANNING / household facts (separate from estate/protection). These prove the family domain
+        # is NOT empty even when no insurance/estate docs exist (partner, pets, beneficiaries, contacts).
+        profile = await self._safe_rows("family_profiles", ctx, limit=1, order="updated_at.desc")
+        beneficiaries = await self._safe_rows("beneficiaries", ctx, limit=50)
+        contacts = await self._safe_rows("emergency_contacts", ctx, limit=50)
+        advisors = await self._safe_rows("trusted_advisors", ctx, limit=50)
+        members = await self._safe_rows("family_members", ctx, limit=50)
+        pets = await self._safe_rows("pets", ctx, limit=50)
+        prof = profile[0] if profile else None
+        meta = (prof or {}).get("metadata") or {}
         return {
             "dependents": dependents, "n_dependents": len(dependents),
             "insurance": insurance[0] if insurance else None, "coverage": cov,
             "estate": estate[0] if estate else None, "guardianship": guardianship[0] if guardianship else None,
             "college": college, "income_median": income_med, "income_source": income.source if income else None,
             "total_debt": total_debt, "insurance_need": need,
+            # planning side
+            "profile": prof, "marital_status": (prof or {}).get("marital_status"), "meta": meta,
+            "n_beneficiaries": len(beneficiaries), "n_contacts": len(contacts), "n_advisors": len(advisors),
+            "n_members": len(members), "n_pets": len(pets),
         }
 
     # ----------------------------------------------------------------- reads
@@ -137,17 +159,80 @@ class FamilyService(DomainService):
             "saved_amount": _num(c.get("saved_amount")),
             "funding_gap": (round((_num(c.get("projected_cost")) or 0) - (_num(c.get("saved_amount")) or 0), 0)),
         } for c in cx["college"]]
+        # FAMILY PLANNING (household) vs PROTECTION & ESTATE — two SEPARATE readiness signals, never merged
+        # into one misleading number. Planning = who's in the family + wedding/home/children goals. Protection
+        # = beneficiaries/contacts/advisors + insurance/will/POA/guardianship. A user can have a rich family
+        # (partner, pets) with zero estate docs — that is "planning started, protection needs attention", NOT
+        # "family has no data".
+        meta = cx.get("meta") or {}
+        planning_known: list[str] = []
+        if cx.get("marital_status"):
+            planning_known.append(f"Marital status: {cx['marital_status']}")
+        if cx.get("n_members"):
+            planning_known.append(f"Household members: {cx['n_members']}")
+        if cx.get("n_pets"):
+            planning_known.append(f"Pets: {cx['n_pets']}")
+        if meta.get("wedding_timeline"):
+            planning_known.append("Wedding timeline captured")
+        if meta.get("home_goal"):
+            planning_known.append("Home goal captured")
+        if meta.get("children_goal"):
+            planning_known.append("Children/family goal captured")
+        planning_missing = [m for m, present in (
+            ("exact wedding date", bool(meta.get("wedding_date"))),
+            ("wedding budget", bool(meta.get("wedding_budget"))),
+            ("children timeline details", bool(meta.get("children_timeline"))),
+            ("home purchase target date", bool(meta.get("home_target_date"))),
+        ) if not present]
+        protection_known: list[str] = []
+        if cx.get("n_beneficiaries"):
+            protection_known.append(f"Beneficiaries: {cx['n_beneficiaries']}")
+        if cx.get("n_contacts"):
+            protection_known.append(f"Emergency contacts: {cx['n_contacts']}")
+        if cx.get("n_advisors"):
+            protection_known.append(f"Trusted advisors: {cx['n_advisors']}")
+        est = cx.get("estate") or {}
+        protection_missing = [m for m, present in (
+            ("will", bool(est.get("has_will"))),
+            ("life insurance", cx["insurance"] is not None),
+            ("disability insurance", bool((cx["insurance"] or {}).get("disability_coverage"))),
+            ("power of attorney", bool(est.get("has_poa"))),
+            ("guardianship", bool((cx["guardianship"] or {}).get("status"))),
+        ) if not present]
+        has_planning = bool(planning_known)
+        has_protection_records = bool(protection_known or cx["insurance"] or cx["estate"])
+        family_planning = {
+            "status": "started" if has_planning else "not_started",
+            "partner": (meta.get("partner_name") or cx.get("marital_status")),
+            "known": planning_known,
+            "missing": planning_missing,
+        }
+        protection_section = {
+            "status": "needs_attention" if protection_missing else ("on_track" if has_protection_records else "not_started"),
+            "known": protection_known,
+            "missing": protection_missing,
+        }
         data: dict[str, Any] = {
-            "protection": protection, "readiness": readiness, "college": college,
+            "family_planning": family_planning,
+            "protection": protection, "protection_readiness": protection_section,
+            "readiness": readiness, "college": college,
             "safety_boundaries": [family_boundary(), family_boundary(legal=True)],
             "missing_data_prompts": missing,
         }
         recs = await self.recommendations(ctx)
-        has_any = bool(cx["dependents"] or cx["insurance"] or cx["estate"] or cx["college"])
+        # has_any now counts PLANNING facts too — household data means the family domain is NOT empty.
+        has_any = bool(
+            cx["dependents"] or cx["insurance"] or cx["estate"] or cx["college"]
+            or has_planning or protection_known
+        )
+        # Confidence reflects what we actually know: planning facts alone → partial (not "missing").
+        conf_score = 0.0
+        if has_any:
+            conf_score = 0.6 if (cx["insurance"] or cx["estate"] or cx["college"]) else 0.4
         return DomainViewModel(
             domain=FAMILY, user_id=ctx.user_id, generated_at=_now(),
-            freshness=Freshness(as_of=_now(), stale=not has_any, sources=[_src("dependents"), _src("insurance_profiles"), _src("estate_plans")]),
-            confidence=Confidence(score=0.6 if has_any else 0.0, basis="partial" if has_any else "missing", missing_fields=missing),
+            freshness=Freshness(as_of=_now(), stale=not has_any, sources=[_src("family_profiles"), _src("dependents"), _src("insurance_profiles"), _src("estate_plans")]),
+            confidence=Confidence(score=conf_score, basis="partial" if has_any else "missing", missing_fields=missing),
             data=data, recommendations=recs, missing=missing,
         )
 

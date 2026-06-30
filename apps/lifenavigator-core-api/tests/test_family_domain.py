@@ -112,3 +112,42 @@ async def test_chat_context_cites_insurance_need_and_estate():
     ctx_obj = await _svc(FULL).chat_context(CTX)
     joined = " ".join(f"{f['fact']} {f['value']}" for f in ctx_obj.authoritative_facts)
     assert "insurance need" in joined and "estate plan" in joined
+
+
+# ---- P0 My Life consistency: family PLANNING facts must not read as "no data" ----
+@pytest.mark.asyncio
+async def test_family_planning_facts_make_domain_not_empty():
+    """Partner + pets + beneficiaries (no insurance/estate) → family is 'started', NOT 0/no-data/missing."""
+    rows = {
+        "family_profiles": [{"id": "fp1", "marital_status": "engaged",
+                             "metadata": {"wedding_timeline": "next June", "home_goal": "first home",
+                                          "children_goal": "after marriage", "partner_name": "Jenny Doe"}}],
+        "pets": [{"id": "p1", "name": "Thor", "species": "dog"}],
+        "beneficiaries": [{"id": "b1"}, {"id": "b2"}, {"id": "b3"}, {"id": "b4"}],
+        "emergency_contacts": [{"id": "ec1"}],
+        "trusted_advisors": [{"id": "a1"}, {"id": "a2"}, {"id": "a3"}],
+        "career_profiles": [CAREER_PROFILE], "compensation_bands": BANDS,
+    }
+    vm = await _svc(rows).summary(CTX)
+    # NOT empty / missing once planning facts exist
+    assert vm.confidence.basis == "partial"
+    assert vm.confidence.score >= 0.4
+    fp = vm.data["family_planning"]
+    assert fp["status"] == "started"
+    assert any("Marital status" in k for k in fp["known"])
+    assert any("Pets" in k for k in fp["known"])
+    # Protection is SEPARATE and shows the real gaps (no will/insurance/POA)
+    prot = vm.data["protection_readiness"]
+    assert prot["status"] == "needs_attention"
+    assert "will" in prot["missing"]
+    assert "life insurance" in prot["missing"]
+    # Protection KNOWN still reflects beneficiaries/contacts/advisors
+    assert any("Beneficiaries" in k for k in prot["known"])
+
+
+@pytest.mark.asyncio
+async def test_family_truly_empty_still_missing():
+    """No family facts at all → still honestly 'missing' (we did not paper over a real empty state)."""
+    vm = await _svc({"career_profiles": [CAREER_PROFILE], "compensation_bands": BANDS}).summary(CTX)
+    assert vm.confidence.basis == "missing"
+    assert vm.data["family_planning"]["status"] == "not_started"

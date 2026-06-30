@@ -259,3 +259,53 @@ async def test_attention_surfaces_risk_alerts_regression():
                    and a.get("source") == "Recommendation OS"]
     assert risk_alerts, "RISK recommendation must surface as a high-severity attention alert"
     assert "Coverage gap" in risk_alerts[0]["title"]
+
+
+# ---- P0: financial-sequencing next-best-move (no more "not enough information") ----
+def test_financial_sequencing_move_fires_with_foundation_goals_and_finance():
+    sb = FakeSupabase({})
+    svc = _svc(sb)
+    canonical = {"goals": [{"goal_text": "save for a first-home down payment", "domain": "finance"},
+                           {"goal_text": "wedding next June", "domain": "family"}]}
+    readiness = {"domains": [{"domain": "finance", "progress": 100}, {"domain": "family", "progress": 40}]}
+    move = svc._financial_sequencing_move(canonical, readiness)
+    assert move is not None
+    assert move["kind"] == "action"
+    assert "financial foundation" in move["title"].lower()
+    assert "not enough information" not in move["title"].lower()
+
+
+def test_financial_sequencing_move_none_without_finance_facts():
+    sb = FakeSupabase({})
+    svc = _svc(sb)
+    canonical = {"goals": [{"goal_text": "wedding next June", "domain": "family"}]}
+    readiness = {"domains": [{"domain": "finance", "progress": 0}]}  # no finance facts
+    assert svc._financial_sequencing_move(canonical, readiness) is None
+
+
+@pytest.mark.asyncio
+async def test_recent_intelligence_labels_inferred_and_leads_with_goals():
+    sb = FakeSupabase({
+        "candidate_goals": [{"goal_text": "save for a down payment", "created_at": "2026-06-01"}],
+        "life_objectives": [{"title": "Reach financial independence", "confirmed": False,
+                             "origin": "persona_bridge", "created_at": "2026-05-01"}],
+    })
+    feed = await _svc(sb)._recent_intelligence(CTX)
+    labels = [f["label"] for f in feed]
+    assert any(l.startswith("Goal captured: save for a down payment") for l in labels)
+    # the generic persona-bridge objective is an INFERRED THEME, never "Objective discovered"
+    assert any(l == "Inferred theme: Reach financial independence" for l in labels)
+    assert not any(l.startswith("Objective discovered") for l in labels)
+
+
+# ---- P0 Part 8: 5% body-fat safety reframe ----
+def test_body_fat_safety_reframe():
+    from app.services.canonical_goals import _safety_reframe
+    disp, note = _safety_reframe("reduce body fat from 18% to 5%")
+    assert disp == "Recompose body safely for long-term health"
+    assert note and "safety review" in note.lower()
+    # a healthy target is left alone
+    disp2, note2 = _safety_reframe("get body fat to 15%")
+    assert note2 is None and disp2 == "get body fat to 15%"
+    # non-body-comp goals untouched
+    assert _safety_reframe("save for a down payment") == ("save for a down payment", None)

@@ -56,7 +56,10 @@ class LifeReadinessEngine:
         self._planning = planning  # optional FinancialPlanningEngine — enriches Finance readiness
 
     async def _enrich_shared(self, ctx: UserContext, readinesses: list[dict[str, Any]]) -> None:
-        """Fact-aware blockers for health + education, sourced from the shared domain summary (one truth)."""
+        """Fact-aware floor + blockers, sourced from the shared domain summary (ONE truth — the same source the
+        dashboard cards read). Applies to health, education, career, AND family so My Life readiness can never
+        contradict the dashboard (e.g. "family 7% / no data" while partner + pets + beneficiaries are captured).
+        The floor only RAISES a score when facts exist; it never lowers one (finance's retirement blend stands)."""
         try:
             from .discovery_coverage import DiscoveryCoverageService
             from .domain_summary import domain_summary
@@ -65,7 +68,7 @@ class LifeReadinessEngine:
         except Exception:  # noqa: BLE001
             return
         for r in readinesses:
-            if r.get("domain") not in ("health", "education"):
+            if r.get("domain") not in ("health", "education", "career", "family"):
                 continue
             try:
                 s = await domain_summary(cov, ctx, r["domain"])
@@ -74,6 +77,9 @@ class LifeReadinessEngine:
             if s.get("facts"):  # the platform knows something → never "no data / get started"
                 r["progress"] = max(int(r.get("progress") or 0), int(s.get("coverage_pct") or 0), 30)
                 r["status"] = _status_from(r["progress"])
+                # For family, the domain "gap" is an estate/PROTECTION gap — keep it as a protection signal but
+                # do NOT let it read as "family has no data" once planning facts exist. The fact-aware blocker
+                # (specific missing planning input) is the primary gap; protection stays in the family VM.
                 if s.get("blockers"):
                     r["gap"] = s["blockers"][0]
                 r["missing"] = s.get("missing_items") or r.get("missing")

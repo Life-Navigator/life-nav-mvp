@@ -9,7 +9,7 @@ composes what already exists into one coherent destination.
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Optional
 
 from ..models.common import UserContext
 from .life_discovery import GENERIC_DEPENDENCY_LABELS, GENERIC_RISK_OPP_LABELS, life_brief
@@ -204,10 +204,14 @@ class MyLifeService:
                            "needed_to_act": "Add your income, savings rate, and retirement details so we can turn this into a concrete recommendation.",
                            "confidence_pct": round((issue.get("confidence") or 0) * 100), "source": "Recommendation OS"}
         else:
-            next_action = {"kind": "insufficient", "label": "Highest priority issue",
-                           "title": "Not enough information to identify a highest-priority issue yet.",
-                           "needed_to_act": "Add income, savings rate, major debts, retirement target, and family obligations so LifeNavigator can identify your highest-priority issue.",
-                           "source": "Recommendation OS"}
+            # No grounded Recommendation-OS action yet — but DO NOT say "not enough information" if the platform
+            # already knows the user's foundation. When family-foundation goals (wedding / home / family) and
+            # finance facts both exist, the genuine highest-priority move is the financial SEQUENCING decision.
+            next_action = self._financial_sequencing_move(canonical, readiness) or {
+                "kind": "insufficient", "label": "Highest priority issue",
+                "title": "Not enough information to identify a highest-priority issue yet.",
+                "needed_to_act": "Add income, savings rate, major debts, retirement target, and family obligations so LifeNavigator can identify your highest-priority issue.",
+                "source": "Recommendation OS"}
 
         # Section 5 — Current Constraints (what's blocking progress)
         constraints = [{"label": c["label"], "detail": c.get("detail"), "source": "Advisor Discovery"}
@@ -215,7 +219,15 @@ class MyLifeService:
         for d in (readiness.get("domains") or []):
             if d.get("status") in ("red", "orange") and d.get("gap") and "On track" not in str(d.get("gap")):
                 constraints.append({"label": d["gap"], "detail": f"{d['domain'].capitalize()} readiness {d['progress']}%", "source": "Life Readiness Engine"})
+        # FACT-GATE the "Missing X discovery" blockers: a domain that already has facts (readiness floored ≥30
+        # by the shared domain_summary) must NEVER show "Missing career/family discovery" — that contradicts the
+        # dashboard cards. Only surface a discovery gap for domains the platform genuinely knows nothing about.
+        domains_with_facts = {str(d.get("domain")) for d in (readiness.get("domains") or []) if int(d.get("progress") or 0) >= 30}
+        _AREA_DOMAIN = [("financ", "finance"), ("family", "family"), ("career", "career"), ("health", "health"), ("edu", "education")]
         for area in (health.get("missing_areas") or []):
+            dom = next((d for frag, d in _AREA_DOMAIN if frag in str(area).lower()), None)
+            if dom and dom in domains_with_facts:
+                continue  # the platform already has facts for this domain — not a discovery gap
             constraints.append({"label": f"Missing {area} discovery", "detail": "Completing this sharpens your plan.", "source": "Discovery health"})
 
         # Section 6 — Recent Intelligence (the platform feels alive) — prefetched in the gather above.
@@ -291,6 +303,38 @@ class MyLifeService:
         "urgency": "Acting on a near-term deadline",
     }
 
+    def _financial_sequencing_move(self, canonical: Any, readiness: dict[str, Any]) -> Optional[dict[str, Any]]:
+        """When the platform already knows a family-foundation plan (wedding / first home / starting a family)
+        AND finance facts exist, the real highest-priority move is the financial ORDER OF OPERATIONS — not a
+        generic "add your income" prompt and certainly not "not enough information". Grounded in the user's own
+        captured goals + the finance readiness signal; returns None if those preconditions aren't met."""
+        goals = canonical.get("goals") if isinstance(canonical, dict) else (canonical or [])
+        texts = " ".join(
+            str(g.get("goal_text") or g.get("title") or g.get("goal") or "").lower()
+            for g in (goals or []) if isinstance(g, dict)
+        )
+        domains = {str(g.get("domain") or "").lower() for g in (goals or []) if isinstance(g, dict)}
+        foundation = any(k in texts for k in (
+            "wedding", "married", "marriage", "home", "house", "down payment", "down-payment",
+            "first home", "family", "child", "baby", "kids",
+        )) or bool({"family", "finance"} & domains)
+        fin = next((d for d in (readiness.get("domains") or []) if d.get("domain") == "finance"), None)
+        finance_known = bool(fin and int(fin.get("progress") or 0) >= 30)
+        if not (foundation and finance_known):
+            return None
+        return {
+            "kind": "action", "label": "Your next best move",
+            "title": "Define the financial foundation for the next 12 months.",
+            "why": ("You have a clear family-foundation plan: wedding, first-home down payment, and starting a "
+                    "family. The next decision is the financial order of operations — emergency reserve, "
+                    "wedding/honeymoon budget, down-payment target, and a monthly savings target."),
+            "recommended_action": ("Set your emergency fund target, wedding/honeymoon budget, down-payment "
+                                   "target, and monthly savings goal."),
+            "expected_benefit": "A clear, sequenced plan that turns your goals into monthly targets.",
+            "rec_type": "ACTION", "confidence_pct": 75,
+            "source": "Life Model (your captured goals + finance facts)",
+        }
+
     def _motivations_from_signals(self, signals: list[str]) -> list[dict[str, Any]]:
         """Expose the already-computed emotional_signals as motivations (inferred), rather than building a
         new extractor or reading the never-written life.motivations table. Honest provenance + no fabrication."""
@@ -324,9 +368,27 @@ class MyLifeService:
 
     async def _recent_intelligence(self, ctx: UserContext) -> list[dict[str, Any]]:
         feed: list[dict[str, Any]] = []
+        # STATED goals (the user's own words) outrank inferred objectives — lead with normalized candidate
+        # goals as "Goal captured", concise (no raw paragraphs). These are what the user actually said.
+        try:
+            cgs = await self._sb.select("candidate_goals", filters={"user_id": f"eq.{ctx.user_id}"}, limit=6, order="created_at.desc", schema="life")
+            for g in cgs:
+                text = str(g.get("goal_text") or "").strip()
+                if not text or len(text) > 120 or len(text.split()) > 18:
+                    continue  # never surface a raw paragraph as a captured goal
+                feed.append({"type": "goal", "label": f"Goal captured: {text}", "when": g.get("created_at")})
+        except Exception:  # noqa: BLE001
+            pass
         try:
             objs = await self._sb.select("life_objectives", filters={"user_id": f"eq.{ctx.user_id}"}, limit=3, order="created_at.desc", schema="life")
-            feed += [{"type": "objective", "label": f"Objective discovered: {o['title']}", "when": o.get("created_at")} for o in objs]
+            for o in objs:
+                # Inferred / persona-seeded objectives are labeled as INFERRED THEMES — never presented as a
+                # stated objective ("Objective discovered: Reach financial independence" was the trust bug).
+                confirmed = bool(o.get("confirmed")) and str(o.get("origin") or "") != "persona_bridge"
+                if confirmed:
+                    feed.append({"type": "objective", "label": f"Goal: {o['title']}", "when": o.get("created_at")})
+                else:
+                    feed.append({"type": "inferred_theme", "label": f"Inferred theme: {o['title']}", "when": o.get("created_at")})
         except Exception:  # noqa: BLE001
             pass
         try:

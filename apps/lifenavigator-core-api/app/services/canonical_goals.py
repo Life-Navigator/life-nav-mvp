@@ -55,6 +55,24 @@ def _norm(title: str) -> str:
     return " ".join(toks).strip()
 
 
+def _safety_reframe(title: str) -> tuple[str, str | None]:
+    """Body-composition SAFETY framing (P0). A single-digit body-fat target (≤8%) is not a safe maintenance
+    range for most people, so we never render an unqualified "reduce body fat to 5%" as a goal. We reframe the
+    DISPLAY title to a safe recomposition goal and attach a safety_note — without generating any aggressive-cut
+    advice. The user's verbatim goal is untouched in the DB (this is display-time framing only). Returns
+    (display_title, safety_note | None)."""
+    low = (title or "").lower()
+    if "body fat" in low or "bodyfat" in low or "body-fat" in low or "% body" in low:
+        nums = [int(n) for n in re.findall(r"(\d{1,2})\s*%", low)]
+        if any(n <= 8 for n in nums):
+            return (
+                "Recompose body safely for long-term health",
+                "Your stated single-digit body-fat target needs a safety review/refinement — sub-8% body fat "
+                "is not a safe maintenance range for most people. Aim for a sustainable recomposition target.",
+            )
+    return (title, None)
+
+
 def _cluster_key(title: str) -> str | None:
     n = (title or "").lower()
     for key, kws in _CLUSTER_KEYWORDS:
@@ -134,11 +152,12 @@ class CanonicalGoalsService:
                confirmation: str, confidence: Any = None, status: Any = None, progress: Any = None,
                timeframe: Any = None, related_objective: Any = None, related_narrative: Any = None,
                why_chain: Any = None) -> dict[str, Any]:
-        return {"title": (title or "").strip(), "domain": str(domain or "core"), "store": store,
+        display, safety = _safety_reframe((title or "").strip())
+        return {"title": display, "domain": str(domain or "core"), "store": store,
                 "source_id": source_id, "priority": priority, "confirmation_status": confirmation,
                 "confidence": confidence, "status": status, "progress": progress, "timeframe": timeframe,
                 "related_objective": related_objective, "related_narrative": related_narrative,
-                "why_chain": why_chain}
+                "why_chain": why_chain, "safety_note": safety}
 
     def _merge(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         groups: dict[str, list[dict[str, Any]]] = {}
