@@ -718,12 +718,12 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
             </div>
           </div>
 
-          {/* Healthcare Overview Card */}
+          {/* Health & Wellness Overview Card */}
           <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden border-t-4 border-red-600 dark:border-red-500 shadow-md">
             <div className="p-6">
               <Link href="/dashboard/healthcare">
                 <h3 className="text-base font-bold mb-4 hover:underline cursor-pointer text-gray-900 dark:text-white">
-                  Healthcare Overview
+                  Health &amp; Wellness Overview
                 </h3>
               </Link>
               <WorkingToward objective={dashboardData?.health.lifeObjective} />
