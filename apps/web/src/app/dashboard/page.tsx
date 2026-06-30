@@ -75,7 +75,8 @@ export default async function DashboardPage() {
   return (
     <>
       <DashboardClient firstInsight={firstInsight} />
-      <div className="px-6 pb-6 max-w-[1400px] mx-auto w-full">
+      {/* Match the full-width cards above (no centered max-width cap) so this section is responsive too. */}
+      <div className="px-6 pb-6 w-full">
         {/* Life Brief (Phase 6): grounded executive summary from REAL career + education
             readiness — title, summary, scores, confidence, next move, "why this brief".
             100% deterministic from /api/life-brief (no fabricated facts). */}
