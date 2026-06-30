@@ -11,8 +11,16 @@ interface Rec {
   description?: string | null;
   priority?: string | null;
 }
+interface FamilySection {
+  status?: string;
+  known?: string[];
+  missing?: string[];
+}
 interface FamilyVM {
   data?: {
+    // Family PLANNING (household) and PROTECTION & ESTATE are separate readiness signals — never one number.
+    family_planning?: FamilySection;
+    protection_readiness?: FamilySection;
     protection?: {
       life_coverage?: number | null;
       disability_coverage?: number | null;
@@ -138,8 +146,6 @@ export default function FamilyOverviewPage() {
   const estate = readiness?.estate;
   const recs = vm?.recommendations ?? [];
 
-  const score = vm?.confidence?.score;
-  const scorePct = score == null ? null : score <= 1 ? Math.round(score * 100) : Math.round(score);
   const guardianStatus =
     guardianship.length > 0
       ? String((guardianship[0] as any).legal_doc_status || 'designated')
@@ -164,10 +170,79 @@ export default function FamilyOverviewPage() {
         <LegalBoundary />
       </div>
 
-      {/* ── Family Readiness Summary ── */}
-      <Card title="Family readiness">
+      {/* ── Family Planning vs Protection & Estate — TWO separate readiness signals ── */}
+      {(() => {
+        const planning = vm?.data?.family_planning;
+        const prot = vm?.data?.protection_readiness;
+        // Fall back to derived facts if the backend blocks aren't present yet (graceful).
+        const planningKnown =
+          planning?.known ??
+          [
+            spouse.length ? `Partner: ${String((spouse[0] as any).name || 'recorded')}` : '',
+            pets.length ? `Pets: ${pets.length}` : '',
+            members.length ? `Household members: ${members.length}` : '',
+          ].filter(Boolean);
+        const protKnown =
+          prot?.known ??
+          [
+            beneficiaries.length ? `Beneficiaries: ${beneficiaries.length}` : '',
+            emergency.length ? `Emergency contacts: ${emergency.length}` : '',
+            advisors.length ? `Trusted advisors: ${advisors.length}` : '',
+          ].filter(Boolean);
+        const planningStatus =
+          planning?.status ?? (planningKnown.length ? 'started' : 'not_started');
+        const protStatus =
+          prot?.status ?? (missingCritical.length ? 'needs_attention' : 'on_track');
+        const statusLabel = (s: string) =>
+          ({
+            started: 'Started',
+            not_started: 'Not started',
+            needs_attention: 'Needs attention',
+            on_track: 'On track',
+          })[s] ?? cap(s);
+        return (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card title="Family planning">
+              <p className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+                Status: {statusLabel(planningStatus)}
+              </p>
+              {planningKnown.length > 0 && (
+                <ul className="mb-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
+                  {planningKnown.map((k) => (
+                    <li key={k}>✓ {k}</li>
+                  ))}
+                </ul>
+              )}
+              {planning?.missing && planning.missing.length > 0 && (
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Still to capture: {planning.missing.join(', ')}
+                </p>
+              )}
+            </Card>
+            <Card title="Protection & estate">
+              <p className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+                Status: {statusLabel(protStatus)}
+              </p>
+              {protKnown.length > 0 && (
+                <ul className="mb-2 space-y-1 text-sm text-slate-700 dark:text-slate-200">
+                  {protKnown.map((k) => (
+                    <li key={k}>✓ {k}</li>
+                  ))}
+                </ul>
+              )}
+              {(prot?.missing ?? missingCritical).length > 0 && (
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  Missing: {(prot?.missing ?? missingCritical).join(', ')}
+                </p>
+              )}
+            </Card>
+          </div>
+        );
+      })()}
+
+      {/* ── Family facts at a glance ── */}
+      <Card title="Family at a glance">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          <Metric label="Readiness score" value={scorePct == null ? '—' : `${scorePct}%`} />
           <Metric label="Dependents" value={String(dependents.length)} />
           <Metric label="Family members" value={String(members.length)} />
           <Metric label="Pets" value={String(pets.length)} />
