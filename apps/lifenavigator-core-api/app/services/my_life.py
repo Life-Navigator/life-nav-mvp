@@ -285,7 +285,10 @@ class MyLifeService:
             "timeline": timeline,
             "coverage": coverage,
             "missing_context": missing_context,
-            "has_discovery": bool(snap.get("objectives")),
+            # The platform "knows the user" if there are objectives OR captured goals (candidate goals are the
+            # user's own words). Gating only on life.objectives wrongly showed the empty CTA when discovery had
+            # written 5 candidate goals but no formal objective yet.
+            "has_discovery": bool(snap.get("objectives") or canonical or snap.get("goal_portfolio")),
             "note": "Your life operating system — organized around your life, not our architecture.",
         }
 
@@ -371,12 +374,16 @@ class MyLifeService:
         # STATED goals (the user's own words) outrank inferred objectives — lead with normalized candidate
         # goals as "Goal captured", concise (no raw paragraphs). These are what the user actually said.
         try:
+            from .canonical_goals import _safety_reframe
             cgs = await self._sb.select("candidate_goals", filters={"user_id": f"eq.{ctx.user_id}"}, limit=6, order="created_at.desc", schema="life")
             for g in cgs:
                 text = str(g.get("goal_text") or "").strip()
                 if not text or len(text) > 120 or len(text.split()) > 18:
                     continue  # never surface a raw paragraph as a captured goal
-                feed.append({"type": "goal", "label": f"Goal captured: {text}", "when": g.get("created_at")})
+                # Apply the body-comp SAFETY reframe here too (recent intelligence reads candidate_goals
+                # directly, bypassing canonical_goals._entry) → never surface a raw "reduce body fat to 5%".
+                display, _note = _safety_reframe(text)
+                feed.append({"type": "goal", "label": f"Goal captured: {display}", "when": g.get("created_at")})
         except Exception:  # noqa: BLE001
             pass
         try:
