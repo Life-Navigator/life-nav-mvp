@@ -58,3 +58,33 @@ Layer 2 (code) is deployed and tested, but the gate is only **airtight once Laye
 Supabase) is done** — that toggle is a founder/dashboard action (or a Management-API call). I cannot set it from
 the build environment. Until it's off, someone could still create an account by calling GoTrue's `/signup`
 directly with the public anon key.
+
+## Waitlist → grant access (expansion / pilot launch)
+
+People who aren't invited yet can **request access** at `/waitlist` (public, no login). This does NOT create an
+account — it records them in `public.waitlist_entries` (status `waiting`) so you can contact + grant access when
+you're ready to expand.
+
+- The page is linked as "Request access" from the login and `/private-beta` pages.
+- `/api/waitlist` is public (bypasses the auth + private-beta gates) and writes to `public.waitlist_entries`
+  (email, name, phone, notes, source='website', status='waiting'). **Fix:** the old route wrote to a
+  non-existent `waitlist` table and swallowed the error, so requests were silently lost — now corrected +
+  verified (returns `recorded: true` only when it actually persisted).
+
+**Founder workflow to grant access:**
+
+1. Review requests (Supabase SQL editor):
+   ```sql
+   select email, name, notes, created_at from public.waitlist_entries
+   where status = 'waiting' order by priority_score desc, created_at asc;
+   ```
+2. Mint an invite key for the chosen email: `INVITE_SIGNING_SECRET=… node scripts/beta/mint_invite.mjs <email>`.
+3. Email them their invite key (they redeem it at `/auth` → Create account).
+4. Mark them invited:
+   ```sql
+   update public.waitlist_entries set status='invited', invited_at=now() where email='<email>';
+   ```
+   (When they finish signup you can set status='signed_up'.)
+
+This composes the two systems: **waitlist collects demand, the invite key grants access** — one at a time, on
+your schedule, all the way through the pilot launch.

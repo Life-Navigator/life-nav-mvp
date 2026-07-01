@@ -24,6 +24,7 @@ function isPublicRoute(path: string): boolean {
   if (PUBLIC_ROUTES.has(path)) return true;
   if (path.startsWith('/auth/')) return true;
   if (path.startsWith('/api/auth')) return true;
+  if (path.startsWith('/api/waitlist')) return true; // public access-request form (no auth required)
   if (path.startsWith('/_next')) return true;
   if (path.startsWith('/static')) return true;
   if (path.includes('/favicon')) return true;
