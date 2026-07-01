@@ -1,12 +1,13 @@
 import 'server-only';
 import { CORE_API, token } from '@/app/api/life/_helper';
-import { appendTurn } from './store';
+import { appendUserMessage, appendAssistantMessage } from './store';
 
 export interface SendResult {
   status: number;
   assistant_message: string;
   citations: unknown[];
   agent: string | null;
+  degraded?: boolean; // advisor produced no text; user message still persisted + thread continuable
   llm_status?: string;
   handoff?: unknown; // cross-agent in-chat handoff metadata (from → target advisor)
   reasoning?: unknown; // {tradeoffs, what_we_know, what_we_still_need} — for the evidence drawer
@@ -38,18 +39,32 @@ export async function sendAdvisorTurn(args: {
   const t = await token();
   if (!t) throw new Error('unauthorized');
 
-  const r = await fetch(`${CORE_API}/v1/life/advisor/chat`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      message: args.message,
-      conversation_id: args.threadId ?? '',
-      agent: args.agent ?? '',
-    }),
-    cache: 'no-store',
-  });
+  // CONTINUITY: persist the user message FIRST — before the (fallible) advisor call — so the thread is never
+  // left empty and can always be reopened/continued, even if the advisor times out or errors.
+  if (args.threadId) {
+    await appendUserMessage(args.userId, args.threadId, args.message);
+  }
 
-  const turn = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+  // The advisor call may throw (network/timeout) or return a non-200; either way we still return a normal
+  // result carrying the thread_id (so the client never forks a duplicate thread) with an empty assistant.
+  let turn: Record<string, unknown> = {};
+  let status = 502;
+  try {
+    const r = await fetch(`${CORE_API}/v1/life/advisor/chat`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: args.message,
+        conversation_id: args.threadId ?? '',
+        agent: args.agent ?? '',
+      }),
+      cache: 'no-store',
+    });
+    status = r.status;
+    turn = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+  } catch (e) {
+    console.error('[advisor] core-api request failed:', e);
+  }
   const assistant = typeof turn.assistant_message === 'string' ? turn.assistant_message : '';
   const citations = Array.isArray(turn.citations) ? (turn.citations as unknown[]) : [];
   const answeredAgent = (typeof turn.agent === 'string' ? turn.agent : args.agent) ?? null;
@@ -79,13 +94,11 @@ export async function sendAdvisorTurn(args: {
         .slice(0, 6)
     : [];
 
-  // Persist the turn whenever we have a thread — the USER message must always be saved for continuity, even if
-  // the advisor returned an empty/failed response (otherwise the thread is created but stays empty and can't be
-  // reopened). appendTurn omits the assistant row when the assistant text is empty (no blank bubble).
+  // The user message was already persisted above; now persist the assistant reply (no-op if it's empty, so a
+  // failed advisor turn leaves the user's message in the thread with no blank assistant bubble).
   if (args.threadId) {
-    await appendTurn(args.userId, args.threadId, {
-      userMessage: args.message,
-      assistantMessage: assistant,
+    await appendAssistantMessage(args.userId, args.threadId, {
+      content: assistant,
       agent: answeredAgent,
       citations,
       metadata: { llm_status },
@@ -93,7 +106,10 @@ export async function sendAdvisorTurn(args: {
   }
 
   return {
-    status: r.status,
+    status,
+    // The advisor produced no text (timeout/error/empty) — the UI shows a retry affordance instead of a blank
+    // bubble, but the user's message is already saved and the thread is continuable.
+    degraded: !assistant,
     assistant_message: assistant,
     citations,
     agent: answeredAgent,

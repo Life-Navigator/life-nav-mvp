@@ -33,7 +33,10 @@ export async function POST(req: NextRequest) {
       threadId = thread?.id ?? null;
     }
     const result = await sendAdvisorTurn({ userId, threadId, message, agent });
-    return NextResponse.json({ ...result, thread_id: threadId }, { status: result.status });
+    // Always 200 so the client ALWAYS receives thread_id (even when the advisor was degraded/errored) and never
+    // forks a duplicate thread on the next message. Degradation is carried in the body (`degraded`), not the
+    // HTTP status. The user's message was already persisted, so the thread is reopenable regardless.
+    return NextResponse.json({ ...result, thread_id: threadId }, { status: 200 });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'send_failed' },

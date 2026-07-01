@@ -63,6 +63,7 @@ export interface SendResult {
   citations: Citation[];
   agent: string | null;
   thread_id?: string | null;
+  degraded?: boolean; // advisor produced no text; user message persisted, thread continuable
   llm_status?: string;
   reasoning?: Reasoning | null;
   goals?: string[];

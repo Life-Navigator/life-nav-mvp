@@ -145,6 +145,71 @@ export async function getMessages(userId: string, threadId: string): Promise<Cha
 }
 
 /** Append a (user, assistant) turn to a thread and bump its recency. Best-effort; never throws. */
+async function bumpThread(sb: any, userId: string, threadId: string): Promise<void> {
+  await sb
+    .from('chat_conversations')
+    .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', threadId)
+    .eq('user_id', userId);
+}
+
+/** Persist the USER message immediately — call this BEFORE the advisor request so the thread is never left
+ *  empty (and is therefore reopenable/continuable) even if the advisor call times out or errors. */
+export async function appendUserMessage(
+  userId: string,
+  threadId: string,
+  content: string
+): Promise<void> {
+  try {
+    const sb = svc();
+    await sb.from('chat_messages').insert([
+      {
+        conversation_id: threadId,
+        user_id: userId,
+        role: 'user',
+        content: (content || '').slice(0, 16_000),
+        metadata: {},
+      },
+    ]);
+    await bumpThread(sb, userId, threadId);
+  } catch (e) {
+    console.error('[chat store] appendUserMessage failed:', e);
+  }
+}
+
+/** Persist the ASSISTANT message — no-op on empty text (a failed/empty advisor turn leaves no blank bubble). */
+export async function appendAssistantMessage(
+  userId: string,
+  threadId: string,
+  turn: {
+    content: string;
+    agent?: string | null;
+    citations?: unknown[];
+    metadata?: Record<string, unknown>;
+  }
+): Promise<void> {
+  if (!turn.content || !turn.content.trim()) return;
+  try {
+    const sb = svc();
+    await sb.from('chat_messages').insert([
+      {
+        conversation_id: threadId,
+        user_id: userId,
+        role: 'assistant',
+        content: turn.content.slice(0, 32_000),
+        agent: turn.agent ?? null,
+        citations: turn.citations ?? [],
+        metadata: turn.metadata ?? {},
+      },
+    ]);
+    await bumpThread(sb, userId, threadId);
+  } catch (e) {
+    console.error('[chat store] appendAssistantMessage failed:', e);
+  }
+}
+
+/** Persist a full turn (user + assistant). Thin wrapper — prefer the granular helpers when the user message
+ *  must be saved before the (fallible) advisor call. */
 export async function appendTurn(
   userId: string,
   threadId: string,
@@ -156,39 +221,13 @@ export async function appendTurn(
     metadata?: Record<string, unknown>;
   }
 ): Promise<void> {
-  try {
-    const sb = svc();
-    // Always persist the user message; add the assistant row only when there's real assistant text (a failed/
-    // empty advisor turn should never leave a blank assistant bubble in the thread).
-    const rows: Record<string, unknown>[] = [
-      {
-        conversation_id: threadId,
-        user_id: userId,
-        role: 'user',
-        content: turn.userMessage.slice(0, 16_000),
-        metadata: {},
-      },
-    ];
-    if (turn.assistantMessage && turn.assistantMessage.trim()) {
-      rows.push({
-        conversation_id: threadId,
-        user_id: userId,
-        role: 'assistant',
-        content: turn.assistantMessage.slice(0, 32_000),
-        agent: turn.agent ?? null,
-        citations: turn.citations ?? [],
-        metadata: turn.metadata ?? {},
-      });
-    }
-    await sb.from('chat_messages').insert(rows);
-    await sb
-      .from('chat_conversations')
-      .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', threadId)
-      .eq('user_id', userId);
-  } catch (e) {
-    console.error('[chat store] appendTurn failed:', e);
-  }
+  await appendUserMessage(userId, threadId, turn.userMessage);
+  await appendAssistantMessage(userId, threadId, {
+    content: turn.assistantMessage,
+    agent: turn.agent,
+    citations: turn.citations,
+    metadata: turn.metadata,
+  });
 }
 
 /** Recent history for THIS thread, oldest-first, for cross-turn context sent to the advisor. Bounded. */

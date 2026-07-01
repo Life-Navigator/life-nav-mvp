@@ -408,23 +408,31 @@ export default function CommandCenter({
         agent: selectedAgent,
         threadId: activeThreadId,
       });
+      // Always adopt the thread id the server used (even on a degraded turn) so the next message continues the
+      // SAME thread and never forks a duplicate.
       if (res.thread_id && !activeThreadId) {
         setActiveThreadId(res.thread_id);
-        void refreshThreads();
       }
-      setMessages((m) => [
-        ...m,
-        {
-          role: 'assistant',
-          content: res.assistant_message,
-          agent: res.agent,
-          citations: res.citations,
-          reasoning: res.reasoning,
-          goals: res.goals,
-          risks: res.risks,
-          handoff: res.handoff,
-        },
-      ]);
+      if (res.thread_id) void refreshThreads();
+      // Degraded / empty advisor turn: the user's message is already persisted server-side; show a retry line
+      // instead of a blank assistant bubble. The thread stays continuable.
+      if (res.degraded || !res.assistant_message) {
+        setError('The advisor didn’t respond just now. Your message was saved — please try again.');
+      } else {
+        setMessages((m) => [
+          ...m,
+          {
+            role: 'assistant',
+            content: res.assistant_message,
+            agent: res.agent,
+            citations: res.citations,
+            reasoning: res.reasoning,
+            goals: res.goals,
+            risks: res.risks,
+            handoff: res.handoff,
+          },
+        ]);
+      }
       // Cross-agent handoff: the answer came from a different specialist — switch the active advisor so the
       // user "continues with" them (no retype). handoff_choice (ambiguous) leaves the agent unchanged.
       if (res.handoff?.response_type === 'handoff' && res.handoff.target_agent) {
