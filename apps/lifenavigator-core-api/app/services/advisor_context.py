@@ -53,6 +53,37 @@ _SAFETY = [
 ]
 
 
+# Finance-turn detection (for the no-agent/orchestrator path) + a home-price parse for down-payment scenarios.
+_FINANCE_WORDS = re.compile(
+    r"\b(afford|mortgage|down\s?-?payment|home price|house (price|cost|budget)|net worth|cash flow|emergency "
+    r"fund|savings|debt|invest\w*|retire\w*|529|roth|ira|401\s?\(?k\)?|budget|income|expenses?|pmi|hysa)\b",
+    re.IGNORECASE)
+_MONEY = re.compile(r"\$?\s?(\d[\d,]*(?:\.\d+)?)\s?([kmb])?\b", re.IGNORECASE)
+
+
+def _mentions_finance(message: str) -> bool:
+    return bool(_FINANCE_WORDS.search(message or ""))
+
+
+def _parse_money(message: str) -> Optional[float]:
+    """Extract a plausible home-PRICE amount from the message (e.g. '$500K house', '500,000 home') so the engine
+    can compute down-payment tiers. Conservative: only when a housing word is present and the amount is large."""
+    m = message or ""
+    if not re.search(r"\b(house|home|property|down\s?-?payment|mortgage)\b", m, re.IGNORECASE):
+        return None
+    best: Optional[float] = None
+    for match in _MONEY.finditer(m):
+        raw, suf = match.group(1).replace(",", ""), (match.group(2) or "").lower()
+        try:
+            val = float(raw)
+        except ValueError:
+            continue
+        val *= {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000}.get(suf, 1)
+        if val >= 50_000:  # a home price, not a percentage or small figure
+            best = max(best or 0.0, val)
+    return best
+
+
 def numbers_in(*texts: Optional[str]) -> set[str]:
     """Numbers the user has stated, as strings the validator can match. Captures k/M/B suffixes and emits
     BOTH the bare digits and the magnitude-expanded form (so '$22k' allows the advisor to write '22' or
@@ -239,6 +270,10 @@ class AdvisorContext:
     # message. None/[] means the legacy broad advisor (back-compat).
     active_agent: Optional[dict[str, Any]] = None
     agent_domains: list[str] = field(default_factory=list)
+    # Deterministic finance figures (net worth, cash flow, emergency-fund range, down-payment scenarios, debt
+    # payoff, savings target, affordability band) computed by FinanceScenarioEngine — the numbers the LLM
+    # INTERPRETS. None unless the turn is finance. Missing inputs are named gaps (needs_*), never fabricated.
+    finance_scenarios: Optional[dict[str, Any]] = None
 
     @property
     def relationships_available(self) -> bool:
@@ -271,6 +306,10 @@ class AdvisorContext:
             # The user's own stated figures — SAFE to reference/reflect back (validator allows these).
             # Surfacing them explicitly so the advisor engages the numbers instead of deflecting.
             "numbers_you_may_reference": sorted(self.allowed_numbers),
+            # DETERMINISTIC finance figures the advisor INTERPRETS (never recomputes/invents). Every value is
+            # arithmetic from finance.* ; `needs_*: true` marks a gap to ASK about, not to guess. Present only
+            # on finance turns.
+            "finance_scenarios": self.finance_scenarios,
             # Phase 8: grounded career/education facts the advisor MAY cite (and ONLY these for those
             # domains). Each carries domain/sourceTable/recordId/confidence for auditable citation.
             "domain_facts": self.domain_facts,
@@ -289,10 +328,11 @@ class AdvisorContext:
 
 
 class AdvisorContextBuilder:
-    def __init__(self, supabase: Any, coverage: Any = None, life: Any = None) -> None:
+    def __init__(self, supabase: Any, coverage: Any = None, life: Any = None, scenarios: Any = None) -> None:
         self._sb = supabase
         self._coverage = coverage  # DiscoveryCoverageService (optional) — per-domain discovery scores
         self._life = life  # LifeDiscoveryService (optional) — real personal graph edges
+        self._scenarios = scenarios  # FinanceScenarioEngine (optional) — deterministic finance figures
 
     async def _rejected(self, ctx: UserContext) -> list[str]:
         try:
@@ -395,6 +435,21 @@ class AdvisorContextBuilder:
         # Phase 8: figures that appear in grounded, cited facts are safe to echo — add them so the
         # validator's number-gate doesn't reject e.g. "~8 years" or a credential count.
         allowed_numbers |= numbers_in_facts(domain_facts)
+        # DETERMINISTIC finance grounding: on a finance turn, compute the scenario packet (net worth, down-payment
+        # tiers, emergency-fund range, …) and add its figures to allowed_numbers so the LLM can cite REAL numbers
+        # and the validator passes — the LLM interprets these, never invents. A parsed home-price goal from the
+        # message unlocks the down-payment scenarios. Best-effort: never breaks the turn.
+        finance_scenarios: Optional[dict[str, Any]] = None
+        finance_in_scope = ("finance" in (agent_domains or [])) or any(
+            f.get("domain") == "finance" for f in (domain_facts or [])
+        ) or (agent is None and _mentions_finance(message))
+        if self._scenarios is not None and finance_in_scope:
+            try:
+                finance_scenarios = await self._scenarios.compute(
+                    ctx, home_price_goal=_parse_money(message))
+                allowed_numbers |= {str(n) for n in (finance_scenarios.get("allowed_numbers") or [])}
+            except Exception:  # noqa: BLE001 — grounding is an enhancement; never break the turn
+                finance_scenarios = None
         stage = base.get("pending_key") or ("complete" if base.get("complete") else "discovery")
         return AdvisorContext(
             user_id=ctx.user_id,
@@ -422,4 +477,5 @@ class AdvisorContextBuilder:
             domain_facts=domain_facts,
             active_agent=active_agent,
             agent_domains=agent_domains,
+            finance_scenarios=finance_scenarios,
         )

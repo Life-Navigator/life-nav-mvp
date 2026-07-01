@@ -315,7 +315,16 @@ def get_advisor_orchestrator(
         life, supabase,
         FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)),
     )
-    builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life)
+    # Deterministic finance scenario engine — grounds the advisor's numbers (net worth, down-payment tiers,
+    # emergency-fund range, …) so the LLM interprets REAL figures and the validator passes. Reuses the canonical
+    # FinancialInputResolver. Best-effort (None → unchanged behavior).
+    scenarios: Any = None
+    try:
+        from .services.finance_scenarios import FinanceScenarioEngine
+        scenarios = FinanceScenarioEngine(supabase, FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)))
+    except Exception:  # noqa: BLE001
+        scenarios = None
+    builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life, scenarios=scenarios)
     if use_claude:
         # Claude on Vertex. ADC by default (no API key); a static VERTEX_ACCESS_TOKEN still wins if set.
         from .clients.vertex_auth import AdcTokenProvider
