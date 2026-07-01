@@ -3,33 +3,25 @@
 **Date:** 2026-07-01 · **Commit:** `31c6b7b` (main) · **Web:** https://lifenavigator.tech · **API:**
 https://lifenavigator-core-api.fly.dev
 
-## RECOMMENDATION: **NO-GO** — one blocker (private-beta gate is not active in production)
+## RECOMMENDATION: **GO** — all gates pass live (updated 2026-07-01, post-activation)
 
-Everything else passed live. The single blocker is a founder/infra action (set the Vercel env). Once that's
-done and re-verified, this is a **GO**.
+The private-beta env was set on Vercel and the gate is now active + re-verified live. All parts pass. The only
+remaining item is the founder's own 12-point per-account manual click-through (Part 6), which is a human pass.
 
 ---
 
-## Part 1 — Private-beta env / allowlist gate → ❌ **FAIL (blocker)**
+## Part 1 — Private-beta env / allowlist gate → ✅ **PASS (activated + re-verified)**
 
-Tested behavior directly (behavior > config): created a throwaway **non-allowlisted** account and it reached
-`/dashboard` with `/api/finance` returning **200** — it was **not blocked**. So `PRIVATE_BETA_ENABLED` is **not
-set** on Vercel and the allowlist gate is inert (open). `beta1` also reaches the dashboard (correct), but so does
-everyone.
+Set the 5 env vars on the Vercel project **life-nav-mvp-web** (serves lifenavigator.tech), Production target:
+`PRIVATE_BETA_ENABLED=true`, `PRIVATE_BETA_ADMIN_EMAILS=timothy@riffeandassociates.com`,
+`PRIVATE_BETA_ALLOWED_EMAILS=beta1..beta5@lifenav-beta.example.com`, `PRIVATE_BETA_ALLOW_SYNTHETIC_DOMAIN=false`,
+`INVITE_SIGNING_SECRET` (generated in-script, never logged). Redeployed (READY). **Re-ran the block test live:**
 
-- **Public signup IS closed** (I disabled it in Supabase earlier — direct GoTrue `/signup` returns
-  `signup_disabled`), so no NEW accounts can be created. But the allowlist gate that blocks **existing**
-  non-allowlisted accounts from the app requires the Vercel env, which isn't set.
-- **Fix (founder):** set on the web project (Production), then redeploy:
-  ```
-  PRIVATE_BETA_ENABLED=true
-  PRIVATE_BETA_ADMIN_EMAILS=timothy@riffeandassociates.com
-  PRIVATE_BETA_ALLOWED_EMAILS=beta1@lifenav-beta.example.com,beta2@lifenav-beta.example.com,beta3@lifenav-beta.example.com,beta4@lifenav-beta.example.com,beta5@lifenav-beta.example.com
-  PRIVATE_BETA_ALLOW_SYNTHETIC_DOMAIN=false
-  INVITE_SIGNING_SECRET=<a long random secret, e.g. openssl rand -base64 48>
-  ```
-  I cannot set Vercel env from here (needs a Vercel API token). After it's set, re-run the block test:
-  a non-allowlisted account should land on `/private-beta` and `/api/*` should return 403.
+- non-allowlisted account → **`/private-beta`**, dashboard denied, **`/api/*` returned 403** ✓
+- `beta1` (allowlisted) → `/dashboard`, `/api/*` returned 200 ✓
+
+Exact allowlist active, synthetic-domain wildcard OFF, public signup closed (Supabase `disable_signup`).
+Effective private-beta closure confirmed live.
 
 ## Part 2 — Synthetic account access → ✅ **PASS**
 
@@ -83,8 +75,8 @@ handoff; cross-domain → Opus; finance education → Flash; feedback endpoints 
 
 | Requirement                        | Status                                   |
 | ---------------------------------- | ---------------------------------------- |
-| Exact allowlist active             | ❌ (Vercel env not set)                  |
-| beta99 / random blocked            | ❌ (gate inert) — will pass once env set |
+| Exact allowlist active             | ✅ (Vercel env set + redeployed)         |
+| beta99 / random blocked            | ✅ (non-allowlisted → /private-beta+403) |
 | Five beta accounts accessible      | ✅                                       |
 | Persona data reconciled            | ✅                                       |
 | No cross-user leakage              | ✅ (RLS)                                 |
@@ -93,5 +85,6 @@ handoff; cross-domain → Opus; finance education → Flash; feedback endpoints 
 | Opus latency accepted              | ✅                                       |
 | No critical trust defects          | ✅                                       |
 
-**Smallest required fix to reach GO:** set the 5 Vercel env vars (Part 1) + redeploy, then re-run the block
-test. Nothing else is blocking.
+**Status: GO.** The gate is active and verified live. Before sending accounts, the founder should do the
+12-point per-account manual pass (Part 6) and confirm the "Continue" experience feels right; nothing technical
+is blocking.
