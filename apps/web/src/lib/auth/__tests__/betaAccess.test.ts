@@ -51,6 +51,12 @@ describe('beta access gate', () => {
     expect(isBetaAccessAllowed('intruder@evil.com')).toBe(false); // still only the synthetic domain
   });
 
+  it('a redeemed invite (app_metadata.invited) is allowed even if the email is not listed', () => {
+    process.env.PRIVATE_BETA_ENABLED = 'true';
+    expect(isBetaAccessAllowed('newtester@gmail.com')).toBe(false); // not listed
+    expect(isBetaAccessAllowed('newtester@gmail.com', { invited: true })).toBe(true); // redeemed invite
+  });
+
   it('blockedReason masks email, never leaks it', () => {
     expect(blockedReason('intruder@evil.com')).toEqual({
       masked: 'in***@evil.com',

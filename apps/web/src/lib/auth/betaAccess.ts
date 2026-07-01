@@ -24,10 +24,16 @@ export function privateBetaEnabled(): boolean {
   return truthy(process.env.PRIVATE_BETA_ENABLED);
 }
 
-/** May this email access the app? Gate OFF → always true. Gate ON → admin OR EXACT allowlisted (first-5 has
- *  NO domain wildcard; the synthetic domain is allowed only when PRIVATE_BETA_ALLOW_SYNTHETIC_DOMAIN=true). */
-export function isBetaAccessAllowed(email: string | null | undefined): boolean {
+/** May this user access the app? Gate OFF → always true. Gate ON → admin OR EXACT allowlisted OR a user who
+ *  redeemed a private invite key (app_metadata.invited). first-5 has NO domain wildcard; the synthetic domain
+ *  is allowed only when PRIVATE_BETA_ALLOW_SYNTHETIC_DOMAIN=true. */
+export function isBetaAccessAllowed(
+  email: string | null | undefined,
+  opts?: { invited?: boolean }
+): boolean {
   if (!privateBetaEnabled()) return true; // gate off → normal
+  // A redeemed private invite (server-stamped app_metadata.invited) grants access without an env change.
+  if (opts?.invited === true) return true;
   const e = (email || '').trim().toLowerCase();
   if (!e) return false; // missing email → block (never initialize)
   if (emailList('PRIVATE_BETA_ADMIN_EMAILS').has(e)) return true;

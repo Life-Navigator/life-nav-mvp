@@ -104,6 +104,7 @@ export default function UnifiedAuthExperience({
 
   const [mode, setMode] = useState<AuthMode>(defaultMode);
   const [name, setName] = useState('');
+  const [inviteKey, setInviteKey] = useState('');
   const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -179,39 +180,52 @@ export default function UnifiedAuthExperience({
       return;
     }
 
+    if (!inviteKey.trim()) {
+      setError('An invite key is required — private beta is invite-only.');
+      return;
+    }
+
     setBusy(true);
     const supabase = client();
     if (!supabase) return;
 
     trackAuthEvent({ event: 'signup_started' });
-    const { data, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name },
-        emailRedirectTo: `${origin}/auth/confirm`,
-      },
+    // PRIVATE-BETA: account creation goes through the server invite-key gate (NOT client signUp). The route
+    // validates the email-bound key and creates the account with the service role; direct Supabase signup is
+    // disabled, so this is the only path in.
+    const res = await fetch('/api/auth/redeem-invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, key: inviteKey.trim(), name }),
     });
-    if (authError) {
-      trackAuthEvent({ event: 'signup_error', error: authError.message });
-      setError(authError.message);
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+      const map: Record<string, string> = {
+        invalid_invite_key: 'That invite key isn’t valid for this email. Check both and try again.',
+        already_registered: 'An account already exists for this email — please sign in instead.',
+        signup_disabled:
+          'Sign-up is currently closed. Please contact your LifeNavigator invite sponsor.',
+        weak_password: body.message || 'Please choose a stronger password.',
+        invalid_email: 'Please enter a valid email address.',
+      };
+      trackAuthEvent({ event: 'signup_error', error: body.error || String(res.status) });
+      setError(map[body.error || ''] || 'We couldn’t create your account. Please try again.');
       setBusy(false);
       return;
     }
     trackAuthEvent({ event: 'signup_success' });
 
-    // If email confirmation is required, no session is returned — show the
-    // branded "check your email" state. If a session exists, the account is
-    // live now, so flow straight into onboarding without a hand-off seam.
-    if (data.session) {
-      setOverlay('Preparing your profile…');
-      router.push('/onboarding/financial-profile');
-      router.refresh();
+    // Account created + email-confirmed by the server → sign in and flow straight into onboarding.
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      setSentKind('signup');
+      setSentTo(email);
+      setBusy(false);
       return;
     }
-    setSentKind('signup');
-    setSentTo(email);
-    setBusy(false);
+    setOverlay('Preparing your profile…');
+    router.push('/onboarding/financial-profile');
+    router.refresh();
   }
 
   async function handleMagic(e: React.FormEvent) {
@@ -393,12 +407,14 @@ export default function UnifiedAuthExperience({
                   {mode === 'create' && (
                     <CreateForm
                       name={name}
+                      inviteKey={inviteKey}
                       email={email}
                       password={password}
                       confirm={confirm}
                       agree={agree}
                       busy={busy}
                       onName={setName}
+                      onInviteKey={setInviteKey}
                       onEmail={setEmail}
                       onPassword={setPassword}
                       onConfirm={setConfirm}
@@ -601,12 +617,14 @@ function SignInForm({
 
 function CreateForm({
   name,
+  inviteKey,
   email,
   password,
   confirm,
   agree,
   busy,
   onName,
+  onInviteKey,
   onEmail,
   onPassword,
   onConfirm,
@@ -614,12 +632,14 @@ function CreateForm({
   onSubmit,
 }: {
   name: string;
+  inviteKey: string;
   email: string;
   password: string;
   confirm: string;
   agree: boolean;
   busy: boolean;
   onName: (v: string) => void;
+  onInviteKey: (v: string) => void;
   onEmail: (v: string) => void;
   onPassword: (v: string) => void;
   onConfirm: (v: string) => void;
@@ -628,6 +648,26 @@ function CreateForm({
 }) {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
+      <div>
+        <label htmlFor="inviteKey" className="mb-1.5 block text-sm font-medium text-white/70">
+          Invite key
+        </label>
+        <input
+          id="inviteKey"
+          type="text"
+          autoComplete="off"
+          required
+          value={inviteKey}
+          onChange={(e) => onInviteKey(e.target.value)}
+          disabled={busy}
+          className={inputClass}
+          placeholder="Paste the invite key you were given"
+        />
+        <p className="mt-1 text-xs text-white/40">
+          LifeNavigator is invite-only. Enter the private key from your invitation to create your
+          account.
+        </p>
+      </div>
       <div>
         <label htmlFor="name" className="mb-1.5 block text-sm font-medium text-white/70">
           Full name

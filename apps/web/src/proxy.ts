@@ -130,7 +130,8 @@ export async function proxy(request: NextRequest) {
   // When PRIVATE_BETA_ENABLED=true, only founder/admin + allowlisted + synthetic-beta emails reach protected
   // app surfaces. Blocked → 403 for APIs (no data), /private-beta for pages. Never logs tokens/allowlist.
   if (isAuthenticated && privateBetaEnabled() && isProtectedRoute(path)) {
-    if (!isBetaAccessAllowed(user!.email)) {
+    const invited = (user!.app_metadata as { invited?: boolean } | undefined)?.invited === true;
+    if (!isBetaAccessAllowed(user!.email, { invited })) {
       const { masked, reason } = blockedReason(user!.email);
       console.log(
         'PRIVATE_BETA_BLOCK ' + JSON.stringify({ path, masked, reason, user_id: user!.id })
