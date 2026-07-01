@@ -158,7 +158,9 @@ export async function appendTurn(
 ): Promise<void> {
   try {
     const sb = svc();
-    await sb.from('chat_messages').insert([
+    // Always persist the user message; add the assistant row only when there's real assistant text (a failed/
+    // empty advisor turn should never leave a blank assistant bubble in the thread).
+    const rows: Record<string, unknown>[] = [
       {
         conversation_id: threadId,
         user_id: userId,
@@ -166,7 +168,9 @@ export async function appendTurn(
         content: turn.userMessage.slice(0, 16_000),
         metadata: {},
       },
-      {
+    ];
+    if (turn.assistantMessage && turn.assistantMessage.trim()) {
+      rows.push({
         conversation_id: threadId,
         user_id: userId,
         role: 'assistant',
@@ -174,8 +178,9 @@ export async function appendTurn(
         agent: turn.agent ?? null,
         citations: turn.citations ?? [],
         metadata: turn.metadata ?? {},
-      },
-    ]);
+      });
+    }
+    await sb.from('chat_messages').insert(rows);
     await sb
       .from('chat_conversations')
       .update({ last_message_at: new Date().toISOString(), updated_at: new Date().toISOString() })

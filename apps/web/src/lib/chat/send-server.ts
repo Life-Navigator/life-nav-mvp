@@ -79,7 +79,10 @@ export async function sendAdvisorTurn(args: {
         .slice(0, 6)
     : [];
 
-  if (args.threadId && assistant) {
+  // Persist the turn whenever we have a thread — the USER message must always be saved for continuity, even if
+  // the advisor returned an empty/failed response (otherwise the thread is created but stays empty and can't be
+  // reopened). appendTurn omits the assistant row when the assistant text is empty (no blank bubble).
+  if (args.threadId) {
     await appendTurn(args.userId, args.threadId, {
       userMessage: args.message,
       assistantMessage: assistant,
