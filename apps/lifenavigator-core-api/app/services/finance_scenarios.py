@@ -31,6 +31,28 @@ def _round(v: Optional[float]) -> Optional[float]:
     return None if v is None else round(float(v), 2)
 
 
+def _forms(v: Optional[float]) -> set[str]:
+    """Exact + common ROUNDED string forms of a GROUNDED figure, so the number-gate accepts natural roundings
+    ("$1.24M" or "$200K" for 1,243,120 / 203,200) of REAL numbers without weakening the fabrication gate — a
+    rounded real number is not a fabricated one. Emits: exact, k-rounded (203 / 203000), and M-rounded
+    (1.24 / 1.2 / 1)."""
+    out: set[str] = set()
+    if v is None:
+        return out
+    n = float(v)
+    out.add(str(int(n)) if n.is_integer() else str(n))
+    out.add(str(int(round(n))))
+    if abs(n) >= 1000:
+        k = int(round(n / 1000))
+        out.add(str(k))            # 203  (from 203,200)
+        out.add(str(k * 1000))     # 203,000
+    if abs(n) >= 100000:
+        out.add(f"{n / 1_000_000:.2f}".rstrip("0").rstrip("."))  # 1.24
+        out.add(f"{n / 1_000_000:.1f}".rstrip("0").rstrip("."))  # 1.2
+        out.add(str(int(round(n / 1_000_000))))                  # 1
+    return out
+
+
 class FinanceScenarioEngine:
     def __init__(self, supabase: Any, resolver: Any) -> None:
         self._sb = supabase
@@ -66,8 +88,7 @@ class FinanceScenarioEngine:
 
         def _keep(*vals: Optional[float]) -> None:
             for v in vals:
-                if v is not None:
-                    allowed.add(str(int(v)) if float(v).is_integer() else str(v))
+                allowed.update(_forms(v))  # exact + rounded forms of each grounded figure
 
         _keep(cash, invest, retire, total_assets, total_debt, net_worth)
 
@@ -121,12 +142,13 @@ class FinanceScenarioEngine:
             tiers = {}
             for p in _DOWN_PAYMENT_TIERS:
                 amt = _round(home_price_goal * p / 100.0)
+                cash_after = _round(cash - (amt or 0))
                 tiers[f"pct_{p}"] = {
                     "amount": amt,
-                    "cash_remaining_after": _round(cash - (amt or 0)),
+                    "cash_remaining_after": cash_after,
                     "pmi_likely": p < _PMI_THRESHOLD_PCT,
                 }
-                _keep(amt)
+                _keep(amt, cash_after)
             down_payment = {
                 "home_price_goal": _round(home_price_goal),
                 "tiers": tiers,

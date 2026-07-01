@@ -112,3 +112,11 @@ def test_prompt_dict_exposes_finance_scenarios():
     )
     pd = c.prompt_dict()
     assert pd["finance_scenarios"]["net_worth"]["value"] == 290080
+
+
+def test_forms_allow_rounded_representations():
+    from app.services.finance_scenarios import _forms
+    f = _forms(1243120)   # a $1.24M mortgage
+    assert "1243120" in f and "1.24" in f and "1.2" in f  # exact + M-rounded (what an LLM naturally writes)
+    f2 = _forms(203200)
+    assert "203200" in f2 and "203" in f2  # exact + k-rounded ("$203K")
