@@ -467,18 +467,22 @@ class AdvisorOrchestrator:
                                  "route_path": tr.get("route_path"),
                                  "model": getattr(self._fast_llm, "model_name", "")}))
             return self._fast_llm, self._llm  # fast primary, deep same-tier fallback
-        # Opus hybrid: route clearly finance/health turns to Claude, with Gemini as same-tier fallback.
+        # Opus hybrid: route clearly finance/health turns AND cross-domain LIFE DECISIONS to Claude (Opus), with
+        # Gemini as same-tier fallback. The cross-domain path catches "should I buy before the wedding or after
+        # promotion?" that keyword-routing doesn't tag finance/health — exactly the turns that most need Opus.
         if self._hybrid_claude is not None and self._claude_domains:
             try:
                 routed = route_domains(message)
                 is_focused = len(routed) < len(ALL_LIFE_DOMAINS)  # a specific (not all-domain) hit
                 hits_claude = bool(set(routed) & self._claude_domains)
+                cross_domain = _is_cross_domain_life_decision(message)
                 # high_stakes_only → require a focused finance/health turn (don't send ambiguous turns to Claude)
-                if hits_claude and (is_focused or not self._claude_high_stakes_only):
-                    tr["hybrid_route"] = {"to": "claude", "domains": routed,
+                if cross_domain or (hits_claude and (is_focused or not self._claude_high_stakes_only)):
+                    tr["hybrid_route"] = {"to": "claude", "domains": routed, "cross_domain": cross_domain,
                                           "model": getattr(self._hybrid_claude, "model_name", "")}
                     log.info(json.dumps({"event": "opus_hybrid_route", "turn_id": tr["turn_id"],
-                                         "domains": routed, "model": getattr(self._hybrid_claude, "model_name", "")}))
+                                         "domains": routed, "cross_domain": cross_domain,
+                                         "model": getattr(self._hybrid_claude, "model_name", "")}))
                     return self._hybrid_claude, self._llm  # Claude primary, Gemini same-tier fallback
             except Exception as e:  # noqa: BLE001 — hybrid routing must never break the turn
                 tr["hybrid_route_error"] = type(e).__name__

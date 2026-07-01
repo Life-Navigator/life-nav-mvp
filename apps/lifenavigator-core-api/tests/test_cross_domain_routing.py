@@ -50,3 +50,22 @@ def test_needs_two_distinct_domains():
     assert _is_cross_domain_life_decision("should I use my bonus?") is False
     # two distinct → yes
     assert _count_life_domains("wedding and a house") == 2
+
+
+def test_route_sends_cross_domain_decision_to_opus():
+    """When a Claude/Opus hybrid is configured, a cross-domain life decision is routed to it (not Gemini)."""
+    from app.services.advisor_orchestrator import AdvisorOrchestrator
+    from app.models.common import UserContext
+    gemini, opus = object(), object()
+    o = AdvisorOrchestrator(None, None, gemini, hybrid_claude=opus, claude_domains={"finance", "health"})
+    ctx = UserContext(user_id="u")
+    tr = {"turn_id": "t", "route_path": "supervised"}  # cross-domain decisions classify supervised
+    primary, fallback = o._route(ctx, "Should I buy before the wedding or after promotion?", None, tr)
+    assert primary is opus         # Opus primary
+    assert fallback is gemini      # Gemini same-tier fallback
+    assert tr["hybrid_route"]["cross_domain"] is True
+
+    # a plain non-life question with a hybrid configured is NOT forced to Opus by the cross-domain path
+    tr2 = {"turn_id": "t2", "route_path": "standard"}
+    p2, _ = o._route(ctx, "should I rename this button?", None, tr2)
+    assert p2 is gemini and "hybrid_route" not in tr2
