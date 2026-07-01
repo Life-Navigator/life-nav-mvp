@@ -455,8 +455,8 @@ class AdvisorOrchestrator:
                 "advisor_turns",
                 columns="user_message,advisor_response,created_at",
                 filters={"user_id": f"eq.{ctx.user_id}", "conversation_id": f"eq.{conversation_id}"},
-                order="created_at.desc", limit=6, schema="analytics",
-            )
+                order="created_at.desc", limit=4, schema="analytics",
+            )  # 4 recent turns is ample continuity; fewer rows = smaller prompt (faster generate) + less query
             rows = list(reversed(rows or []))  # oldest-first
             return [{"user": str(r.get("user_message") or ""), "advisor": str(r.get("advisor_response") or "")}
                     for r in rows if r.get("user_message")]
