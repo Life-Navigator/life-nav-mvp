@@ -189,14 +189,55 @@ _HIGH_RISK_CUE = re.compile(
 _TRIVIAL = re.compile(r"^\s*(hi|hey|hello|thanks|thank you|ok(ay)?|cool|got it|yes|no|sure|what can you do)\b",
                       re.IGNORECASE)
 
+# ── Finance intent subtypes (first-5 latency) ──────────────────────────────────────────────────────────
+# LOW-RISK finance EDUCATION (define/explain a concept — "what is a 529?", "what is PMI?") may take the fast
+# path; PERSONALIZED finance planning/calculation/high-risk stays supervised on the reasoning model. The
+# distinction is deterministic and conservative: an educational opener + a finance concept + NO personalization,
+# NO dollar amount, NO decision verb. Anything ambiguous falls through to supervised.
+_EDU_OPENER = re.compile(
+    r"^\s*(what\s+(is|are|does|do)\b|what'?s\b|explain\b|define\b|describe\b|"
+    r"(the\s+)?difference between\b|tell me about\b|meaning of\b)", re.IGNORECASE)
+_FINANCE_CONCEPT = re.compile(
+    r"\b(529|pmi|roth|ira|401\s?\(?k\)?|hysa|mortgage|down\s?-?payment|emergency fund|net worth|cash flow|"
+    r"debt|avalanche|snowball|apr|apy|compound|interest rate|budget|savings|checking|preapproval|"
+    r"refinanc\w*|credit score|escrow|amortiz\w*|dividend|etf|index fund|bond|equity|expense ratio|"
+    r"capital gains|deductible|premium|term life|whole life)\b", re.IGNORECASE)
+# Personalization / decision signals — force the deep supervised path even with an educational opener.
+_FINANCE_PERSONAL = re.compile(
+    r"\b(my|mine|our|should i|can i|how much (should|do|can) i|afford|for me|do with my|allocat\w*|"
+    r"prioriti[sz]e|pay off|target be|best (tax|strateg\w*|option|way))\b", re.IGNORECASE)
+_MONEY_AMOUNT = re.compile(r"\$\s?\d|\b\d{2,3}\s?k\b|\b\d{4,}\b", re.IGNORECASE)
+
+
+def _is_finance_education(message: str, domains: set[str]) -> bool:
+    """True only for a LOW-RISK finance education/definition question — safe for the fast model. False (→ deep
+    supervised) for anything personalized, calculational, decision-seeking, health, or ambiguous."""
+    m = message or ""
+    if "health" in domains:
+        return False  # health is always supervised (clinical safety)
+    if not _EDU_OPENER.search(m):
+        return False  # must be a definitional/explanatory question
+    if not (_FINANCE_CONCEPT.search(m) or "finance" in domains):
+        return False  # must actually be a finance topic
+    if _FINANCE_PERSONAL.search(m) or _MONEY_AMOUNT.search(m):
+        return False  # personalization / a dollar amount → planning/calculation → supervised
+    return True
+
 
 def select_route_path(message: str, domains: list[str] | None) -> str:
+    msg = message or ""
     doms = set(domains or [])
-    if doms & {"finance", "health"} or _HIGH_RISK_CUE.search(message or ""):
+    if "health" in doms:
+        return "supervised"  # clinical safety — never fast
+    # Low-risk finance EDUCATION → fast model (still validated). Checked BEFORE the finance/high-risk gate so a
+    # definition question isn't forced slow by the finance nouns it contains. Personalized finance stays deep.
+    if _is_finance_education(msg, doms):
+        return "standard"
+    if doms & {"finance", "health"} or _HIGH_RISK_CUE.search(msg):
         return "supervised"
     if len(doms) >= 2:
         return "supervised"  # cross-domain synthesis → full supervision
-    if _TRIVIAL.match(message or "") and len(message or "") <= 40 and not any(c.isdigit() for c in (message or "")):
+    if _TRIVIAL.match(msg) and len(msg) <= 40 and not any(c.isdigit() for c in msg):
         return "fast"
     return "standard"
 
