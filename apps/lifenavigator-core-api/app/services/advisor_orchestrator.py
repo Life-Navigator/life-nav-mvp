@@ -208,6 +208,28 @@ _FINANCE_PERSONAL = re.compile(
     r"prioriti[sz]e|pay off|target be|best (tax|strateg\w*|option|way))\b", re.IGNORECASE)
 _MONEY_AMOUNT = re.compile(r"\$\s?\d|\b\d{2,3}\s?k\b|\b\d{4,}\b", re.IGNORECASE)
 
+# Cross-domain LIFE DECISION detection: a decision-seeking cue + TWO OR MORE distinct life-domain cues → route
+# to the supervised (Opus) path even when domain keyword-routing missed a finance tag. Catches "should I buy
+# before the wedding or after promotion?" (wedding + promotion) that has no explicit finance word. A generic
+# "should I rename this button?" has zero life-domain cues, so it is NOT caught (no over-routing).
+_DECISION_CUE = re.compile(
+    r"\b(should\s+(i|we)|do\s+(i|we)|can\s+i\s+afford|is\s+it\s+better\s+to|compare|choose between|"
+    r"before or after|now or later|now versus|now vs|prioriti[sz]e|sequence|trade[\s-]?off)\b", re.IGNORECASE)
+_LIFE_DOMAIN_CUE = re.compile(
+    r"\b(wedding|marriage|married|spouse|partner|family|baby|child(?:ren)?|kids|home|house|mortgage|"
+    r"down\s?-?payment|promotion|job|career|income|salary|bonus|raise|debt|loan|savings|emergency\s?(?:fund|"
+    r"reserve)|retire\w*|insurance|school|college|degree|tuition|buy(?:ing)?|purchase)\b", re.IGNORECASE)
+
+
+def _count_life_domains(message: str) -> int:
+    """Distinct life-domain cues present (for the cross-domain-decision router)."""
+    return len({mt.group(0).lower() for mt in _LIFE_DOMAIN_CUE.finditer(message or "")})
+
+
+def _is_cross_domain_life_decision(message: str) -> bool:
+    m = message or ""
+    return bool(_DECISION_CUE.search(m)) and _count_life_domains(m) >= 2
+
 
 def _is_finance_education(message: str, domains: set[str]) -> bool:
     """True only for a LOW-RISK finance education/definition question — safe for the fast model. False (→ deep
@@ -233,6 +255,10 @@ def select_route_path(message: str, domains: list[str] | None) -> str:
     # definition question isn't forced slow by the finance nouns it contains. Personalized finance stays deep.
     if _is_finance_education(msg, doms):
         return "standard"
+    # Cross-domain LIFE DECISION (decision cue + ≥2 life-domain cues) → supervised/Opus, even without an
+    # explicit finance keyword. Generic "should I rename this button?" (no life-domain cues) is not caught.
+    if _is_cross_domain_life_decision(msg):
+        return "supervised"
     if doms & {"finance", "health"} or _HIGH_RISK_CUE.search(msg):
         return "supervised"
     if len(doms) >= 2:
