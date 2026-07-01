@@ -378,9 +378,24 @@ def get_advisor_orchestrator(
         )
         claude_domains = {d.strip() for d in os.environ.get("CLAUDE_DOMAINS", "finance,health").split(",") if d.strip()}
 
+    # FAST PATH model (first-5 latency): a Gemini Flash client for non-supervised advisor turns. Built on the
+    # same Vertex/ADC auth as the primary (no API key), so it works wherever the Pro model does. Only wired for
+    # the Vertex path (prod); other providers leave it None (unchanged behavior). Kill-switch:
+    # ADVISOR_FAST_PATH_ENABLED=false. Model override: ADVISOR_FAST_MODEL (default gemini-2.5-flash).
+    fast_llm: Any = None
+    try:
+        if not use_claude and settings.model_provider.lower() == "vertex":
+            from .clients.gemini import VertexGeminiClient
+            from .clients.vertex_auth import AdcTokenProvider
+            fast_model = os.environ.get("ADVISOR_FAST_MODEL", "gemini-2.5-flash")
+            fast_llm = GeminiAdvisorLLM(
+                VertexGeminiClient.from_settings(settings, AdcTokenProvider(), generation_model=fast_model))
+    except Exception:  # noqa: BLE001 — a missing fast model must never break advisor construction
+        fast_llm = None
+
     return AdvisorOrchestrator(rm, builder, llm, enabled=enabled, supabase=supabase, router=router,
                                hybrid_claude=hybrid_claude, claude_domains=claude_domains,
-                               claude_high_stakes_only=high_stakes_only)
+                               claude_high_stakes_only=high_stakes_only, fast_llm=fast_llm)
 
 
 def get_recommendation_os(

@@ -35,24 +35,40 @@ const THINKING_STEPS = [
 ];
 function ThinkingProgress({ name }: { name: string }) {
   const [step, setStep] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setStep((s) => Math.min(s + 1, THINKING_STEPS.length - 1)), 2600);
-    return () => clearInterval(t);
+    const e = setInterval(() => setElapsed((x) => x + 1), 1000);
+    return () => {
+      clearInterval(t);
+      clearInterval(e);
+    };
   }, []);
+  // Long deep turns (~40s) would otherwise sit on the last step and feel frozen — after 15s, reassure the user
+  // it's still working AND that their message is already saved (matches the server persist-before-call contract).
+  const longRunning = elapsed >= 15;
   return (
-    <div
-      className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400"
-      data-testid="cc-loading"
-    >
-      <span className="inline-flex gap-1" aria-hidden>
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.3s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.15s]" />
-        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400" />
-      </span>
-      <span>
-        <span className="font-medium text-gray-600 dark:text-gray-300">{name}</span> is{' '}
-        {THINKING_STEPS[step]}
-      </span>
+    <div className="space-y-1" data-testid="cc-loading">
+      <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+        <span className="inline-flex gap-1" aria-hidden>
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.3s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400 [animation-delay:-0.15s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-400" />
+        </span>
+        <span>
+          <span className="font-medium text-gray-600 dark:text-gray-300">{name}</span> is{' '}
+          {THINKING_STEPS[step]}
+        </span>
+      </div>
+      {longRunning && (
+        <p
+          className="pl-6 text-[11px] text-gray-400 dark:text-gray-500"
+          data-testid="cc-loading-longrun"
+        >
+          Taking a little longer — working through the details and checking the numbers. Your
+          message is saved, so you won’t lose it.
+        </p>
+      )}
     </div>
   );
 }

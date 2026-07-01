@@ -139,11 +139,14 @@ class VertexGeminiClient:
         self._timeout = timeout
 
     @classmethod
-    def from_settings(cls, settings: Settings, token_provider: Any) -> "VertexGeminiClient":
+    def from_settings(cls, settings: Settings, token_provider: Any,
+                      generation_model: Optional[str] = None) -> "VertexGeminiClient":
+        # generation_model override lets us build a faster variant (e.g. gemini-2.5-flash) for the advisor
+        # fast path without touching the default (Pro) client. None → the configured default.
         return cls(
             project=settings.vertex_project,
             region=settings.vertex_region,
-            generation_model=settings.vertex_gemini_model or settings.gemini_generation_model,
+            generation_model=generation_model or settings.vertex_gemini_model or settings.gemini_generation_model,
             token_provider=token_provider,
             # Gemini 2.5 Pro is a slow reasoning model; advisor JSON over a large context can take 45-90s.
             # 45s caused ReadTimeout -> None -> deterministic fallback in prod. 120s gives real headroom.

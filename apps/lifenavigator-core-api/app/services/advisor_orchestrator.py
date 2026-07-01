@@ -273,10 +273,14 @@ def _compose(safe: dict[str, Any]) -> str:
 class AdvisorOrchestrator:
     def __init__(self, relationship_manager: Any, context_builder: AdvisorContextBuilder, llm: AdvisorLLM,
                  *, enabled: bool = True, supabase: Any = None, router: Any = None,
-                 hybrid_claude: Any = None, claude_domains: Any = None, claude_high_stakes_only: bool = True) -> None:
+                 hybrid_claude: Any = None, claude_domains: Any = None, claude_high_stakes_only: bool = True,
+                 fast_llm: Any = None) -> None:
         self._rm = relationship_manager
         self._ctx = context_builder
         self._llm = llm
+        # Optional FAST model (e.g. Gemini Flash) used for non-supervised turns to cut latency; deep/high-stakes
+        # (supervised) turns stay on the reasoning model. None → unchanged behavior. Validator gates both.
+        self._fast_llm = fast_llm
         self._enabled = enabled
         self._sb = supabase  # best-effort advisor-turn persistence (ops.advisor_turns)
         self._router = router  # optional ModelRouter; only used when MODEL_ROUTER_ENABLED (default off)
@@ -382,6 +386,20 @@ class AdvisorOrchestrator:
     def _route(self, ctx: UserContext, message: str, context_obj: Any, tr: dict[str, Any]) -> tuple[Any, Any]:
         """Select (primary_llm, fallback_llm) for this turn. Default → the DI-provided single LLM, so
         production behavior is unchanged. Never raises."""
+        # FAST PATH (first-5 latency): a non-supervised turn (route_path fast/standard — simple follow-ups,
+        # explanations, single-domain non-finance/health Q&A) → a fast model (Flash) with the deep model as
+        # same-tier fallback. supervised turns (finance/health/cross-domain/high-risk) keep the reasoning model.
+        # The SAME validator gates both, so this trades a little model capability on simple turns for a large
+        # latency win, never safety. Env kill-switch ADVISOR_FAST_PATH_ENABLED (default on).
+        if (self._fast_llm is not None
+                and tr.get("route_path") in ("fast", "standard")
+                and os.environ.get("ADVISOR_FAST_PATH_ENABLED", "true").lower() in ("1", "true", "yes")):
+            tr["fast_path"] = True
+            tr["model_route"] = "fast"
+            log.info(json.dumps({"event": "advisor_fast_path", "turn_id": tr["turn_id"],
+                                 "route_path": tr.get("route_path"),
+                                 "model": getattr(self._fast_llm, "model_name", "")}))
+            return self._fast_llm, self._llm  # fast primary, deep same-tier fallback
         # Opus hybrid: route clearly finance/health turns to Claude, with Gemini as same-tier fallback.
         if self._hybrid_claude is not None and self._claude_domains:
             try:
