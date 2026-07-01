@@ -4,6 +4,9 @@ import { createThread } from '@/lib/chat/store';
 import { sendAdvisorTurn } from '@/lib/chat/send-server';
 
 export const dynamic = 'force-dynamic';
+// Advisor turns can legitimately take ~40s (slow model + one bounded repair). Give the function room so a valid
+// turn completes; send-server's 55s client deadline sits just under this and degrades gracefully past it.
+export const maxDuration = 60;
 
 /**
  * POST /api/chat/advisor — the Command Center send endpoint.

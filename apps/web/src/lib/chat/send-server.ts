@@ -47,23 +47,57 @@ export async function sendAdvisorTurn(args: {
 
   // The advisor call may throw (network/timeout) or return a non-200; either way we still return a normal
   // result carrying the thread_id (so the client never forks a duplicate thread) with an empty assistant.
-  let turn: Record<string, unknown> = {};
-  let status = 502;
-  try {
-    const r = await fetch(`${CORE_API}/v1/life/advisor/chat`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: args.message,
-        conversation_id: args.threadId ?? '',
-        agent: args.agent ?? '',
-      }),
-      cache: 'no-store',
-    });
-    status = r.status;
-    turn = (await r.json().catch(() => ({}))) as Record<string, unknown>;
-  } catch (e) {
-    console.error('[advisor] core-api request failed:', e);
+  // A hard client-side deadline (below the Vercel function limit) turns a slow/hung turn into a clean degrade
+  // instead of a platform 504 — the user always gets a bounded response. ONE bounded retry for a FAST transient
+  // failure only (immediate network error / 5xx), never for a timeout (retrying a slow turn just hangs again).
+  const DEADLINE_MS = Number(process.env.ADVISOR_CLIENT_TIMEOUT_MS || 55_000);
+  const attempt = async (
+    budgetMs: number
+  ): Promise<{ status: number; turn: Record<string, unknown>; threw: boolean }> => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), budgetMs);
+    try {
+      const r = await fetch(`${CORE_API}/v1/life/advisor/chat`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: args.message,
+          conversation_id: args.threadId ?? '',
+          agent: args.agent ?? '',
+        }),
+        cache: 'no-store',
+        signal: ctrl.signal,
+      });
+      const body = (await r.json().catch(() => ({}))) as Record<string, unknown>;
+      return { status: r.status, turn: body, threw: false };
+    } catch (e) {
+      const aborted = e instanceof Error && e.name === 'AbortError';
+      console.error(
+        `[advisor] core-api request ${aborted ? 'timed out' : 'failed'}:`,
+        aborted ? `${budgetMs}ms` : e
+      );
+      return { status: aborted ? 504 : 502, turn: {}, threw: true };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const started = Date.now();
+  let { status, turn, threw } = await attempt(DEADLINE_MS);
+  let retry_count = 0;
+  const elapsed = Date.now() - started;
+  const gotText = typeof turn.assistant_message === 'string' && turn.assistant_message.length > 0;
+  // Retry only a FAST transient failure (returned quickly), not a timeout — and only if there's budget left.
+  if (!gotText && (threw || status >= 500) && status !== 504 && elapsed < 10_000) {
+    const remaining = DEADLINE_MS - elapsed - 1_000;
+    if (remaining > 5_000) {
+      retry_count = 1;
+      console.warn('[advisor] transient failure — one bounded retry', {
+        status,
+        elapsed_ms: elapsed,
+      });
+      ({ status, turn, threw } = await attempt(remaining));
+    }
   }
   const assistant = typeof turn.assistant_message === 'string' ? turn.assistant_message : '';
   const citations = Array.isArray(turn.citations) ? (turn.citations as unknown[]) : [];
@@ -104,6 +138,22 @@ export async function sendAdvisorTurn(args: {
       metadata: { llm_status },
     });
   }
+
+  // Reliability observability (no PII): one structured line per turn so degraded/timeout turns are diagnosable.
+  const outcome = assistant ? 'success' : status === 504 ? 'timeout' : 'degraded';
+  console.log(
+    'advisor_turn_reliability ' +
+      JSON.stringify({
+        thread_id: args.threadId,
+        agent: answeredAgent,
+        status,
+        outcome,
+        retry_count,
+        aborted: threw && status === 504,
+        duration_ms: Date.now() - started,
+        assistant_len: assistant.length,
+      })
+  );
 
   return {
     status,

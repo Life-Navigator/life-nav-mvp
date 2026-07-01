@@ -97,6 +97,12 @@ def build_constraints(base: dict[str, Any], context: Any) -> dict[str, Any]:
     }
 
 
+# RELIABILITY: soft wall-clock budget for a single advisor turn's repair loop. Once total turn time
+# exceeds this, we stop repairing and return the safe deterministic fallback (a clean degrade instead of
+# a multi-minute hang). Tunable via env; default 45s keeps turns under the client/Vercel timeout.
+_ADVISOR_TURN_BUDGET_S = float(os.environ.get("ADVISOR_TURN_BUDGET_S", "45"))
+
+
 def _is_repairable(reasons: list[str]) -> bool:
     """Supervised-repair model (2026-06-25): ALL content failures are worth a repair attempt — ungrounded
     numbers, unsupported relationships, AND advice/clinical/legal/tax/verdict overreach (the model is asked
@@ -479,7 +485,7 @@ class AdvisorOrchestrator:
 
     async def _enhance(self, base: dict[str, Any], ctx: UserContext, message: str, tr: dict[str, Any], lap,
                        history: Optional[list[dict[str, str]]] = None, llm: Any = None,
-                       fallback_llm: Any = None, agent: Any = None) -> None:
+                       fallback_llm: Any = None, agent: Any = None, deadline: Optional[float] = None) -> None:
         """LLM enhancement: build context → generate → validate → compose. Mutates base + tr in place.
         Never raises — on any failure, base keeps its deterministic fallback text and llm_status is set.
         `llm` is the routed model for this turn (defaults to the DI LLM); `fallback_llm` (if provided by the
@@ -534,16 +540,23 @@ class AdvisorOrchestrator:
             tr["auth_token_available"] = True  # the provider answered → token was acquired
             ok, safe, reasons = validate(out, context)
             lap("validate")
-            # SUPERVISED REPAIR LOOP (max 2 attempts): the model produced a strong draft; the validator is the
-            # supervisor. On failure we send STRUCTURED, per-issue repair instructions and let the model revise,
-            # re-validating each time. The SAME gate checks every draft, so nothing unsafe slips through — this
-            # turns "block → dumb fallback" into "block → guided fix → safe answer". (ADVISOR_SUPERVISION)
-            # Route tier tunes the repair BUDGET only (latency), never the validator. Trivial fast-path turns
-            # skip the (expensive) repair loop; standard/supervised keep the full 2-attempt supervision.
-            _MAX_REPAIRS = 0 if tr.get("route_path") == "fast" else 2
+            # SUPERVISED REPAIR LOOP: the model produced a strong draft; the validator is the supervisor. On
+            # failure we send STRUCTURED, per-issue repair instructions and let the model revise, re-validating
+            # each time. The SAME gate checks every draft, so nothing unsafe slips through. (ADVISOR_SUPERVISION)
+            # RELIABILITY (first-5): each repair is a full ~30s LLM call, so 2 attempts pushed worst-case turns
+            # to ~120s (past the client/Vercel timeout → perceived as a dead advisor). Cap to ONE repair AND a
+            # wall-clock DEADLINE for the whole turn — once the budget is spent we stop repairing and fall back
+            # to the safe deterministic counsel (a clean degrade beats a 2-minute hang). The validator is never
+            # relaxed; only the latency budget shrinks.
+            _MAX_REPAIRS = 0 if tr.get("route_path") == "fast" else 1
             attempt = 0
             issues: list[dict[str, Any]] = []
-            while (not ok) and _is_repairable(reasons) and attempt < _MAX_REPAIRS:
+            while (
+                (not ok)
+                and _is_repairable(reasons)
+                and attempt < _MAX_REPAIRS
+                and (deadline is None or time.perf_counter() < deadline)
+            ):
                 attempt += 1
                 issues = classify_issues(out, context)
                 repair_plan = dict(constraints)
@@ -690,7 +703,8 @@ class AdvisorOrchestrator:
         history = await self._fetch_history(ctx, conversation_id)
         lap("history_fetch")
         primary_llm, fallback_llm = self._route(ctx, message, None, tr)
-        await self._enhance(base, ctx, message, tr, lap, history, primary_llm, fallback_llm, agent=agent_obj)
+        await self._enhance(base, ctx, message, tr, lap, history, primary_llm, fallback_llm, agent=agent_obj,
+                            deadline=t0 + _ADVISOR_TURN_BUDGET_S)
         return self._finish(ctx, base, tr, t0, trace)
 
     async def converse_stream(self, ctx: UserContext, message: str, pending_key: Optional[str] = None,
@@ -743,7 +757,8 @@ class AdvisorOrchestrator:
             history = await self._fetch_history(ctx, conversation_id)
             lap("history_fetch")
             primary_llm, fallback_llm = self._route(ctx, message, None, tr)
-            await self._enhance(base, ctx, message, tr, lap, history, primary_llm, fallback_llm, agent=agent_obj)
+            await self._enhance(base, ctx, message, tr, lap, history, primary_llm, fallback_llm, agent=agent_obj,
+                            deadline=t0 + _ADVISOR_TURN_BUDGET_S)
         else:
             tr["llm_status"] = base.get("llm_status") or "disabled"
         self._finish(ctx, base, tr, t0, trace)  # log + best-effort persist + (optional) attach _trace
