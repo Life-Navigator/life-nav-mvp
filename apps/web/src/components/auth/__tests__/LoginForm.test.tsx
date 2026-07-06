@@ -38,9 +38,9 @@ describe('LoginForm', () => {
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
-    expect(screen.getByText(/don't have an account\?/i)).toBeInTheDocument();
-    expect(screen.getByText(/register now/i)).toBeInTheDocument();
-    expect(screen.getByText(/forgot your password\?/i)).toBeInTheDocument();
+    // Public "don't have an account? register now" link was removed when private-beta
+    // closed public signup — only the forgot-password link remains.
+    expect(screen.getByText(/forgot password\?/i)).toBeInTheDocument();
   });
 
   it('does not have a demo login button', () => {

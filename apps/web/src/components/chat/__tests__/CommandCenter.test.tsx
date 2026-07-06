@@ -6,6 +6,9 @@ import { ADVISOR_WELCOME } from '@/lib/chat/advisor';
 jest.mock('@/components/ui/StreamingText', () => ({
   __esModule: true,
   default: ({ text }: { text: string }) => <span>{text}</span>,
+  // AdvisorMessage imports the named useStreamedText hook; render text fully (done) so
+  // the grounded reply is present synchronously in tests.
+  useStreamedText: (text: string) => ({ shown: text, done: true }),
 }));
 
 interface FetchOpts {
