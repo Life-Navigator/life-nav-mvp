@@ -209,7 +209,7 @@ async def advisor_action_apply(user: AuthenticatedUser = Depends(authenticated),
     change exclusively through IngestionService.submit_life_fact (tenant-scoped, provenance-stamped,
     idempotent). Returns what was written + the impacted areas + a plain summary. No silent writes."""
     return await advisor_actions.apply(IngestionService(supabase), _ctx(user), action, fields or {},
-                                       conversation_id=conversation_id or None)
+                                       conversation_id=conversation_id or None, supabase=supabase)
 
 
 from ..services.my_life import MyLifeService  # noqa: E402

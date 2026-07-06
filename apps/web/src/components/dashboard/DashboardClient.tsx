@@ -2,6 +2,7 @@
 
 import { humanName } from '@/lib/identity/humanName';
 import { filterDisplayGoals } from '@/lib/goals/displayGoals';
+import { useLifeModelRevision } from '@/lib/lifeModel/refreshBus';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import LoadingSpinner from '@/components/ui/loaders/LoadingSpinner';
@@ -145,6 +146,9 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
   // Per-domain discovery coverage — ONE source (/api/life/discovery-coverage, same as My Discovery).
   // Drives the domain cards' coverage %, missing inputs, unlocks, and next-action CTA.
   const [coverage, setCoverage] = useState<Record<string, DomainCoverageData>>({});
+  // Re-fetch when the life model changes (e.g. a goal approved in the advisor) so the domain cards'
+  // coverage advances live, matching My Discovery.
+  const lifeModelRev = useLifeModelRevision();
   useEffect(() => {
     fetch('/api/life/discovery-coverage', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
@@ -156,7 +160,7 @@ export default function DashboardClient({ initialSession, firstInsight }: Dashbo
         }
       })
       .catch(() => {});
-  }, []);
+  }, [lifeModelRev]);
 
   // Canonical domain summaries — the SAME source the domain pages use, so the dashboard card never
   // disagrees with the domain page ("the system forgot" trust smell). eslint-disable for the VM shapes.

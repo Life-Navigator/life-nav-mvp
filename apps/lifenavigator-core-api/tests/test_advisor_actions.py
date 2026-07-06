@@ -9,13 +9,28 @@ CTX = UserContext(user_id="u-1")
 
 
 class FakeIngestion:
-    """Captures submit_life_fact calls so we can prove the action writes ONLY through this path."""
+    """Captures submit_life_fact / submit_goal calls so we can prove the action writes ONLY via this path."""
     def __init__(self):
         self.calls = []
+        self.goals = []
 
     async def submit_life_fact(self, ctx, payload):
         self.calls.append((ctx.user_id, payload))
         return {"ok": True, "table": "life.facts", "id": f"id-{len(self.calls)}", "action": "upserted"}
+
+    async def submit_goal(self, ctx, payload):
+        self.goals.append((ctx.user_id, payload))
+        return {"ok": True, "table": "life.candidate_goals", "id": f"g-{len(self.goals)}", "action": "upserted"}
+
+
+class FakeSupabaseUpsert:
+    """Captures finance.financial_planning_goals upserts for the set_goal finance path."""
+    def __init__(self):
+        self.upserts = []
+
+    async def upsert(self, table, row, *, schema=None, on_conflict=None):
+        self.upserts.append((schema, table, row))
+        return [row]
 
 
 def test_detect_all_five_intents():
@@ -55,7 +70,7 @@ async def test_apply_writes_only_via_ingestion_with_provenance():
         assert payload["domain"] == "career"
         assert payload["provenance"]["submitted_by"] == "arcana-action-loop"
     assert "Compensation" in out["impact"]
-    assert out["refresh"] == ["dashboard", "readiness", "recommendations"]
+    assert out["refresh"] == ["dashboard", "readiness", "recommendations", "coverage"]
 
 
 @pytest.mark.asyncio
@@ -104,3 +119,70 @@ async def test_promotion_apply_persists_title_without_salary():
     types = [payload.get("fact_type") for _uid, payload in ing.calls]
     assert "promotion.title" in types
     assert out["ok"] is True
+
+
+# ── set_goal action: goal-setting that persists a TRACKED goal (and advances coverage) ─────────────
+
+def test_detect_set_goal_and_specific_life_changes_still_win():
+    # generic goal-setting language → set_goal
+    assert A.detect("Help me set a short-term goal") == "set_goal"
+    assert A.detect("I want to set an emergency fund target") == "set_goal"
+    assert A.detect("let's save up for a down payment") == "set_goal"
+    # but a concrete life-change still beats the generic goal-setter (order matters)
+    assert A.detect("we bought a house and want to set a goal") == "home_purchase"
+
+
+def test_set_goal_proposal_prefills_area_from_message():
+    p = A.proposal("set_goal", "I want to set an emergency fund target")
+    assert p["action"] == "set_goal"
+    assert p["prefill"].get("area") == "finance"
+    assert {f["key"] for f in p["fields"]} == {"goal", "area", "target_amount", "target_date", "toward"}
+    # only goal + area are required so the approve button enables with the prefilled area
+    required = [f["key"] for f in p["fields"] if not f["optional"]]
+    assert set(required) == {"goal", "area"}
+
+
+@pytest.mark.asyncio
+async def test_set_goal_apply_persists_tracked_candidate_goal():
+    ing = FakeIngestion()
+    out = await A.apply(ing, CTX, "set_goal",
+                        {"goal": "Run a half marathon", "area": "health", "target_date": "2026-10-01",
+                         "toward": "Get in the best shape of my life"})
+    assert out["ok"] is True
+    assert ing.calls == []  # set_goal writes a GOAL, not a life.fact
+    assert len(ing.goals) == 1
+    _uid, g = ing.goals[0]
+    assert _uid == "u-1"
+    assert g["goal_title"] == "Run a half marathon"
+    assert g["domain"] == "health"
+    assert g["confirmation_status"] == "confirmed"  # user approved
+    assert g["timeframe"] == "2026-10-01"
+    assert g["provenance"]["submitted_by"] == "arcana-action-loop"
+    assert out["goals"][0]["domain"] == "health"
+    assert "coverage" in out["refresh"]  # goal-setting must refresh coverage
+
+
+@pytest.mark.asyncio
+async def test_set_goal_finance_also_writes_planning_goal():
+    ing = FakeIngestion()
+    sb = FakeSupabaseUpsert()
+    out = await A.apply(ing, CTX, "set_goal",
+                        {"goal": "Build a $25,000 emergency fund", "area": "money", "target_amount": "$25,000"},
+                        supabase=sb)
+    assert out["ok"] is True
+    # money → normalized to finance; candidate goal written
+    assert ing.goals[0][1]["domain"] == "finance"
+    # AND a finance.financial_planning_goals row upserted with the parsed amount
+    assert len(sb.upserts) == 1
+    schema, table, row = sb.upserts[0]
+    assert schema == "finance" and table == "financial_planning_goals"
+    assert row["target_amount"] == 25000.0 and row["label"] == "Build a $25,000 emergency fund"
+    assert out["goals"][0]["finance_planning_ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_set_goal_blank_goal_writes_nothing():
+    ing = FakeIngestion()
+    out = await A.apply(ing, CTX, "set_goal", {"goal": "", "area": "finance"})
+    assert out["ok"] is False and out["code"] == "no_values"
+    assert ing.goals == [] and ing.calls == []

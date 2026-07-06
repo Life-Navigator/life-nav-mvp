@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { emitLifeModelUpdated } from '@/lib/lifeModel/refreshBus';
 import { StreamedAdvisorMessage } from '@/components/chat/AdvisorMessage';
 import {
   chatClient,
@@ -327,7 +328,13 @@ export default function CommandCenter({
   const [threads, setThreads] = useState<Thread[]>([]);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<UiMessage[]>([]);
-  const [input, setInput] = useState(initialInput);
+  // Prefill the composer from initialInput, else from a ?seed= deep-link (e.g. "Continue finance discovery"
+  // opens the advisor pre-seeded with a goal-setting prompt instead of a blank box).
+  const [input, setInput] = useState<string>(() => {
+    if (initialInput) return initialInput;
+    if (typeof window === 'undefined') return '';
+    return new URLSearchParams(window.location.search).get('seed') || '';
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
@@ -494,9 +501,11 @@ export default function CommandCenter({
       if (res && res.ok) {
         setActionResult(res as ActionResult);
         setAction(null);
-        // The new confirmed facts now power the advisor + the dashboard "Recently learned" strip on next
-        // read; the Impact Summary Card is the live payoff in-chat.
+        // The new confirmed facts/goals power the advisor + the dashboard "Recently learned" strip; the
+        // Impact Summary Card is the live payoff in-chat. Broadcast so coverage / My Discovery / dashboard
+        // cards re-fetch immediately (approving a goal must visibly advance discovery, not "on next read").
         void refreshThreads();
+        emitLifeModelUpdated();
       } else {
         setActionResult({ ok: false, summary: 'That didn’t save — please try again.' });
       }

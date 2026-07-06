@@ -10,9 +10,16 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Any
+from urllib.parse import quote
 
 from ..models.common import UserContext
 from .domain_summary import missing_for
+
+
+def _goal_seed(label: str) -> str:
+    """Pre-seed prompt for the domain advisor so 'Continue X discovery' opens on a concrete next step
+    (a short-term goal) rather than a blank chat. Sending it triggers the set_goal action loop."""
+    return quote(f"Help me set a short-term {str(label or '').lower()} goal.")
 
 # Degree labeling — never "doctorate in Juris Doctorate"; JD/MBA/MD get their proper names, others "BS in X".
 _DEGREE_ORDER = {"high_school": 1, "certificate": 1, "bootcamp": 1, "associate": 2, "bachelor": 3,
@@ -247,7 +254,20 @@ class DiscoveryCoverageService:
                                           limit=50, schema="life")
         except Exception:  # noqa: BLE001
             cands = []
-        goal_domains = {str(c.get("domain") or "").lower() for c in cands}
+        goal_counts: dict[str, int] = {}
+        for c in cands:
+            d = str(c.get("domain") or "").lower()
+            if d:
+                goal_counts[d] = goal_counts.get(d, 0) + 1
+        # Finance short-term targets live in finance.financial_planning_goals (not candidate_goals) —
+        # count them so an approved finance goal advances finance coverage too. Fail-soft.
+        try:
+            fin_goals = await self._sb.select("financial_planning_goals",
+                                              filters={"user_id": f"eq.{ctx.user_id}"}, limit=50, schema="finance")
+        except Exception:  # noqa: BLE001
+            fin_goals = []
+        if fin_goals:
+            goal_counts["finance"] = goal_counts.get("finance", 0) + len(fin_goals)
         fin_missing: list[dict[str, Any]] = []
         if self._resolver is not None:
             try:
@@ -259,7 +279,8 @@ class DiscoveryCoverageService:
         for key, spec in DOMAINS.items():
             answered_here = [k for k in spec["advisor_keys"] if k in answered]
             # P0.3: an explicit candidate goal tagged to this domain means the user spoke to it.
-            has_goal = key in goal_domains
+            n_goals = goal_counts.get(key, 0)
+            has_goal = n_goals > 0
             has_objective = any(any(kw in t for kw in spec["objective_kw"]) for t in obj_text)
             # coverage signals: each answered advisor question + an objective + (finance) resolved inputs
             total_signals = max(1, len(spec["advisor_keys"]) + 1)  # +1 for "has an objective"
@@ -276,6 +297,11 @@ class DiscoveryCoverageService:
             if has_data:
                 coverage_pct = max(coverage_pct, 30)
             is_deprioritized = key in deprioritized
+            # A tracked short-term goal is a real coverage signal: goal-setting must MOVE the domain forward
+            # (founder #1 — no more "stuck at 30% / never completes"). 1 goal → partial (40), 3+ → complete
+            # (80). Never lowers an already-higher coverage. Computed before facts/missing so both reflect it.
+            if n_goals and not is_deprioritized:
+                coverage_pct = max(coverage_pct, min(80, 40 + 20 * n_goals))
             facts = await self._domain_facts(ctx, key) if has_data else {}
             # MISSING labels (P3): say what's actually missing — never "X goal" once we already know the domain.
             if is_deprioritized:
@@ -286,7 +312,7 @@ class DiscoveryCoverageService:
                 # One truth for the dashboard card, onboarding review, readiness, and advisor.
                 missing_inputs = missing_for(key, facts)
                 if coverage_pct < 60:  # rich captured facts read as real progress, not a flat 30%
-                    coverage_pct = min(85, 30 + 12 * len(facts))
+                    coverage_pct = max(coverage_pct, min(85, 30 + 12 * len(facts)))
             elif has_data:
                 missing_inputs = list(spec.get("baseline_missing", [])) if coverage_pct < 80 else []
             else:
@@ -303,10 +329,11 @@ class DiscoveryCoverageService:
                 "facts": facts,  # concrete KNOWN values — the card's primary content (like Financial Overview)
                 "has_objective": has_objective or has_data,
                 "missing": missing_inputs[:5], "unlocks": spec["unlocks"],
-                # Scope the CTA to the DOMAIN advisor so "Continue health discovery" opens the Health
-                # Advisor, not the generic Arcana orchestrator (CommandCenter reads ?agent=).
-                "cta": (f"/dashboard/advisor?agent={key}_advisor" if (missing_inputs or coverage_pct < 80)
-                        else None),
+                # Scope the CTA to the DOMAIN advisor AND pre-seed a goal-setting prompt, so "Continue
+                # health discovery" opens the Health Advisor on a concrete next step — not a blank chat or
+                # the generic Arcana orchestrator (CommandCenter reads ?agent= and ?seed=).
+                "cta": (f"/dashboard/advisor?agent={key}_advisor&seed={_goal_seed(spec['label'])}"
+                        if (missing_inputs or coverage_pct < 80) else None),
                 "source": "Advisor Discovery",
             })
 

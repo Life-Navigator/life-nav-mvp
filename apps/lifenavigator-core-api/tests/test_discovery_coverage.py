@@ -36,6 +36,50 @@ async def test_uncovered_domain_is_not_started_with_unlocks():
     out = await svc.coverage(CTX)
     health = next(d for d in out["domains"] if d["domain"] == "health")
     assert health["status"] == "not_started" and health["unlocks"] and health["cta"]
-    # CTA must open the HEALTH advisor (not the generic Arcana orchestrator)
-    assert health["cta"] == "/dashboard/advisor?agent=health_advisor"
+    # CTA must open the HEALTH advisor (not the generic Arcana orchestrator), pre-seeded with a goal prompt
+    assert health["cta"].startswith("/dashboard/advisor?agent=health_advisor")
+    assert "seed=" in health["cta"]
     assert out["overall_coverage_pct"] == 0 and out["recommendation_quality"] == "Low"
+
+
+def _uid() -> str:
+    return CTX.user_id
+
+
+@pytest.mark.asyncio
+async def test_one_tracked_goal_advances_domain_past_the_30_floor():
+    """Founder #1: setting a goal must MOVE the domain forward, not sit at 30% 'started' forever."""
+    sb = FakeSupabase({"candidate_goals": [
+        {"user_id": _uid(), "domain": "health", "goal_text": "Run a half marathon", "status": "confirmed"},
+    ]})
+    svc = DiscoveryCoverageService(LifeDiscoveryService(sb), sb)
+    out = await svc.coverage(CTX)
+    health = next(d for d in out["domains"] if d["domain"] == "health")
+    assert health["coverage_pct"] >= 40 and health["status"] == "partial"  # 1 goal → partial, not stuck at 30
+
+
+@pytest.mark.asyncio
+async def test_three_tracked_goals_complete_the_domain():
+    sb = FakeSupabase({"candidate_goals": [
+        {"user_id": _uid(), "domain": "career", "goal_text": "Make staff engineer", "status": "confirmed"},
+        {"user_id": _uid(), "domain": "career", "goal_text": "Lead a project", "status": "confirmed"},
+        {"user_id": _uid(), "domain": "career", "goal_text": "Mentor two juniors", "status": "confirmed"},
+    ]})
+    svc = DiscoveryCoverageService(LifeDiscoveryService(sb), sb)
+    out = await svc.coverage(CTX)
+    career = next(d for d in out["domains"] if d["domain"] == "career")
+    assert career["coverage_pct"] >= 80 and career["status"] == "complete"
+
+
+@pytest.mark.asyncio
+async def test_finance_planning_goal_advances_finance_coverage():
+    """A finance short-term target lives in finance.financial_planning_goals (not candidate_goals) — it must
+    still advance finance coverage."""
+    sb = FakeSupabase({"financial_planning_goals": [
+        {"user_id": _uid(), "goal_type": "emergency_fund", "label": "Build a $25k emergency fund",
+         "target_amount": 25000, "status": "active"},
+    ]})
+    svc = DiscoveryCoverageService(LifeDiscoveryService(sb), sb, FinancialInputResolver(sb))
+    out = await svc.coverage(CTX)
+    finance = next(d for d in out["domains"] if d["domain"] == "finance")
+    assert finance["coverage_pct"] >= 40 and finance["status"] in ("partial", "complete")

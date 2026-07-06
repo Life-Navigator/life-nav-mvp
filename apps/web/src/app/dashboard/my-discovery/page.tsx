@@ -6,6 +6,7 @@
 
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
+import { useLifeModelRevision } from '@/lib/lifeModel/refreshBus';
 
 interface Domain {
   domain: string;
@@ -39,15 +40,23 @@ const statusOf = (s: string) => STATUS[s] || STATUS.not_started;
 export default function MyDiscoveryPage() {
   const [d, setD] = useState<Coverage | null>(null);
   const [loading, setLoading] = useState(true);
+  // Re-fetch coverage when the life model changes (e.g. the user just approved a goal in the advisor),
+  // so this page advances live instead of only on reload.
+  const rev = useLifeModelRevision();
   useEffect(() => {
-    fetch('/api/life/discovery-coverage')
+    let on = true;
+    fetch('/api/life/discovery-coverage', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((x) => {
+        if (!on) return;
         setD(x);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
-  }, []);
+      .catch(() => on && setLoading(false));
+    return () => {
+      on = false;
+    };
+  }, [rev]);
 
   if (loading) return <div className="max-w-4xl mx-auto px-4 py-8 text-gray-500">Loading…</div>;
   if (!d?.domains)
