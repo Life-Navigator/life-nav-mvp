@@ -97,3 +97,5 @@ apps/lifenavigator-core-api/beta_pdfs/
 supabase/.temp/
 # local document-intelligence data (never committed — see docs)
 /documents/
+/reports/
+apps/*/target/
