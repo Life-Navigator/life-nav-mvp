@@ -40,6 +40,19 @@ cards). Model-agnostic; validator/guardrails unchanged.
 
 ---
 
+## #2 — Mobile capture-api (voice / document / meal / body) · **parked on a branch**
+
+**Source:** repo readiness analysis. The Rust/axum mobile-capture service was built once but never committed
+(source lost; only build artifacts remained). It only serves the **mobile** app's capture features, and mobile
+is not in the first-5 beta.
+
+**Disposition:** removed from `main` (nothing was tracked there — deleted the 1.2GB untracked build-artifact
+husk). The full recovered **design spec** is preserved on branch **`feat/capture-api-postbeta`**
+(`apps/lifenavigator-capture-api/README.md`) — start there after the beta. Go-live blockers were: Supabase key
+rotation, Fly app + secrets, and the `nutrition_logs`/`body_metrics` vs `health_meta` schema question.
+
+---
+
 ## Fixed during the manual pass (already shipped, not deferred)
 
 - **My Discovery crash** on the `deprioritized` status — fixed (`dfd11aa`); page now renders all 5 distinct
