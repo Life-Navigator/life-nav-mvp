@@ -9,13 +9,17 @@ query / headers. The only trusted source of identity is the verified JWT.
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
 import jwt
 from fastapi import Depends, Header, HTTPException, status
 
+from .beta_access import is_beta_access_allowed, masked_email
 from .config import Settings, get_settings
+
+logger = logging.getLogger("app.auth")
 
 
 @dataclass(frozen=True)
@@ -25,6 +29,7 @@ class AuthenticatedUser:
     user_id: str
     email: Optional[str]
     role: str  # 'authenticated' | 'anon' | 'service_role' | ...
+    invited: bool = False  # app_metadata.invited — redeemed a private beta invite key
 
 
 def _strip_bearer(authorization: Optional[str]) -> str:
@@ -79,10 +84,30 @@ def verify_jwt(token: str, secret: str) -> AuthenticatedUser:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token missing 'sub' claim",
         )
+    app_meta = payload.get("app_metadata")
+    invited = bool(isinstance(app_meta, dict) and app_meta.get("invited") is True)
     return AuthenticatedUser(
         user_id=sub,
         email=payload.get("email"),
         role=payload.get("role") or "authenticated",
+        invited=invited,
+    )
+
+
+def _enforce_beta_gate(user: AuthenticatedUser, settings: Settings) -> None:
+    """Private-beta allowlist — enforced HERE, not only in the web proxy, because the
+    core-api is publicly reachable. When the gate is OFF this is a no-op. Service-role
+    callers (internal service-to-service) always bypass. 403 for a non-allowlisted user.
+    """
+    if user.role == "service_role":
+        return
+    if is_beta_access_allowed(user.email, user.invited, settings):
+        return
+    # Loud, non-PII log so a blocked attempt is visible without leaking the address.
+    logger.warning("beta_gate_block masked=%s reason=not_allowlisted", masked_email(user.email))
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="This account is not part of the current private beta.",
     )
 
 
@@ -90,6 +115,8 @@ def current_user(
     authorization: Optional[str] = Header(default=None, include_in_schema=False),
     settings: Settings = Depends(get_settings),
 ) -> AuthenticatedUser:
-    """FastAPI dependency: returns the authenticated user (401 if absent/invalid)."""
+    """FastAPI dependency: returns the authenticated user (401 if absent/invalid, 403 if not in beta)."""
     token = _strip_bearer(authorization)
-    return verify_jwt(token, settings.supabase_jwt_secret)
+    user = verify_jwt(token, settings.supabase_jwt_secret)
+    _enforce_beta_gate(user, settings)
+    return user
