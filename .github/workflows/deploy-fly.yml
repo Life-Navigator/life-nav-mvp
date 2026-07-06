@@ -1,0 +1,150 @@
+name: Fly Apps CI/CD
+
+# Per-app CI (test/check) + CD (deploy) for the three Fly.io apps. Each app's jobs run ONLY when that app's
+# files change (path filter), so a web-only change doesn't rebuild the backend and vice-versa. Deploy runs
+# only on a push to main, only for the app that changed, and only after its tests pass.
+#
+# Requires one repo secret: FLY_API_TOKEN  (create with: flyctl tokens create deploy -a lifenavigator-core-api,
+# or an org-scoped `flyctl tokens create org`). Until it's set, the CI (test) jobs still run; only the deploy
+# steps fail on auth. Web deploys via Vercel's own Git integration; edge functions deploy from ci.yml.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: fly-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ── Detect which Fly app(s) changed ────────────────────────────────────────
+  changes:
+    name: Detect changed apps
+    runs-on: ubuntu-latest
+    outputs:
+      core_api: ${{ steps.f.outputs.core_api }}
+      api_gateway: ${{ steps.f.outputs.api_gateway }}
+      ingestion_worker: ${{ steps.f.outputs.ingestion_worker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: f
+        with:
+          filters: |
+            core_api:
+              - 'apps/lifenavigator-core-api/**'
+            api_gateway:
+              - 'apps/api-gateway/**'
+            ingestion_worker:
+              - 'apps/ingestion-worker/**'
+
+  # ── CI: core-api (FastAPI) pytest ──────────────────────────────────────────
+  test-core-api:
+    name: Test core-api
+    needs: changes
+    if: ${{ needs.changes.outputs.core_api == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/lifenavigator-core-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/lifenavigator-core-api/requirements-dev.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest tests/ -q
+
+  # ── CI: api-gateway pytest ─────────────────────────────────────────────────
+  test-api-gateway:
+    name: Test api-gateway
+    needs: changes
+    if: ${{ needs.changes.outputs.api_gateway == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/api-gateway/requirements-dev.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest tests/ -q
+
+  # ── CI: ingestion-worker (Rust) compile check ──────────────────────────────
+  check-ingestion-worker:
+    name: Check ingestion-worker
+    needs: changes
+    if: ${{ needs.changes.outputs.ingestion_worker == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ingestion-worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/ingestion-worker
+      - run: cargo check --all-targets
+
+  # ── CD: deploy each changed app to Fly (main only, after its tests pass) ────
+  deploy-core-api:
+    name: Deploy core-api
+    needs: [changes, test-core-api]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.core_api == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-core-api
+      cancel-in-progress: false
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        working-directory: apps/lifenavigator-core-api
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-api-gateway:
+    name: Deploy api-gateway
+    needs: [changes, test-api-gateway]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.api_gateway == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-api-gateway
+      cancel-in-progress: false
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        working-directory: apps/api-gateway
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+  deploy-ingestion-worker:
+    name: Deploy ingestion-worker
+    needs: [changes, check-ingestion-worker]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.ingestion_worker == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-ingestion-worker
+      cancel-in-progress: false
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        working-directory: apps/ingestion-worker
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

@@ -4,51 +4,63 @@ This document lists all required secrets for CI/CD pipelines.
 
 ## Required Secrets
 
+### Fly.io deploy (deploy-fly.yml)
+
+| Secret Name     | Description                                                                                                        | Required For                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FLY_API_TOKEN` | Fly deploy token — `flyctl tokens create org` (or per-app `flyctl tokens create deploy -a lifenavigator-core-api`) | Auto-deploying core-api / api-gateway / ingestion-worker on merge to main. Until set, the CI test jobs run but the deploy steps fail on auth. |
+
 ### GCP Infrastructure
-| Secret Name | Description | Required For |
-|-------------|-------------|--------------|
-| `GCP_PROJECT_ID` | Google Cloud Project ID (e.g., `lifenav-prod`) | All deployments |
-| `GCP_SA_KEY` | Service Account JSON key for GCP authentication | All GCP operations |
-| `GKE_CLUSTER_NAME` | GKE cluster name | K8s deployments |
+
+| Secret Name        | Description                                     | Required For       |
+| ------------------ | ----------------------------------------------- | ------------------ |
+| `GCP_PROJECT_ID`   | Google Cloud Project ID (e.g., `lifenav-prod`)  | All deployments    |
+| `GCP_SA_KEY`       | Service Account JSON key for GCP authentication | All GCP operations |
+| `GKE_CLUSTER_NAME` | GKE cluster name                                | K8s deployments    |
 
 ### Application Secrets (Production)
-| Secret Name | Description | Example |
-|-------------|-------------|---------|
-| `SECRET_KEY` | JWT signing key (min 32 chars) | `openssl rand -hex 32` |
-| `ENCRYPTION_KEY` | AES-256 encryption key (64 hex chars) | `openssl rand -hex 32` |
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql+asyncpg://user:pass@host:5432/db` |
-| `REDIS_URL` | Redis connection string | `redis://user:pass@host:6379/0` |
+
+| Secret Name      | Description                           | Example                                       |
+| ---------------- | ------------------------------------- | --------------------------------------------- |
+| `SECRET_KEY`     | JWT signing key (min 32 chars)        | `openssl rand -hex 32`                        |
+| `ENCRYPTION_KEY` | AES-256 encryption key (64 hex chars) | `openssl rand -hex 32`                        |
+| `DATABASE_URL`   | PostgreSQL connection string          | `postgresql+asyncpg://user:pass@host:5432/db` |
+| `REDIS_URL`      | Redis connection string               | `redis://user:pass@host:6379/0`               |
 
 ### Third-Party Services
-| Secret Name | Description | Required |
-|-------------|-------------|----------|
-| `SENTRY_DSN` | Sentry error tracking DSN | Recommended |
-| `RESEND_API_KEY` | Resend email service API key | For emails |
-| `OPENAI_API_KEY` | OpenAI API key for embeddings/LLM | For AI features |
-| `PLAID_CLIENT_ID` | Plaid financial data API | For banking |
-| `PLAID_SECRET` | Plaid API secret | For banking |
-| `STRIPE_API_KEY` | Stripe payments API key | For payments |
-| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret | For payments |
+
+| Secret Name             | Description                       | Required        |
+| ----------------------- | --------------------------------- | --------------- |
+| `SENTRY_DSN`            | Sentry error tracking DSN         | Recommended     |
+| `RESEND_API_KEY`        | Resend email service API key      | For emails      |
+| `OPENAI_API_KEY`        | OpenAI API key for embeddings/LLM | For AI features |
+| `PLAID_CLIENT_ID`       | Plaid financial data API          | For banking     |
+| `PLAID_SECRET`          | Plaid API secret                  | For banking     |
+| `STRIPE_API_KEY`        | Stripe payments API key           | For payments    |
+| `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret     | For payments    |
 
 ### OAuth Providers (Optional)
-| Secret Name | Description |
-|-------------|-------------|
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth secret |
-| `MICROSOFT_CLIENT_ID` | Microsoft OAuth client ID |
-| `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth secret |
+
+| Secret Name               | Description               |
+| ------------------------- | ------------------------- |
+| `GOOGLE_CLIENT_ID`        | Google OAuth client ID    |
+| `GOOGLE_CLIENT_SECRET`    | Google OAuth secret       |
+| `MICROSOFT_CLIENT_ID`     | Microsoft OAuth client ID |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft OAuth secret    |
 
 ### Cloud Storage
-| Secret Name | Description |
-|-------------|-------------|
-| `GCS_BUCKET_NAME` | Google Cloud Storage bucket name |
+
+| Secret Name        | Description                                |
+| ------------------ | ------------------------------------------ |
+| `GCS_BUCKET_NAME`  | Google Cloud Storage bucket name           |
 | `STORAGE_PROVIDER` | Storage provider (`gcs`, `s3`, or `local`) |
 
 ### OCR Processing (Google Cloud Vision)
-| Secret Name | Description |
-|-------------|-------------|
-| `GOOGLE_CLOUD_VISION_ENABLED` | Enable OCR processing (`true`) |
-| `GCP_VISION_SA_KEY` | Service account key for Vision API (can use same as `GCP_SA_KEY`) |
+
+| Secret Name                   | Description                                                       |
+| ----------------------------- | ----------------------------------------------------------------- |
+| `GOOGLE_CLOUD_VISION_ENABLED` | Enable OCR processing (`true`)                                    |
+| `GCP_VISION_SA_KEY`           | Service account key for Vision API (can use same as `GCP_SA_KEY`) |
 
 ## Setting Secrets via GitHub CLI
 
