@@ -40,7 +40,13 @@
       "fast-xml-parser": ">=5.5.6",
       "fast-xml-builder": ">=1.1.7",
       "flatted": ">=3.4.2",
-      "@babel/plugin-transform-modules-systemjs": ">=7.29.4"
+      "@babel/plugin-transform-modules-systemjs": ">=7.29.4",
+      "shell-quote": ">=1.8.4",
+      "undici": ">=6.27.0 <7",
+      "dompurify": ">=3.4.11",
+      "@babel/core": ">=7.29.6 <8",
+      "form-data@>=4.0.0 <4.0.6": ">=4.0.6",
+      "ws@>=8.0.0 <8.21.0": ">=8.21.0"
     }
   },
   "packageManager": "pnpm@9.15.0",
