@@ -56,7 +56,7 @@ These are non-PASS surfaces reachable by a pilot user (Health surfaces are exclu
 
 - **Investments Add-Holding** (PARTIAL) — row persists but the page renders from Plaid analytics returning `holdings:[]`, so a manually added holding does not visibly appear; account_id linkage unresolved.
 - **Tax** (NOT_READY) — `/dashboard/finance/tax` form swallows errors; all `/api/tax/*` routes 404. No save path exists.
-- **Retirement planning page** (NOT*READY) — `/dashboard/finance/retirement`; all `/api/retirement/*` routes 404. (Canonical retirement \_balance* entry on /add works separately.)
+- **Retirement planning page** (NOT*READY) — `/dashboard/finance/retirement`; all `/api/retirement/*` routes 404. (Canonical retirement \_balance\* entry on /add works separately.)
 - **Insurance/Estate (legacy)** (NOT_READY) — `/dashboard/finance/legacy` is read-only with no entry form and no canonical table.
 - **Accounts page Add Account button** (DEPRECATED) — `/dashboard/finance/accounts` Connect button is a console.log stub; canonical manual account entry lives at /add.
 - **Account/Security** (NOT_READY) — `/dashboard/settings/security` active sessions, login history, and 2FA are mock UI with no persistence (password change works via auth).

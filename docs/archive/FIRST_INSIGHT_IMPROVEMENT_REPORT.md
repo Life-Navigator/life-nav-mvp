@@ -139,7 +139,7 @@ Applied to verified personas: credit_rebuilding → `Paying off this 28% card be
 
 **Evidence:** `first-insight.ts:100-103`. `monthlyExpenses` sums `transactions` where `transaction_type === 'expense'`. Per `persist.ts:179`, `transaction_type = amount >= 0 ? 'expense' : 'income'`, and in the configs **payroll is encoded as a negative amount** (e.g. `tx(D('05-31'), -2150, 'EMPLOYER PAYROLL')` → income), while only the positive entries (rent, groceries, a loan payment) become "expenses." So `monthlyExpenses` is a small, non-representative slice of real spending:
 
-- `married_family`: monthlyExpenses = $3,050 (mortgage $2,350 + childcare $240 + grocery $318 + $142) → runway **10.3 months**. That's wrong; the household clearly spends far more than $3,050/mo. The inflated runway is why married_family _doesn't_ trip rule 4 idle-cash and why no runway-based warning ever fires for a family carrying real obligations.
+- `married_family`: monthlyExpenses = $3,050 (mortgage $2,350 + childcare $240 + grocery $318 + $142) → runway **10.3 months**. That's wrong; the household clearly spends far more than $3,050/mo. The inflated runway is why married*family \_doesn't* trip rule 4 idle-cash and why no runway-based warning ever fires for a family carrying real obligations.
 - `small_business_owner`: monthlyExpenses = $9,350 mixes business AP, SaaS, and payroll-run together → runway 3.6mo is coincidental, not meaningful.
 
 Compounding this is the **KNOWN sandbox bug**: override transactions frequently persist as `transactions_synced: 0` (`activate-persona/route.ts:97-104`), so `runwayMonths` is `null` live and rules 2 & 4 silently don't fire — the engine falls through to retirement/fallback. So runway is both _miscomputed_ (test path) and _absent_ (live path).
@@ -164,7 +164,7 @@ Compounding this is the **KNOWN sandbox bug**: override transactions frequently 
 
 ## P2-1 — Fallback (rule 6) is a flat summary, not advice
 
-**Evidence:** `first-insight.ts:186-195`. salary_plus_bonus and gig_worker both land here: `"$242,200 in savings & investments across 3 accounts."` / `"$44,100 in savings & investments across 2 accounts."` with recommendation `"Ask your advisor how to ..."`. This is the BAD pattern (observation, no consequence) for two _healthy_ personas who have the most room for a sophisticated insight.
+**Evidence:** `first-insight.ts:186-195`. salary*plus_bonus and gig_worker both land here: `"$242,200 in savings & investments across 3 accounts."` / `"$44,100 in savings & investments across 2 accounts."` with recommendation `"Ask your advisor how to ..."`. This is the BAD pattern (observation, no consequence) for two \_healthy* personas who have the most room for a sophisticated insight.
 
 **Rewrite ideas (data already present):**
 

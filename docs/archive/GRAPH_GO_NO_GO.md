@@ -47,7 +47,7 @@ The first things on screen are a node/edge count (`page.tsx:118-122`), then a st
 
 ### 2. The V2 storytelling spec was written but NOT implemented
 
-`GRAPH_STORYTELLING.md` (Sprint G) defined the fix: lead with the real `life_brief` headline + next_move, add spotlight chips, auto-focus the camera on the top risk, pass through `graph_integrity` completeness bars. **None of it shipped** — `GraphStoryHeader.tsx` is still the static "This is your life, connected." copy; the only `life_brief` reference is the doc comment at `:13-15` describing the _intended_ swap. So the storytelling layer that would make it demo-ready exists on paper only.
+`GRAPH_STORYTELLING.md` (Sprint G) defined the fix: lead with the real `life_brief` headline + next*move, add spotlight chips, auto-focus the camera on the top risk, pass through `graph_integrity` completeness bars. **None of it shipped** — `GraphStoryHeader.tsx` is still the static "This is your life, connected." copy; the only `life_brief` reference is the doc comment at `:13-15` describing the \_intended* swap. So the storytelling layer that would make it demo-ready exists on paper only.
 
 ### 3. Visual quality is "competent generic knowledge-graph," not signature
 
@@ -84,7 +84,7 @@ OrbitControls + double-click-to-drill (`LifeGraphCanvas.tsx:171,177`) assume the
 
 ## Could it reach the bar before the pilot? (effort honesty)
 
-Closing all five gaps means: implement the entire Sprint-G storytelling layer (life_brief lead, spotlight, auto-focus, completeness, guided tour), add label de-collision + a curated demo layout, retire/redirect the legacy graph, and tune the scene for both sparse and dense accounts — then QA it live on the actual demo account. That is a multi-day visual-design + frontend effort with real demo-risk if rushed. **It is not a safe bet to land at investor-hero quality before the pilot.** The teaser path delivers the _wow of the idea_ with near-zero risk and lets the graph mature behind it.
+Closing all five gaps means: implement the entire Sprint-G storytelling layer (life*brief lead, spotlight, auto-focus, completeness, guided tour), add label de-collision + a curated demo layout, retire/redirect the legacy graph, and tune the scene for both sparse and dense accounts — then QA it live on the actual demo account. That is a multi-day visual-design + frontend effort with real demo-risk if rushed. **It is not a safe bet to land at investor-hero quality before the pilot.** The teaser path delivers the \_wow of the idea* with near-zero risk and lets the graph mature behind it.
 
 ---
 

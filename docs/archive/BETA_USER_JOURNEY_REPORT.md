@@ -26,8 +26,8 @@ invited user can go from a link to a working, grounded chat — exercising every
 
 **FULL JOURNEY (all 8 steps): 10/10.**
 
-Sample grounded chat (young_professional): _"Here's a summary of your current account balances:
-**Assets:** Everyday Checking …"_ — the activation → grounding chain works end to end (the chat reads the
+Sample grounded chat (young*professional): *"Here's a summary of your current account balances:
+**Assets:** Everyday Checking …"\_ — the activation → grounding chain works end to end (the chat reads the
 freshly-activated accounts from the system of record).
 
 ---

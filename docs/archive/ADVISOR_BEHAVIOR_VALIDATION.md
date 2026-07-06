@@ -4,7 +4,7 @@ Live, on Vertex `gemini-2.5-pro`, real advisor pipeline (prompt → validator �
 
 ## Answer-first: measured
 
-Across the 6 critical conversations (CRITICAL_CONVERSATION_REPLAY.md), **every** turn led with a substantive recommendation (`answered_first = True` 6/6). Each also offered ONE refining question — but as _refine-second_, after delivering the answer (not as a blocking opener). None opened by interrogating the user.
+Across the 6 critical conversations (CRITICAL*CONVERSATION_REPLAY.md), **every** turn led with a substantive recommendation (`answered_first = True` 6/6). Each also offered ONE refining question — but as \_refine-second*, after delivering the answer (not as a blocking opener). None opened by interrogating the user.
 
 ## Before vs after
 

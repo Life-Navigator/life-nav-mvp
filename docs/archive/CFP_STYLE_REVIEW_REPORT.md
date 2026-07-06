@@ -33,7 +33,7 @@ The V1 rejections all concerned the two most fragile personas and a wrong APR. E
 - **high_income_executive — "put idle cash to work" as the lead.** Now far better (phased/DCA, concentration + tax + equity all present), but a Morgan Stanley advisor would still want the **tax/asset-location** conversation to lead for a client whose stated #1 goal is tax — and would want explicit risk-tolerance confirmation before deploying ~$193k. _Challenge: ordering._
 - **married_family — "capture the match" assumes a match exists.** No data confirms the employer offers one. _Challenge: add "confirm your plan offers a match and its formula."_
 - **small_business_owner — "pay down your 18% card before investing" as the risk line.** The $6,240 balance may be a routine monthly business charge, not carried debt. _Challenge: verify it's actually revolving before framing it as debt._
-- **"Keep investing consistently toward your goal" (the growth fallback)** for young_professional / bank_income is a touch generic. _Challenge: tie to a specific vehicle/amount._
+- **"Keep investing consistently toward your goal" (the growth fallback)** for young*professional / bank_income is a touch generic. \_Challenge: tie to a specific vehicle/amount.*
 
 ## ❌ Would REJECT — _none_
 

@@ -201,7 +201,7 @@ If anything is wrong post-launch:
 
 Signed off by:
 
-- Engineering lead: ******\_\_\_******
-- Security lead: ******\_\_\_******
-- Operations lead: ******\_\_\_******
-- Date: ******\_\_\_******
+- Engineering lead: **\*\***\_\_\_**\*\***
+- Security lead: **\*\***\_\_\_**\*\***
+- Operations lead: **\*\***\_\_\_**\*\***
+- Date: **\*\***\_\_\_**\*\***

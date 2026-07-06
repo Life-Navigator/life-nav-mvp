@@ -184,7 +184,7 @@ The **render path is reference-quality** and the **pipeline mechanics are sound*
 
 ### Exact remediation order + effort
 
-1. **Worker typed relationships** — add finance arms to `relationships_for()` (HAS_ACCOUNT, etc.) AND emit inter-entity edges (account→transaction `HAS_TRANSACTION`, etc.) from payload FKs; redeploy; backfill edges. **Effort: M.** _(shared infrastructure — every domain inherits it)_
+1. **Worker typed relationships** — add finance arms to `relationships_for()` (HAS*ACCOUNT, etc.) AND emit inter-entity edges (account→transaction `HAS_TRANSACTION`, etc.) from payload FKs; redeploy; backfill edges. **Effort: M.** *(shared infrastructure — every domain inherits it)\_
 2. **Reconcile Qdrant↔Neo4j drift** — re-enqueue the 233 relabeled transactions so Qdrant `transaction_summary` matches Neo4j. **Effort: S.**
 3. **Phase-1 elite schema** (9 tables, migration-116 RLS) **with worker enum variants first** (enum-before-trigger), then triggers. **Effort: L.**
 4. **Recommendation breadth + persistence** — `financial_recommendations` table + cash-flow/retirement/budget/investment generators. **Effort: M.**

@@ -29,7 +29,7 @@ FAMILY COMMAND CENTER (Overview)
 
 ## Concrete changes (each maps to existing data)
 
-1. **Wire the hidden office engine.** Add `/api/family/office` proxy; render the 5 pillars (ESTATE_READINESS_ENGINE.md). _Highest leverage — turns an unused endpoint into the centerpiece._
+1. **Wire the hidden office engine.** Add `/api/family/office` proxy; render the 5 pillars (ESTATE*READINESS_ENGINE.md). \_Highest leverage — turns an unused endpoint into the centerpiece.*
 2. **Fill the 3 stubs honestly.**
    - **Estate** → the 5-pillar board (real).
    - **Goals** → reuse the canonical goals surface filtered to family domain (goals data exists cross-domain); if none, the existing empty pattern with one CTA.

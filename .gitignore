@@ -86,3 +86,14 @@ lifenav-model-runtime*.json
 service-account*.json
 *.sa.json
 *.b64
+
+# --- dev scratch / one-off probes & reports (not part of the app) ---
+apps/web/_uismoke*.mjs
+apps/web/beta20-*.mjs
+apps/web/setup-beta20-fixtures.mjs
+apps/web/reports/
+apps/*/beta_*.py
+apps/lifenavigator-core-api/beta_pdfs/
+supabase/.temp/
+# local document-intelligence data (never committed — see docs)
+/documents/

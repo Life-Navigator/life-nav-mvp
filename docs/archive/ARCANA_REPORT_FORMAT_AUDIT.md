@@ -21,4 +21,4 @@
 
 ## Root finding
 
-The report feel was 100% in `_compose` formatting (presentation), plus one prompt-level over-restriction that made health requests refuse (separate, see ARCANA_DOMAIN_STYLE_GUIDE.md). The LLM's structured reasoning itself is sound and validator-gated; only its _rendering_ was wrong.
+The report feel was 100% in `_compose` formatting (presentation), plus one prompt-level over-restriction that made health requests refuse (separate, see ARCANA*DOMAIN_STYLE_GUIDE.md). The LLM's structured reasoning itself is sound and validator-gated; only its \_rendering* was wrong.

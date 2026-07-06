@@ -76,9 +76,9 @@ RELATED_TO for mapped types.
 
 ### `DomainEvidenceProvider`
 
-For each recommendation: the evidence facts (metric_name/value/source_table/observed_at/
+For each recommendation: the evidence facts (metric*name/value/source_table/observed_at/
 confidence/explanation), assumptions, tradeoffs, and the governance boundary. This is the
-_only_ place a domain decides what counts as evidence.
+\_only* place a domain decides what counts as evidence.
 
 ## Quality gates (inherited; a domain unlocks only when all pass)
 

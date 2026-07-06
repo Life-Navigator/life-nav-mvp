@@ -198,8 +198,8 @@ allow`, regardless of policy priority field.
 - **Tenant-shaped policies.** Compliance teams describe what is
   approved / prohibited / escalated in their own terms, and the
   platform enforces them.
-- **Visible safety floor.** The blocked_overrides field is the
-  _evidence_ that the platform cannot be silently weakened by the
+- **Visible safety floor.** The blocked*overrides field is the
+  \_evidence* that the platform cannot be silently weakened by the
   organization. Auditors can verify the floor.
 - **Per-tenant rule set version.** Caching by `rule_set_version`
   guarantees consistent behavior across a fleet of users in a

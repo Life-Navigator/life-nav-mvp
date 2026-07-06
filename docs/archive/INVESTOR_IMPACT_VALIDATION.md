@@ -14,7 +14,7 @@
 
 ## The one caveat to frame, not hide
 
-Readiness/recommendation **numbers** don't jump from an action yet, because those are computed from domain tables (and behavioral/connected-account data), not from `life.facts` (see DOMAIN_WRITE_GAP_AUDIT.md). The story to tell: _"the life model updates instantly and grounds the advisor; the scored projections refresh as the domain data behind them fills in."_ If you want one **real** numeric jump for the demo, the cheapest honest path is New Child → `family.dependents` (DOMAIN_WRITE_DECISION.md) — ~0.5–1 day, flag-gated.
+Readiness/recommendation **numbers** don't jump from an action yet, because those are computed from domain tables (and behavioral/connected-account data), not from `life.facts` (see DOMAIN*WRITE_GAP_AUDIT.md). The story to tell: *"the life model updates instantly and grounds the advisor; the scored projections refresh as the domain data behind them fills in."\_ If you want one **real** numeric jump for the demo, the cheapest honest path is New Child → `family.dependents` (DOMAIN_WRITE_DECISION.md) — ~0.5–1 day, flag-gated.
 
 ## Verification basis
 

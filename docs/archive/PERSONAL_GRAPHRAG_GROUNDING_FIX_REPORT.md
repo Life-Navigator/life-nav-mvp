@@ -19,8 +19,8 @@ benefits, retirement plans, goals, career profile, job applications, education, 
 persona profile, and prior chat sessions** directly from their systems of record, into one labeled
 `AUTHORITATIVE_PERSONAL_FACTS` section (per-domain sub-blocks; empty domains render "NONE on file — do not
 invent"). The `ANSWER_SYSTEM` rules apply to **any** personal fact — never invent goals, employers,
-schools, simulation results, or what was said in a prior chat. Verified live (young_professional):
-transactions grounded, goals + career _refused_ (no invention), persona profession grounded, finance
+schools, simulation results, or what was said in a prior chat. Verified live (young*professional):
+transactions grounded, goals + career \_refused* (no invention), persona profession grounded, finance
 intact.
 
 ---
