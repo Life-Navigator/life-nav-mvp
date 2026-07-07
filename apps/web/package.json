@@ -47,7 +47,7 @@
     "resend": "^6.12.4",
     "three": "^0.184.0",
     "uuid": "^9.0.1",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^3.22.0"
   },
   "devDependencies": {
