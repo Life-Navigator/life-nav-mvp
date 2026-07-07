@@ -83,6 +83,12 @@ def get_gemini(settings: Settings = Depends(get_settings)) -> GeminiClient:
     return GeminiClient.from_settings(settings)
 
 
+def get_plaid(settings: Settings = Depends(get_settings)) -> "PlaidClient":
+    from .clients.plaid import PlaidClient
+
+    return PlaidClient.from_settings(settings)
+
+
 def get_cost_meter() -> CostMeter:
     return _cost_meter
 

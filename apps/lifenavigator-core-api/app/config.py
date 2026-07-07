@@ -38,6 +38,16 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("VERTEX_GEMINI_MODEL", "VERTEX_MODEL", "vertex_gemini_model"),
     )
 
+    # --- Plaid (financial data — BACKEND ONLY; creds must never live on the Vercel frontend) ---
+    # The backend owns the Plaid integration: it exchanges tokens, pulls accounts/transactions/
+    # liabilities, and persists into finance.* (which the frontend then only renders).
+    plaid_client_id: str = ""
+    plaid_client_secret: str = ""
+    plaid_env: str = "sandbox"  # sandbox | development | production
+
+    def plaid_configured(self) -> bool:
+        return bool(self.plaid_client_id and self.plaid_client_secret)
+
     # --- Qdrant (grounding vectors) ---
     qdrant_url: str = ""
     qdrant_api_key: str = ""

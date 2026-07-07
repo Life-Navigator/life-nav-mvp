@@ -254,6 +254,31 @@ class SupabaseClient:
             log.warning("supabase upsert %s failed: %s", table, exc)
             return []
 
+    async def delete(
+        self,
+        table: str,
+        *,
+        filters: dict[str, str],
+        schema: str = "public",
+    ) -> bool:
+        """Service-role delete of rows matching ``filters`` (PostgREST ``col=eq.value``).
+        Returns True on success (or no-op), False on error. Best-effort — used to clear a
+        user's prior finance rows before re-activating a Plaid persona."""
+        if not self.configured or not filters:
+            return False
+        headers = self._headers()
+        if schema != "public":
+            headers["Content-Profile"] = schema
+        endpoint = f"{self._url}/rest/v1/{table}"
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.delete(endpoint, headers=headers, params=filters)
+                resp.raise_for_status()
+                return True
+        except Exception as exc:  # noqa: BLE001
+            log.warning("supabase delete %s failed: %s", table, exc)
+            return False
+
     async def ready(self) -> bool:
         """Readiness ping — never raises."""
         if not self.configured:
