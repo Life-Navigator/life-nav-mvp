@@ -148,32 +148,19 @@ jobs:
             apps/web/playwright-report/
           retention-days: 14
 
-  # ── Python Pipeline Validation ─────────────────────────────────────
-  python-validate:
-    name: Validate Python Pipeline
+  # ── Ontology Validation ────────────────────────────────────────────
+  # (The graphrag-pipeline py_compile step was removed with that app — it's superseded by the Rust
+  #  ingestion-worker. The ontology TTL files it consumed are still validated here.)
+  validate-ontology:
+    name: Validate Ontology
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/graphrag-pipeline
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-          cache-dependency-path: apps/graphrag-pipeline/requirements.txt
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      - name: Check syntax (compile all .py files)
-        run: python -m py_compile api/sync.py api/query.py api/health.py api/reindex.py api/ontology.py lib/config.py lib/supabase_client.py lib/neo4j_client.py lib/qdrant_client.py lib/gemini_client.py lib/entity_mapper.py lib/graph_schema.py lib/embedding_builder.py lib/rrf.py
 
       - name: Verify ontology files exist
         run: |
           for f in core/person.ttl core/document.ttl core/cross-domain.ttl health/condition.ttl career/profile.ttl career/job.ttl education/credentials.ttl education/institutions.ttl finance/accounts.ttl finance/instruments.ttl finance/strategies.ttl goals/goal.ttl; do
-            if [ ! -f "../../ontology/$f" ]; then
+            if [ ! -f "ontology/$f" ]; then
               echo "::error::Missing ontology file: ontology/$f"
               exit 1
             fi
@@ -247,7 +234,7 @@ jobs:
     name: Deploy Edge Functions
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [build, unit-tests, secrets-scan, python-validate]
+    needs: [build, unit-tests, secrets-scan, validate-ontology]
     environment: production
     steps:
       - uses: actions/checkout@v4
