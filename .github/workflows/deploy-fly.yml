@@ -31,7 +31,7 @@ jobs:
       ingestion_worker: ${{ steps.f.outputs.ingestion_worker }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: f
         with:
           filters: |
