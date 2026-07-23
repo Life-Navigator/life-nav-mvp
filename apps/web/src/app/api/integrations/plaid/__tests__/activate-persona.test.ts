@@ -1,46 +1,17 @@
 /** @jest-environment node */
 
+// The route is now a thin proxy to core-api: it authenticates, records the
+// activation funnel events, and forwards the persona_id with the caller's JWT.
+// All Plaid work + finance.* persistence happen on the backend, so these tests
+// assert the proxy contract (forwarding + analytics), not direct Plaid calls.
+
 const mockGetUser = jest.fn();
 const mockGetSession = jest.fn();
 jest.mock('@/lib/supabase/server', () => ({
   createServerSupabaseClient: jest.fn(async () => ({
     auth: { getUser: mockGetUser, getSession: mockGetSession },
-    from: () => ({ insert: jest.fn(async () => ({ error: null })) }),
   })),
-  createServiceRoleClient: jest.fn(() => ({
-    // profiles.update(...).eq(...).select('id') → returns the updated row.
-    from: () => ({
-      update: () => ({
-        eq: () => ({ select: jest.fn(async () => ({ data: [{ id: 'user-1' }], error: null })) }),
-      }),
-    }),
-  })),
-}));
-
-const mockCreateSandbox = jest.fn();
-const mockExchange = jest.fn();
-const mockGetAccounts = jest.fn();
-const mockGetTransactions = jest.fn();
-const mockGetLiabilities = jest.fn();
-jest.mock('@/lib/integrations/plaid/client', () => ({
-  createSandboxPublicToken: (...a: unknown[]) => mockCreateSandbox(...a),
-  exchangePublicToken: (...a: unknown[]) => mockExchange(...a),
-  getAccounts: (...a: unknown[]) => mockGetAccounts(...a),
-  getTransactions: (...a: unknown[]) => mockGetTransactions(...a),
-  getLiabilities: (...a: unknown[]) => mockGetLiabilities(...a),
-}));
-
-const mockPersistItem = jest.fn();
-const mockPersistAccounts = jest.fn();
-const mockPersistTxns = jest.fn();
-const mockPersistPersonaProfile = jest.fn();
-const mockClearPrior = jest.fn();
-jest.mock('@/lib/integrations/plaid/persist', () => ({
-  persistPlaidItem: (...a: unknown[]) => mockPersistItem(...a),
-  persistAccounts: (...a: unknown[]) => mockPersistAccounts(...a),
-  persistTransactions: (...a: unknown[]) => mockPersistTxns(...a),
-  persistPersonaProfile: (...a: unknown[]) => mockPersistPersonaProfile(...a),
-  clearPriorFinanceData: (...a: unknown[]) => mockClearPrior(...a),
+  createServiceRoleClient: jest.fn(() => ({})),
 }));
 
 const mockRecordEvent = jest.fn();
@@ -54,54 +25,43 @@ function req(body: unknown) {
   return { json: async () => body } as never;
 }
 
+const CORE = 'https://lifenavigator-core-api.fly.dev';
+
 beforeEach(() => {
   jest.clearAllMocks();
-  process.env.PLAID_CLIENT_ID = 'test-id';
-  process.env.PLAID_CLIENT_SECRET = 'test-secret';
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'svc';
+  delete process.env.NEXT_PUBLIC_API_URL; // skip the best-effort recommendation kickoff
   mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
-  mockGetSession.mockResolvedValue({ data: { session: null } });
-});
-
-it('rejects an unknown persona_id with 400', async () => {
-  const res = await POST(req({ persona_id: 'not_a_real_persona' }));
-  expect(res.status).toBe(400);
-  expect(mockCreateSandbox).not.toHaveBeenCalled();
+  mockGetSession.mockResolvedValue({ data: { session: { access_token: 'jwt-123' } } });
+  mockRecordEvent.mockResolvedValue(undefined);
+  global.fetch = jest.fn();
 });
 
 it('rejects unauthenticated callers with 401', async () => {
   mockGetUser.mockResolvedValue({ data: { user: null } });
   const res = await POST(req({ persona_id: 'young_professional' }));
   expect(res.status).toBe(401);
+  expect(global.fetch).not.toHaveBeenCalled();
 });
 
-it('returns 503 when Plaid is not configured', async () => {
-  delete process.env.PLAID_CLIENT_ID;
-  const res = await POST(req({ persona_id: 'young_professional' }));
-  expect(res.status).toBe(503);
+it('rejects a missing/invalid persona_id with 400', async () => {
+  const res = await POST(req({ persona_id: 123 }));
+  expect(res.status).toBe(400);
+  expect(global.fetch).not.toHaveBeenCalled();
 });
 
-it('valid persona: exchanges sandbox token, syncs accounts, writes audit event', async () => {
-  mockCreateSandbox.mockResolvedValue({ publicToken: 'public-sandbox-token' });
-  mockExchange.mockResolvedValue({ accessToken: 'access-token', itemId: 'item-1' });
-  mockGetAccounts.mockResolvedValue([
-    {
-      account_id: 'acct-1',
-      name: 'Checking',
-      type: 'depository',
-      subtype: 'checking',
-      balances: { current: 100 },
-    },
-  ]);
-  mockPersistItem.mockResolvedValue(undefined);
-  mockPersistAccounts.mockResolvedValue({ 'acct-1': 'fa-1' });
-  mockClearPrior.mockResolvedValue(undefined);
-  mockGetLiabilities.mockResolvedValue({ credit: [] });
-  mockGetTransactions.mockResolvedValue({ transactions: [], totalTransactions: 0 });
-  mockPersistTxns.mockResolvedValue(0);
-  mockPersistPersonaProfile.mockResolvedValue(undefined);
-  mockRecordEvent.mockResolvedValue(undefined);
+it('forwards the persona_id + JWT to the backend and passes through the response', async () => {
+  (global.fetch as jest.Mock).mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      success: true,
+      persona_id: 'young_professional',
+      accounts_linked: 3,
+      graph_promotion: 'enqueued',
+    }),
+  });
 
   const res = await POST(req({ persona_id: 'young_professional' }));
   const json = await res.json();
@@ -109,18 +69,18 @@ it('valid persona: exchanges sandbox token, syncs accounts, writes audit event',
   expect(res.status).toBe(200);
   expect(json.success).toBe(true);
   expect(json.graph_promotion).toBe('enqueued');
-  // sandbox token exchange works
-  expect(mockCreateSandbox).toHaveBeenCalledTimes(1);
-  expect(mockExchange).toHaveBeenCalledWith('public-sandbox-token');
-  // account sync (persisting accounts fires the graph-promotion trigger = the
-  // "financial activation job")
-  expect(mockPersistItem).toHaveBeenCalledTimes(1);
-  expect(mockPersistAccounts).toHaveBeenCalledTimes(1);
-  // persona metadata persisted (dashboard/recs + graph promotion)
-  expect(mockPersistPersonaProfile).toHaveBeenCalledTimes(1);
-  // prior persona data cleared FIRST (kills the persona-merge corruption)
-  expect(mockClearPrior).toHaveBeenCalledTimes(1);
-  // funnel: selection recorded + activation recorded
+
+  // Proxied to the backend activate-persona endpoint with the JWT + persona_id.
+  expect(global.fetch).toHaveBeenCalledWith(
+    `${CORE}/v1/finance/plaid/activate-persona`,
+    expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ Authorization: 'Bearer jwt-123' }),
+      body: JSON.stringify({ persona_id: 'young_professional' }),
+    })
+  );
+
+  // Funnel: selection recorded + activation recorded.
   expect(mockRecordEvent).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({ event_type: 'sample_financial_profile_selected' })
@@ -128,5 +88,20 @@ it('valid persona: exchanges sandbox token, syncs accounts, writes audit event',
   expect(mockRecordEvent).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({ event_type: 'sample_financial_profile_activated' })
+  );
+});
+
+it('passes through a backend 503 and records a failure event', async () => {
+  (global.fetch as jest.Mock).mockResolvedValue({
+    ok: false,
+    status: 503,
+    json: async () => ({ detail: 'Sample financial profiles are not available yet.' }),
+  });
+
+  const res = await POST(req({ persona_id: 'young_professional' }));
+  expect(res.status).toBe(503);
+  expect(mockRecordEvent).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ event_type: 'persona_activation_failed' })
   );
 });

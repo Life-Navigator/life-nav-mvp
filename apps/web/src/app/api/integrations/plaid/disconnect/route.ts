@@ -1,44 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { removeItem } from '@/lib/integrations/plaid/client';
-import { safeApiError } from '@/lib/security/safe-error';
+import { CORE_API, sessionToken } from '../_core';
 
 export const dynamic = 'force-dynamic';
 
+// Proxy to core-api: the backend revokes the Plaid item (creds are Fly secrets)
+// and deletes the finance.plaid_items row for the caller's own item only.
 export async function POST(request: NextRequest) {
-  const supabase = await createServerSupabaseClient();
-  if (!supabase) return NextResponse.json({ error: 'Not configured' }, { status: 503 });
+  const t = await sessionToken();
+  if (!t) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { itemId } = await request.json().catch(() => ({}));
+  if (!itemId) return NextResponse.json({ error: 'Missing itemId' }, { status: 400 });
 
-  try {
-    const { itemId } = await request.json();
-    if (!itemId) return NextResponse.json({ error: 'Missing itemId' }, { status: 400 });
-
-    const { data: item, error } = await (supabase as any)
-      .from('plaid_items')
-      .select('access_token')
-      .eq('user_id', user.id)
-      .eq('item_id', itemId)
-      .single();
-
-    if (error || !item) {
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 });
-    }
-
-    await removeItem(item.access_token);
-
-    await (supabase as any)
-      .from('plaid_items')
-      .delete()
-      .eq('user_id', user.id)
-      .eq('item_id', itemId);
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    return safeApiError({ code: 'internal_error', internal: err });
-  }
+  const r = await fetch(`${CORE_API}/v1/finance/plaid/disconnect`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item_id: itemId }),
+    cache: 'no-store',
+  });
+  return NextResponse.json(await r.json().catch(() => ({ error: 'Disconnect failed.' })), {
+    status: r.status,
+  });
 }

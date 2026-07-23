@@ -4,6 +4,7 @@
 - POST /v1/finance/plaid/activate-persona   → activate a sandbox persona for the caller
 - POST /v1/finance/plaid/link-token         → create a Link token (real-user connect)
 - POST /v1/finance/plaid/exchange           → exchange a public_token + sync (real-user)
+- POST /v1/finance/plaid/disconnect         → remove a linked item (caller's own)
 
 All write the caller's own finance.* rows (user_id from the verified JWT, never the body).
 """
@@ -94,3 +95,40 @@ async def exchange(
     except Exception as exc:  # noqa: BLE001
         log.exception("exchange failed: %s", exc)
         raise HTTPException(status_code=500, detail="Could not link your account. Please try again.")
+
+
+@router.post("/disconnect")
+async def disconnect(
+    item_id: str = Body(..., embed=True),
+    user: AuthenticatedUser = Depends(authenticated),
+    plaid: PlaidClient = Depends(get_plaid),
+    sb: SupabaseClient = Depends(get_supabase),
+) -> dict:
+    """Remove a linked Plaid item (caller's own only) and delete its stored row.
+
+    Looks up the access token by (user_id, plaid_item_id) so a caller can only
+    disconnect their own item; revokes it at Plaid, then deletes the finance row.
+    """
+    if not plaid.configured:
+        raise HTTPException(status_code=503, detail="Bank connections are not available yet.")
+    rows = await sb.select(
+        "plaid_items",
+        columns="access_token_encrypted",
+        filters={"user_id": f"eq.{user.user_id}", "plaid_item_id": f"eq.{item_id}"},
+        schema="finance",
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Linked account not found.")
+    access_token = rows[0].get("access_token_encrypted")
+    try:
+        if access_token:
+            await plaid.item_remove(access_token)
+    except PlaidError as exc:
+        # Item may already be gone at Plaid; still delete our row so it stops rendering.
+        log.warning("disconnect item_remove error (deleting row anyway): %s", exc)
+    await sb.delete(
+        "plaid_items",
+        filters={"user_id": f"eq.{user.user_id}", "plaid_item_id": f"eq.{item_id}"},
+        schema="finance",
+    )
+    return {"success": True}
