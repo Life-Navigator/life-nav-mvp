@@ -99,7 +99,10 @@ it('passes through a backend 503 and records a failure event', async () => {
   });
 
   const res = await POST(req({ persona_id: 'young_professional' }));
+  const json = await res.json();
   expect(res.status).toBe(503);
+  // Backend `detail` is normalized to `error` for the consuming UI.
+  expect(json.error).toBe('Sample financial profiles are not available yet.');
   expect(mockRecordEvent).toHaveBeenCalledWith(
     expect.anything(),
     expect.objectContaining({ event_type: 'persona_activation_failed' })

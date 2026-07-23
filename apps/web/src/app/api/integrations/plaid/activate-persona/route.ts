@@ -105,7 +105,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json(data, { status: r.status });
+    // The consuming UI reads `error`; FastAPI returns `detail`. Normalize on
+    // failure so specific backend messages (e.g. "profile still being set up")
+    // still surface instead of a generic fallback.
+    const payload = r.ok
+      ? data
+      : { ...data, error: data?.detail ?? data?.error ?? 'Activation failed. Please try again.' };
+    return NextResponse.json(payload, { status: r.status });
   } catch (err) {
     console.error('Persona activation proxy error:', (err as Error)?.message);
     if (svc) {

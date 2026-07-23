@@ -19,8 +19,11 @@ export async function POST(_request: NextRequest) {
     body: '{}',
     cache: 'no-store',
   });
+  const data = await r.json().catch(() => ({ error: 'Bank connections are not available yet.' }));
+  // The consuming button reads `linkToken` (camelCase, as the old client returned);
+  // the backend returns `link_token`. Expose both so Plaid Link opens correctly.
   return NextResponse.json(
-    await r.json().catch(() => ({ error: 'Bank connections are not available yet.' })),
+    { ...data, linkToken: data?.link_token ?? data?.linkToken },
     { status: r.status }
   );
 }
