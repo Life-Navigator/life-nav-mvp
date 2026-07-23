@@ -43,3 +43,27 @@ def test_labs_meds_require_review_boundary():
     assert d.allowed  # not a diagnosis/dosing request...
     assert d.boundary["requires_human_review"] is True  # ...but flagged for physician review
     assert d.boundary["escalation_path"] == "physician"
+
+
+# --- WS-B (F8): the gate must stop over-blocking benign wellness while still catching real medical intent ---
+def test_benign_wellness_no_longer_blocked():
+    """These are coaching/finance questions that the old substring gate wrongly blocked."""
+    for q in [
+        "What's a good creatine dosage for training?",   # supplement, not a drug
+        "I want to start taking morning walks",           # 'start taking' was a bare trigger
+        "How do I read my prescription insurance benefits?",  # a finance/benefits question
+        "Do I have enough protein in my diet?",           # 'do i have' with no condition cue
+        "What's a solid sleep protocol for better recovery?",  # 'protocol' was over-flagged
+        "How much should I take of my protein powder?",   # dosing intent + wellness context → allow
+    ]:
+        assert G.evaluate(q).allowed, q
+
+
+def test_real_medical_intent_still_blocked():
+    for q in [
+        "How much should I take of ibuprofen for a headache?",  # drug dosing intent, no wellness
+        "What dose of my blood pressure medication is right?",  # dose intent
+        "Prescribe me something for anxiety",                    # prescription intent
+        "Do I have diabetes?",                                   # 'do i have' + condition cue
+    ]:
+        assert not G.evaluate(q).allowed, q
