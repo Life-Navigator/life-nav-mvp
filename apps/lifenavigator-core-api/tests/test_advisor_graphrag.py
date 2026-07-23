@@ -283,6 +283,25 @@ async def test_advisor_unsupported_relationship_triggers_fallback():
     assert out["llm_status"].startswith("fallback:")
 
 
+def test_counsel_fallback_is_domain_aware_not_finance():
+    """WS-A: a NON-finance turn whose number was gated must open THAT domain's conversation, never the
+    finance 'income/savings/expenses' deflection (the education-misframe bug). Finance turns keep it."""
+    orch = AdvisorOrchestrator(
+        FakeRM(_base()),
+        AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH)),
+        FakeLLM(None),
+    )
+    edu = {"assistant_message": "x", "pending_key": "k", "options": ["a"]}
+    orch._apply_counsel_fallback(edu, cause="trust_spine_block", domains=["education"])
+    assert edu["assistant_message"] == AdvisorOrchestrator._DOMAIN_COUNSEL["education"]
+    assert "income, savings" not in edu["assistant_message"]
+    assert edu["pending_key"] is None and edu["options"] is None
+
+    fin = {"assistant_message": "x", "pending_key": None, "options": None}
+    orch._apply_counsel_fallback(fin, cause="trust_spine_block", domains=["finance"])
+    assert "income, savings" in fin["assistant_message"]
+
+
 @pytest.mark.asyncio
 async def test_relationship_turn_still_respects_rejected_goal():
     rejected = [{"rejected_goal": "advance my career"}]

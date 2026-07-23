@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from ..models.common import UserContext
-from .advisor_agents import domains_for
+from .advisor_agents import domains_for, route_domains
 from .advisor_facts import build_fact_packet, numbers_in_facts
 
 LIFE = "life"
@@ -270,6 +270,9 @@ class AdvisorContext:
     # message. None/[] means the legacy broad advisor (back-compat).
     active_agent: Optional[dict[str, Any]] = None
     agent_domains: list[str] = field(default_factory=list)
+    # The MESSAGE's topic domains (education/career/health/…), used to append the matching conversational
+    # playbook to the advisor prompt. Empty when the route is broad/ambiguous (no single topic).
+    turn_domains: list[str] = field(default_factory=list)
     # Deterministic finance figures (net worth, cash flow, emergency-fund range, down-payment scenarios, debt
     # payoff, savings target, affordability band) computed by FinanceScenarioEngine — the numbers the LLM
     # INTERPRETS. None unless the turn is finance. Missing inputs are named gaps (needs_*), never fabricated.
@@ -451,6 +454,10 @@ class AdvisorContextBuilder:
             except Exception:  # noqa: BLE001 — grounding is an enhancement; never break the turn
                 finance_scenarios = None
         stage = base.get("pending_key") or ("complete" if base.get("complete") else "discovery")
+        # turn_domains: the MESSAGE's topic for per-domain prompt guidance. route_domains returns a focused
+        # subset, or all domains when ambiguous — treat the broad fallback (≥4) as "no specific topic".
+        _routed = route_domains(message)
+        turn_domains = [] if len(_routed) >= 4 else _routed
         return AdvisorContext(
             user_id=ctx.user_id,
             user_message=message,
@@ -477,5 +484,6 @@ class AdvisorContextBuilder:
             domain_facts=domain_facts,
             active_agent=active_agent,
             agent_domains=agent_domains,
+            turn_domains=turn_domains,
             finance_scenarios=finance_scenarios,
         )

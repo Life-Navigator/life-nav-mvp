@@ -544,21 +544,40 @@ class AdvisorOrchestrator:
         "I can't stand behind, but I'll give you the most useful read I can from what you provide."
     )
 
+    # Domain-shaped fallbacks: a non-finance turn must NEVER get the finance "give me your income/savings/
+    # expenses" deflection (that was the education-misframe bug). When the routed domain is education/career/
+    # health/family, open THAT conversation with a substantive, counsel-first prompt instead of a money ask.
+    _DOMAIN_COUNSEL = {
+        "education": ("Let's actually dig into your education. Tell me what you're weighing — a degree, a "
+                      "certificate or credential, a bootcamp, grad school, or the ROI of one path versus staying "
+                      "put — plus where you are now (field, role, rough timeline). I'll lay out how the options "
+                      "compare, what tends to pay off, and the few things that decide it."),
+        "career": ("Let's get into your career. Tell me what's in play — a move, a promotion, a pivot, or what "
+                   "you're worth in the market — and where you stand now (role, field, years in). I'll map the "
+                   "realistic paths, the tradeoffs between them, and what would actually move the needle."),
+        "health": ("Let's build your health plan. Tell me what you're focused on — training, nutrition, sleep, "
+                   "recovery, energy — and your starting point and any constraints, and I'll give you a concrete "
+                   "approach and the tradeoffs. Anything that needs a clinician, I'll flag and point you to the "
+                   "right professional."),
+        "family": ("Let's map the family side. Tell me what you're weighing — guardianship, a will or estate "
+                   "plan, protecting dependents, or a big family decision — and I'll walk through the "
+                   "considerations, the sequence, and the calls that matter most."),
+    }
+
     def _apply_counsel_fallback(self, base: dict[str, Any], *, cause: str = "",
-                                issues: Optional[list[dict[str, Any]]] = None) -> None:
-        """Cause-aware fallback copy (item 3). For a trust-spine number block, say WHAT was blocked, WHY, and
-        WHAT verified input unlocks a precise answer — never a bare 'I want to give you a grounded answer'."""
+                                issues: Optional[list[dict[str, Any]]] = None,
+                                domains: Optional[list[str]] = None) -> None:
+        """Cause-aware AND domain-aware fallback copy. For a trust-spine number block, say WHAT was blocked, WHY,
+        and WHAT verified input unlocks a precise answer. For a NON-finance routed domain, open that domain's
+        conversation rather than defaulting to the finance income/savings deflection."""
         types = {i.get("type") for i in (issues or [])}
+        primary = next((d for d in (domains or []) if d in self._DOMAIN_COUNSEL), None)
         if cause == "trust_spine_block" and "unsupported_monthly_payment" in types:
+            # Inherently a finance computation — keep the finance-specific copy.
             msg = ("I won't put an exact monthly payment on that yet — that needs the interest rate and loan term, "
                    "which I don't have. Share the rate and term (or a lender quote) and I'll compute the payment, "
                    "total interest, and how it fits your budget. I can still talk through the down payment and what "
                    "to watch for, qualitatively.")
-        elif cause == "trust_spine_block":
-            msg = ("I won't put an exact dollar figure on that yet — a precise number would need your verified "
-                   "income, savings, and monthly expenses, which I don't have on file. Share those (or connect your "
-                   "accounts) and I'll run the real math and the tradeoffs. I'd rather be useful than guess at a "
-                   "number I can't stand behind — tell me the inputs and I'll be specific.")
         elif cause in ("policy_safety_gate", "safety_gate"):
             msg = ("This is an area I can't give a definitive ruling on (medical, legal, tax, or a specific "
                    "product). I can lay out the key considerations, a checklist, and the exact questions to take to "
@@ -566,6 +585,15 @@ class AdvisorOrchestrator:
         elif cause in ("infrastructure_auth", "provider_timeout", "provider_error"):
             msg = ("I hit a brief issue reaching my reasoning engine, so I won't guess. Try again in a moment and "
                    "I'll give you the full analysis.")
+        elif cause == "trust_spine_block" and primary:
+            # Education/career/health/family turn whose number was gated — engage the actual topic instead of
+            # the finance income/savings deflection (the education-misframe bug). Never ask for money inputs.
+            msg = self._DOMAIN_COUNSEL[primary]
+        elif cause == "trust_spine_block":
+            msg = ("I won't put an exact dollar figure on that yet — a precise number would need your verified "
+                   "income, savings, and monthly expenses, which I don't have on file. Share those (or connect your "
+                   "accounts) and I'll run the real math and the tradeoffs. I'd rather be useful than guess at a "
+                   "number I can't stand behind — tell me the inputs and I'll be specific.")
         else:
             msg = self._COUNSEL_FALLBACK
         base["assistant_message"] = msg
@@ -619,7 +647,7 @@ class AdvisorOrchestrator:
                 tr["fallback_cause"], tr["llm_last_error"] = cause, last_error
                 tr["auth_token_available"] = cause != "infrastructure_auth"
                 tr["gate_that_blocked"] = ""
-                self._apply_counsel_fallback(base, cause=cause)
+                self._apply_counsel_fallback(base, cause=cause, domains=route_domains(message))
                 # LOUD: a model/auth failure must never be a silent quality drop (org-policy / ADC visibility).
                 log.warning(json.dumps({"event": "advisor_model_fallback", "turn_id": tr["turn_id"],
                                         "reason": "llm_unavailable_or_unparseable", "cause": cause,
@@ -671,7 +699,7 @@ class AdvisorOrchestrator:
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"], tr["validator_reason"] = (
                     True, "; ".join(reasons), "rejected", "; ".join(reasons))
                 tr["fallback_cause"], tr["gate_that_blocked"] = cause, "; ".join(reasons)[:120]
-                self._apply_counsel_fallback(base, cause=cause, issues=issues)
+                self._apply_counsel_fallback(base, cause=cause, issues=issues, domains=route_domains(message))
                 return
             composed = _compose(safe)
             lap("compose")
@@ -679,7 +707,7 @@ class AdvisorOrchestrator:
                 base["llm_status"] = "fallback:empty"
                 tr["fallback_used"], tr["fallback_reason"], tr["validator_result"] = True, "empty_composed", "accepted"
                 tr["fallback_cause"] = "malformed_output"
-                self._apply_counsel_fallback(base, cause="malformed_output")
+                self._apply_counsel_fallback(base, cause="malformed_output", domains=route_domains(message))
                 return
             # Merge: only the human-facing text changes; all deterministic outcomes are preserved.
             base["assistant_message"] = composed
