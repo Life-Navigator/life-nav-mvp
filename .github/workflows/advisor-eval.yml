@@ -1,0 +1,58 @@
+name: Advisor Eval
+
+# On-demand trust/quality eval of the LIVE advisor (apps/web/advisor-eval.mjs). Drives the deployed Fly
+# advisor with 12 personas + an adversarial suite and runs the deterministic Success Criteria (no fabricated
+# $ figures, no ungrounded risks, rejected-goal-never-resurfaces, no 5xx). Creates + DELETES ~13 test users
+# on prod Supabase and spends a little Gemini budget, so it's manual (workflow_dispatch), never on push.
+#
+# Secrets used (set in repo → Settings → Secrets and variables → Actions):
+#   SUPABASE_URL · SUPABASE_ANON_KEY · SUPABASE_SERVICE_ROLE_KEY
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 'Optional note for this run (shows in the run title)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    name: Run advisor eval (live prod)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: pnpm
+
+      - name: Install workspace deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Assemble eval creds
+        run: |
+          printf '%s\n%s\n%s\n' \
+            "${{ secrets.SUPABASE_URL }}" \
+            "${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" > /tmp/sweep_creds.txt
+
+      - name: Run advisor eval
+        working-directory: apps/web
+        run: node advisor-eval.mjs
+
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: /tmp/eval_results.json
+          if-no-files-found: ignore
