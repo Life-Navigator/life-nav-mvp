@@ -112,6 +112,31 @@ async function run() {
     (advCands?.top_themes || []).some((t) => /career/i.test(String(t)));
   turns.push({ persona: 'adversarial', kind: 'adversarial', advLog, careerResurfaced });
 
+  // ---- Advisor LLM suite (drives /v1/life/advisor/chat — the model path, NOT deterministic discovery) ----
+  // This is what actually exercises the advisor prompt + validator. Includes the reported education-misframe.
+  const PROBES = [
+    { tag: 'education-open', msg: "Let's discuss my education, please" },
+    { tag: 'career-move', msg: 'Should I take a manager role or stay a senior engineer?' },
+    { tag: 'health-plan', msg: 'Give me a beginner strength-training plan for 3 days a week' },
+    { tag: 'finance-afford', msg: 'I make $8,000 a month — can I afford $2,400 rent?' },
+  ];
+  const au = await mkUser('advisor-llm');
+  const advisorTurns = [];
+  for (const p of PROBES) {
+    const t0 = Date.now();
+    const r = await api(au.token, '/v1/life/advisor/chat', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: p.msg }),
+    });
+    const b = await r.json().catch(() => ({}));
+    advisorTurns.push({
+      tag: p.tag, status: r.status, latency_ms: Date.now() - t0,
+      llm_status: b.llm_status, prompt_version: b.prompt_version,
+      reply: b.assistant_message || '', halluc: hallucinatedNumbers(b.assistant_message || '', [p.msg]),
+    });
+  }
+  turns.push({ persona: 'advisor-llm', kind: 'advisor', advisorTurns });
+
   writeFileSync('/tmp/eval_results.json', JSON.stringify(turns, null, 2));
 
   // ---- Deterministic scoring ----
@@ -142,6 +167,23 @@ async function run() {
   R('Objective provenance = advisor_inferred (not confirmed)', inferredProv === states.length, `${inferredProv}/${states.length}`);
   R('Rejected goal never resurfaces (adversarial)', adversarial && !adversarial.careerResurfaced);
   R('No 5xx / transport errors', errors.length === 0, errors.map((e) => `${e.persona}:${e.status}`).join(',') || 'clean');
+
+  // ---- Advisor LLM suite scoring (the model path) ----
+  const advisorSuite = turns.find((t) => t.kind === 'advisor');
+  const at = advisorSuite?.advisorTurns || [];
+  const advEnhanced = at.filter((t) => t.llm_status === 'enhanced').length;
+  const eduReply = (at.find((t) => t.tag === 'education-open')?.reply || '').toLowerCase();
+  const eduFinanceDeflect =
+    /income[^.]*savings|savings[^.]*expenses|connect your accounts|exact dollar figure/.test(eduReply);
+  const advHalluc = at.filter((t) => (t.halluc || []).length > 0);
+  console.log('\n--- Advisor LLM suite (/v1/life/advisor/chat) ---');
+  console.log(`llm_status: ${at.map((t) => `${t.tag}=${t.llm_status}`).join(' ')} | prompt=${at[0]?.prompt_version || '?'}`);
+  R('Advisor LLM runs (not all deterministic fallback)', advEnhanced > 0, `${advEnhanced}/${at.length} enhanced`);
+  R('Education prompt is NOT a finance deflection', eduReply.length > 0 && !eduFinanceDeflect,
+    eduFinanceDeflect ? 'STILL finance-deflecting' : (eduReply ? 'clean' : 'empty reply'));
+  R('No fabricated $ in advisor replies', advHalluc.length === 0,
+    advHalluc.map((t) => `${t.tag}:${t.halluc}`).join(' | ') || 'clean');
+
   console.log('\nResults written to /tmp/eval_results.json');
 }
 
