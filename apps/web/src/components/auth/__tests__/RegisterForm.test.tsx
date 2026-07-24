@@ -123,13 +123,15 @@ describe('RegisterForm', () => {
     fireEvent.click(screen.getByRole('button', { name: /create account/i }));
 
     await waitFor(() => {
-      expect(mockSignUp).toHaveBeenCalledWith({
-        email: 'test@example.com',
-        password: STRONG_PASSWORD,
-        options: {
-          data: { name: 'Test User' },
-        },
-      });
+      // objectContaining tolerates options.emailRedirectTo (the confirmation-redirect P0) while still
+      // pinning the params that matter: email, password, and the user's name.
+      expect(mockSignUp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'test@example.com',
+          password: STRONG_PASSWORD,
+          options: expect.objectContaining({ data: { name: 'Test User' } }),
+        })
+      );
       expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'success' }));
       expect(mockPush).toHaveBeenCalledWith('/auth/login?registered=true');
     });

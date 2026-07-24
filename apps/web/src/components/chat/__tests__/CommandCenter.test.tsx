@@ -6,6 +6,8 @@ import { ADVISOR_WELCOME } from '@/lib/chat/advisor';
 jest.mock('@/components/ui/StreamingText', () => ({
   __esModule: true,
   default: ({ text }: { text: string }) => <span>{text}</span>,
+  // StreamedAdvisorMessage calls useStreamedText — in tests render the full text immediately (done=true).
+  useStreamedText: (text: string) => ({ shown: text, done: true }),
 }));
 
 interface FetchOpts {
