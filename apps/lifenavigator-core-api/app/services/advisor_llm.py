@@ -20,7 +20,7 @@ from typing import Any, Optional, Protocol
 log = logging.getLogger("core.advisor_llm")
 
 # Prompt version — logged with each turn (model-router audit compatible).
-ADVISOR_PROMPT_VERSION = "advisor-hybrid-6.0.0"
+ADVISOR_PROMPT_VERSION = "advisor-hybrid-6.1.0"
 
 # Per-task temperature. Advisor work is grounded, not creative — low temperatures throughout, and 0 for
 # anything structured. The orchestrator passes an `intent` and we pick the matching temperature.
@@ -171,6 +171,10 @@ HARD RULES:
   "career.experience_records"). Never assert a degree, role, certification, license, employer, tenure, or
   count that is not in domain_facts. If a career/education thing the user asks about is absent from
   domain_facts, say it's missing and (if useful) point them to add it — do not guess.
+- GRAPH EVIDENCE: `graph_evidence` (when present) is user-scoped material RETRIEVED from the user's own
+  graph/vector store for THIS question — each item carries a title/summary/domain. You MAY use it as grounding
+  and reference its titles/summaries, exactly like `domain_facts` (it is the user's real data). It is NOT a
+  licence to state a number or a goal-relationship that isn't in the numbers / relationship context.
 - ADVICE — what you MAY and MAY NOT recommend:
   * ALLOWED: a grounded STRATEGIC / PERSONAL-FINANCE / LIFE-PLANNING recommendation reasoned only from the
     user's stated facts — e.g. prioritize high-interest debt before investing, this purchase looks affordable
@@ -222,6 +226,74 @@ Respond with a SINGLE JSON object only (no prose, no markdown fences) matching e
 Always populate decision_frame, tradeoffs (≥2), what_we_know (≥1), recommendation, and what_we_still_need
 (1-3). Populate next_question + why_this_question when a question is warranted (see section 6); when you've
 fully answered a direct request, leave them as empty strings. Leave reflection empty; the sections replace it."""
+
+
+# --- Per-domain conversational playbooks (WS-A.2) --------------------------------------------------------
+# ADVISOR_SYSTEM is finance/numbers-heavy by necessity (that's the trust spine), but it gave the model NO
+# frame for holding a qualitative education/career/health conversation — so non-finance turns defaulted to a
+# finance "give me your income" deflection. These blocks are appended to the system prompt ONLY for the
+# turn's routed domain, so an education turn gets education guidance without weakening the global
+# no-fabrication rules (which still apply to every turn).
+_DOMAIN_PLAYBOOKS: dict[str, str] = {
+    "education": (
+        "EDUCATION — how to advise here (the turn is about education/credentials):\n"
+        "- Lead with the DECISION and its ROI, not a request for money. The real question is usually \"is this "
+        "degree / cert / bootcamp / path worth it for where I want to go?\" — frame what it opens, what it "
+        "costs (time, money, opportunity), and the payback.\n"
+        "- Reason about fit and trajectory: how the credential connects to the user's field, target role, and "
+        "timeline. Name the 2-3 factors that actually decide it (career goal, cost vs. expected return, "
+        "time-to-completion, whether the field rewards the credential vs. experience).\n"
+        "- Give a grounded READ (\"for someone aiming at X, a Y credential tends to pay off / is often not "
+        "worth it because…\"). Typical program lengths and whether a field values a cert vs. a degree are "
+        "GENERAL guidance, not the user's figures.\n"
+        "- Ask about money ONLY if the user raises affordability/funding. Otherwise the sharp question is about "
+        "goal and fit (\"what role are you trying to reach — does it actually require the degree, or is "
+        "experience the faster path?\"), never \"what's your income?\""
+    ),
+    "career": (
+        "CAREER — how to advise here (the turn is about career/role/comp):\n"
+        "- Lead with the move and the tradeoff, not intake. It's usually a fork: take the job / hold out, chase "
+        "the promotion / pivot, specialize / broaden. Name what each path opens and closes.\n"
+        "- Reason about trajectory and leverage: how the decision compounds over 2-5 years, what skills and "
+        "relationships it builds, and market reality for the role/field. Deciding factors: growth vs. "
+        "stability, comp vs. learning, title vs. scope.\n"
+        "- Give a grounded READ (\"given you're aiming at X, leaning toward Y makes sense because…\"). Market "
+        "norms are GENERAL guidance; keep comp qualitative unless the user gives figures.\n"
+        "- The sharp question is about direction and constraints (\"what would make you turn this down?\"), not "
+        "\"what's your salary?\""
+    ),
+    "health": (
+        "HEALTH — how to advise here (the turn is about training/nutrition/sleep/recovery):\n"
+        "- This is COACHING, and you GIVE it — lead with a concrete plan or structure (training split, "
+        "progression, nutrition habits, sleep/recovery), not questions. General coaching numbers (sets/reps, "
+        "rough calories/macros, %1RM, sleep hours) ARE allowed and expected as GENERAL guidance.\n"
+        "- Tailor to the user's stated goal, level, and constraints; state ONE assumption and proceed rather "
+        "than stalling for detail. For any injury/condition, give the plan WITH modifications + one brief "
+        "\"clear this with your doctor/PT\" note — never refuse.\n"
+        "- Keep clinical calls (diagnosis, drug dosing, interpreting labs) out — point to the right "
+        "professional — but keep the coaching.\n"
+        "- The sharp question refines the plan (\"how many days a week can you realistically train?\"), not "
+        "intake."
+    ),
+}
+
+
+def domain_playbook_block(domains: Optional[list[str]]) -> str:
+    """Per-turn domain guidance appended to ADVISOR_SYSTEM. Empty for finance/general turns — the core prompt
+    already covers finance, and a broad/ambiguous route carries no specific topic."""
+    if not domains:
+        return ""
+    picked = [d for d in domains if d in _DOMAIN_PLAYBOOKS]
+    if not picked:
+        return ""
+    header = ("\n\nDOMAIN GUIDANCE FOR THIS TURN — the user's message is about " + ", ".join(picked)
+              + ". Apply the matching playbook(s) below; do NOT default to asking for financial inputs:\n\n")
+    return header + "\n\n".join(_DOMAIN_PLAYBOOKS[d] for d in picked)
+
+
+def _system_for(context: Any) -> str:
+    """ADVISOR_SYSTEM plus the routed domain's conversational playbook (if any)."""
+    return ADVISOR_SYSTEM + domain_playbook_block(getattr(context, "turn_domains", None))
 
 
 class AdvisorLLM(Protocol):
@@ -293,7 +365,7 @@ class GeminiAdvisorLLM:
         user = json.dumps({"guardrails": context.prompt_dict(), "constraints": plan}, ensure_ascii=False, default=str)
         prompt = f"GUARDRAILS_AND_CONSTRAINTS:\n{user}\n\nReason within these guardrails and return the JSON object now."
         try:
-            raw, usage = await self._g.generate_with_usage(ADVISOR_SYSTEM, prompt, temperature=_temperature_for(plan))
+            raw, usage = await self._g.generate_with_usage(_system_for(context), prompt, temperature=_temperature_for(plan))
             self.last_usage, self.last_raw = usage, raw or ""
             out = parse_advisor_json(raw)
             if out is None:
@@ -302,7 +374,7 @@ class GeminiAdvisorLLM:
         except AttributeError:
             # Older Gemini client without generate_with_usage — degrade gracefully (no token telemetry).
             try:
-                raw = await self._g.generate(ADVISOR_SYSTEM, prompt, temperature=_temperature_for(plan))
+                raw = await self._g.generate(_system_for(context), prompt, temperature=_temperature_for(plan))
                 self.last_raw = raw or ""
                 out = parse_advisor_json(raw)
                 if out is None:
@@ -378,7 +450,7 @@ class VertexClaudeAdvisorLLM:
             # NOTE: `temperature` is deprecated/rejected (HTTP 400) by newer Claude models (Opus 4.5+), which
             # manage sampling internally. Older models accepted it; omitting it is safe for all and avoids the
             # 400 → fallback. (Advisor JSON output stays well-formed without an explicit temperature.)
-            "system": ADVISOR_SYSTEM,
+            "system": _system_for(context),
             "messages": [{"role": "user", "content": prompt}],
         }
         try:

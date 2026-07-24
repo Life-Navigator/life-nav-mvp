@@ -330,7 +330,18 @@ def get_advisor_orchestrator(
         scenarios = FinanceScenarioEngine(supabase, FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)))
     except Exception:  # noqa: BLE001
         scenarios = None
-    builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life, scenarios=scenarios)
+    # WS-E (Option A): wire live GraphRAG retrieval (Neo4j + Qdrant) into the advisor's grounding. DEFAULT
+    # OFF — the retriever is None until GRAPH_GROUNDING_ENABLED, so the advisor grounds on Supabase exactly
+    # as before. Enable only after the eval harness confirms it doesn't regress trust. Constructed lazily.
+    retriever: Any = None
+    if os.environ.get("GRAPH_GROUNDING_ENABLED", "false").lower() in ("1", "true", "yes"):
+        try:
+            from .grounding.retriever import Retriever
+            retriever = Retriever(gemini=gemini, qdrant=get_qdrant(settings), neo4j=get_neo4j(settings))
+        except Exception:  # noqa: BLE001 — grounding is optional; never block advisor construction
+            retriever = None
+    builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life, scenarios=scenarios,
+                                    retriever=retriever)
     if use_claude:
         # Claude on Vertex. ADC by default (no API key); a static VERTEX_ACCESS_TOKEN still wins if set.
         from .clients.vertex_auth import AdcTokenProvider
@@ -338,7 +349,7 @@ def get_advisor_orchestrator(
         llm: Any = VertexClaudeAdvisorLLM(
             project=os.environ.get("VERTEX_PROJECT", "") or settings.vertex_project,
             region=os.environ.get("VERTEX_REGION", "global"),
-            model=os.environ.get("ADVISOR_MODEL", "claude-opus-4-1@20250805"),
+            model=os.environ.get("ADVISOR_MODEL", "claude-opus-4-8"),
             token=static_tok,
             token_provider=None if static_tok else AdcTokenProvider(),
         )

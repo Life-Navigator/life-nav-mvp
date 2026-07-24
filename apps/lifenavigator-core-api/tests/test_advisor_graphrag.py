@@ -283,6 +283,25 @@ async def test_advisor_unsupported_relationship_triggers_fallback():
     assert out["llm_status"].startswith("fallback:")
 
 
+def test_counsel_fallback_is_domain_aware_not_finance():
+    """WS-A: a NON-finance turn whose number was gated must open THAT domain's conversation, never the
+    finance 'income/savings/expenses' deflection (the education-misframe bug). Finance turns keep it."""
+    orch = AdvisorOrchestrator(
+        FakeRM(_base()),
+        AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH)),
+        FakeLLM(None),
+    )
+    edu = {"assistant_message": "x", "pending_key": "k", "options": ["a"]}
+    orch._apply_counsel_fallback(edu, cause="trust_spine_block", domains=["education"])
+    assert edu["assistant_message"] == AdvisorOrchestrator._DOMAIN_COUNSEL["education"]
+    assert "income, savings" not in edu["assistant_message"]
+    assert edu["pending_key"] is None and edu["options"] is None
+
+    fin = {"assistant_message": "x", "pending_key": None, "options": None}
+    orch._apply_counsel_fallback(fin, cause="trust_spine_block", domains=["finance"])
+    assert "income, savings" in fin["assistant_message"]
+
+
 @pytest.mark.asyncio
 async def test_relationship_turn_still_respects_rejected_goal():
     rejected = [{"rejected_goal": "advance my career"}]
@@ -294,3 +313,40 @@ async def test_relationship_turn_still_respects_rejected_goal():
     assert out["llm_status"] == "enhanced"
     titles = [g.get("title") for g in out.get("candidate_goals", [])]
     assert "advance my career" not in titles  # rejected goal never resurfaces, even on a relationship turn
+
+
+# --- WS-E: live GraphRAG retrieval wired into the advisor context (Option A), default-off-safe ---
+class _FakeRetriever:
+    def __init__(self):
+        self.calls = []
+    async def retrieve_personal(self, message, ctx, *, domain=None, limit=10):
+        self.calls.append({"message": message, "domain": domain})
+        return [{"source": "qdrant", "entity_type": "goal", "title": "Buy a home", "score": 0.91}]
+
+
+@pytest.mark.asyncio
+async def test_graph_evidence_wired_when_retriever_present():
+    r = _FakeRetriever()
+    b = AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH), retriever=r)
+    ctx = await b.build(_ctx(), "help me buy a house", _base())
+    assert ctx.graph_evidence and ctx.graph_evidence[0]["title"] == "Buy a home"
+    assert ctx.prompt_dict()["graph_evidence"] == ctx.graph_evidence   # surfaced to the LLM
+    assert r.calls and r.calls[0]["message"] == "help me buy a house"  # query-scoped, real message
+
+
+@pytest.mark.asyncio
+async def test_no_graph_evidence_without_retriever():
+    b = AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH))  # retriever=None (default)
+    ctx = await b.build(_ctx(), "help me buy a house", _base())
+    assert ctx.graph_evidence == []
+    assert ctx.prompt_dict()["graph_evidence"] == []
+
+
+@pytest.mark.asyncio
+async def test_graph_grounding_degrades_on_retriever_error():
+    class Boom:
+        async def retrieve_personal(self, *a, **k):
+            raise RuntimeError("neo4j down")
+    b = AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH), retriever=Boom())
+    ctx = await b.build(_ctx(), "hi", _base())   # must not raise
+    assert ctx.graph_evidence == []

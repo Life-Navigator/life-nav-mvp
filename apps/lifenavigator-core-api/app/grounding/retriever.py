@@ -70,20 +70,33 @@ class Retriever:
             except Exception as exc:  # noqa: BLE001
                 log.warning("vector retrieval degraded: %s", exc)
 
-        # --- graph (Neo4j) scaffold: user-scoped node neighbourhood ---
+        # --- graph (Neo4j): user-scoped, domain-filtered nodes with their real content ---
+        # Every node the worker writes carries tenant_id/entity_id/domain/title/summary (see
+        # ingestion-worker normalizer). Filter to the turn's domain when known and return the title +
+        # summary so the advisor gets the user's actual graph entities as grounding — not a bare label dump.
         if self._neo4j.configured:
             try:
                 rows = await self._neo4j.query_personal(
                     "MATCH (n {tenant_id: $user_id}) "
-                    "RETURN labels(n) AS labels, n.entity_id AS entity_id LIMIT $k",
+                    "WHERE $domain IS NULL OR n.domain = $domain "
+                    "RETURN labels(n) AS labels, n.entity_id AS entity_id, n.title AS title, "
+                    "n.summary AS summary, n.domain AS domain "
+                    "LIMIT $k",
                     user_id=ctx.user_id,
-                    parameters={"k": limit},
+                    parameters={"k": limit, "domain": domain},
                 )
                 for row in rows:
-                    labels = row[0] if len(row) > 0 else None
-                    entity_id = row[1] if len(row) > 1 else None
+                    labels = row[0] if len(row) > 0 and row[0] else None
                     evidence.append(
-                        {"source": "neo4j", "label": labels, "entity_id": entity_id, "score": None}
+                        {
+                            "source": "neo4j",
+                            "label": labels[0] if isinstance(labels, list) and labels else labels,
+                            "entity_id": row[1] if len(row) > 1 else None,
+                            "title": row[2] if len(row) > 2 else None,
+                            "summary": row[3] if len(row) > 3 else None,
+                            "domain": row[4] if len(row) > 4 else None,
+                            "score": None,
+                        }
                     )
             except Exception as exc:  # noqa: BLE001
                 log.warning("graph retrieval degraded: %s", exc)
