@@ -35,8 +35,12 @@ def test_grounded_or_hedged_number_is_allowed(text, allowed):
     assert not blocked(text, allowed), f"should allow: {text} -> blocked {blocked(text, allowed)}"
 
 
-# ---- WS-B TARGET: a general price WITHOUT a recognized benchmark cue is still (over-)blocked. This pins the
-#      exact surface WS-B must relax — it should flip to allowed once non-possessive prices aren't gated. ----
-@pytest.mark.xfail(reason="WS-B: non-possessive general price w/o a hedge cue should not be gated", strict=True)
-def test_uncued_general_price_should_be_allowed_wsb():
-    assert not blocked("A home inspection runs $400 to $600.")
+# ---- WS-B/F2 LANDED: a non-possessive general price ("an inspection runs $400") is no longer over-blocked,
+#      while invented DECISION figures (afford/put-down/invest above) stay blocked. ----
+@pytest.mark.parametrize("text", [
+    "A home inspection runs $400 to $600.",
+    "Real-estate agents charge $12,000 in commission on a sale like that.",
+    "There's usually a $500 origination fee.",
+])
+def test_general_price_verb_is_allowed_wsb(text):
+    assert not blocked(text), f"WS-B/F2: {text} -> {blocked(text)}"

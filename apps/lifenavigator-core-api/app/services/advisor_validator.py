@@ -142,6 +142,10 @@ _BENCHMARK_MARK = re.compile(
     r"\b(about|around|roughly|approximate\w*|approx|estimat\w+|illustrat\w+|examples?|e\.g\.|scenario|"
     r"hypothetical|ballpark|typical\w*|often|usual(?:ly)?|common(?:ly)?|general(?:ly)?|on average|"
     r"averages?|standard|conventional|traditional|recommend\w*|suggest\w*|target|full|"
+    # WS-B/F2: general-price VERBS — a non-possessive "an inspection runs / attorneys charge / a fee of $X" is
+    # a market cost, not a claim about the user's money (the possessive `you`+money-cue block still catches
+    # "your … $X"). This stops over-blocking concrete price benchmarks that make advice actionable.
+    r"runs?|charges?|charging|fees?|priced|"
     r"rule of thumb|up to|ranges?|guidelines?|benchmark\w*|industry|assume|assuming)\b|~|≈",
     re.IGNORECASE,
 )
