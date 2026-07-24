@@ -128,6 +128,8 @@ describe('RegisterForm', () => {
         password: STRONG_PASSWORD,
         options: {
           data: { name: 'Test User' },
+          // Component now sends a confirm-email redirect back to the app.
+          emailRedirectTo: expect.stringContaining('/auth/confirm'),
         },
       });
       expect(mockAddToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'success' }));
