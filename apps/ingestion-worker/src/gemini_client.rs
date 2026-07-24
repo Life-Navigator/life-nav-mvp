@@ -10,7 +10,11 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use crate::errors::{Result, WorkerError};
 
-pub const EMBEDDING_DIMENSION: usize = 768;
+// gemini-embedding-001 returns 3072-dim vectors by default (no outputDimensionality set), and the live
+// Qdrant collections (life_navigator, ln_central) are 3072-dim — verified against prod. This constant was
+// a stale 768 that never matched reality; embed() now asserts the returned length so a future model/dim
+// drift fails LOUD (a rejected job) instead of silently shipping a wrong-sized vector to Qdrant.
+pub const EMBEDDING_DIMENSION: usize = 3072;
 
 // Transient Gemini statuses worth retrying: rate limit (429), provider
 // overload (503), internal (500). Auth (401/403), validation (400), and
@@ -112,7 +116,17 @@ impl GeminiClient {
             )));
         }
         let resp: EmbedResponse = res.json().await?;
-        Ok(resp.embedding.values)
+        let values = resp.embedding.values;
+        if values.len() != EMBEDDING_DIMENSION {
+            // Fail loud: a wrong-sized vector would 400 on Qdrant upsert (or silently mismatch the
+            // collection dim). Surface it as a job error so the drift is visible, not a data-loss.
+            return Err(WorkerError::Gemini(format!(
+                "embedding dim mismatch: got {} floats, expected {}",
+                values.len(),
+                EMBEDDING_DIMENSION
+            )));
+        }
+        Ok(values)
     }
 }
 
