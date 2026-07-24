@@ -55,6 +55,10 @@ const ready = {
 };
 
 beforeEach(() => {
+  // Defensive against cross-suite pollution: another suite in the same worker can leave fake timers active
+  // (jest.useFakeTimers without a restore), which freezes this component's staged reveal so the goals
+  // (rendered at stage >= 2) never appear. Force real timers so the staged effects actually run.
+  jest.useRealTimers();
   global.fetch = jest.fn(() =>
     Promise.resolve({ ok: true, json: () => Promise.resolve(ready) } as Response)
   ) as unknown as typeof fetch;

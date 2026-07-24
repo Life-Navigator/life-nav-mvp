@@ -38,9 +38,8 @@ describe('LoginForm', () => {
     expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
-    expect(screen.getByText(/don't have an account\?/i)).toBeInTheDocument();
-    expect(screen.getByText(/register now/i)).toBeInTheDocument();
-    expect(screen.getByText(/forgot your password\?/i)).toBeInTheDocument();
+    // Register is now on the unified auth page (not an inline link on the login form); keep the recovery link.
+    expect(screen.getByText(/forgot password\?/i)).toBeInTheDocument();
   });
 
   it('does not have a demo login button', () => {

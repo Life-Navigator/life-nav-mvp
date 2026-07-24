@@ -126,7 +126,7 @@ describe('Onboarding pages use Supabase session', () => {
 
 describe('Middleware is Supabase-only', () => {
   it('does not reference NextAuth or JWT', () => {
-    const content = readSource('middleware');
+    const content = readSource('proxy');
     expect(content).not.toContain('next-auth');
     expect(content).not.toContain('NextAuth');
     expect(content).not.toContain('JWT_SECRET');
@@ -134,26 +134,28 @@ describe('Middleware is Supabase-only', () => {
   });
 
   it('uses supabase.auth.getUser for session check', () => {
-    const content = readSource('middleware');
+    const content = readSource('proxy');
     expect(content).toContain('supabase.auth.getUser');
   });
 
   it('checks profiles.setup_completed for onboarding gate', () => {
-    const content = readSource('middleware');
+    const content = readSource('proxy');
     expect(content).toContain('setup_completed');
     expect(content).toContain("'/onboarding/questionnaire'");
   });
 
   it('does not pass userId in onboarding redirect', () => {
-    const content = readSource('middleware');
+    const content = readSource('proxy');
     expect(content).not.toContain('userId=');
   });
 
   it('handles missing profile row (trigger lag) gracefully', () => {
-    const content = readSource('middleware');
-    // Should handle profileError or !profile — not just profile && !setup_completed
+    const content = readSource('proxy');
+    // The onboarding redirect must be GUARDED on the profile loading cleanly — a missing row / query error
+    // (trigger lag) must NOT bounce the user to onboarding. proxy.ts only redirects when
+    // `!profileError && profile && (...)`, so trigger-lag falls through.
     expect(content).toContain('profileError');
-    expect(content).toMatch(/profileError\s*\|\|\s*!profile\s*\|\|\s*!profile\.setup_completed/);
+    expect(content).toMatch(/!profileError\s*&&\s*profile\s*&&/);
   });
 });
 
