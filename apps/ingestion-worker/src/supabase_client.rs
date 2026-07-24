@@ -25,6 +25,12 @@ impl SupabaseClient {
         let http = Http::builder()
             .gzip(true)
             .timeout(std::time::Duration::from_secs(30))
+            // Supabase's connection pooler closes idle keep-alive connections server-side; reusing a
+            // half-closed socket surfaced as intermittent "Connection reset by peer" on claim_sync_jobs
+            // (the worker polls every ~5s, so a warm idle connection is common). Expire our idle pooled
+            // connections below that server window and keep the TCP link alive.
+            .pool_idle_timeout(std::time::Duration::from_secs(15))
+            .tcp_keepalive(std::time::Duration::from_secs(30))
             .build()?;
         Ok(Self {
             http,
