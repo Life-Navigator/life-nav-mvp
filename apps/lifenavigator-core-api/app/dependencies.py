@@ -349,7 +349,7 @@ def get_advisor_orchestrator(
         llm: Any = VertexClaudeAdvisorLLM(
             project=os.environ.get("VERTEX_PROJECT", "") or settings.vertex_project,
             region=os.environ.get("VERTEX_REGION", "global"),
-            model=os.environ.get("ADVISOR_MODEL", "claude-opus-4-1@20250805"),
+            model=os.environ.get("ADVISOR_MODEL", "claude-opus-4-8"),
             token=static_tok,
             token_provider=None if static_tok else AdcTokenProvider(),
         )
