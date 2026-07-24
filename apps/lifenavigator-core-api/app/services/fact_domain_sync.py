@@ -391,6 +391,12 @@ async def sync_finance_planning(sb: Any, ctx: UserContext, facts: dict[str, Any]
             res["fields_updated"].append(g["goal_type"])
         except Exception as e:  # noqa: BLE001
             res["errors"].append(f"{g.get('goal_type')}:{str(e)[:100]}")
+            # Loud: a write here failing usually means finance.financial_planning_goals is
+            # missing in prod (migration 20260626000100 unapplied) -> silent data loss of
+            # planning goals captured from chat. Surface it instead of swallowing.
+            log.warning("finance_planning_write_failed user=%s goal=%s err=%s "
+                        "(is migration 20260626000100 applied?)",
+                        ctx.user_id, g.get("goal_type"), str(e)[:200])
     return res
 
 

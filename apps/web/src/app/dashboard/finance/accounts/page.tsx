@@ -78,13 +78,6 @@ export default function AccountsPage() {
     console.log('Account clicked:', accountId);
   };
 
-  // Handle institution connect
-  const handleConnectAccount = (institutionId: string) => {
-    console.log('Connecting to institution:', institutionId);
-    // In a real implementation, this would initiate the OAuth flow or manual account entry
-    setIsConnectModalOpen(false);
-  };
-
   return (
     <div className="container mx-auto py-6 px-4 md:px-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
@@ -152,7 +145,6 @@ export default function AccountsPage() {
       <ConnectAccountModal
         isOpen={isConnectModalOpen}
         onClose={() => setIsConnectModalOpen(false)}
-        onConnect={handleConnectAccount}
       />
     </div>
   );

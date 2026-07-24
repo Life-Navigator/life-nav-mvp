@@ -72,6 +72,16 @@ class Settings(BaseSettings):
     # Comma-separated allow-list of admin emails (platform-wide metrics access).
     admin_emails: str = ""
 
+    # --- Private-beta access gate (mirrors web betaAccess.ts) ---
+    # The core-api is publicly reachable, so the allowlist MUST be enforced here too, not just in
+    # the web proxy. Gate is OFF (open) unless private_beta_enabled is truthy — so core-api behaves
+    # normally until prod arms it. Set the SAME values here that the web app has:
+    #   PRIVATE_BETA_ENABLED / PRIVATE_BETA_ADMIN_EMAILS / PRIVATE_BETA_ALLOWED_EMAILS
+    private_beta_enabled: str = ""
+    private_beta_admin_emails: str = ""
+    private_beta_allowed_emails: str = ""
+    private_beta_allow_synthetic_domain: str = ""
+
     def admin_email_set(self) -> set[str]:
         return {e.strip().lower() for e in self.admin_emails.split(",") if e.strip()}
 

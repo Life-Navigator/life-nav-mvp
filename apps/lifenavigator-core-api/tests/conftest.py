@@ -120,16 +120,25 @@ class FakeSupabase:
         return True
 
 
-def make_jwt(sub: str = "11111111-1111-1111-1111-111111111111", *, secret: str = TEST_JWT_SECRET) -> str:
+def make_jwt(
+    sub: str = "11111111-1111-1111-1111-111111111111",
+    *,
+    secret: str = TEST_JWT_SECRET,
+    email: str = "test@lifenav.test",
+    role: str = "authenticated",
+    invited: bool = False,
+) -> str:
     now = dt.datetime(2026, 1, 1, tzinfo=dt.timezone.utc)
-    payload = {
+    payload: dict[str, Any] = {
         "sub": sub,
         "aud": "authenticated",
-        "role": "authenticated",
-        "email": "test@lifenav.test",
+        "role": role,
+        "email": email,
         "iat": now,
         "exp": now + dt.timedelta(days=3650),
     }
+    if invited:
+        payload["app_metadata"] = {"invited": True}
     return jwt.encode(payload, secret, algorithm="HS256")
 
 
