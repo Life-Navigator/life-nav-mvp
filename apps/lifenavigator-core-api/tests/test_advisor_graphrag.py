@@ -313,3 +313,40 @@ async def test_relationship_turn_still_respects_rejected_goal():
     assert out["llm_status"] == "enhanced"
     titles = [g.get("title") for g in out.get("candidate_goals", [])]
     assert "advance my career" not in titles  # rejected goal never resurfaces, even on a relationship turn
+
+
+# --- WS-E: live GraphRAG retrieval wired into the advisor context (Option A), default-off-safe ---
+class _FakeRetriever:
+    def __init__(self):
+        self.calls = []
+    async def retrieve_personal(self, message, ctx, *, domain=None, limit=10):
+        self.calls.append({"message": message, "domain": domain})
+        return [{"source": "qdrant", "entity_type": "goal", "title": "Buy a home", "score": 0.91}]
+
+
+@pytest.mark.asyncio
+async def test_graph_evidence_wired_when_retriever_present():
+    r = _FakeRetriever()
+    b = AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH), retriever=r)
+    ctx = await b.build(_ctx(), "help me buy a house", _base())
+    assert ctx.graph_evidence and ctx.graph_evidence[0]["title"] == "Buy a home"
+    assert ctx.prompt_dict()["graph_evidence"] == ctx.graph_evidence   # surfaced to the LLM
+    assert r.calls and r.calls[0]["message"] == "help me buy a house"  # query-scoped, real message
+
+
+@pytest.mark.asyncio
+async def test_no_graph_evidence_without_retriever():
+    b = AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH))  # retriever=None (default)
+    ctx = await b.build(_ctx(), "help me buy a house", _base())
+    assert ctx.graph_evidence == []
+    assert ctx.prompt_dict()["graph_evidence"] == []
+
+
+@pytest.mark.asyncio
+async def test_graph_grounding_degrades_on_retriever_error():
+    class Boom:
+        async def retrieve_personal(self, *a, **k):
+            raise RuntimeError("neo4j down")
+    b = AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH), retriever=Boom())
+    ctx = await b.build(_ctx(), "hi", _base())   # must not raise
+    assert ctx.graph_evidence == []

@@ -19,6 +19,7 @@ says nothing about connections.
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
@@ -26,6 +27,8 @@ from typing import Any, Optional
 from ..models.common import UserContext
 from .advisor_agents import domains_for, route_domains
 from .advisor_facts import build_fact_packet, numbers_in_facts
+
+log = logging.getLogger("core.advisor_context")
 
 LIFE = "life"
 
@@ -273,6 +276,9 @@ class AdvisorContext:
     # The MESSAGE's topic domains (education/career/health/…), used to append the matching conversational
     # playbook to the advisor prompt. Empty when the route is broad/ambiguous (no single topic).
     turn_domains: list[str] = field(default_factory=list)
+    # WS-E: user-scoped GraphRAG evidence (Qdrant vector hits + Neo4j nodes) for THIS query. Empty unless
+    # GRAPH_GROUNDING_ENABLED and the retriever found something. Additive grounding — never a fabrication source.
+    graph_evidence: list[dict[str, Any]] = field(default_factory=list)
     # Deterministic finance figures (net worth, cash flow, emergency-fund range, down-payment scenarios, debt
     # payoff, savings target, affordability band) computed by FinanceScenarioEngine — the numbers the LLM
     # INTERPRETS. None unless the turn is finance. Missing inputs are named gaps (needs_*), never fabricated.
@@ -309,6 +315,9 @@ class AdvisorContext:
             # The user's own stated figures — SAFE to reference/reflect back (validator allows these).
             # Surfacing them explicitly so the advisor engages the numbers instead of deflecting.
             "numbers_you_may_reference": sorted(self.allowed_numbers),
+            # WS-E: user-scoped GraphRAG evidence (vector hits + graph nodes) the advisor MAY reference as
+            # grounding. Empty unless GRAPH_GROUNDING_ENABLED. Never a licence to fabricate — it's retrieved.
+            "graph_evidence": self.graph_evidence,
             # DETERMINISTIC finance figures the advisor INTERPRETS (never recomputes/invents). Every value is
             # arithmetic from finance.* ; `needs_*: true` marks a gap to ASK about, not to guess. Present only
             # on finance turns.
@@ -331,11 +340,15 @@ class AdvisorContext:
 
 
 class AdvisorContextBuilder:
-    def __init__(self, supabase: Any, coverage: Any = None, life: Any = None, scenarios: Any = None) -> None:
+    def __init__(self, supabase: Any, coverage: Any = None, life: Any = None, scenarios: Any = None,
+                 retriever: Any = None) -> None:
         self._sb = supabase
         self._coverage = coverage  # DiscoveryCoverageService (optional) — per-domain discovery scores
         self._life = life  # LifeDiscoveryService (optional) — real personal graph edges
         self._scenarios = scenarios  # FinanceScenarioEngine (optional) — deterministic finance figures
+        # WS-E: live GraphRAG retriever (Neo4j + Qdrant). None unless GRAPH_GROUNDING_ENABLED — until then the
+        # advisor grounds on Supabase only. When present, build() adds user-scoped graph/vector evidence.
+        self._retriever = retriever
 
     async def _rejected(self, ctx: UserContext) -> list[str]:
         try:
@@ -458,6 +471,19 @@ class AdvisorContextBuilder:
         # subset, or all domains when ambiguous — treat the broad fallback (≥4) as "no specific topic".
         _routed = route_domains(message)
         turn_domains = [] if len(_routed) >= 4 else _routed
+
+        # WS-E: live GraphRAG retrieval (Option A). Best-effort and user-scoped; never raises into the turn.
+        # Off (retriever is None) until GRAPH_GROUNDING_ENABLED, so today this is a no-op.
+        graph_evidence: list[dict[str, Any]] = []
+        if self._retriever is not None:
+            try:
+                graph_evidence = await self._retriever.retrieve_personal(
+                    message, ctx, domain=(turn_domains[0] if turn_domains else None), limit=8
+                ) or []
+            except Exception as exc:  # noqa: BLE001 — grounding degrades to empty, never breaks the turn
+                log.warning("graph grounding degraded: %s", exc)
+                graph_evidence = []
+
         return AdvisorContext(
             user_id=ctx.user_id,
             user_message=message,
@@ -485,5 +511,6 @@ class AdvisorContextBuilder:
             active_agent=active_agent,
             agent_domains=agent_domains,
             turn_domains=turn_domains,
+            graph_evidence=graph_evidence,
             finance_scenarios=finance_scenarios,
         )
