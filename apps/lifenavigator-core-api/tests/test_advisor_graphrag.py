@@ -354,33 +354,38 @@ async def test_graph_grounding_degrades_on_retriever_error():
 
 # --- Elite regression lock: the reported education-misframe (WS-A.1) ---------------------------------------
 @pytest.mark.asyncio
-async def test_education_number_block_yields_education_opener_not_finance_deflection():
-    """REPRODUCES the reported bug end-to-end: an education turn where the model reaches for an ungrounded
-    personal $ figure is blocked (trust_spine_block) — and VERIFIES the fix: the fallback opens the EDUCATION
-    conversation instead of the finance 'give me your income/savings/expenses' deflection."""
+async def test_education_number_block_redacted_not_finance_deflection():
+    """WS-B/F6 (redact-don't-nuke): an education turn where the model reaches for a fabricated $ figure has
+    that SENTENCE dropped and the rest of the answer KEPT — never the finance 'income/savings/expenses'
+    deflection, and the fabricated figure never leaks. (The reported bug, now fixed by salvage instead of a
+    dead-end fallback.)"""
     orch = AdvisorOrchestrator(
         FakeRM(_base()),
         AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH)),
-        FakeLLM(_llm(reflection="Your total tuition cost for that program will be $50,000.")),
+        FakeLLM(_llm(reflection="Your total tuition cost for that program will be $50,000.",
+                     next_question="What role are you aiming for — does it actually require the degree?")),
     )
     out = await orch.converse(_ctx(), "Let's discuss my education, please")
-    assert out["llm_status"].startswith("fallback:"), out["llm_status"]         # the number was blocked
-    assert out["assistant_message"] == AdvisorOrchestrator._DOMAIN_COUNSEL["education"]  # education opener
-    assert "income, savings" not in out["assistant_message"]                    # NOT the finance deflection
-    assert "50,000" not in out["assistant_message"]                            # the fabricated figure never leaks
+    assert out["llm_status"] == "enhanced"                                  # salvaged via redaction, not nuked
+    assert "50,000" not in out["assistant_message"]                         # fabricated figure removed
+    assert "income, savings" not in out["assistant_message"].lower()        # NOT the finance deflection
+    assert out["assistant_message"].strip()                                 # the answer survived
 
 
 @pytest.mark.asyncio
-async def test_finance_number_block_still_gets_finance_copy():
-    """Control: the SAME block on a FINANCE turn keeps the finance-specific fallback (no over-correction)."""
+async def test_finance_number_block_redacted_keeps_the_answer():
+    """The SAME redact-don't-nuke on a FINANCE turn: the fabricated net-worth sentence is dropped, the rest of
+    the finance answer survives — no all-or-nothing discard, and the fabricated figure never leaks."""
     orch = AdvisorOrchestrator(
         FakeRM(_base()),
         AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH)),
-        FakeLLM(_llm(reflection="Your net worth is $250,000 and your savings will cover it.")),
+        FakeLLM(_llm(reflection="Your net worth is $250,000.",
+                     next_question="What's your target retirement age?")),
     )
     out = await orch.converse(_ctx(), "Can I afford to retire early on my savings?")
-    assert out["llm_status"].startswith("fallback:")
-    assert "income, savings" in out["assistant_message"]   # finance turn -> finance copy
+    assert out["llm_status"] == "enhanced"
+    assert "250,000" not in out["assistant_message"]
+    assert out["assistant_message"].strip()
 
 
 @pytest.mark.asyncio
@@ -389,3 +394,22 @@ async def test_context_sets_turn_domains_for_education_message():
     b = AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH))
     ctx = await b.build(_ctx(), "should I go back to school for a masters degree?", _base())
     assert ctx.turn_domains == ["education"]
+
+
+@pytest.mark.asyncio
+async def test_f6_salvages_multi_section_answer_dropping_only_the_bad_sentence():
+    """F6 end-to-end: a full answer with ONE fabricated $ figure keeps its good sections; only the offending
+    sentence is dropped. Not an all-or-nothing discard, and the figure never leaks."""
+    orch = AdvisorOrchestrator(
+        FakeRM(_base()),
+        AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH)),
+        FakeLLM(_llm(
+            reflection="A graduate degree can lift your earning power. Your tuition will run you $50,000.",
+            next_question="Which matters more right now — speed to a promotion or the credential itself?",
+        )),
+    )
+    out = await orch.converse(_ctx(), "Is a master's degree worth it for me?")
+    assert out["llm_status"] == "enhanced"
+    assert "50,000" not in out["assistant_message"]                      # bad sentence dropped
+    assert "earning power" in out["assistant_message"].lower()           # good sentence kept
+    assert "which matters more" in out["assistant_message"].lower()      # the question survives

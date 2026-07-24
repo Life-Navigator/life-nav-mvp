@@ -335,6 +335,66 @@ def _check_relationships(result: dict[str, Any], context: AdvisorContext, visibl
     return reasons, valid
 
 
+# ── F6: redact-don't-nuke — drop only the SENTENCE(S) carrying a fabricated figure, keep the rest ─────────
+_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+")
+
+
+def _number_digits(text: str) -> set[str]:
+    """Digit-normalized numeric tokens ($ amounts, %s, bare integers) in text: '$50,000'->'50000', '82%'->'82'."""
+    return {re.sub(r"[^0-9]", "", t) for t in re.findall(r"\$?\s?\d[\d,]*(?:\.\d+)?%?", text)} - {""}
+
+
+def _strip_number_sentences(text: str, blocked: set[str]) -> str:
+    """Remove whole sentences that carry a blocked figure; leave the rest of the prose intact."""
+    if not text or not blocked:
+        return text
+    kept = [s for s in _SENT_SPLIT.split(text) if not (_number_digits(s) & blocked)]
+    return " ".join(s for s in kept if s.strip()).strip()
+
+
+def _redact_number_sentences(result: dict[str, Any], blocked: set[str]) -> dict[str, Any]:
+    """A copy of the LLM result with any sentence carrying a fabricated figure removed from every user-visible
+    field. Empty list items are dropped; non-string shapes are left untouched."""
+    r = dict(result)
+    for k in ("reflection", "decision_frame", "recommendation", "next_question", "why_this_question", "summary"):
+        if isinstance(r.get(k), str):
+            r[k] = _strip_number_sentences(r[k], blocked)
+    for k in ("what_we_know", "what_we_still_need"):
+        r[k] = [x for x in (_strip_number_sentences(str(v), blocked) for v in (r.get(k) or [])) if x]
+    tos = []
+    for t in (r.get("tradeoffs") or []):
+        if isinstance(t, dict):
+            t = {**t,
+                 "benefit": _strip_number_sentences(str(t.get("benefit", "")), blocked),
+                 "cost": _strip_number_sentences(str(t.get("cost", "")), blocked)}
+        tos.append(t)
+    r["tradeoffs"] = tos
+    return r
+
+
+def try_redact_number_block(result: dict[str, Any], context: AdvisorContext,
+                            reasons: list[str]) -> dict[str, Any] | None:
+    """F6 salvage (called by the orchestrator on a rejected turn): if the rejection was ONLY for fabricated
+    numbers, drop the sentence(s) carrying them and re-validate. Returns the safe (redacted) result if it now
+    passes cleanly, else None (caller uses the deterministic fallback as before). Trust-preserving — the
+    figure is removed and the WHOLE answer is re-checked by validate(), so nothing ungrounded slips through."""
+    if not isinstance(result, dict) or not reasons or not all("invented numbers" in r for r in reasons):
+        return None
+    strict_vals, scenario_vals, _ = verify_derivations(result.get("derivations"), context.allowed_numbers)
+    allowed = context.allowed_numbers | strict_vals
+    invented = _fabricated_personal_numbers(_visible_text(result), allowed, scenario_vals, set())
+    if not invented:
+        return None
+    ok, safe, _ = validate(_redact_number_sentences(result, invented), context)
+    if not ok:
+        return None
+    safe = dict(safe)
+    reps = list(safe.get("_repairs") or [])
+    reps.append("redacted_invented_number")
+    safe["_repairs"] = reps
+    return safe
+
+
 def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any], list[str]]:
     """Return (ok, safe_result, reasons). ok=False → caller uses the deterministic fallback."""
     reasons: list[str] = []
