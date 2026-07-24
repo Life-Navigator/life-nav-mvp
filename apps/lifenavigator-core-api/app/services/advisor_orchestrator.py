@@ -35,7 +35,7 @@ from ..models.common import UserContext
 from .advisor_agents import ALL_LIFE_DOMAINS, focus_domains as _focus_domains, get_agent, route_domains
 from .advisor_context import AdvisorContextBuilder
 from .advisor_llm import AdvisorLLM, ADVISOR_PROMPT_VERSION
-from .advisor_validator import classify_issues, validate
+from .advisor_validator import classify_issues, try_redact_number_block, validate
 from . import fact_domain_sync
 from . import model_registry as reg
 from .model_router import detect_health_urgent, health_safety_response
@@ -691,16 +691,25 @@ class AdvisorOrchestrator:
                     break
             lap("repair")
             if not ok:
-                base["llm_status"] = "fallback:" + ("; ".join(reasons))[:140]
-                cause = classify_fallback_cause(base["llm_status"], "", reasons)
-                if attempt >= _MAX_REPAIRS and _MAX_REPAIRS > 0:
-                    cause = cause or "repair_loop_exhausted"
-                issues = issues or classify_issues(out, context)
-                tr["fallback_used"], tr["fallback_reason"], tr["validator_result"], tr["validator_reason"] = (
-                    True, "; ".join(reasons), "rejected", "; ".join(reasons))
-                tr["fallback_cause"], tr["gate_that_blocked"] = cause, "; ".join(reasons)[:120]
-                self._apply_counsel_fallback(base, cause=cause, issues=issues, domains=route_domains(message))
-                return
+                # F6 (redact-don't-nuke): a numbers-ONLY rejection → drop the sentence(s) carrying the
+                # fabricated figure and re-validate, salvaging the rest of the answer instead of discarding
+                # all six sections for a generic fallback. Trust is intact (validate() re-checks). Falls
+                # through to the success path when the redacted answer comes back clean.
+                salvaged = try_redact_number_block(out, context, reasons)
+                if salvaged is not None:
+                    safe = salvaged
+                    tr["validator_result"], tr["redacted_number"] = "redacted_invented_number", True
+                else:
+                    base["llm_status"] = "fallback:" + ("; ".join(reasons))[:140]
+                    cause = classify_fallback_cause(base["llm_status"], "", reasons)
+                    if attempt >= _MAX_REPAIRS and _MAX_REPAIRS > 0:
+                        cause = cause or "repair_loop_exhausted"
+                    issues = issues or classify_issues(out, context)
+                    tr["fallback_used"], tr["fallback_reason"], tr["validator_result"], tr["validator_reason"] = (
+                        True, "; ".join(reasons), "rejected", "; ".join(reasons))
+                    tr["fallback_cause"], tr["gate_that_blocked"] = cause, "; ".join(reasons)[:120]
+                    self._apply_counsel_fallback(base, cause=cause, issues=issues, domains=route_domains(message))
+                    return
             composed = _compose(safe)
             lap("compose")
             if not composed:
