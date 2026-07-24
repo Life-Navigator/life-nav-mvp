@@ -350,3 +350,42 @@ async def test_graph_grounding_degrades_on_retriever_error():
     b = AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH), retriever=Boom())
     ctx = await b.build(_ctx(), "hi", _base())   # must not raise
     assert ctx.graph_evidence == []
+
+
+# --- Elite regression lock: the reported education-misframe (WS-A.1) ---------------------------------------
+@pytest.mark.asyncio
+async def test_education_number_block_yields_education_opener_not_finance_deflection():
+    """REPRODUCES the reported bug end-to-end: an education turn where the model reaches for an ungrounded
+    personal $ figure is blocked (trust_spine_block) — and VERIFIES the fix: the fallback opens the EDUCATION
+    conversation instead of the finance 'give me your income/savings/expenses' deflection."""
+    orch = AdvisorOrchestrator(
+        FakeRM(_base()),
+        AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH)),
+        FakeLLM(_llm(reflection="Your total tuition cost for that program will be $50,000.")),
+    )
+    out = await orch.converse(_ctx(), "Let's discuss my education, please")
+    assert out["llm_status"].startswith("fallback:"), out["llm_status"]         # the number was blocked
+    assert out["assistant_message"] == AdvisorOrchestrator._DOMAIN_COUNSEL["education"]  # education opener
+    assert "income, savings" not in out["assistant_message"]                    # NOT the finance deflection
+    assert "50,000" not in out["assistant_message"]                            # the fabricated figure never leaks
+
+
+@pytest.mark.asyncio
+async def test_finance_number_block_still_gets_finance_copy():
+    """Control: the SAME block on a FINANCE turn keeps the finance-specific fallback (no over-correction)."""
+    orch = AdvisorOrchestrator(
+        FakeRM(_base()),
+        AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH)),
+        FakeLLM(_llm(reflection="Your net worth is $250,000 and your savings will cover it.")),
+    )
+    out = await orch.converse(_ctx(), "Can I afford to retire early on my savings?")
+    assert out["llm_status"].startswith("fallback:")
+    assert "income, savings" in out["assistant_message"]   # finance turn -> finance copy
+
+
+@pytest.mark.asyncio
+async def test_context_sets_turn_domains_for_education_message():
+    """Integration: the context builder tags an education message so the per-domain playbook is injected."""
+    b = AdvisorContextBuilder(FakeSupabase(), coverage=None, life=FakeLife(EMPTY_GRAPH))
+    ctx = await b.build(_ctx(), "should I go back to school for a masters degree?", _base())
+    assert ctx.turn_domains == ["education"]
