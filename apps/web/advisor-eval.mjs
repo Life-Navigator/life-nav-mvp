@@ -67,9 +67,19 @@ function record(persona, turnIdx, message, res, extra = {}) {
 }
 // number-hallucination check: $ amounts in the reply not present in the user's messages so far
 function hallucinatedNumbers(reply, userMsgs) {
-  const nums = (reply.match(/\$\s?\d[\d,]*(?:\.\d+)?/g) || []).map((s) => s.replace(/[^0-9]/g, ''));
-  const said = userMsgs.join(' ').replace(/[^0-9]/g, ' ');
-  return nums.filter((n) => n.length >= 3 && !said.includes(n));
+  const digits = (s) => s.replace(/[^0-9]/g, ''); // "$8,000" -> "8000"
+  const nums = (reply.match(/\$\s?\d[\d,]*(?:\.\d+)?/g) || []).map(digits);
+  // The user's OWN stated numbers, plus the validator's allowed derivations (a simple sum/difference of two
+  // of their numbers, e.g. income − rent). Anything outside this set is a candidate invented figure. This
+  // avoids false-flagging the user's comma'd numbers ("$8,000") and grounded math the advisor is allowed to do.
+  const userNums = (userMsgs.join(' ').match(/\d[\d,]*(?:\.\d+)?/g) || []).map(digits).filter(Boolean);
+  const grounded = new Set(userNums);
+  for (const a of userNums)
+    for (const b of userNums) {
+      const x = Number(a), y = Number(b);
+      if (x && y) { grounded.add(String(x + y)); grounded.add(String(Math.abs(x - y))); }
+    }
+  return nums.filter((n) => n.length >= 3 && !grounded.has(n));
 }
 
 async function run() {
