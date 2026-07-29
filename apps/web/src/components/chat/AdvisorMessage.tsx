@@ -156,12 +156,21 @@ export default function AdvisorMessage({ text }: { text: string }) {
   );
 }
 
+// The advisor appends a verification-links block ("Check current numbers") when it quotes a market price.
+// It is the one part of a reply that is mostly Markdown syntax rather than prose, so typing it out reveals
+// `- [CFPB — Consumer Fin...](https://www.co` one character at a time — raw punctuation where a citation
+// should be. Links are also the element a reader is most likely to grab at mid-render.
+export const SOURCES_MARKER = '*Check current numbers:*';
+
 // While the message is "typing", reveal plain text (premium feel + valid mid-stream Markdown is rare);
 // once complete, swap to the polished block render. Non-animating (historical) messages render polished
-// immediately.
+// immediately. The sources block is excluded from the typed span and appears whole with the final render.
 export function StreamedAdvisorMessage({ text, animate }: { text: string; animate: boolean }) {
-  const { shown, done } = useStreamedText(text || '', animate);
-  if (done) return <AdvisorMessage text={text} />;
+  const full = text || '';
+  const cut = full.lastIndexOf(SOURCES_MARKER);
+  const prose = cut === -1 ? full : full.slice(0, cut).trimEnd();
+  const { shown, done } = useStreamedText(prose, animate);
+  if (done) return <AdvisorMessage text={full} />;
   return (
     <span className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-200">
       {shown}
