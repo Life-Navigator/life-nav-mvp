@@ -1,7 +1,8 @@
 # Numeric Provenance — replacing the number gate with declared figures
 
-**Status:** design, not built · **Date:** 2026-07-28 · **Supersedes:** the `_BENCHMARK_MARK` /
-`_MONEY_CUE` / `_SECOND_PERSON` heuristic stack in `advisor_validator.py`
+**Status:** partly built — see [What shipped](#what-shipped-2026-07-28) · **Date:** 2026-07-28 ·
+**Supersedes:** the `_BENCHMARK_MARK` / `_MONEY_CUE` / `_POSSESSIVE_LINK` heuristic stack in
+`advisor_validator.py`
 
 ## Why
 
@@ -166,6 +167,38 @@ a **curated, versioned benchmarks table**, at which point they become slots like
 being unverifiable. That's the migration path: market starts declared-and-quarantined and hardens into
 sourced as the table grows. Not a permanent unverified lane.
 
+## What shipped (2026-07-28)
+
+Branch `fix/number-gate-f2-regression`. Two of this spec's ideas turned out to be cheap enough to build
+against the existing heuristic gate, so they shipped early — the **form** rule for market numbers, and the
+**server owning what renders**. The declared-`figures` contract, slots, and the renderer did not.
+
+| Spec idea                                                 | Shipped                                                                                                                                                                                        |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Market kind = range or hedged, never a point value        | **Yes.** A range is now a benchmark cue in its own right; a point price raises `unhedged_market_price`, whose repair says KEEP-and-rephrase, not delete.                                       |
+| Graceful failure — reject a figure, don't nuke the answer | **Yes,** for market form: it earns a repair on every route, including the fast route where repairs are otherwise skipped.                                                                      |
+| Server owns what is rendered                              | **Partly.** Applied to LINKS, not digits: `advisor_sources.py` holds 13 authoritative URLs, the model emits a KEY, unknown keys are dropped. A hallucinated source is structurally impossible. |
+| Market figures carry a `basis`/source                     | **Partly.** They carry a link to somewhere the user can check, not a machine-readable basis.                                                                                                   |
+| `figures` array, refs in prose, slots, two-lane renderer  | **No.** Unchanged design.                                                                                                                                                                      |
+
+Fixed along the way, all of them instances of "the window is guessing what the model already knew":
+
+- **`_MONEY_CUE` covered money the user HOLDS but not money they PAY.** So `personal_holding` was False for
+  every "your monthly payment / closing costs / fees are $X" sentence, and any benchmark cue — a plain
+  hedge, not just PR #72's price verbs — un-gated a fabricated personal figure. Hedged possessive claims had
+  been passing since long before #72.
+- **Ownership was decided by proximity.** Any `you` within 70 characters counted, so
+  `"since you're closing next month, attorneys charge $1,500"` was blocked as a personal claim. Now
+  ownership must be _asserted_ (`your <noun>`, or `you have/pay/owe/...`).
+- **The gate read all six sections concatenated.** A word in one section vouched for a number in another —
+  `"an inspection runs $400"` in the recommendation was un-gated by the word "target" in
+  `what_we_still_need`. Now gated per section. Found by the integration harness, not by unit tests, which
+  test one sentence at a time and so could never see it.
+
+Each of these was invisible for the same reason: **a character window cannot tell whose money a number is,
+and every fix is another guess at the same missing information.** The `subject` field in the contract below
+is what ends the class. Until then, expect the next missing noun to reopen the hole exactly as this one did.
+
 ## Build order
 
 1. **Slot packet** — promote `allowed_numbers` to provenanced records in `AdvisorContext`; keep the flat set
@@ -175,8 +208,12 @@ sourced as the table grows. Not a permanent unverified lane.
    cheapest way to measure the model's labelling accuracy before trusting it.
 3. **Renderer** — substitution + the two lanes + provenance links in `_compose` and the web UI.
 4. **Flip the invariant** — no numeral in rendered output unless produced by a slot substitution.
-5. **Delete** `_BENCHMARK_MARK`, `_PRICE_VERB`, `_MONEY_CUE`, `_TIGHT_WINDOW`, and most of
-   `_fabricated_personal_numbers`.
+5. **Delete** `_BENCHMARK_MARK`, `_PRICE_VERB`, `_MONEY_CUE`, `_MONEY_RANGE`, `_POSSESSIVE_LINK`,
+   `_TIGHT_WINDOW`, `_visible_segments`, and most of `_fabricated_personal_numbers`.
+
+Steps 1–3 are unaffected by what shipped. Step 2 gets cheaper: `advisor_sources` already proves the
+model-proposes / server-resolves pattern works end to end, and `sources` is the template for `figures` —
+same shape (model emits a key or a declaration, server owns what renders), same drop-unknown-entries rule.
 
 Step 4 is where the fiddly work is: distinguishing financial numerals from innocent ones — dates, ages,
 "3–6 months", "the 2 options", "401k". Needs a real allowlist and its own test matrix, or it will block
@@ -185,5 +222,20 @@ ordinary prose.
 ## Test matrix
 
 Built from the counterfactual-user rule, not from phrasings. Every case is stated as: _would this number
-differ for another user?_ → expected kind → expected behaviour when the slot is present and absent. The
-regression rows added to `test_number_gate_matrix.py` alongside the stopgap are the seed.
+differ for another user?_ → expected kind → expected behaviour when the slot is present and absent.
+
+The seed now exists and is bigger than planned:
+
+- `tests/test_number_gate_matrix.py` — the block/allow contract, organised by the counterfactual rule.
+- `tests/test_market_prices_and_sources.py` — market-price form, and the source catalog's drop-what-we-
+  don't-own behaviour.
+- `tests/test_advisor_market_price_integration.py` — the real `_enhance` pipeline with a scripted LLM
+  double that records the repair notes it was sent, so tests assert on what the model was TOLD.
+
+**Keep the integration layer when the contract lands.** It found the cross-section bleed that eight months
+of unit tests missed, and the same blindness applies to declared figures: a `figures` array is validated
+against assembled prose, and prose is where sections meet.
+
+Still missing: a live-model measurement of prompt adherence. `scripts/eval_prompt_live.py` is written but
+unrun — no test with a scripted LLM can tell us whether a real model actually hedges its market prices or
+picks valid source keys, and those two rates decide whether the repair loop is a safety net or the norm.
