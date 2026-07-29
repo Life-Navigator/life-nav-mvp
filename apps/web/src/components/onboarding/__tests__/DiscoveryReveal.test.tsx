@@ -72,7 +72,17 @@ describe('DiscoveryReveal canonical rendering', () => {
         screen.getByText(/building toward an independent, family-first life/i)
       ).toBeInTheDocument()
     );
-    expect(screen.getByText('Financial independence')).toBeInTheDocument();
+    // STAGE 2 IS A SEPARATE AWAIT, not a synchronous follow-on to the headline.
+    //
+    // The headline renders at stage 1; goals, tension, opportunity, risk and next move render at
+    // stage >= 2. Asserting them with a bare getByText immediately after the stage-1 waitFor assumes
+    // both stages land in the same tick. They usually do, which is why this passed in isolation and
+    // failed only in the full suite: under load, or behind another suite that left timers patched,
+    // stage 2 arrives a tick later and every assertion below fires against stage-1 DOM.
+    //
+    // Waiting for a stage-2 element makes the test assert the END STATE rather than a timing
+    // coincidence. `findByText` is the await; the rest are then safely synchronous.
+    expect(await screen.findByText('Financial independence')).toBeInTheDocument();
     expect(screen.getByText('College fund')).toBeInTheDocument();
     expect(screen.getByText(/Career intensity competes/)).toBeInTheDocument();
     expect(screen.getByText(/Capture the full 401k match/)).toBeInTheDocument();
@@ -82,7 +92,8 @@ describe('DiscoveryReveal canonical rendering', () => {
 
   it('renders constraints and motivations when present', async () => {
     render(<DiscoveryReveal onContinue={() => {}} />);
-    await waitFor(() => expect(screen.getByText(/holding things back/i)).toBeInTheDocument());
+    // Same staging concern as above — await a stage-2 element rather than assuming it is already there.
+    expect(await screen.findByText(/holding things back/i)).toBeInTheDocument();
     expect(screen.getByText(/One income while spouse retrains/)).toBeInTheDocument();
     expect(screen.getByText(/what's driving you/i)).toBeInTheDocument();
     expect(screen.getByText(/Provide for family/)).toBeInTheDocument();
