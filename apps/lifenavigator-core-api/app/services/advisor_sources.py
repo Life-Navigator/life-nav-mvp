@@ -16,6 +16,12 @@ what is rendered.
 Every URL here is an authoritative root or a stable long-lived landing page — root-ish by design, because a
 deep path is what rots. Adding an entry means committing to keep it alive; prefer .gov and standards bodies
 over commercial sites, whose URLs and paywalls move.
+
+VERIFIED 2026-07-28: all 13 checked over the network. 11 returned 200 (eldercare.acl.gov redirects to
+/home — kept at the root deliberately, the redirect is the stable part). ssa.gov and bls.gov returned an
+Akamai "Access Denied" edge page to every client from this network: a WAF block on datacenter egress, not a
+missing page — both are live in a browser. Re-check with `python scripts/check_source_links.py`, which
+treats 403 as inconclusive for exactly this reason.
 """
 from __future__ import annotations
 
