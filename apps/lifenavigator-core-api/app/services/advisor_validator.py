@@ -142,13 +142,30 @@ _BENCHMARK_MARK = re.compile(
     r"\b(about|around|roughly|approximate\w*|approx|estimat\w+|illustrat\w+|examples?|e\.g\.|scenario|"
     r"hypothetical|ballpark|typical\w*|often|usual(?:ly)?|common(?:ly)?|general(?:ly)?|on average|"
     r"averages?|standard|conventional|traditional|recommend\w*|suggest\w*|target|full|"
-    # WS-B/F2: general-price VERBS — a non-possessive "an inspection runs / attorneys charge / a fee of $X" is
-    # a market cost, not a claim about the user's money (the possessive `you`+money-cue block still catches
-    # "your … $X"). This stops over-blocking concrete price benchmarks that make advice actionable.
-    r"runs?|charges?|charging|fees?|priced|"
     r"rule of thumb|up to|ranges?|guidelines?|benchmark\w*|industry|assume|assuming)\b|~|≈",
     re.IGNORECASE,
 )
+# WS-B/F2 general-price VERBS — "an inspection RUNS $400", "attorneys CHARGE $1,500", "a $500 origination
+# FEE" are MARKET costs (facts about the world), not claims about the user's money, and over-blocking them
+# made the advice useless. But unlike the hedges above these words carry no hedging of their own, so they
+# are a benchmark cue ONLY in non-possessive prose — see _benchmark_cue().
+#
+# The original F2 landing folded these straight into _BENCHMARK_MARK on the assumption that the possessive
+# `you`+money-cue check above would still catch "your … $X". It does not: _MONEY_CUE has no entry for
+# payment/fee/cost/charge, so `personal_holding` is False for exactly the sentences these verbs appear in,
+# and "Your monthly payment runs $3,200" / "You'll pay $18,200 in fees" went from blocked to allowed.
+_PRICE_VERB = re.compile(r"\b(runs?|charges?|charging|fees?|priced)\b", re.IGNORECASE)
+
+
+def _benchmark_cue(window: str) -> bool:
+    """True if the number reads as a benchmark/labeled estimate rather than a fabricated personal figure.
+
+    A hedge word ("about", "typically", "rule of thumb") qualifies anywhere. A bare price verb qualifies only
+    when the window is NOT second-person — "a home inspection runs $400" is a market price; "your closing
+    costs run $9,500" is an ungrounded claim about the user's money and stays gated."""
+    if _BENCHMARK_MARK.search(window):
+        return True
+    return bool(_PRICE_VERB.search(window) and not _SECOND_PERSON.search(window))
 
 
 # ── Bounded benchmark-derivation relaxation (AFFORDABILITY_GATE 2026-06-25) ────────────────────────────
@@ -274,7 +291,7 @@ def _fabricated_personal_numbers(text: str, allowed: set[str], scenario: set[str
             # A verified benchmark/scenario calc (e.g. "a 20% down payment is $100,000") in non-possessive
             # prose — the arithmetic checks out against a stated base; allow.
             continue
-        elif tok.startswith("$") and not _BENCHMARK_MARK.search(window):
+        elif tok.startswith("$") and not _benchmark_cue(window):
             # Before blocking: a bounded benchmark-derivation of a grounded base (e.g. 20% of the stated
             # $500k = $100,000) is safe to pass — math-verified, no prohibited claim. (AFFORDABILITY_GATE)
             v = _to_float(norm)

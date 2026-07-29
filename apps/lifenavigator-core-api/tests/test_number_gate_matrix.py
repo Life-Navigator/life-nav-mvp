@@ -44,3 +44,25 @@ def test_grounded_or_hedged_number_is_allowed(text, allowed):
 ])
 def test_general_price_verb_is_allowed_wsb(text):
     assert not blocked(text), f"WS-B/F2: {text} -> {blocked(text)}"
+
+
+# ---- F2 REGRESSION LOCK: the price verbs must NOT un-gate a possessive claim about the user's money. ----
+# The first F2 landing folded runs/charges/fees straight into _BENCHMARK_MARK, betting that the possessive
+# `you`+money-cue check would still catch these. It didn't — _MONEY_CUE has no payment/fee/cost/charge entry,
+# so every sentence below flipped from BLOCKED to allowed, including the monthly-payment case the trust spine
+# exists to stop. The counterfactual-user rule: these numbers change per user, so they are PERSONAL and must
+# be sourced; the cases above don't, so they're market prices and pass.
+@pytest.mark.parametrize("text", [
+    "Your monthly payment runs $3,200.",          # the exact unsupported_monthly_payment case
+    "Your closing costs run $9,500.",
+    "You'll pay $18,200 in fees.",
+    "Your attorney charges $12,000.",
+    "Your student loan fees total $45,000.",
+])
+def test_price_verb_does_not_ungate_possessive_personal_figure(text):
+    assert blocked(text), f"F2 regression: possessive personal figure must stay blocked: {text}"
+
+
+def test_possessive_price_verb_is_fine_once_grounded():
+    """The gate is about PROVENANCE, not phrasing — the same sentence passes when the number is the user's."""
+    assert not blocked("Your monthly payment runs $3,200.", ["3200"])
