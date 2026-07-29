@@ -15,6 +15,7 @@ from typing import Any
 
 from .advisor_context import AdvisorContext, _norm
 from .advisor_math import user_values, verify_derivations
+from .advisor_sources import resolve as resolve_sources
 
 # Connective phrases that assert a relationship between two goals/objectives. If the LLM uses one, it must
 # cite a supporting edge — otherwise it is inventing graph reasoning and we reject it.
@@ -150,25 +151,40 @@ _BENCHMARK_MARK = re.compile(
     r"rule of thumb|up to|ranges?|guidelines?|benchmark\w*|industry|assume|assuming)\b|~|≈",
     re.IGNORECASE,
 )
-# WS-B/F2 general-price VERBS — "an inspection RUNS $400", "attorneys CHARGE $1,500", "a $500 origination
-# FEE" are MARKET costs (facts about the world), not claims about the user's money, and over-blocking them
-# made the advice useless. Unlike the hedges above these carry no hedging of their own, so they are safe
-# ONLY because the possessive `you` + _MONEY_CUE check runs first and now covers pays-money nouns.
+# MARKET PRICES — "a home inspection runs $400–600", "attorneys charge about $1,500". These are facts about
+# the WORLD, not the user's money, and suppressing them is what made the advice useless. They are allowed —
+# but only in the FORM a market price honestly takes: a RANGE, or hedged.
 #
-# PR #72 added these to _BENCHMARK_MARK betting that that check would catch "your … $X". The bet was sound;
-# the check was not — the _MONEY_CUE gap above meant it never fired, and "Your monthly payment runs $3,200"
-# shipped allowed. Closing the gap is what makes this relaxation safe. Do not add price verbs here without
-# confirming the corresponding possessive noun is in _MONEY_CUE.
-_PRICE_VERB = re.compile(r"\b(runs?|charges?|charging|fees?|priced)\b", re.IGNORECASE)
+# The form requirement is not pedantry. We cannot verify what an inspection costs; the number comes from
+# model weights and is stale, region-blind, and confidently wrong at the edges. "$400–600" carries its own
+# uncertainty and invites the user to check. "$400" reads as arithmetic we did for them. A point value is a
+# precision claim we have no standing to make, so it is sent back for rephrasing (see `unhedged_market_price`
+# in _issues) rather than deleted — the number is welcome, the false precision isn't.
+#
+# A price VERB (runs/charges/fees) is deliberately NOT a cue on its own. PR #72 made it one, which un-gated
+# "Your monthly payment runs $3,200"; the possessive check now catches that, but a bare verb still says
+# nothing about whether the figure is honest about its own uncertainty. Range-or-hedge does.
+_PRICE_VERB = re.compile(r"\b(runs?|charges?|charging|fees?|priced|costs?)\b", re.IGNORECASE)
+# Nouns that name a thing bought in a MARKET rather than a holding the user owns. Used ONLY to pick the
+# repair instruction — "rephrase as a range" vs "delete this, it's fabricated" — never to allow anything.
+_MARKET_SUBJECT = re.compile(
+    r"\b(inspections?|appraisals?|attorneys?|lawyers?|realtors?|agents?|brokers?|commissions?|"
+    r"contractors?|movers?|permits?|origination|closing costs?|tuitions?|premiums?|deductibles?|"
+    r"retainers?|filing fees?|market|going rate|price range)\b",
+    re.IGNORECASE,
+)
+_MONEY_RANGE = re.compile(
+    r"\$?\s?[\d,]+(?:\.\d+)?\s?[kKmM]?\s*(?:-|–|—|\bto\b|\bthrough\b)\s*\$?\s?[\d,]+(?:\.\d+)?\s?[kKmM]?",
+)
 
 
 def _benchmark_cue(window: str) -> bool:
     """True if the number reads as a benchmark/labeled estimate rather than a fabricated personal figure.
 
-    Reached only after the possessive personal-holding check has passed, so a bare market price verb is a
-    valid cue here: "a home inspection runs $400" is a market fact, while "your closing costs run $9,500"
-    never gets this far."""
-    return bool(_BENCHMARK_MARK.search(window) or _PRICE_VERB.search(window))
+    Reached only after the possessive personal-holding check has passed, so what's left is a claim about the
+    world. Two honest forms: an explicit hedge ("about", "typically", "rule of thumb"), or a RANGE, which
+    hedges itself. A bare point value is neither and gets repaired into one."""
+    return bool(_BENCHMARK_MARK.search(window) or _MONEY_RANGE.search(window))
 
 
 # ── Bounded benchmark-derivation relaxation (AFFORDABILITY_GATE 2026-06-25) ────────────────────────────
@@ -524,6 +540,9 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
         # Metadata (condition 7): figures that passed via the bounded benchmark-derivation relaxation —
         # marked as benchmark-derived scenarios, NOT proven personal data.
         safe["benchmark_derived"] = sorted(benchmark_derived)
+    # Reference links: the model proposes catalog KEYS, the server owns the labels and URLs. An unknown key
+    # is dropped rather than guessed at — see advisor_sources for why the model never writes a URL.
+    safe["sources"] = resolve_sources(result.get("sources"))
     safe.setdefault("assumptions", [])
     safe.setdefault("missing_data", [])
     safe.setdefault("warnings", [])
@@ -597,7 +616,25 @@ def classify_issues(result: Any, context: AdvisorContext) -> list[dict[str, Any]
             continue
         if not tok.startswith("$"):
             continue  # bare % benchmarks etc. are allowed unless personal (handled above)
+        # Mirror the gate: a hedged or ranged figure in non-possessive prose PASSES, so it is not an issue.
+        # Without this the repair note listed numbers that were never blocked, teaching the model to strip
+        # good benchmarks — the same over-correction WS-B exists to undo.
+        if _benchmark_cue(window):
+            continue
         seen.add(norm)
+        # A MARKET price stated as a point value. The figure is welcome — the false precision isn't — so the
+        # instruction is "rephrase", not "delete". This is the difference between an advisor that says
+        # "inspections run about $400-600, here's where to check" and one that won't name a price at all.
+        if _PRICE_VERB.search(window) or _MARKET_SUBJECT.search(window):
+            issues.append({
+                "type": "unhedged_market_price", "text": tok,
+                "reason": "A market price stated as an exact figure. We can't verify what things cost, so a "
+                          "point value claims a precision we don't have.",
+                "repair_instruction": f"KEEP this price — don't delete it. Rewrite {tok} as a hedged RANGE "
+                                      f"(\"about $X-Y\", \"typically $X-Y\") so it reads as a market estimate, "
+                                      f"and add a `sources` entry so the user can check the current number.",
+            })
+            continue
         if v is not None and _is_benchmark_fraction(v, grounded):
             issues.append({
                 "type": "unlabeled_scenario_math", "text": tok,

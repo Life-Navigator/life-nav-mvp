@@ -334,6 +334,17 @@ def _compose(safe: dict[str, Any]) -> str:
     if q:
         parts.append(q)
 
+    # 3) Where to verify. Market prices we quote come from general knowledge and we can't check them, so the
+    #    honest move is to hand the user the place that can. These links are resolved from the server-owned
+    #    catalog (advisor_sources) — the model chose a key, never a URL.
+    sources = [s for s in (safe.get("sources") or []) if isinstance(s, dict) and s.get("url")]
+    if sources:
+        lines = ["*Check current numbers:*"]
+        for s in sources:
+            why = str(s.get("for") or "").strip()
+            lines.append(f"- [{s['label']}]({s['url']})" + (f" — {why}" if why else ""))
+        parts.append("\n".join(lines))
+
     return "\n\n".join(parts).strip()
 
 

@@ -35,14 +35,17 @@ def test_grounded_or_hedged_number_is_allowed(text, allowed):
     assert not blocked(text, allowed), f"should allow: {text} -> blocked {blocked(text, allowed)}"
 
 
-# ---- WS-B/F2 LANDED: a non-possessive general price ("an inspection runs $400") is no longer over-blocked,
-#      while invented DECISION figures (afford/put-down/invest above) stay blocked. ----
+# ---- WS-B/F2 LANDED: a market price is no longer over-blocked — in the FORM a market price honestly takes.
+# We can't verify what an inspection costs, so a RANGE or a hedge passes and a bare point value does not
+# (it claims a precision we don't have). Both honest forms are covered here; the point form is not rejected
+# either, it's routed to a keep-and-rephrase repair — see test_unhedged_market_price_is_repaired_not_deleted.
 @pytest.mark.parametrize("text", [
-    "A home inspection runs $400 to $600.",
-    "Real-estate agents charge $12,000 in commission on a sale like that.",
-    "There's usually a $500 origination fee.",
+    "A home inspection runs $400 to $600.",                            # range with `to`
+    "Estate attorneys charge $1,500-3,000 for a will.",                # range with a dash
+    "Real-estate agents charge about $12,000 in commission on a sale like that.",   # hedged point value
+    "There's usually a $500 origination fee.",                         # hedged point value
 ])
-def test_general_price_verb_is_allowed_wsb(text):
+def test_market_price_in_honest_form_is_allowed(text):
     assert not blocked(text), f"WS-B/F2: {text} -> {blocked(text)}"
 
 
@@ -79,7 +82,7 @@ def test_possessive_personal_figure_stays_blocked(text):
 # The relaxation must survive REAL prose, where second person is almost always somewhere nearby — a market
 # price in a sentence that also addresses the user is the normal case, not an edge case.
 def test_market_price_allowed_alongside_second_person():
-    assert not blocked("You mentioned you're buying in Austin. A home inspection runs $400.")
+    assert not blocked("You mentioned you're buying in Austin. An inspection runs about $400-600.")
 
 
 def test_possessive_price_verb_is_fine_once_grounded():

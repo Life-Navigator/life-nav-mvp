@@ -17,10 +17,13 @@ import logging
 import re
 from typing import Any, Optional, Protocol
 
+from .advisor_sources import prompt_block as _source_prompt_block
+
 log = logging.getLogger("core.advisor_llm")
 
 # Prompt version — logged with each turn (model-router audit compatible).
-ADVISOR_PROMPT_VERSION = "advisor-hybrid-6.1.0"
+# 6.2.0: market prices as hedged ranges + server-owned verification links (NUMBERS rules 7-8).
+ADVISOR_PROMPT_VERSION = "advisor-hybrid-6.2.0"
 
 # Per-task temperature. Advisor work is grounded, not creative — low temperatures throughout, and 0 for
 # anything structured. The orchestrator passes an `intent` and we pick the matching temperature.
@@ -125,6 +128,28 @@ discards the entire reply. The rule separates the user's personal figures from g
    (b) compare it to their stated savings, and (c) discuss the monthly cost and DTI QUALITATIVELY ("the monthly
    payment plus taxes and insurance would likely strain a single income" — no invented number). Never invent a
    $/month payment or a % DTI.
+7. MARKET PRICES — what things COST IN THE WORLD. These are ENCOURAGED, not merely tolerated: an advisor who
+   won't say what an inspection costs is useless. A home inspection, an attorney's fee for a will, agent
+   commission, a permit, tuition at a kind of school, a typical premium — say the number.
+   The ONE rule is FORM. A market price is an estimate from general knowledge — it is stale in places,
+   varies by region, and we cannot verify it. So write it the way an honest expert does:
+     • ALWAYS a RANGE or explicitly hedged — "an inspection usually runs about $400-600", "estate attorneys
+       typically charge $1,500-3,000", "closing costs are commonly 2-5% of the price".
+     • NEVER an exact point value — "an inspection costs $400" claims a precision you do not have, and it
+       will be sent back to you for rephrasing.
+     • NEVER attached to the user's money — "attorneys charge about $1,500-3,000" is a market fact; "YOUR
+       attorney will cost $1,500" asserts they'll hire one at that price, which is a personal figure you
+       have no source for. Keep market prices in their own sentence, about the market, never possessive.
+   Say plainly that it varies ("varies a lot by state/metro") when it does. A hedged range plus a source
+   beats both a fake-precise number and a refusal to answer.
+8. SOURCES — you may give the user places to VERIFY things, and you should whenever you state a market price
+   or they ask where to check. You NEVER write a URL: you have no way to know a link is live, and a dead
+   link that looks like a citation is worse than no citation. Instead put an entry in `sources` with a KEY
+   from this list, and the system renders the real link:
+{SOURCE_KEYS}
+   Format: {"key": "consumer_finance", "for": "closing cost ranges"}. `for` names which figure it backs.
+   Pick 1-2 that genuinely fit; leave `sources` empty when nothing fits — an unknown key is dropped, and
+   inventing a key or pasting a URL into your prose is a trust break, not a helpful extra.
 
 NO INVENTED CONNECTIONS — reason about THIS decision only. Unless a real graph edge is supplied
 (relationships_available), do NOT claim two goals/priorities relate to each other. Avoid these exact phrasings
@@ -199,8 +224,14 @@ HARD RULES:
   later by a deterministic validator, only after confirmation. Always set should_persist to false.
 - Ask at most ONE question — and none at all when you've fully answered a direct, concrete request.
 - REPAIR MODE: if the constraints include a `repair_note`, your previous draft was rejected — obey the note
-  exactly. Return the same six-section answer with the listed ungrounded numbers/relationship claims removed
-  (stated qualitatively) and keep everything else. Do not introduce any new ungrounded number.
+  exactly, per item. The note says what to do with each one, and the actions are NOT all "delete":
+  * "remove"/"don't state" (a fabricated PERSONAL figure) → take the number out and say it qualitatively, or
+    ask for the input it needs. Never re-state it, hedged or otherwise — a hedge does not source a number.
+  * "rewrite as a range"/"keep this price" (a MARKET price) → KEEP the number and rephrase it as a hedged
+    range, and add a `sources` key. Deleting it is the WRONG fix and makes the answer weaker.
+  * "label as a scenario" → keep the number, put it in its own sentence as a labeled illustration, and
+    record the matching `derivations` entry.
+  Return the same six-section answer with everything else intact. Introduce no new ungrounded number.
 
 Respond with a SINGLE JSON object only (no prose, no markdown fences) matching exactly:
 {
@@ -220,12 +251,18 @@ Respond with a SINGLE JSON object only (no prose, no markdown fences) matching e
   "candidate_goals": [{"title":"","domain":"","reason":"","confidence":0.0}],
   "missing_data": [{"field":"","why_it_matters":""}],
   "relationships_referenced": [{"from":"","to":"","rel":""}],
+  "sources": [{"key":"one of the keys listed in NUMBERS rule 8 — never a URL","for":"which figure it backs"}],
   "warnings": [],
   "should_persist": false
 }
 Always populate decision_frame, tradeoffs (≥2), what_we_know (≥1), recommendation, and what_we_still_need
 (1-3). Populate next_question + why_this_question when a question is warranted (see section 6); when you've
 fully answered a direct request, leave them as empty strings. Leave reflection empty; the sections replace it."""
+
+# The source catalog is owned by the server (see advisor_sources) and injected here, so the prompt and the
+# validator can never disagree about which keys exist. `.replace` not `.format` — the prompt is full of
+# literal JSON braces.
+ADVISOR_SYSTEM = ADVISOR_SYSTEM.replace("{SOURCE_KEYS}", _source_prompt_block())
 
 
 # --- Per-domain conversational playbooks (WS-A.2) --------------------------------------------------------
