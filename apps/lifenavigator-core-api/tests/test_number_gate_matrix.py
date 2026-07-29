@@ -81,6 +81,29 @@ def test_possessive_personal_figure_stays_blocked(text):
 
 # The relaxation must survive REAL prose, where second person is almost always somewhere nearby — a market
 # price in a sentence that also addresses the user is the normal case, not an edge case.
+# ---- CROSS-SECTION WINDOW BLEED ----
+# Found by the integration harness, not by unit tests: the gate reads a +-70 CHARACTER window to decide what
+# a number is a claim about, but it used to read it over all six sections CONCATENATED. So a word in one
+# section vouched for a number in another — "a home inspection runs $400" (recommendation) was un-gated by
+# the unrelated word "target" in what_we_still_need, a different sentence in a different part of the UI.
+# Words that aren't near each other on screen must not be near each other in the window.
+def test_a_cue_in_another_section_cannot_unblock_a_number():
+    from app.services.advisor_validator import validate
+
+    class _Ctx:
+        allowed_numbers, connected_pairs, candidate_goals, primary_objective = set(), set(), [], ""
+        rejected_goals, domain_facts, relationship_edges, connections = [], [], [], []
+
+    ok, _safe, reasons = validate({
+        "decision_frame": "You're deciding whether to buy this year.",
+        "tradeoffs": [{"option": "Buy", "benefit": "Locks price", "cost": "Thin cushion"}],
+        "recommendation": "A home inspection runs $400.",   # unhedged point price — must be caught
+        "what_we_still_need": ["Your target closing month"],  # "target" is a hedge word, 30 chars away once joined
+        "next_question": "When do you want to close?",
+    }, _Ctx())
+    assert not ok and any("invented numbers" in r for r in reasons), reasons
+
+
 def test_market_price_allowed_alongside_second_person():
     assert not blocked("You mentioned you're buying in Austin. An inspection runs about $400-600.")
 

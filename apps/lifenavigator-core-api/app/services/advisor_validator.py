@@ -211,28 +211,42 @@ def _to_float(norm: str):
         return None
 
 
+def _visible_segments(result: Any) -> list[str]:
+    """The user-visible prose, as SEPARATE sections.
+
+    The gate reads a ±70-character window around each number to decide what the number is a claim about.
+    Concatenating the sections first makes that window bleed across boundaries: "a home inspection runs
+    $400" (recommendation) was un-gated by the unrelated word "target" in what_we_still_need, 30 characters
+    later in the joined string but a different sentence in a different part of the UI. Words that are not
+    near each other on screen must not be near each other in the window."""
+    return [s for s in _visible_parts(result) if s and s.strip()]
+
+
 def _visible_text(result: Any) -> str:
-    """The user-visible prose across all rendered sections — the canonical text the gate inspects."""
+    """The sections joined — for callers that need one blob (redaction, advice scan). The NUMBER gate uses
+    _visible_segments instead; see there for why."""
+    return " ".join(_visible_parts(result))
+
+
+def _visible_parts(result: Any) -> list[str]:
     if not isinstance(result, dict):
-        return ""
-    tradeoffs = result.get("tradeoffs") or []
-    tradeoff_text = " ".join(
-        f"{(t or {}).get('option', '')} {(t or {}).get('benefit', '')} {(t or {}).get('cost', '')}"
-        for t in tradeoffs if isinstance(t, dict)
-    )
-    know = " ".join(str(x) for x in (result.get("what_we_know") or []) if x)
-    need = " ".join(str(x) for x in (result.get("what_we_still_need") or []) if x)
+        return []
+    parts: list[str] = [str(result.get("decision_frame") or "")]
+    # Each tradeoff / bullet / source is its OWN segment: they render as separate rows, so a hedge in one
+    # must never vouch for a number in another.
+    for t in (result.get("tradeoffs") or []):
+        if isinstance(t, dict):
+            parts.append(f"{t.get('option', '')} {t.get('benefit', '')} {t.get('cost', '')}")
+    parts += [str(x) for x in (result.get("what_we_know") or []) if x]
+    parts.append(str(result.get("recommendation") or ""))
+    parts += [str(x) for x in (result.get("what_we_still_need") or []) if x]
+    parts += [str(result.get("reflection") or ""), str(result.get("next_question") or ""),
+              str(result.get("why_this_question") or ""), str(result.get("summary") or "")]
     # A source's `for` ("closing cost ranges") is RENDERED, so it passes the same gate as any other visible
     # field — otherwise it's a free-text lane where "the $9,500 closing costs on your $450,000 home" reaches
     # the user ungated, right next to a link that lends it authority.
-    src = " ".join(str((s or {}).get("for") or "") for s in (result.get("sources") or [])
-                   if isinstance(s, dict))
-    return " ".join([
-        str(result.get("decision_frame") or ""), tradeoff_text, know,
-        str(result.get("recommendation") or ""), need, str(result.get("reflection") or ""),
-        str(result.get("next_question") or ""), str(result.get("why_this_question") or ""),
-        str(result.get("summary") or ""), src,
-    ])
+    parts += [str((s or {}).get("for") or "") for s in (result.get("sources") or []) if isinstance(s, dict)]
+    return parts
 
 
 def _is_benchmark_fraction(value: float, grounded: set[float]) -> bool:
@@ -475,7 +489,9 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     strict_vals, scenario_vals, kept_derivs = verify_derivations(result.get("derivations"), context.allowed_numbers)
     allowed = context.allowed_numbers | strict_vals
     benchmark_derived: set[str] = set()
-    invented = _fabricated_personal_numbers(visible, allowed, scenario_vals, benchmark_derived)
+    invented: set[str] = set()
+    for _seg in _visible_segments(result):  # per SECTION — no cross-section window bleed
+        invented |= _fabricated_personal_numbers(_seg, allowed, scenario_vals, benchmark_derived)
     if invented:
         reasons.append(f"invented numbers not in context: {sorted(invented)}")
 
@@ -577,85 +593,88 @@ def classify_issues(result: Any, context: AdvisorContext) -> list[dict[str, Any]
     allowed = set(context.allowed_numbers) | strict
     grounded = user_values(allowed)
     seen: set[str] = set()
-    for m in _FIN_NUM.finditer(visible):
-        tok = m.group(0)
-        norm = tok.strip().lstrip("$").rstrip("%").replace(",", "")
-        if not norm or norm in allowed or norm in scenario or norm in seen:
-            continue
-        if re.match(r"\(?[kb]\)", visible[m.end(): m.end() + 3], re.IGNORECASE):
-            continue
-        window = visible[max(0, m.start() - _NUM_WINDOW): min(len(visible), m.end() + _NUM_WINDOW)]
-        tight = visible[max(0, m.start() - _TIGHT_WINDOW): min(len(visible), m.end() + _TIGHT_WINDOW)]
-        after = visible[m.end(): m.end() + 14]
-        v = _to_float(norm)
-        # Skip numbers that actually PASS (benchmark-derivation auto-accept).
-        if v is not None and not (_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight)) \
-                and _benchmark_derivation_ok(v, window, after, grounded):
-            continue
-        # Monthly mortgage/loan payment — check FIRST so it gets the precise "needs rate+term" guidance
-        # (even though it's also a possessive personal figure).
-        if tok.startswith("$") and (_MONTHLY_SUFFIX.match(after)
-                                    or re.search(r"\b(?:mortgage|monthly|loan) payment\b", window, re.IGNORECASE)):
+    # Per SECTION, for the same reason validate() does — a hedge in what_we_still_need must not
+    # excuse a number in the recommendation.
+    for seg in _visible_segments(result):
+        for m in _FIN_NUM.finditer(seg):
+            tok = m.group(0)
+            norm = tok.strip().lstrip("$").rstrip("%").replace(",", "")
+            if not norm or norm in allowed or norm in scenario or norm in seen:
+                continue
+            if re.match(r"\(?[kb]\)", seg[m.end(): m.end() + 3], re.IGNORECASE):
+                continue
+            window = seg[max(0, m.start() - _NUM_WINDOW): min(len(seg), m.end() + _NUM_WINDOW)]
+            tight = seg[max(0, m.start() - _TIGHT_WINDOW): min(len(seg), m.end() + _TIGHT_WINDOW)]
+            after = seg[m.end(): m.end() + 14]
+            v = _to_float(norm)
+            # Skip numbers that actually PASS (benchmark-derivation auto-accept).
+            if v is not None and not (_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight)) \
+                    and _benchmark_derivation_ok(v, window, after, grounded):
+                continue
+            # Monthly mortgage/loan payment — check FIRST so it gets the precise "needs rate+term" guidance
+            # (even though it's also a possessive personal figure).
+            if tok.startswith("$") and (_MONTHLY_SUFFIX.match(after)
+                                        or re.search(r"\b(?:mortgage|monthly|loan) payment\b", window, re.IGNORECASE)):
+                seen.add(norm)
+                issues.append({
+                    "type": "unsupported_monthly_payment", "text": tok,
+                    "reason": "A monthly mortgage/loan payment needs an interest RATE and TERM the user didn't give.",
+                    "repair_instruction": f"Remove {tok}. Say the monthly payment depends on the rate and term; "
+                                          f"don't invent one.",
+                })
+                continue
+            # A % is a personal claim only when tied to a personal stat (DTI/readiness/probability); else it's
+            # an illustrative rate and passes. $-amounts/bare integers near a money cue stay gated.
+            _is_pct = tok.rstrip().endswith("%")
+            _personal = (_SECOND_PERSON.search(window) and _PERSONAL_STAT_PCT.search(tight)) if _is_pct \
+                else (_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight))
+            if _personal:
+                seen.add(norm)
+                issues.append({
+                    "type": "unsupported_personal_number", "text": tok,
+                    "reason": "Stated as the user's ACTUAL figure (net worth / balance / DTI / readiness / tax) "
+                              "without grounding.",
+                    "repair_instruction": f"Do NOT state {tok} as the user's figure. Remove it or reframe "
+                                          f"qualitatively; only assert numbers the user actually gave.",
+                })
+                continue
+            if not tok.startswith("$"):
+                continue  # bare % benchmarks etc. are allowed unless personal (handled above)
+            # Mirror the gate: a hedged or ranged figure in non-possessive prose PASSES, so it is not an issue.
+            # Without this the repair note listed numbers that were never blocked, teaching the model to strip
+            # good benchmarks — the same over-correction WS-B exists to undo.
+            if _benchmark_cue(window):
+                continue
             seen.add(norm)
-            issues.append({
-                "type": "unsupported_monthly_payment", "text": tok,
-                "reason": "A monthly mortgage/loan payment needs an interest RATE and TERM the user didn't give.",
-                "repair_instruction": f"Remove {tok}. Say the monthly payment depends on the rate and term; "
-                                      f"don't invent one.",
-            })
-            continue
-        # A % is a personal claim only when tied to a personal stat (DTI/readiness/probability); else it's
-        # an illustrative rate and passes. $-amounts/bare integers near a money cue stay gated.
-        _is_pct = tok.rstrip().endswith("%")
-        _personal = (_SECOND_PERSON.search(window) and _PERSONAL_STAT_PCT.search(tight)) if _is_pct \
-            else (_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight))
-        if _personal:
-            seen.add(norm)
-            issues.append({
-                "type": "unsupported_personal_number", "text": tok,
-                "reason": "Stated as the user's ACTUAL figure (net worth / balance / DTI / readiness / tax) "
-                          "without grounding.",
-                "repair_instruction": f"Do NOT state {tok} as the user's figure. Remove it or reframe "
-                                      f"qualitatively; only assert numbers the user actually gave.",
-            })
-            continue
-        if not tok.startswith("$"):
-            continue  # bare % benchmarks etc. are allowed unless personal (handled above)
-        # Mirror the gate: a hedged or ranged figure in non-possessive prose PASSES, so it is not an issue.
-        # Without this the repair note listed numbers that were never blocked, teaching the model to strip
-        # good benchmarks — the same over-correction WS-B exists to undo.
-        if _benchmark_cue(window):
-            continue
-        seen.add(norm)
-        # A MARKET price stated as a point value. The figure is welcome — the false precision isn't — so the
-        # instruction is "rephrase", not "delete". This is the difference between an advisor that says
-        # "inspections run about $400-600, here's where to check" and one that won't name a price at all.
-        if _PRICE_VERB.search(window) or _MARKET_SUBJECT.search(window):
-            issues.append({
-                "type": "unhedged_market_price", "text": tok,
-                "reason": "A market price stated as an exact figure. We can't verify what things cost, so a "
-                          "point value claims a precision we don't have.",
-                "repair_instruction": f"KEEP this price — don't delete it. Rewrite {tok} as a hedged RANGE "
-                                      f"(\"about $X-Y\", \"typically $X-Y\") so it reads as a market estimate, "
-                                      f"and add a `sources` entry so the user can check the current number.",
-            })
-            continue
-        if v is not None and _is_benchmark_fraction(v, grounded):
-            issues.append({
-                "type": "unlabeled_scenario_math", "text": tok,
-                "reason": "This is benchmark math on a stated amount but isn't clearly labeled as a scenario "
-                          "(or sits next to a payment/affordability claim).",
-                "repair_instruction": f"Keep {tok} but present it as a STANDALONE labeled scenario, e.g. "
-                                      f"'as a scenario, 20% down on $500,000 is about {tok}', in its own "
-                                      f"sentence — not glued to a possessive holding or a payment claim.",
-            })
-        else:
-            issues.append({
-                "type": "fabricated_number", "text": tok,
-                "reason": "Ungrounded dollar figure not traceable to the user's own numbers.",
-                "repair_instruction": f"Remove {tok}, or compute it ONLY from the user's own numbers "
-                                      f"(e.g. $500,000 − $60,000) and record that in `derivations`.",
-            })
+            # A MARKET price stated as a point value. The figure is welcome — the false precision isn't — so the
+            # instruction is "rephrase", not "delete". This is the difference between an advisor that says
+            # "inspections run about $400-600, here's where to check" and one that won't name a price at all.
+            if _PRICE_VERB.search(window) or _MARKET_SUBJECT.search(window):
+                issues.append({
+                    "type": "unhedged_market_price", "text": tok,
+                    "reason": "A market price stated as an exact figure. We can't verify what things cost, so a "
+                              "point value claims a precision we don't have.",
+                    "repair_instruction": f"KEEP this price — don't delete it. Rewrite {tok} as a hedged RANGE "
+                                          f"(\"about $X-Y\", \"typically $X-Y\") so it reads as a market estimate, "
+                                          f"and add a `sources` entry so the user can check the current number.",
+                })
+                continue
+            if v is not None and _is_benchmark_fraction(v, grounded):
+                issues.append({
+                    "type": "unlabeled_scenario_math", "text": tok,
+                    "reason": "This is benchmark math on a stated amount but isn't clearly labeled as a scenario "
+                              "(or sits next to a payment/affordability claim).",
+                    "repair_instruction": f"Keep {tok} but present it as a STANDALONE labeled scenario, e.g. "
+                                          f"'as a scenario, 20% down on $500,000 is about {tok}', in its own "
+                                          f"sentence — not glued to a possessive holding or a payment claim.",
+                })
+            else:
+                issues.append({
+                    "type": "fabricated_number", "text": tok,
+                    "reason": "Ungrounded dollar figure not traceable to the user's own numbers.",
+                    "repair_instruction": f"Remove {tok}, or compute it ONLY from the user's own numbers "
+                                          f"(e.g. $500,000 − $60,000) and record that in `derivations`.",
+                })
     rel_reasons, _valid = _check_relationships(result, context, visible)
     for r in rel_reasons:
         issues.append({
