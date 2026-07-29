@@ -46,21 +46,40 @@ def test_general_price_verb_is_allowed_wsb(text):
     assert not blocked(text), f"WS-B/F2: {text} -> {blocked(text)}"
 
 
-# ---- F2 REGRESSION LOCK: the price verbs must NOT un-gate a possessive claim about the user's money. ----
-# The first F2 landing folded runs/charges/fees straight into _BENCHMARK_MARK, betting that the possessive
-# `you`+money-cue check would still catch these. It didn't — _MONEY_CUE has no payment/fee/cost/charge entry,
-# so every sentence below flipped from BLOCKED to allowed, including the monthly-payment case the trust spine
-# exists to stop. The counterfactual-user rule: these numbers change per user, so they are PERSONAL and must
-# be sourced; the cases above don't, so they're market prices and pass.
+# ---- F2 REGRESSION LOCK: nothing may un-gate a possessive claim about money the user PAYS. ----
+# PR #72 folded runs/charges/fees into _BENCHMARK_MARK, betting the possessive `you`+money-cue check would
+# still catch these. The bet was sound; the check was broken — _MONEY_CUE covered money the user HOLDS
+# (net worth, savings, mortgage) but not money they PAY (payment, cost, fee, premium, rent, tuition), so
+# `personal_holding` was False for exactly these sentences and every row below shipped ALLOWED.
+#
+# The hedged rows matter more than the price-verb rows: they were allowed before #72 and after it, and a
+# hedge is what a model reaches for by default ("your payment will be about $3,200"). A fix that only
+# special-cased the price verbs would have left the wider door open.
+#
+# The counterfactual-user rule these are built from: would this number differ for another user? Yes ⇒
+# PERSONAL, must be sourced. No ⇒ market price, passes (see the WS-B cases above).
 @pytest.mark.parametrize("text", [
     "Your monthly payment runs $3,200.",          # the exact unsupported_monthly_payment case
     "Your closing costs run $9,500.",
     "You'll pay $18,200 in fees.",
     "Your attorney charges $12,000.",
     "Your student loan fees total $45,000.",
+    # hedged — the wider door, open since long before #72
+    "Your monthly payment will be about $3,200.",
+    "Your closing costs are roughly $9,500.",
+    "You'll pay approximately $18,200 in fees.",
+    "Your attorney will typically cost $12,000.",
+    "Your premium is around $450 a month.",
+    "Your rent is typically $2,400.",
 ])
-def test_price_verb_does_not_ungate_possessive_personal_figure(text):
+def test_possessive_personal_figure_stays_blocked(text):
     assert blocked(text), f"F2 regression: possessive personal figure must stay blocked: {text}"
+
+
+# The relaxation must survive REAL prose, where second person is almost always somewhere nearby — a market
+# price in a sentence that also addresses the user is the normal case, not an edge case.
+def test_market_price_allowed_alongside_second_person():
+    assert not blocked("You mentioned you're buying in Austin. A home inspection runs $400.")
 
 
 def test_possessive_price_verb_is_fine_once_grounded():

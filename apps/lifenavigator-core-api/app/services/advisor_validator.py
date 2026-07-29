@@ -126,7 +126,12 @@ _MONEY_CUE = re.compile(
     r"\b(net worth|salar(?:y|ies)|incomes?|savings?|saved|portfolio|balances?|retirement|401k|ira|"
     r"debts?|owe|owed|mortgages?|earn(?:ings?|ed)?|assets?|liabilit\w*|wealth|nest egg|cash|"
     r"spend\w*|spent|budget|net pay|take[- ]home|paycheck|equity|tax(?:es|able)?|tax bill|"
-    r"readiness|\bdti\b|debt[- ]to[- ]income)\b",
+    r"readiness|\bdti\b|debt[- ]to[- ]income|"
+    # WS-B/F2 — money the user PAYS, not just money they HOLD. Their absence is what let PR #72 through:
+    # `personal_holding` was False for "Your monthly payment runs $3,200", so the price verbs added to
+    # _BENCHMARK_MARK un-gated it. `payment` is deliberately narrow (needs monthly/mortgage/loan/car/auto/
+    # student-loan) so a scenario's "down payment" still routes to the label-it repair, not a hard block.
+    r"(?:monthly|mortgage|loan|car|auto|student[- ]loan) payments?|premiums?|costs?|fees?|charges?|tuition|rent)\b",
     re.IGNORECASE,
 )
 # A PERCENTAGE is gated as a fabricated personal stat ONLY when tied to one of these (a claim about the
@@ -147,25 +152,23 @@ _BENCHMARK_MARK = re.compile(
 )
 # WS-B/F2 general-price VERBS — "an inspection RUNS $400", "attorneys CHARGE $1,500", "a $500 origination
 # FEE" are MARKET costs (facts about the world), not claims about the user's money, and over-blocking them
-# made the advice useless. But unlike the hedges above these words carry no hedging of their own, so they
-# are a benchmark cue ONLY in non-possessive prose — see _benchmark_cue().
+# made the advice useless. Unlike the hedges above these carry no hedging of their own, so they are safe
+# ONLY because the possessive `you` + _MONEY_CUE check runs first and now covers pays-money nouns.
 #
-# The original F2 landing folded these straight into _BENCHMARK_MARK on the assumption that the possessive
-# `you`+money-cue check above would still catch "your … $X". It does not: _MONEY_CUE has no entry for
-# payment/fee/cost/charge, so `personal_holding` is False for exactly the sentences these verbs appear in,
-# and "Your monthly payment runs $3,200" / "You'll pay $18,200 in fees" went from blocked to allowed.
+# PR #72 added these to _BENCHMARK_MARK betting that that check would catch "your … $X". The bet was sound;
+# the check was not — the _MONEY_CUE gap above meant it never fired, and "Your monthly payment runs $3,200"
+# shipped allowed. Closing the gap is what makes this relaxation safe. Do not add price verbs here without
+# confirming the corresponding possessive noun is in _MONEY_CUE.
 _PRICE_VERB = re.compile(r"\b(runs?|charges?|charging|fees?|priced)\b", re.IGNORECASE)
 
 
 def _benchmark_cue(window: str) -> bool:
     """True if the number reads as a benchmark/labeled estimate rather than a fabricated personal figure.
 
-    A hedge word ("about", "typically", "rule of thumb") qualifies anywhere. A bare price verb qualifies only
-    when the window is NOT second-person — "a home inspection runs $400" is a market price; "your closing
-    costs run $9,500" is an ungrounded claim about the user's money and stays gated."""
-    if _BENCHMARK_MARK.search(window):
-        return True
-    return bool(_PRICE_VERB.search(window) and not _SECOND_PERSON.search(window))
+    Reached only after the possessive personal-holding check has passed, so a bare market price verb is a
+    valid cue here: "a home inspection runs $400" is a market fact, while "your closing costs run $9,500"
+    never gets this far."""
+    return bool(_BENCHMARK_MARK.search(window) or _PRICE_VERB.search(window))
 
 
 # ── Bounded benchmark-derivation relaxation (AFFORDABILITY_GATE 2026-06-25) ────────────────────────────

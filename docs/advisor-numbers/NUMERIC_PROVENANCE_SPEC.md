@@ -22,8 +22,21 @@ or _charge_ — so these all flipped from blocked to allowed and shipped to prod
 | `Your closing costs run $9,500.`    | BLOCKED    | allowed   |
 | `You'll pay $18,200 in fees.`       | BLOCKED    | allowed   |
 
-All 847 tests stayed green, because you cannot enumerate phrasings. The stopgap fix (`_benchmark_cue()`,
-price verbs only in non-possessive prose) closes this instance. It does not close the class.
+All 847 tests stayed green, because you cannot enumerate phrasings. Worse, the same three sentences are
+_still_ allowed with a hedge instead of a price verb — `Your monthly payment will be about $3,200` — and
+always were, long before #72. The price verbs were the narrow door; the hedge was the wide one, and the
+common one, since a hedge is what a model reaches for by default.
+
+The stopgap fix treats the actual cause: `_MONEY_CUE` enumerated money the user _holds_ (net worth, savings,
+mortgage) but not money they _pay_ (payment, cost, fee, premium, rent, tuition), so `personal_holding` was
+False for every sentence of this shape. Closing that gap re-arms the possessive check #72 relied on, which
+in turn lets the price verbs stay a plain benchmark cue. This closes both doors for these nouns. It does not
+close the class — the next missing noun reopens it silently, exactly as this one did.
+
+One known false positive remains: `attorneys charge $1,500` is over-blocked when second person appears
+within the 70-character window, because `charge` is simultaneously a market price verb and a personal money
+noun, and a character window cannot tell which subject it attaches to. Over-blocking is the safe direction,
+and it is the pre-#72 behaviour — but it is a direct instance of the argument below.
 
 The second cost is quality. The model knows an ungrounded number can get the _entire_ six-section answer
 discarded, so it self-censors and goes vague — the measured cause of roughly half the gap against ChatGPT in
@@ -110,7 +123,9 @@ The slot packet is today's `allowed_numbers` promoted from a bare set of strings
 
 Validation of `kind: "market"` runs against `subject` — a three-word field the model wrote specifically to
 name what the number is about — instead of a 70-character sliding window over free prose.
-`"home inspection fee"` vs `"your monthly payment"` is a trivial discrimination.
+`"home inspection fee"` vs `"your monthly payment"` is a trivial discrimination — and `"attorney fee"` vs
+`"your attorney fee"` resolves the false positive above, because the subject is stated rather than inferred
+from what happens to sit within 70 characters.
 
 `_MONEY_CUE` and `_TIGHT_WINDOW = 44` exist only because the validator is reconstructing, from character
 distance, information the model already had and never wrote down. This has it write it down.
