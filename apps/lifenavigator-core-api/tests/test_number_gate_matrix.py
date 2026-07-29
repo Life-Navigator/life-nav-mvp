@@ -108,6 +108,33 @@ def test_market_price_allowed_alongside_second_person():
     assert not blocked("You mentioned you're buying in Austin. An inspection runs about $400-600.")
 
 
+# ---- POSSESSIVE ATTACHMENT ----
+# "Is the user mentioned nearby?" is too coarse a test for whose money a figure is. `charge` and `cost` are
+# both market verbs and personal nouns, so in "since you're closing next month, attorneys charge $1,500" the
+# only second-person word belongs to a different clause — and proximity alone over-blocked the price.
+# Ownership must be ASSERTED: "your <noun>", or "you <have/pay/owe/…>". "you're"/"you were" mark the user as
+# a subject, not an owner, and must not gate a market price.
+@pytest.mark.parametrize("text", [
+    "Since you're closing next month, note that attorneys charge about $1,500 for the review.",
+    "Because you're self-employed, expect underwriting fees of roughly $900-1,200.",
+    "You mentioned Austin — an inspection runs about $400-600 there.",
+])
+def test_market_price_survives_a_second_person_clause(text):
+    assert not blocked(text), f"market price over-blocked by an unrelated second-person clause: {text}"
+
+
+@pytest.mark.parametrize("text", [
+    "You have about $50,000 saved.",          # ownership via a HAVE verb, no "your"
+    "You've saved roughly $50,000.",
+    "You owe about $22,000 on the card.",
+    "You'll pay approximately $18,200 in fees.",
+])
+def test_asserted_ownership_without_the_word_your_is_still_personal(text):
+    """The attachment rule must not become a loophole: dropping "your" and using a have/owe/pay verb is
+    still a claim about the user's money, and a hedge still doesn't source it."""
+    assert blocked(text), f"ungrounded personal figure slipped through: {text}"
+
+
 def test_possessive_price_verb_is_fine_once_grounded():
     """The gate is about PROVENANCE, not phrasing — the same sentence passes when the number is the user's."""
     assert not blocked("Your monthly payment runs $3,200.", ["3200"])

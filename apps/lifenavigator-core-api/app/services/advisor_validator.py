@@ -122,7 +122,26 @@ def _financial_numbers(text: str) -> set[str]:
 #         mortgage payment / readiness probability), and an invented bare price the user never gave.
 _NUM_WINDOW = 70
 _TIGHT_WINDOW = 44  # money-cue must be this close for the number to be a claim about the user's holding
-_SECOND_PERSON = re.compile(r"\byou(?:r|rs|'[a-z]+)?\b", re.IGNORECASE)
+# POSSESSIVE ATTACHMENT. "Is the user mentioned nearby?" is too coarse a test for whose money a figure is:
+# in "since you're closing next month, attorneys charge $1,500", the only second-person word belongs to a
+# different clause, and treating it as ownership over-blocked a plain market price. (It replaced a bare
+# second-person match, which fired on any `you` within the 70-char window.)
+#
+# Ownership must be ASSERTED, by one of two shapes:
+#   "your <money noun>"      — your monthly payment, your closing costs, your attorney's fee
+#   "you <have/pay/owe/...>" — you'll pay $18,200 in fees, you have $50,000 saved
+# The verb list is what keeps this from being a loophole: dropping "your" doesn't launder a personal figure.
+# "you're"/"you were" are deliberately absent — they mark the user as a subject, not as an owner of money.
+#
+# This is searched in the TIGHT (44-char) window, which is the whole bound on how far a possessive reaches;
+# there is no clause-boundary logic, so a "your" just inside that radius still attaches. Erring toward
+# blocking is the right side to err on for a personal-money claim.
+_POSSESSIVE_LINK = re.compile(
+    r"\byour\b|"
+    r"\byou(?:'ve|'ll|'d)?\s+(?:have|had|hold|own|owe|owed|earn|earned|make|made|pay|paid|spend|spent|"
+    r"save|saved|put|withdraw|contribute|carry|took|take)\b",
+    re.IGNORECASE,
+)
 _MONEY_CUE = re.compile(
     r"\b(net worth|salar(?:y|ies)|incomes?|savings?|saved|portfolio|balances?|retirement|401k|ira|"
     r"debts?|owe|owed|mortgages?|earn(?:ings?|ed)?|assets?|liabilit\w*|wealth|nest egg|cash|"
@@ -318,9 +337,9 @@ def _fabricated_personal_numbers(text: str, allowed: set[str], scenario: set[str
         # integers near a money cue stay gated as personal holdings. (ADVISOR_USEFULNESS)
         is_percent = tok.rstrip().endswith("%")
         if is_percent:
-            personal_holding = bool(_SECOND_PERSON.search(window) and _PERSONAL_STAT_PCT.search(tight))
+            personal_holding = bool(_POSSESSIVE_LINK.search(tight) and _PERSONAL_STAT_PCT.search(tight))
         else:
-            personal_holding = bool(_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight))
+            personal_holding = bool(_POSSESSIVE_LINK.search(tight) and _MONEY_CUE.search(tight))
         if personal_holding:
             # Tier 1: a claim about the user's own money — must be grounded; a hedge word OR a benchmark
             # derivation does NOT excuse a possessive personal figure ("your tax bill will be $18,200").
@@ -608,7 +627,7 @@ def classify_issues(result: Any, context: AdvisorContext) -> list[dict[str, Any]
             after = seg[m.end(): m.end() + 14]
             v = _to_float(norm)
             # Skip numbers that actually PASS (benchmark-derivation auto-accept).
-            if v is not None and not (_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight)) \
+            if v is not None and not (_POSSESSIVE_LINK.search(tight) and _MONEY_CUE.search(tight)) \
                     and _benchmark_derivation_ok(v, window, after, grounded):
                 continue
             # Monthly mortgage/loan payment — check FIRST so it gets the precise "needs rate+term" guidance
@@ -626,8 +645,8 @@ def classify_issues(result: Any, context: AdvisorContext) -> list[dict[str, Any]
             # A % is a personal claim only when tied to a personal stat (DTI/readiness/probability); else it's
             # an illustrative rate and passes. $-amounts/bare integers near a money cue stay gated.
             _is_pct = tok.rstrip().endswith("%")
-            _personal = (_SECOND_PERSON.search(window) and _PERSONAL_STAT_PCT.search(tight)) if _is_pct \
-                else (_SECOND_PERSON.search(window) and _MONEY_CUE.search(tight))
+            _personal = (_POSSESSIVE_LINK.search(tight) and _PERSONAL_STAT_PCT.search(tight)) if _is_pct \
+                else (_POSSESSIVE_LINK.search(tight) and _MONEY_CUE.search(tight))
             if _personal:
                 seen.add(norm)
                 issues.append({
