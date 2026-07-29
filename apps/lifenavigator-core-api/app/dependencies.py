@@ -335,9 +335,30 @@ def get_advisor_orchestrator(
     # as before. Enable only after the eval harness confirms it doesn't regress trust. Constructed lazily.
     retriever: Any = None
     if os.environ.get("GRAPH_GROUNDING_ENABLED", "false").lower() in ("1", "true", "yes"):
+        # SEMANTIC ENGINE (Phase 5A: core-api owns GraphRAG orchestration).
+        # GRAPH_RETRIEVAL_V2 selects the semantic engine — planning, entity linking, bounded typed
+        # traversal, RRF fusion across personal+central, feature reranking. Default ON when grounding is
+        # enabled at all; set GRAPH_RETRIEVAL_V2=false to fall back to the legacy flat retriever, which
+        # remains in-tree as the rollback path until the eval harness confirms the new engine wins.
+        _v2 = os.environ.get("GRAPH_RETRIEVAL_V2", "true").lower() in ("1", "true", "yes")
         try:
-            from .grounding.retriever import Retriever
-            retriever = Retriever(gemini=gemini, qdrant=get_qdrant(settings), neo4j=get_neo4j(settings))
+            if _v2:
+                from .clients.qdrant import QdrantClient
+                from .grounding.semantic import SemanticGraphRAG
+                central = None
+                try:
+                    central = QdrantClient.central_from_settings(settings)
+                except Exception:  # noqa: BLE001 — central is optional; personal retrieval still works
+                    central = None
+                retriever = SemanticGraphRAG(
+                    gemini=gemini,
+                    qdrant=get_qdrant(settings),
+                    neo4j=get_neo4j(settings),
+                    central_qdrant=central,
+                )
+            else:
+                from .grounding.retriever import Retriever
+                retriever = Retriever(gemini=gemini, qdrant=get_qdrant(settings), neo4j=get_neo4j(settings))
         except Exception:  # noqa: BLE001 — grounding is optional; never block advisor construction
             retriever = None
     builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life, scenarios=scenarios,

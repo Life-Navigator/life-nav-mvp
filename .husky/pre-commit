@@ -1,1 +1,23 @@
 pnpm exec lint-staged
+
+# ── Secret scanning on staged changes (incident 2026-07-28) ──────────────────────────────────────
+# The credential that leaked was committed by a normal, well-intentioned commit and lived in shared
+# history for ~30 days. CI-only scanning is too late: once pushed, remediation requires coordinated
+# history rewriting across every branch and every clone. This blocks it at the last point where
+# removal is still free.
+#
+# Install: brew install gitleaks | apt install gitleaks | https://github.com/gitleaks/gitleaks
+if command -v gitleaks >/dev/null 2>&1; then
+  if ! gitleaks protect --staged --redact --config .gitleaks.toml --no-banner; then
+    echo ""
+    echo "✖ Secret detected in staged changes — commit blocked."
+    echo "  Remove the value, read it from the environment, and rotate it if it was ever real."
+    echo "  A hardcoded fallback — os.environ.get(\"X\", \"literal\") — counts as a committed secret."
+    echo "  Genuine false positive? Add a narrow [allowlist] entry to .gitleaks.toml in the same commit."
+    exit 1
+  fi
+else
+  # Do not silently pass. A missing scanner is a gap the developer must be told about.
+  echo "⚠ gitleaks not installed — staged changes were NOT scanned for secrets."
+  echo "  Install: https://github.com/gitleaks/gitleaks#installing   (CI will still scan)"
+fi

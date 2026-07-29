@@ -28,10 +28,7 @@ TEST_JWT_SECRET = "test-secret-please-rotate"
 
 def _test_settings() -> Settings:
     return Settings(
-        supabase_url="https://test.supabase.local",
-        supabase_anon_key="anon",
         supabase_jwt_secret=TEST_JWT_SECRET,
-        supabase_service_role_key="service",
         gemini_api_key="g",
         qdrant_url="https://qdrant.local",
         qdrant_api_key="q",

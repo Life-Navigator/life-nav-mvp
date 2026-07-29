@@ -28,6 +28,28 @@ primary_region = "iad"
   GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"   # 3072-dim; MUST match the worker
   GEMINI_GENERATION_MODEL = "gemini-2.5-flash"
 
+  # ── Semantic GraphRAG (Phase 5A: core-api is the authoritative owner) ──────────────────────────
+  # GRAPH_GROUNDING_ENABLED turns retrieval on at all; GRAPH_RETRIEVAL_V2 selects the semantic engine
+  # (planning → entity linking → bounded typed traversal → RRF fusion over personal+central → feature
+  # reranking) over the legacy flat retriever, which stays in-tree purely as the rollback path.
+  #
+  # Left OFF here deliberately: enabling it changes what reaches the model on every advisor turn, and
+  # the honest gate for that is a measured win on the retrieval eval set, not a config edit. Flip it in
+  # staging first — `flyctl secrets set GRAPH_GROUNDING_ENABLED=true -a lifenavigator-core-api` — read
+  # the per-turn `graphrag` trace lines, then promote.
+  #
+  # Rollback is a flag, not a deploy: GRAPH_RETRIEVAL_V2=false reverts to the previous behaviour, and
+  # GRAPH_GROUNDING_ENABLED=false removes graph evidence from the turn entirely.
+  GRAPH_GROUNDING_ENABLED = "false"
+  GRAPH_RETRIEVAL_V2 = "true"
+
+  # Store bindings the engine needs. Secrets (QDRANT_API_KEY, NEO4J_PASSWORD, GEMINI_API_KEY) are set
+  # via `flyctl secrets set`, never here.
+  QDRANT_PERSONAL_COLLECTION = "life_navigator"
+  QDRANT_CENTRAL_COLLECTION = "ln_central"
+  NEO4J_PERSONAL_DATABASE = "neo4j"
+  NEO4J_CENTRAL_DATABASE = "central"
+
 [http_service]
   internal_port = 8080
   force_https = true

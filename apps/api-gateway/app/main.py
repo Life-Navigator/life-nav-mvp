@@ -7,7 +7,9 @@ one file. Every protected route depends on
 """
 from __future__ import annotations
 
+import json
 import logging
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -32,9 +34,36 @@ def _build_logger(level: str) -> None:
     )
 
 
+def _warn_on_residual_supabase_credentials() -> None:
+    """Surface Supabase credentials still attached to this service's runtime.
+
+    The 2026-07-29 privilege reduction removed all Supabase config except the JWT secret, because the
+    service had zero Supabase read sites. Removing the *code* does not remove the *grant*: if the
+    deployment platform still injects SUPABASE_SERVICE_ROLE_KEY, this process still holds a key that
+    bypasses every Row-Level Security policy in the project, and a container compromise still leaks it.
+
+    This warns rather than exits: the credential is unused, so refusing to boot would trade a real-but-
+    contained exposure for an outage during the migration window. The warning names the exact fix so the
+    residual cannot be silently forgotten. See GATEWAY_PRIVILEGE_REDUCTION.md.
+    """
+    residual = [k for k in ("SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_URL", "SUPABASE_ANON_KEY")
+                if os.environ.get(k)]
+    if residual:
+        logging.getLogger("gateway.privilege").warning(
+            json.dumps({
+                "event": "residual_unused_credential",
+                "service": "api-gateway",
+                "variables": residual,
+                "impact": "service_role bypasses all RLS; this service has no Supabase usage",
+                "remediation": "flyctl secrets unset " + " ".join(residual) + " -a lifenavigator-api-gateway",
+            })
+        )
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     _build_logger(settings.log_level)
+    _warn_on_residual_supabase_credentials()
 
     app = FastAPI(
         title="LifeNavigator API gateway",

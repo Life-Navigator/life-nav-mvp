@@ -1,0 +1,78 @@
+# Gitleaks configuration — LifeNavigator
+#
+# WHY THIS EXISTS
+# CI already ran TruffleHog, and it never flagged the credential that leaked on 2026-06-29 and stayed live
+# for ~30 days (CREDENTIAL_INCIDENT_REPORT.md). The reason is in the workflow:
+#
+#     uses: trufflesecurity/trufflehog@main
+#     with:
+#       extra_args: --only-verified
+#
+# `--only-verified` reports a finding ONLY when the scanner can verify the secret against a provider API —
+# AWS keys, GitHub tokens, Stripe keys. A generic *application* password for our own Supabase project has no
+# provider verifier, so it is invisible to that scan by design. The control was working exactly as
+# configured and still missed a live production credential.
+#
+# Gitleaks complements it with entropy- and pattern-based detection that does not require verification, plus
+# the project-specific rules below aimed at the shapes we actually got wrong.
+
+title = "LifeNavigator secret scanning"
+
+[extend]
+useDefault = true   # keep all upstream rules (cloud keys, tokens, private keys)
+
+# ── Project-specific rules ────────────────────────────────────────────────────────────────────────
+
+# The exact class that leaked: a credential supplied as a fallback to an env lookup. This is the highest
+# value rule in the file — a hardcoded default IS a committed secret, and it reads as harmless boilerplate.
+[[rules]]
+id = "env-fallback-credential"
+description = "Hardcoded fallback for a credential-shaped environment variable"
+regex = '''(?i)(os\.environ\.get|getenv|process\.env\.[A-Z_]+\s*\|\||env::var)\s*\(?\s*["'][A-Z_]*(PASSWORD|PASSWD|PW|SECRET|TOKEN|API_?KEY|CREDENTIAL)[A-Z_]*["']\s*,\s*["'][^"']{6,}["']'''
+tags = ["password", "default", "incident-2026-07-28"]
+
+# Assignment of a password/secret to a non-trivial literal.
+[[rules]]
+id = "assigned-credential-literal"
+description = "Credential-named variable assigned a literal value"
+regex = '''(?i)\b(password|passwd|secret|api_?key|access_token|auth_token)\s*[:=]\s*["'][^"'$\{][^"']{7,}["']'''
+tags = ["password"]
+
+# Supabase service-role JWTs — the highest-impact secret in this system (bypasses RLS).
+[[rules]]
+id = "supabase-service-role-jwt"
+description = "Supabase JWT (anon or service_role)"
+regex = '''eyJhbGciOi[A-Za-z0-9_\-\.=]{20,}'''
+tags = ["supabase", "jwt"]
+
+# Connection strings with inline credentials (Neo4j, Postgres, Qdrant, Redis).
+[[rules]]
+id = "connection-string-credentials"
+description = "Database/service URI containing inline credentials"
+regex = '''(?i)\b(neo4j\+s?|bolt|postgres(ql)?|redis|https?|qdrant)://[^:\s/]+:[^@\s]{6,}@'''
+tags = ["connection-string"]
+
+# ── Allowlist ─────────────────────────────────────────────────────────────────────────────────────
+# Keep this SHORT and specific. Every entry is a place a real secret could hide undetected.
+
+[allowlist]
+description = "Documented non-secrets"
+
+paths = [
+  '''(^|/)pnpm-lock\.yaml$''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)Cargo\.lock$''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.venv/''',
+  '''(^|/)\.next/''',
+  '''(^|/)target/''',
+  # The incident report intentionally documents redacted markers and detection patterns.
+  '''(^|/)CREDENTIAL_INCIDENT_REPORT\.md$''',
+  '''(^|/)\.gitleaks\.toml$''',
+]
+
+regexes = [
+  '''\[REDACTED[^\]]*\]''',                    # our redaction marker
+  '''(?i)(placeholder|example|changeme|your[-_]?\w*[-_]?here|xxx+|\.\.\.)''',
+  '''(?i)test[-_]?(password|secret|key)[-_]?(123|abc)''',
+]

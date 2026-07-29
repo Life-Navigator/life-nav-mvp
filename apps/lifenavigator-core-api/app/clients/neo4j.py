@@ -56,9 +56,27 @@ class Neo4jClient:
         """
         if not user_id:
             raise ValueError("query_personal requires a non-empty user_id")
+        # STRUCTURAL TENANT ENFORCEMENT (T-1, CROSS_SERVICE_TENANT_ISOLATION_AUDIT.md).
+        #
+        # Two defects made the tenant filter a convention rather than a mechanism:
+        #
+        #  1. The statement was never checked. The docstring said it "MUST filter tenant_id = $user_id"
+        #     and nothing verified it, so a statement omitting the filter returned EVERY tenant's nodes.
+        #  2. `parameters` was spread AFTER user_id, so parameters={"user_id": "<victim>"} silently
+        #     replaced the authenticated tenant.
+        #
+        # Both are now refused. This runs BEFORE the semantic engine's traversal call sites exist, so
+        # multi-hop queries cannot inherit the weaker contract.
+        if "$user_id" not in statement:
+            raise ValueError(
+                "query_personal statement must reference $user_id — refusing to run an untenanted "
+                "personal-graph query. Every MATCH must constrain tenant_id: {tenant_id: $user_id}."
+            )
+        if parameters and "user_id" in parameters:
+            raise ValueError("cannot override user_id in personal query parameters — tenant is immutable")
         if not self.configured:
             return []
-        params = {"user_id": user_id, **(parameters or {})}
+        params = {**(parameters or {}), "user_id": user_id}  # tenant binds LAST — cannot be overridden
         url = f"{_host_from_uri(self._uri)}/db/{self._database}/query/v2"
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:

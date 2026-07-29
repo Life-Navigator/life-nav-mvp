@@ -74,6 +74,48 @@ class QdrantClient:
             log.warning("qdrant search_personal failed: %s", exc)
             return []
 
+    async def search_central(
+        self,
+        vector: list[float],
+        *,
+        limit: int = 10,
+        domain: Optional[str] = None,
+    ) -> list[dict[str, Any]]:
+        """Search the SHARED knowledge collection — deliberately NOT tenant-filtered.
+
+        The central collection holds world knowledge (benchmarks, concepts, rules of thumb) and by
+        contract contains no per-user data, so there is no tenant to scope to. That contract is the
+        safety property: this method must only ever be pointed at a collection with no personal rows.
+        Harvested from api-gateway, which was the only tier with a central channel.
+
+        A DIFFERENT client instance is used for central so a misconfiguration cannot make a personal
+        search untenanted — the personal client has no code path that skips the filter.
+        """
+        if not self.configured:
+            return []
+        url = f"{self._url}/collections/{self._collection}/points/search"
+        body: dict[str, Any] = {"vector": vector, "limit": limit, "with_payload": True}
+        if domain:
+            body["filter"] = {"must": [{"key": "domain", "match": {"value": domain}}]}
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(url, headers={"api-key": self._api_key}, json=body)
+                resp.raise_for_status()
+                return resp.json().get("result", []) or []
+        except Exception as exc:  # noqa: BLE001
+            log.warning("qdrant search_central failed: %s", exc)
+            return []
+
+    @classmethod
+    def central_from_settings(cls, settings: Settings) -> "QdrantClient":
+        """A client bound to the CENTRAL collection. Separate instance, separate collection."""
+        return cls(
+            url=settings.qdrant_url,
+            api_key=settings.qdrant_api_key,
+            collection=settings.qdrant_central_collection,
+            timeout=settings.http_timeout_seconds,
+        )
+
     async def points_count(self) -> int | None:
         """Collection point count (used by /readyz). None on error."""
         if not self.configured:

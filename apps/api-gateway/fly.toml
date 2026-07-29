@@ -6,8 +6,7 @@
 #
 #   fly apps create lifenavigator-api-gateway
 #   fly secrets set \
-#     SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_JWT_SECRET=... \
-#     SUPABASE_SERVICE_ROLE_KEY=... \
+#     SUPABASE_JWT_SECRET=... \
 #     GEMINI_API_KEY=... \
 #     QDRANT_URL=... QDRANT_API_KEY=... \
 #     QDRANT_PERSONAL_COLLECTION=life_navigator QDRANT_CENTRAL_COLLECTION=ln_central \

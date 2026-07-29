@@ -99,3 +99,15 @@ supabase/.temp/
 /documents/
 /reports/
 apps/*/target/
+
+# --- credential material (incident 2026-07-28) -----------------------------------------------
+# Rotated beta/test credentials live OUTSIDE the repo. These patterns exist so that a file created
+# in a hurry during an incident cannot be committed by a reflexive `git add -A`.
+*credentials*.txt
+*credentials*.json
+*-secrets.txt
+*.secrets
+.pat
+beta-credentials*
+new-beta-credentials*
+!.gitleaks.toml

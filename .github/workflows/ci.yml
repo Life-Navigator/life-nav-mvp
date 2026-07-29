@@ -175,9 +175,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: trufflesecurity/trufflehog@main
+      # TruffleHog verified-only pass: high-confidence, provider-verified secrets (AWS, GitHub, Stripe…).
+      # Kept because its false-positive rate is ~0.
+      - name: TruffleHog (verified secrets)
+        uses: trufflesecurity/trufflehog@main
         with:
           extra_args: --only-verified
+
+      # Gitleaks pass — added after the 2026-07-28 incident (CREDENTIAL_INCIDENT_REPORT.md).
+      #
+      # The TruffleHog step above ran on every commit for months and never flagged the credential that
+      # leaked, because `--only-verified` reports a secret ONLY if it can be verified against a provider
+      # API. A generic application password for our OWN Supabase project has no provider verifier, so it
+      # was invisible to that scan by design. The control worked as configured and still missed a live
+      # production credential for ~30 days.
+      #
+      # Gitleaks needs no verification step and carries project-specific rules (.gitleaks.toml) targeting
+      # the exact shape that leaked: a hardcoded fallback to an env-var lookup.
+      - name: Gitleaks (pattern + entropy, full history)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'true'
 
   dependency-audit:
     name: Dependency Audit

@@ -17,8 +17,22 @@ from app.models.common import UserContext
 U = os.environ["SUPABASE_URL"].rstrip("/"); K = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 ANON = os.environ.get("SUPABASE_ANON_KEY") or K
 H = {"apikey": K, "Authorization": "Bearer " + K, "Content-Type": "application/json", "User-Agent": "gate"}
-# Synthetic verification password — override via env; reset each account before distributing to a tester.
-PW = os.environ.get("BETA_GATE_PW", "BetaGate2026verify")
+# Synthetic verification password — REQUIRED from the environment, never defaulted.
+#
+# A default here is not a placeholder, it is a live production credential: this script CREATES accounts with
+# it, so whatever value sits on this line authenticates against the real project the moment the script runs.
+# The previous default was committed on 2026-06-29 and stayed valid until it was found and rotated on
+# 2026-07-28 (see CREDENTIAL_INCIDENT_REPORT.md). Fail closed instead — an unset variable must stop the run,
+# not silently fall back to a shared secret that is readable by anyone with repository access.
+PW = os.environ.get("BETA_GATE_PW")
+if not PW:
+    raise SystemExit(
+        "BETA_GATE_PW is not set.\n"
+        "Generate a strong per-run secret and export it, e.g.:\n"
+        "  export BETA_GATE_PW=\"$(python3 -c 'import secrets,string;"
+        "print(\"\".join(secrets.choice(string.ascii_letters+string.digits) for _ in range(28)))')\"\n"
+        "Never hardcode it, never commit it, and rotate after each distribution."
+    )
 
 PERSONAS = [
     ("beta1@lifenav-beta.example.com", "Avery", "family_foundation",

@@ -25,7 +25,7 @@ Effective private-beta closure confirmed live.
 
 ## Part 2 — Synthetic account access → ✅ **PASS**
 
-All five beta accounts (password login, `BetaGate2026verify`): **login + dashboard load + "Synthetic beta
+All five beta accounts (password login, `[REDACTED-ROTATED-2026-07-28]`): **login + dashboard load + "Synthetic beta
 profile" banner** all confirmed live (beta1–beta5). RLS is structurally enforced (`auth.uid() = user_id` on every
 persona table); no cross-user leakage path.
 

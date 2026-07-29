@@ -19,6 +19,7 @@ says nothing about connections.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -476,10 +477,20 @@ class AdvisorContextBuilder:
         # Off (retriever is None) until GRAPH_GROUNDING_ENABLED, so today this is a no-op.
         graph_evidence: list[dict[str, Any]] = []
         if self._retriever is not None:
+            _dom = turn_domains[0] if turn_domains else None
             try:
-                graph_evidence = await self._retriever.retrieve_personal(
-                    message, ctx, domain=(turn_domains[0] if turn_domains else None), limit=8
-                ) or []
+                if hasattr(self._retriever, "retrieve"):
+                    # SemanticGraphRAG: plan → link → traverse → fuse → rerank. Returns (evidence, trace);
+                    # the trace is logged so retrieval quality is observable per turn instead of guessed at.
+                    graph_evidence, _trace = await self._retriever.retrieve(
+                        message, user_id=ctx.user_id, domain=_dom, limit=10
+                    )
+                    log.info("graphrag %s", json.dumps(_trace.as_dict(), default=str))
+                else:
+                    # Legacy flat retriever — kept as the rollback path (GRAPH_RETRIEVAL_V2=false).
+                    graph_evidence = await self._retriever.retrieve_personal(
+                        message, ctx, domain=_dom, limit=8
+                    ) or []
             except Exception as exc:  # noqa: BLE001 — grounding degrades to empty, never breaks the turn
                 log.warning("graph grounding degraded: %s", exc)
                 graph_evidence = []
