@@ -34,10 +34,12 @@ False for every sentence of this shape. Closing that gap re-arms the possessive 
 in turn lets the price verbs stay a plain benchmark cue. This closes both doors for these nouns. It does not
 close the class — the next missing noun reopens it silently, exactly as this one did.
 
-One known false positive remains: `attorneys charge $1,500` is over-blocked when second person appears
-within the 70-character window, because `charge` is simultaneously a market price verb and a personal money
-noun, and a character window cannot tell which subject it attaches to. Over-blocking is the safe direction,
-and it is the pre-#72 behaviour — but it is a direct instance of the argument below.
+Closing that gap then exposed the mirror-image failure: `attorneys charge $1,500` was over-blocked whenever
+any second-person word sat within the 70-character window, because `charge` is simultaneously a market price
+verb and a personal money noun. Fixed by requiring ownership to be _asserted_ (`your <noun>`, or
+`you have/pay/owe/...`) rather than merely nearby — `_POSSESSIVE_LINK`. That is the third guess in a row at
+the same missing fact, and the reason for everything below: **a character window cannot tell whose money a
+number is.**
 
 The second cost is quality. The model knows an ungrounded number can get the _entire_ six-section answer
 discarded, so it self-censors and goes vague — the measured cause of roughly half the gap against ChatGPT in
@@ -124,9 +126,9 @@ The slot packet is today's `allowed_numbers` promoted from a bare set of strings
 
 Validation of `kind: "market"` runs against `subject` — a three-word field the model wrote specifically to
 name what the number is about — instead of a 70-character sliding window over free prose.
-`"home inspection fee"` vs `"your monthly payment"` is a trivial discrimination — and `"attorney fee"` vs
-`"your attorney fee"` resolves the false positive above, because the subject is stated rather than inferred
-from what happens to sit within 70 characters.
+`"home inspection fee"` vs `"your monthly payment"` is a trivial discrimination, and `"attorney fee"` vs
+`"your attorney fee"` needs no possessive-attachment heuristic at all — the subject is stated rather than
+inferred from what happens to sit within 70 characters.
 
 `_MONEY_CUE` and `_TIGHT_WINDOW = 44` exist only because the validator is reconstructing, from character
 distance, information the model already had and never wrote down. This has it write it down.
