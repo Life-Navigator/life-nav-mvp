@@ -168,7 +168,10 @@ class SemanticGraphRAG:
         cypher = build_lexical_seed_cypher()
         for mention in plan.mentions[:3]:
             try:
-                rows = await self._neo4j.query_personal(
+                # NAMED rows — see traversal.traverse. With positional rows the `isinstance(r, dict)`
+                # test below is simply always False, so lexical linking would contribute nothing and
+                # report no error at all: the quietest possible failure.
+                rows = await self._neo4j.query_personal_dicts(
                     cypher, user_id=user_id, parameters={"mention": mention, "k": 3}
                 )
                 for r in rows or []:

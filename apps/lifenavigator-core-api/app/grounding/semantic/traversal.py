@@ -212,7 +212,11 @@ async def traverse(
             result.truncated = True
             break
         try:
-            rows = await neo4j.query_personal(
+            # NAMED rows — this RETURN has nine columns and is read by name below. `query_personal`
+            # returns positional rows, against which every `row.get(...)` raises and the handler below
+            # would swallow it as a generic "degraded" with hops_executed=0. That failure is
+            # indistinguishable from a sparse graph, which is why the shape is pinned here explicitly.
+            rows = await neo4j.query_personal_dicts(
                 cypher,
                 user_id=user_id,
                 parameters={

@@ -309,14 +309,37 @@ class _FakeCentral:
 
 
 class _FakeNeo4j:
+    """Emulates the REAL client's dual row contract — this fake previously hid a production defect.
+
+    `Neo4jClient.query_personal` returns POSITIONAL rows (the Aura Query API's `data.values`);
+    `query_personal_dicts` returns named rows. The original fake returned the test's dict rows from
+    `query_personal`, so traversal's `row.get(...)` passed under test and raised `AttributeError`
+    against a live database — where the hop handler swallowed it as a generic "degraded" and the walk
+    silently returned seeds only.
+
+    So `query_personal` here down-converts to positional rows exactly as the real client does. Code that
+    reads by name must call `query_personal_dicts`, or it fails in the suite the same way it fails in
+    production.
+    """
     configured = True
     def __init__(self, hop_rows):
         self._hops = list(hop_rows)
         self.calls = []
-    async def query_personal(self, statement, *, user_id, parameters=None):
-        self.calls.append({"statement": statement, "user_id": user_id, "parameters": parameters})
+
+    def _next(self, statement):
         if "CONTAINS toLower($mention)" in statement:
             return []
         if self._hops:
             return self._hops.pop(0)
         return []
+
+    async def query_personal(self, statement, *, user_id, parameters=None):
+        self.calls.append({"statement": statement, "user_id": user_id, "parameters": parameters,
+                           "shape": "positional"})
+        # Down-convert to the positional shape the real Query API returns.
+        return [list(r.values()) if isinstance(r, dict) else r for r in self._next(statement)]
+
+    async def query_personal_dicts(self, statement, *, user_id, parameters=None):
+        self.calls.append({"statement": statement, "user_id": user_id, "parameters": parameters,
+                           "shape": "named"})
+        return self._next(statement)
