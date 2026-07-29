@@ -4,9 +4,20 @@ name: Fly Apps CI/CD
 # files change (path filter), so a web-only change doesn't rebuild the backend and vice-versa. Deploy runs
 # only on a push to main, only for the app that changed, and only after its tests pass.
 #
-# Requires one repo secret: FLY_API_TOKEN  (create with: flyctl tokens create deploy -a lifenavigator-core-api,
-# or an org-scoped `flyctl tokens create org`). Until it's set, the CI (test) jobs still run; only the deploy
-# steps fail on auth. Web deploys via Vercel's own Git integration; edge functions deploy from ci.yml.
+# SECRETS ARE SYNCED FROM GITHUB, NOT SET BY HAND ON FLY.
+# Each deploy job stages that app's secrets from the `secrets.*` context via scripts/ci/fly_secrets.sh,
+# then deploys — so the staged values and the image ship in ONE release. GitHub is the single source of
+# truth; `flyctl secrets set` by hand drifts silently and is invisible to review.
+#
+# The script holds a per-app manifest and refuses to deploy when a required secret is unset or EMPTY (an
+# unset GitHub secret expands to an empty string, which would otherwise deploy an app that cannot reach
+# its stores and fails later as "no results"). The manifests are also least-privilege: api-gateway does
+# NOT receive SUPABASE_SERVICE_ROLE_KEY — see GATEWAY_PRIVILEGE_REDUCTION.md.
+#
+# Required repo secret for deployment itself: FLY_API_TOKEN (flyctl tokens create org).
+# The full inventory, and which service needs which value, is in docs/deploy/SECRETS.md.
+#
+# Web deploys via Vercel's own Git integration; Supabase migrations/edge functions via supabase.yml.
 
 on:
   push:
@@ -107,13 +118,38 @@ jobs:
       group: deploy-core-api
       cancel-in-progress: false
     environment: production
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      NEO4J_URI: ${{ secrets.NEO4J_URI }}
+      NEO4J_USERNAME: ${{ secrets.NEO4J_USERNAME }}
+      NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+      PLAID_CLIENT_ID: ${{ secrets.PLAID_CLIENT_ID }}
+      PLAID_CLIENT_SECRET: ${{ secrets.PLAID_CLIENT_SECRET }}
+      PLAID_ENV: ${{ vars.PLAID_ENV }}
+      # Retrieval flags come from repo VARIABLES, not secrets — they are configuration, they are not
+      # sensitive, and they must be visible to whoever is reading why production behaves as it does.
+      GRAPH_GROUNDING_ENABLED: ${{ vars.GRAPH_GROUNDING_ENABLED }}
+      GRAPH_RETRIEVAL_V2: ${{ vars.GRAPH_RETRIEVAL_V2 }}
+      MODEL_PROVIDER: ${{ vars.MODEL_PROVIDER }}
+      VERTEX_PROJECT: ${{ vars.VERTEX_PROJECT }}
+      VERTEX_REGION: ${{ vars.VERTEX_REGION }}
+      PRIVATE_BETA_ENABLED: ${{ vars.PRIVATE_BETA_ENABLED }}
+      PRIVATE_BETA_ALLOWLIST: ${{ secrets.PRIVATE_BETA_ALLOWLIST }}
+      ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Stage secrets from GitHub
+        run: ./scripts/ci/fly_secrets.sh core-api
       - run: flyctl deploy --remote-only
         working-directory: apps/lifenavigator-core-api
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   deploy-api-gateway:
     name: Deploy api-gateway
@@ -124,13 +160,26 @@ jobs:
       group: deploy-api-gateway
       cancel-in-progress: false
     environment: production
+    # DELIBERATELY SHORT. This service verifies Supabase-issued JWTs and queries the stores; it never
+    # calls Supabase, so it gets the JWT secret and nothing else from that provider. SUPABASE_URL /
+    # ANON_KEY / SERVICE_ROLE_KEY were removed after an audit found zero read sites
+    # (GATEWAY_PRIVILEGE_REDUCTION.md). Adding them back here would silently re-grant an RLS bypass.
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      NEO4J_URI: ${{ secrets.NEO4J_URI }}
+      NEO4J_USERNAME: ${{ secrets.NEO4J_USERNAME }}
+      NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Stage secrets from GitHub
+        run: ./scripts/ci/fly_secrets.sh api-gateway
       - run: flyctl deploy --remote-only
         working-directory: apps/api-gateway
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
   deploy-ingestion-worker:
     name: Deploy ingestion-worker
@@ -141,10 +190,25 @@ jobs:
       group: deploy-ingestion-worker
       cancel-in-progress: false
     environment: production
+    # The worker is the one service that legitimately holds the service-role key AND write access to all
+    # three stores — it IS the ingestion path. It verifies no user tokens, so it needs no JWT secret.
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      QDRANT_URL: ${{ secrets.QDRANT_URL }}
+      QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+      NEO4J_URI: ${{ secrets.NEO4J_URI }}
+      NEO4J_USERNAME: ${{ secrets.NEO4J_USERNAME }}
+      NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+      WORKER_BATCH_SIZE: ${{ vars.WORKER_BATCH_SIZE }}
+      WORKER_MAX_RETRIES: ${{ vars.WORKER_MAX_RETRIES }}
+      WORKER_POLL_INTERVAL_SECONDS: ${{ vars.WORKER_POLL_INTERVAL_SECONDS }}
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Stage secrets from GitHub
+        run: ./scripts/ci/fly_secrets.sh ingestion-worker
       - run: flyctl deploy --remote-only
         working-directory: apps/ingestion-worker
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

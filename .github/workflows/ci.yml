@@ -288,6 +288,47 @@ jobs:
         with:
           version: latest
 
+      # Edge-function secrets, synced from GitHub BEFORE the functions that need them are deployed.
+      #
+      # These functions have been deploying without their secrets ever being set. A Deno function reading
+      # an unset env var gets `undefined`, so `graphrag-sync` and `process-ingestion` deploy green and
+      # then fail at runtime on their first store call — the same silent-empty-config failure the Fly
+      # manifest guards against, in the one tier that had no guard at all.
+      - name: Sync Edge Function secrets
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+          NEO4J_URI: ${{ secrets.NEO4J_URI }}
+          NEO4J_USERNAME: ${{ secrets.NEO4J_USERNAME }}
+          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+        run: |
+          set -euo pipefail
+          MISSING=()
+          for n in GEMINI_API_KEY QDRANT_URL QDRANT_API_KEY NEO4J_URI NEO4J_USERNAME NEO4J_PASSWORD; do
+            [ -n "${!n:-}" ] || MISSING+=("$n")
+          done
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "::error::Edge function secrets unset: ${MISSING[*]}"
+            exit 1
+          fi
+          # Values are piped via an env file on stdin-equivalent; never echoed, never in argv.
+          umask 077
+          ENVFILE="$(mktemp)"
+          trap 'rm -f "$ENVFILE"' EXIT
+          {
+            printf 'GEMINI_API_KEY=%s\n' "$GEMINI_API_KEY"
+            printf 'QDRANT_URL=%s\n' "$QDRANT_URL"
+            printf 'QDRANT_API_KEY=%s\n' "$QDRANT_API_KEY"
+            printf 'NEO4J_URI=%s\n' "$NEO4J_URI"
+            printf 'NEO4J_USERNAME=%s\n' "$NEO4J_USERNAME"
+            printf 'NEO4J_PASSWORD=%s\n' "$NEO4J_PASSWORD"
+          } > "$ENVFILE"
+          supabase secrets set --env-file "$ENVFILE" --project-ref "$PROJECT_REF"
+          echo "synced 6 edge-function secrets"
+
       - name: Deploy Edge Functions
         run: |
           supabase functions deploy graphrag-sync --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
@@ -297,3 +338,43 @@ jobs:
           supabase functions deploy process-ingestion --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+  # ── Database migrations (main only, after validation) ──────────────
+  # Migrations were VALIDATED here but never APPLIED, so every schema change needed someone to remember
+  # to run `supabase db push` by hand. That is why "migration NOT yet applied" has blocked so many
+  # features — the pipeline reported success for a deploy whose schema had not shipped.
+  #
+  # Gated on `environment: production`, so a required reviewer can be attached in repo settings if
+  # unattended schema changes ever stop being acceptable. `--linked` targets the project the
+  # SUPABASE_PROJECT_REF secret names; it does not read any connection string from the repo.
+  deploy-migrations:
+    name: Apply Database Migrations
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [validate-migrations, unit-tests, secrets-scan]
+    environment: production
+    concurrency:
+      group: supabase-migrations
+      cancel-in-progress: false # never interrupt a migration mid-apply
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Link project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+      - name: Show pending migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          echo "## Pending migrations" >> $GITHUB_STEP_SUMMARY
+          supabase migration list --linked >> $GITHUB_STEP_SUMMARY 2>&1 || true
+      - name: Apply migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: supabase db push --linked
