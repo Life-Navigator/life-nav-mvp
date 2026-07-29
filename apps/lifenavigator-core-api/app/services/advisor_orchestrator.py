@@ -679,6 +679,15 @@ class AdvisorOrchestrator:
             _MAX_REPAIRS = 0 if tr.get("route_path") == "fast" else 1
             attempt = 0
             issues: list[dict[str, Any]] = []
+            # EXCEPTION for market-price FORM. A fast turn skips repair to protect latency, and whatever it
+            # skips falls through to redaction — which DELETES the sentence carrying the figure. For an
+            # unhedged market price that is the worst available outcome: the answer loses "an inspection runs
+            # $400" entirely, when the only thing wrong was the missing hedge. That is precisely the
+            # over-blocking this workstream exists to end, so these earn one repair on any route.
+            if _MAX_REPAIRS == 0 and not ok and _is_repairable(reasons):
+                pre = classify_issues(out, context)
+                if pre and all(i["type"] == "unhedged_market_price" for i in pre):
+                    _MAX_REPAIRS, issues = 1, pre
             while (
                 (not ok)
                 and _is_repairable(reasons)

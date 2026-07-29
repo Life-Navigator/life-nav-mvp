@@ -99,6 +99,17 @@ def test_every_catalog_url_is_a_plausible_https_root():
         assert url.count("/") <= 4, f"{key}: {url} is too deep to stay alive"
 
 
+def test_source_for_text_is_number_gated_like_any_visible_field():
+    """`for` is rendered next to an authoritative link, which lends it credibility. If it weren't gated it
+    would be a free-text lane straight past the number gate."""
+    from app.services.advisor_validator import _visible_text
+    visible = _visible_text({
+        "recommendation": "Closing costs vary by state.",
+        "sources": [{"key": "consumer_finance", "for": "the $9,500 closing costs on your $450,000 home"}],
+    })
+    assert "9,500" in visible and "450,000" in visible
+
+
 def test_prompt_block_lists_every_key():
     block = prompt_block()
     for key in MARKET_SOURCES:

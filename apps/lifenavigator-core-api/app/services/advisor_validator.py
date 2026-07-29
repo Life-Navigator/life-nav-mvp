@@ -222,11 +222,16 @@ def _visible_text(result: Any) -> str:
     )
     know = " ".join(str(x) for x in (result.get("what_we_know") or []) if x)
     need = " ".join(str(x) for x in (result.get("what_we_still_need") or []) if x)
+    # A source's `for` ("closing cost ranges") is RENDERED, so it passes the same gate as any other visible
+    # field — otherwise it's a free-text lane where "the $9,500 closing costs on your $450,000 home" reaches
+    # the user ungated, right next to a link that lends it authority.
+    src = " ".join(str((s or {}).get("for") or "") for s in (result.get("sources") or [])
+                   if isinstance(s, dict))
     return " ".join([
         str(result.get("decision_frame") or ""), tradeoff_text, know,
         str(result.get("recommendation") or ""), need, str(result.get("reflection") or ""),
         str(result.get("next_question") or ""), str(result.get("why_this_question") or ""),
-        str(result.get("summary") or ""),
+        str(result.get("summary") or ""), src,
     ])
 
 
