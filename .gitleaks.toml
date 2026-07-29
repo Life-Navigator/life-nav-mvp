@@ -32,10 +32,21 @@ regex = '''(?i)(os\.environ\.get|getenv|process\.env\.[A-Z_]+\s*\|\||env::var)\s
 tags = ["password", "default", "incident-2026-07-28"]
 
 # Assignment of a password/secret to a non-trivial literal.
+#
+# The identifier list is deliberately SUFFIX-based. The original version enumerated exact names
+# (password|secret|api_key|access_token|auth_token) and the canary proved it missed
+# `SUPABASE_SERVICE_KEY = "..."` — an identifier ending in `_KEY`. That is the service-role key shape,
+# the single highest-impact secret in this system because it bypasses RLS entirely. A rule that catches
+# `api_key` but not `service_key` gives precisely the false assurance both incidents ran on.
+#
+# The `_key` qualifiers are ENUMERATED rather than left open as `[a-z0-9]+_key`. The open form was tried
+# and flagged 74 ordinary domain identifiers — `pending_key`, `finding_key`, `alert_key`. A rule that
+# cries wolf 74 times is worse than a narrow one: the second incident's finding sat in a pile of 199 and
+# nobody read it. Precision here is what keeps a hit meaningful.
 [[rules]]
 id = "assigned-credential-literal"
 description = "Credential-named variable assigned a literal value"
-regex = '''(?i)\b(password|passwd|secret|api_?key|access_token|auth_token)\s*[:=]\s*["'][^"'$\{][^"']{7,}["']'''
+regex = '''(?i)\b[a-z0-9_]*(password|passwd|secret|api_?key|(service|anon|signing|private|encryption|access|publishable|admin|master|role|jwt)_key|access_token|auth_token|credential)\s*[:=]\s*["'][^"'$\{][^"']{7,}["']'''
 tags = ["password"]
 
 # Supabase service-role JWTs — the highest-impact secret in this system (bypasses RLS).
@@ -52,11 +63,37 @@ description = "Database/service URI containing inline credentials"
 regex = '''(?i)\b(neo4j\+s?|bolt|postgres(ql)?|redis|https?|qdrant)://[^:\s/]+:[^@\s]{6,}@'''
 tags = ["connection-string"]
 
+# The Supabase Postgres pooler connection string — the shape that leaked on 2026-06-23 and sat PUBLICLY
+# readable on origin/main for ~5 weeks (LN-SEC-2026-0729-02). The generic connection-string rule above did
+# match it; nothing was running gitleaks locally, and it went unnoticed. This rule exists so the highest-
+# impact credential in the system has a named, un-ignorable finding rather than one line in a pile of 199.
+#
+# It matches the project-ref username form (`postgres.<ref>`) that only ever appears in a REAL Supabase
+# connection string — a local dev URI is `postgres:postgres@localhost`, which this cannot match.
+[[rules]]
+id = "supabase-pooler-connection-string"
+description = "Supabase Postgres connection string with an inline password (production database credential)"
+# NOTE: gitleaks compiles with RE2 (go-re2), which has no lookahead. The leading character class is how
+# `${VAR}` and `<PLACEHOLDER>` are excluded — the first password character may not be `$` or `<`.
+regex = '''postgres(ql)?://postgres\.[a-z]{16,24}:[^@\s$<][^@\s]{3,}@'''
+tags = ["supabase", "database", "critical", "incident-2026-07-29"]
+
 # ── Allowlist ─────────────────────────────────────────────────────────────────────────────────────
 # Keep this SHORT and specific. Every entry is a place a real secret could hide undetected.
+#
+# DELIBERATELY ABSENT: any blanket allowlist for `tests/`, `__tests__/` or `*.test.*`. Test files are one
+# of the most common places a real credential gets committed — the convenience of a working value is
+# exactly the temptation. Benign test fixtures are allowlisted below by VALUE, one shape at a time, so a
+# real secret pasted into a test still fails the scan.
 
 [allowlist]
 description = "Documented non-secrets"
+
+# Match the allowlist regexes against the WHOLE LINE, not just the extracted secret. The indirection
+# forms below (`env(VAR)`, `${VAR}`, `<PLACEHOLDER>`) and the local-only URIs are properties of the line;
+# several rules capture only a fragment as the "secret", so a secret-targeted allowlist silently misses
+# them and the finding survives as noise.
+regexTarget = "line"
 
 paths = [
   '''(^|/)pnpm-lock\.yaml$''',
@@ -66,13 +103,64 @@ paths = [
   '''(^|/)\.venv/''',
   '''(^|/)\.next/''',
   '''(^|/)target/''',
-  # The incident report intentionally documents redacted markers and detection patterns.
+  # The incident reports intentionally document redacted markers and detection patterns.
   '''(^|/)CREDENTIAL_INCIDENT_REPORT\.md$''',
   '''(^|/)\.gitleaks\.toml$''',
+  # RDF/OWL vocabularies. Every hit here is a PROPERTY NAME (`linkedInUrl a owl:DatatypeProperty`)
+  # matching the upstream linkedin rule on the substring "linkedIn". These files declare an ontology and
+  # cannot contain a runtime credential — there is no assignment syntax in Turtle for one.
+  '''(^|/)ontology/.*\.ttl$''',
+  # Build/lint caches — generated, not authored, and rewritten on every run.
+  '''(^|/)\.ruff_cache/''',
+  '''(^|/)\.pytest_cache/''',
+  '''(^|/)__pycache__/''',
+  # The canary PLANTS fake credentials on purpose — it is the test that proves the scanner works.
+  # Scanning it would make the canary flag itself and mask a real regression in the noise.
+  '''(^|/)scripts/security/gitleaks_canary\.sh$''',
 ]
 
 regexes = [
   '''\[REDACTED[^\]]*\]''',                    # our redaction marker
   '''(?i)(placeholder|example|changeme|your[-_]?\w*[-_]?here|xxx+|\.\.\.)''',
   '''(?i)test[-_]?(password|secret|key)[-_]?(123|abc)''',
+  # `replace-with-…` is the convention used throughout apps/web/env-values/*.env.example. Resolving
+  # incident residual R-6: every credential-named var in those files is one of these placeholders, so
+  # the "8 credential-named vars in prod.env.example" question is closed — none holds a real value.
+  '''(?i)replace[-_]with[-_]''',
+  '''(?i)\btest[-_]secret\b|a-totally-different-secret''',   # JWT/invite test fixtures
+  '''(?i)micro-credential''',                                # education.ts enum VALUE, not a credential
+
+  # ── Indirection, not secrets ──────────────────────────────────────────────────────────────────
+  # A value that REFERENCES a secret is the pattern we are actively migrating toward; flagging it
+  # would penalise the fix. All three forms resolve at runtime and contain nothing on their own.
+  '''\$\{[A-Za-z_][A-Za-z0-9_]*\}''',          # ${SUPABASE_DB_PASSWORD}
+  '''\$[A-Z][A-Z0-9_]{2,}''',                  # $SUPABASE_DB_PASSWORD
+  '''env\([A-Z][A-Z0-9_]*\)''',                # supabase/config.toml: secret = "env(GOOGLE_CLIENT_SECRET)"
+  '''<[A-Za-z][^<>]{2,80}>''',                 # <DB_PASSWORD>, <fresh token from …/account/tokens>
+
+  # ── Local-only development URIs ───────────────────────────────────────────────────────────────
+  # `postgres:postgres@localhost:54322` is the fixed Supabase CLI local default. It is published in
+  # Supabase's own docs, grants nothing beyond the developer's own machine, and appears in runbooks.
+  '''://[^:@\s]+:[^@\s]*@(localhost|127\.0\.0\.1|0\.0\.0\.0|host\.docker\.internal)[:/]''',
+  '''://(username|user|postgres|lifenavigator|<[^>]+>):(password|postgres|<[^>]+>)@''',
+
+  # ── Named benign fixtures ─────────────────────────────────────────────────────────────────────
+  # Allowlisted individually, by value, rather than by granting their directories a blanket pass.
+  '''wrong-(password|secret|key|token)''',     # auth tests asserting REJECTION
+  '''ya29\.LEAK''',                            # audit-log test proving a token is scrubbed from logs
+  '''MyPassword123!''',                        # LoginForm fixture
+  '''Test12345!|Phase0-Test-''',               # smoke-script fixtures
+  '''@ln_auth_token''',                        # mobile AsyncStorage KEY NAME, not a token
+  '''CommunityKey=''',                         # public data-source URL in a knowledge migration
+  '''test-anon-key|ya29\.SUPER-SECRET|StrongPass123!''',    # proxy / email / register test fixtures
+  # Self-describing local-development defaults in dev.env.example. These configure a developer's own
+  # machine; they are never deployed, and each names itself as a placeholder.
+  '''(?i)lifenavigator-(super-secure-secret|master-key-for-field-encryption)''',
+
+  # ── Identifiers and prose that merely CONTAIN a credential word ───────────────────────────────
+  # `key=` is a common ordinary parameter name. These forms are structurally incapable of holding a
+  # credential: an ordinal section id, a log message, and English prose in a markdown table.
+  '''\bkey="\d+_[a-z0-9_]+"''',                 # ReportSection(key="1_total_compensation", ...)
+  '''console\.(log|warn|error|debug)\(''',      # console.error('Error changing password:', error)
+  '''(?i)secret[- ]rotation''',                 # prose: "populate secret rotation table"
 ]

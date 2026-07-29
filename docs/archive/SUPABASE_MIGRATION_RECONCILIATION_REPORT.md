@@ -261,7 +261,7 @@ chat, recommendations, outcome tracking only.
 supabase migration list                    # 071 onwards: Local + Remote both filled
 
 # 2. New schemas exist.
-psql 'postgres://postgres.diwkyyahglnqmyledsey:LifeNav!\$#007@aws-1-us-east-1.pooler.supabase.com:6543/postgres' -c "
+psql 'postgres://postgres.diwkyyahglnqmyledsey:${SUPABASE_DB_PASSWORD}@aws-1-us-east-1.pooler.supabase.com:6543/postgres' -c "
    SELECT schema_name FROM information_schema.schemata
    WHERE schema_name IN ('governance','economic','outcome','enterprise','projections',
                          'platform','connectors','models','security','analytics',

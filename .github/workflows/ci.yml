@@ -199,6 +199,31 @@ jobs:
           GITLEAKS_CONFIG: .gitleaks.toml
           GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'true'
 
+      # CANARY — proves the scanner above actually detects secrets, rather than merely exiting 0.
+      #
+      # Both credential incidents happened while a secret-scanning job passed on every commit. A green
+      # check is equally consistent with "no secrets present" and "scanner broken, misconfigured, or
+      # pointed at the wrong ruleset", and nothing here could tell those apart. This step plants fake
+      # credentials shaped like the two that actually leaked and fails the build if any goes undetected.
+      #
+      # It runs AFTER the scan deliberately: if an allowlist entry is widened until it swallows a real
+      # rule, this is what catches it. It already has — the first run found that
+      # `assigned-credential-literal` missed `SUPABASE_SERVICE_KEY = "..."`, the service-role shape that
+      # bypasses RLS.
+      #
+      # If this fails, fix the rule. Do not weaken the canary.
+      - name: Install gitleaks (for canary)
+        run: |
+          VER=8.28.0
+          curl -sSL -o /tmp/gl.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz"
+          tar -xzf /tmp/gl.tar.gz -C /tmp gitleaks
+          sudo mv /tmp/gitleaks /usr/local/bin/
+          gitleaks version
+
+      - name: Secret-scanner canary (control must detect the threat)
+        run: ./scripts/security/gitleaks_canary.sh
+
   dependency-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest

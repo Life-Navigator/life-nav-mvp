@@ -159,7 +159,7 @@ Implement now / defer / hide:   IMPLEMENT NOW
 
 ```
 Route/component:    operational
-Current behavior:   `Techgenius!$#1` (Supabase account) and `LifeNav!$#007` (Supabase
+Current behavior:   `Techgenius!$#1` (Supabase account) and `${SUPABASE_DB_PASSWORD}` (Supabase
                     DB password) are in conversation transcript logs.
 Expected behavior:  Both rotated; downstream Edge Function secrets re-staged where
                     they reference the old DB password.
