@@ -192,12 +192,39 @@ jobs:
       #
       # Gitleaks needs no verification step and carries project-specific rules (.gitleaks.toml) targeting
       # the exact shape that leaked: a hardcoded fallback to an env-var lookup.
-      - name: Gitleaks (pattern + entropy, full history)
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: .gitleaks.toml
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'true'
+      # Installed as a BINARY, not via gitleaks/gitleaks-action@v2.
+      #
+      # That action refuses to run for GitHub *organizations* without a paid licence key, and it had
+      # been failing closed with "missing gitleaks license" on every run since it was added — so the
+      # control the incident response introduced never actually executed once. The scanner itself is
+      # free; only the Action wrapper is licensed. Running the binary removes the dependency entirely.
+      - name: Install gitleaks
+        run: |
+          VER=8.28.0
+          curl -sSL -o /tmp/gl.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz"
+          tar -xzf /tmp/gl.tar.gz -C /tmp gitleaks
+          sudo mv /tmp/gitleaks /usr/local/bin/
+          gitleaks version
+
+      # The working tree must be clean, always. This is the check that matters: it is what stops a
+      # credential from being added.
+      - name: Gitleaks (working tree)
+        run: gitleaks detect --config .gitleaks.toml --no-git --redact --no-banner
+
+      # Newly introduced commits are scanned as well, so a secret that is added and then deleted in a
+      # later commit of the same PR is still caught.
+      #
+      # NOT a full-history scan. History currently holds 87 findings, dominated by the two rotated/
+      # pending-rotation incident credentials (CREDENTIAL_INCIDENT_REPORT.md). Gating on those would
+      # mean a permanently red required check, and a permanently red check is one people learn to
+      # merge past — the precise failure mode that let both credentials survive. History is addressed
+      # by ROTATION, which makes the values inert; this gate is about what is being added now.
+      - name: Gitleaks (commits in this PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          gitleaks detect --config .gitleaks.toml --redact --no-banner \
+            --log-opts="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
 
       # CANARY — proves the scanner above actually detects secrets, rather than merely exiting 0.
       #
@@ -212,15 +239,6 @@ jobs:
       # bypasses RLS.
       #
       # If this fails, fix the rule. Do not weaken the canary.
-      - name: Install gitleaks (for canary)
-        run: |
-          VER=8.28.0
-          curl -sSL -o /tmp/gl.tar.gz \
-            "https://github.com/gitleaks/gitleaks/releases/download/v${VER}/gitleaks_${VER}_linux_x64.tar.gz"
-          tar -xzf /tmp/gl.tar.gz -C /tmp gitleaks
-          sudo mv /tmp/gitleaks /usr/local/bin/
-          gitleaks version
-
       - name: Secret-scanner canary (control must detect the threat)
         run: ./scripts/security/gitleaks_canary.sh
 
