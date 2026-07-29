@@ -806,16 +806,45 @@ mod manifest_tests {
     ///   cargo test -p ingestion-worker export_relationship_manifest -- --ignored
     #[test]
     fn manifest_on_disk_matches_the_registry() {
-        let expected = relationship_manifest();
-        let actual = std::fs::read_to_string(MANIFEST_PATH).unwrap_or_else(|e| {
+        let raw = std::fs::read_to_string(MANIFEST_PATH).unwrap_or_else(|e| {
             panic!(
                 "cannot read {MANIFEST_PATH}: {e}. Generate it with: \
                     cargo test -p ingestion-worker export_relationship_manifest -- --ignored"
             )
         });
+
+        // Compare CONTENT, not bytes.
+        //
+        // The first version of this gate compared raw strings and broke within the hour: the repo's
+        // pre-commit `prettier` pass rewrites .json and normalised `0.80` -> `0.8`, so a FORMATTER,
+        // not a drift, failed the build. A contract test that a formatter can break teaches people to
+        // bypass it, which is worse than not having the test.
+        //
+        // The semantics are (rel_type, family, weight). Whitespace and float spelling are not.
+        let parse = |s: &str| -> Vec<(String, String, String)> {
+            let v: serde_json::Value = serde_json::from_str(s).expect("manifest is valid JSON");
+            let mut rows: Vec<(String, String, String)> = v["relationships"]
+                .as_array()
+                .expect("relationships array")
+                .iter()
+                .map(|r| {
+                    (
+                        r["rel_type"].as_str().unwrap_or_default().to_string(),
+                        r["family"].as_str().unwrap_or_default().to_string(),
+                        // Canonical precision, so 0.8 and 0.80 compare equal.
+                        format!("{:.2}", r["weight"].as_f64().unwrap_or_default()),
+                    )
+                })
+                .collect();
+            rows.sort();
+            rows
+        };
+
+        let actual = parse(&raw);
+        let expected = parse(&relationship_manifest());
         assert_eq!(
-            actual.trim(),
-            expected.trim(),
+            actual,
+            expected,
             "\n\nThe ontology manifest is STALE — the registry declares relationships the generated \
              contract does not.\n\
              core-api's traversal reads that contract, so every un-exported edge type is one the \

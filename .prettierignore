@@ -1,0 +1,5 @@
+
+# Generated ontology contract — owned by apps/ingestion-worker/src/ontology.rs and verified byte-for-
+# content against the registry in CI. Prettier rewriting it (0.80 -> 0.8) is pure churn on a file no
+# human should edit.
+apps/lifenavigator-core-api/app/grounding/semantic/ontology_manifest.json
