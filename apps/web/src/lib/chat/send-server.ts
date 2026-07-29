@@ -11,6 +11,9 @@ export interface SendResult {
   llm_status?: string;
   handoff?: unknown; // cross-agent in-chat handoff metadata (from → target advisor)
   reasoning?: unknown; // {tradeoffs, what_we_know, what_we_still_need} — for the evidence drawer
+  // Verification links for market prices the advisor quoted. Server-resolved from a closed catalog, so a
+  // `url` here is always one we own — the model chooses a key and can never author a link.
+  sources?: Array<{ key: string; label: string; url: string; for?: string }>;
   goals?: string[]; // relevant goal chips (candidate_goals)
   risks?: string[]; // detected risk chips (context_panel.top_risks)
   // RELEASE_HARDENING observability passthrough (item 1/2) — lets the live regression + dashboards confirm
@@ -111,6 +114,25 @@ export async function sendAdvisorTurn(args: {
   // Surfacing payloads for the premium chat UI (drawer + chips) — never injected into the message text.
   const reasoning =
     turn.reasoning && typeof turn.reasoning === 'object' ? turn.reasoning : undefined;
+  // Only keep entries that carry a real http(s) URL — defence in depth. The core API already resolves these
+  // from its own catalog; this makes a malformed or hand-edited payload unrenderable rather than trusted.
+  const sources = Array.isArray(turn.sources)
+    ? (turn.sources as Array<Record<string, unknown>>)
+        .filter(
+          (s) =>
+            typeof s?.url === 'string' &&
+            /^https?:\/\//.test(s.url) &&
+            typeof s?.label === 'string' &&
+            typeof s?.key === 'string'
+        )
+        .map((s) => ({
+          key: String(s.key),
+          label: String(s.label),
+          url: String(s.url),
+          for: typeof s.for === 'string' ? s.for : undefined,
+        }))
+        .slice(0, 4)
+    : undefined;
   const goals = Array.isArray(turn.candidate_goals)
     ? (turn.candidate_goals as Array<Record<string, unknown>>)
         .map((g) => (typeof g?.goal === 'string' ? g.goal : ''))
@@ -166,6 +188,7 @@ export async function sendAdvisorTurn(args: {
     llm_status,
     handoff,
     reasoning,
+    sources,
     goals,
     risks,
     model: typeof turn.model === 'string' ? turn.model : undefined,

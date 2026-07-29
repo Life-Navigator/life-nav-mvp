@@ -47,6 +47,15 @@ export interface Reasoning {
   what_we_still_need?: string[];
 }
 
+/** A verification link the advisor surfaced. Resolved server-side from a closed catalog — the model picks a
+ *  key, never a URL, so `url` is always one we own and never one a model invented. */
+export interface AdvisorSource {
+  key: string;
+  label: string;
+  url: string;
+  for?: string;
+}
+
 export interface Handoff {
   response_type: 'handoff' | 'handoff_choice';
   from_agent?: string;
@@ -66,6 +75,7 @@ export interface SendResult {
   degraded?: boolean; // advisor produced no text; user message persisted, thread continuable
   llm_status?: string;
   reasoning?: Reasoning | null;
+  sources?: AdvisorSource[];
   goals?: string[];
   risks?: string[];
   handoff?: Handoff | null;

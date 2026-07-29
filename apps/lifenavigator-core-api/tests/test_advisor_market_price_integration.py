@@ -157,6 +157,24 @@ def test_the_users_own_number_passes_through_untouched():
 
 # ────────────────────────────────────────────────────────── sources through the pipeline
 
+def test_sources_travel_as_structured_data_not_only_as_markdown():
+    """A client that reads only assistant_message can never render these as anything but inline text. The
+    structured field is what lets the UI give them their own treatment — and what makes them auditable."""
+    llm = _ScriptedLLM(_draft(sources=[{"key": "bls_wages", "for": "salary ranges for this role"}]))
+    out = _run(_orch(llm), llm)
+    assert out["sources"] == [{
+        "key": "bls_wages", "label": "BLS — Occupational Outlook Handbook",
+        "url": "https://www.bls.gov/ooh/", "for": "salary ranges for this role",
+    }]
+    assert out["_tr"]["sources"] == ["bls_wages"]  # keys reach the audit trail
+
+
+def test_turn_without_sources_sets_no_key_at_all():
+    """Absent, not an empty list — a client can distinguish 'no links' from 'links not supported'."""
+    out = _run(_orch(l := _ScriptedLLM(_draft())), l)
+    assert "sources" not in out
+
+
 def test_invented_source_key_is_dropped_without_failing_the_turn():
     """A bad key must not cost the user their answer — the answer is fine without the link."""
     llm = _ScriptedLLM(_draft(sources=[{"key": "bankrate_dot_com", "for": "rates"}]))

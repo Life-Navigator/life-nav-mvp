@@ -174,6 +174,9 @@ _ADVISOR_TURNS_COLUMNS = (
     "validator_reason", "validator_repairs", "fallback_used", "fallback_reason", "latency_ms", "stages_ms",
     "prompt_tokens", "completion_tokens", "total_tokens", "graph_edges_available", "relationships_referenced",
     "confidence", "user_message", "advisor_response", "llm_response_raw",
+    # NOT YET: "sources" — add ONLY after migration 20260728000000_advisor_turns_sources.sql is applied.
+    # A column the table lacks 400s the insert and silently drops every turn (that is why this list exists).
+    # Until then the same keys are carried on the structured `advisor_turn` log line.
 )
 
 
@@ -751,6 +754,12 @@ class AdvisorOrchestrator:
                 base["missing_data"] = safe["missing_data"]  # advisory display only — not persisted
             if safe.get("relationships_referenced"):
                 base["relationships_referenced"] = safe["relationships_referenced"]  # real cited edges
+            if safe.get("sources"):
+                # Structured, server-resolved reference links (advisor_sources). They are ALSO rendered into
+                # assistant_message, but a client that only reads the markdown can never show them as
+                # anything but inline text — this is what lets the UI give them their own treatment.
+                base["sources"] = safe["sources"]
+                tr["sources"] = [s.get("key") for s in safe["sources"]]
             tr["validator_result"] = "repaired" if safe.get("_repairs") else "accepted"
             tr["validator_repairs"] = safe.get("_repairs") or []
             tr["relationships_referenced"] = safe.get("relationships_referenced") or []
@@ -936,6 +945,9 @@ class AdvisorOrchestrator:
             "llm_last_error": tr.get("llm_last_error", ""), "repair_attempts": tr.get("repair_attempts", 0),
             "repairs": tr["validator_repairs"], "latency_ms": tr["latency_ms"], "stages_ms": tr["stages_ms"],
             "tokens": tr["total_tokens"], "edges": tr["graph_edges_available"], "msg_len": len(tr.get("user_message") or ""),
+            # Which reference links we sent this user off to. Auditable today without waiting on the
+            # advisor_turns column below — keys only, they're a closed set owned by advisor_sources.
+            "sources": tr.get("sources", []),
         }))
         # Best-effort durable write (analytics.advisor_turns, service-role only). Swallow if table absent.
         # jsonb columns (stages_ms / relationships_referenced / validator_repairs) are passed as native
