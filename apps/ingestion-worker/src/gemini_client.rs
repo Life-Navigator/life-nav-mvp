@@ -88,10 +88,7 @@ impl GeminiClient {
         let res = loop {
             let res = self.http.post(&url).json(&body).send().await?;
             let status = res.status().as_u16();
-            if res.status().is_success()
-                || !is_transient(status)
-                || attempt >= GEMINI_MAX_RETRIES
-            {
+            if res.status().is_success() || !is_transient(status) || attempt >= GEMINI_MAX_RETRIES {
                 break res;
             }
             let base = GEMINI_BACKOFF_MS[(attempt as usize).min(GEMINI_BACKOFF_MS.len() - 1)];

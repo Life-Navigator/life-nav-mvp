@@ -259,87 +259,293 @@ const DOCUMENT_FIELD: &[IncomingEdge] = &[fk("HAS_EXTRACTED_FIELD", "document", 
 /// its legacy typed-label `match`, and unmapped types fall back to `RELATED_TO`.
 /// Mapped entities therefore NEVER fall back to `RELATED_TO`.
 pub fn incoming_edges(et: &EntityType) -> &'static [IncomingEdge] {
-    match et {
-        EntityType::FinancialAccount => FINANCIAL_ACCOUNT,
-        EntityType::TransactionSummary => TRANSACTION_SUMMARY,
-        EntityType::Asset => ASSET,
-        EntityType::Debt => DEBT,
-        EntityType::InvestmentHolding => INVESTMENT_HOLDING,
-        EntityType::RetirementPlan => RETIREMENT_PLAN,
-        EntityType::FinancialGoal => FINANCIAL_GOAL,
-        // Finance elite schema (migration 117).
-        EntityType::Liability => LIABILITY,
-        EntityType::CashFlowSnapshot => CASH_FLOW_SNAPSHOT,
-        EntityType::NetWorthSnapshot => NET_WORTH_SNAPSHOT,
-        EntityType::BudgetCategory => BUDGET_CATEGORY,
-        EntityType::IncomeSource => INCOME_SOURCE,
-        EntityType::ExpenseCategory => EXPENSE_CATEGORY,
-        EntityType::FinancialEvent => FINANCIAL_EVENT,
-        // Recommendation evidence graph.
-        EntityType::FinancialRecommendation => FINANCIAL_RECOMMENDATION,
-        EntityType::Evidence => EVIDENCE,
-        EntityType::Assumption => ASSUMPTION,
-        EntityType::Tradeoff => TRADEOFF,
-        EntityType::AdviceBoundary => ADVICE_BOUNDARY,
-        // Health & Wellness (migration 119).
-        EntityType::HealthProfile => HEALTH_PROFILE,
-        EntityType::HealthGoal => HEALTH_GOAL,
-        EntityType::WellnessHabit => WELLNESS_HABIT,
-        EntityType::ActivityLog => ACTIVITY_LOG,
-        EntityType::SleepLog => SLEEP_LOG,
-        EntityType::NutritionLog => NUTRITION_LOG,
-        EntityType::SupplementLog => SUPPLEMENT_LOG,
-        EntityType::WorkoutLog => WORKOUT_LOG,
-        EntityType::Vital => VITAL,
-        EntityType::LabMarker => LAB_MARKER,
-        EntityType::BodyMetric => BODY_METRIC,
-        EntityType::HealthInsurancePlan => HEALTH_INSURANCE_PLAN,
-        EntityType::HealthSpendingAccount => HEALTH_SPENDING_ACCOUNT,
-        EntityType::MedicalExpense => MEDICAL_EXPENSE,
-        EntityType::BenefitDeadline => BENEFIT_DEADLINE,
-        EntityType::HealthRecommendation => HEALTH_RECOMMENDATION,
-        // Career (migration 122).
-        EntityType::CareerProfile => CAREER_PROFILE,
-        EntityType::CareerGoal => CAREER_GOAL,
-        EntityType::ExperienceRecord => EXPERIENCE_RECORD,
-        EntityType::Skill => SKILL,
-        EntityType::UserSkill => USER_SKILL,
-        EntityType::SkillGap => SKILL_GAP,
-        EntityType::Credential => CREDENTIAL,
-        EntityType::Certification => CERTIFICATION,
-        EntityType::Degree => DEGREE,
-        EntityType::Resume => RESUME,
-        EntityType::PortfolioItem => PORTFOLIO_ITEM,
-        EntityType::JobTarget => JOB_TARGET,
-        EntityType::JobApplication => JOB_APPLICATION,
-        EntityType::Interview => INTERVIEW,
-        EntityType::CompensationRecord => COMPENSATION_RECORD,
-        EntityType::CompensationProjection => COMPENSATION_PROJECTION,
-        EntityType::CareerRecommendation => CAREER_RECOMMENDATION,
-        // Education (migration 127).
-        EntityType::EducationProfile => EDUCATION_PROFILE,
-        EntityType::EducationGoal => EDUCATION_GOAL,
-        EntityType::LearningPath => LEARNING_PATH,
-        EntityType::School => SCHOOL,
-        EntityType::Program => PROGRAM,
-        EntityType::ProgramComparison => PROGRAM_COMPARISON,
-        EntityType::EducationRecommendation => EDUCATION_RECOMMENDATION,
-        // Family (migration 131).
-        EntityType::FamilyProfile => FAMILY_PROFILE,
-        EntityType::Dependent => DEPENDENT,
-        EntityType::SpouseProfile => SPOUSE_PROFILE,
-        EntityType::GuardianshipPlan => GUARDIANSHIP_PLAN,
-        EntityType::EstatePlan => ESTATE_PLAN,
-        EntityType::InsuranceProfile => INSURANCE_PROFILE,
-        EntityType::CollegePlanning => COLLEGE_PLANNING,
-        EntityType::FamilyRecommendation => FAMILY_RECOMMENDATION,
-        // Decision Engine (migration 134).
-        EntityType::LifeDecision => LIFE_DECISION,
-        EntityType::DecisionScenario => DECISION_SCENARIO,
-        EntityType::Document => DOCUMENT,
-        EntityType::DocumentField => DOCUMENT_FIELD,
-        _ => &[],
+    REGISTRY
+        .iter()
+        .find(|(k, _)| k == et)
+        .map(|(_, edges)| *edges)
+        .unwrap_or(&[])
+}
+
+/// The registry, as an enumerable TABLE.
+///
+/// This was a `match` — which meant the set of declared relationships could be *evaluated* but never
+/// *listed*. Nothing outside this crate could ask "what edge types exist?", so the retrieval tier in
+/// core-api kept its own hand-copied Python list, and the two drifted: 24 of 61 relationship types were
+/// being written to Neo4j that traversal could not follow, including every Document Intelligence edge.
+/// A vocabulary that cannot be enumerated will always drift from its copies.
+///
+/// As a table it is data, exactly as this module's header claims a relationship should be — and it can be
+/// exported (see [`relationship_manifest`]) so every tier consumes ONE vocabulary instead of a transcript
+/// of one.
+pub const REGISTRY: &[(EntityType, &'static [IncomingEdge])] = &[
+    (EntityType::FinancialAccount, FINANCIAL_ACCOUNT),
+    (EntityType::TransactionSummary, TRANSACTION_SUMMARY),
+    (EntityType::Asset, ASSET),
+    (EntityType::Debt, DEBT),
+    (EntityType::InvestmentHolding, INVESTMENT_HOLDING),
+    (EntityType::RetirementPlan, RETIREMENT_PLAN),
+    (EntityType::FinancialGoal, FINANCIAL_GOAL),
+    // Finance elite schema (migration 117).
+    (EntityType::Liability, LIABILITY),
+    (EntityType::CashFlowSnapshot, CASH_FLOW_SNAPSHOT),
+    (EntityType::NetWorthSnapshot, NET_WORTH_SNAPSHOT),
+    (EntityType::BudgetCategory, BUDGET_CATEGORY),
+    (EntityType::IncomeSource, INCOME_SOURCE),
+    (EntityType::ExpenseCategory, EXPENSE_CATEGORY),
+    (EntityType::FinancialEvent, FINANCIAL_EVENT),
+    // Recommendation evidence graph.
+    (
+        EntityType::FinancialRecommendation,
+        FINANCIAL_RECOMMENDATION,
+    ),
+    (EntityType::Evidence, EVIDENCE),
+    (EntityType::Assumption, ASSUMPTION),
+    (EntityType::Tradeoff, TRADEOFF),
+    (EntityType::AdviceBoundary, ADVICE_BOUNDARY),
+    // Health & Wellness (migration 119).
+    (EntityType::HealthProfile, HEALTH_PROFILE),
+    (EntityType::HealthGoal, HEALTH_GOAL),
+    (EntityType::WellnessHabit, WELLNESS_HABIT),
+    (EntityType::ActivityLog, ACTIVITY_LOG),
+    (EntityType::SleepLog, SLEEP_LOG),
+    (EntityType::NutritionLog, NUTRITION_LOG),
+    (EntityType::SupplementLog, SUPPLEMENT_LOG),
+    (EntityType::WorkoutLog, WORKOUT_LOG),
+    (EntityType::Vital, VITAL),
+    (EntityType::LabMarker, LAB_MARKER),
+    (EntityType::BodyMetric, BODY_METRIC),
+    (EntityType::HealthInsurancePlan, HEALTH_INSURANCE_PLAN),
+    (EntityType::HealthSpendingAccount, HEALTH_SPENDING_ACCOUNT),
+    (EntityType::MedicalExpense, MEDICAL_EXPENSE),
+    (EntityType::BenefitDeadline, BENEFIT_DEADLINE),
+    (EntityType::HealthRecommendation, HEALTH_RECOMMENDATION),
+    // Career (migration 122).
+    (EntityType::CareerProfile, CAREER_PROFILE),
+    (EntityType::CareerGoal, CAREER_GOAL),
+    (EntityType::ExperienceRecord, EXPERIENCE_RECORD),
+    (EntityType::Skill, SKILL),
+    (EntityType::UserSkill, USER_SKILL),
+    (EntityType::SkillGap, SKILL_GAP),
+    (EntityType::Credential, CREDENTIAL),
+    (EntityType::Certification, CERTIFICATION),
+    (EntityType::Degree, DEGREE),
+    (EntityType::Resume, RESUME),
+    (EntityType::PortfolioItem, PORTFOLIO_ITEM),
+    (EntityType::JobTarget, JOB_TARGET),
+    (EntityType::JobApplication, JOB_APPLICATION),
+    (EntityType::Interview, INTERVIEW),
+    (EntityType::CompensationRecord, COMPENSATION_RECORD),
+    (EntityType::CompensationProjection, COMPENSATION_PROJECTION),
+    (EntityType::CareerRecommendation, CAREER_RECOMMENDATION),
+    // Education (migration 127).
+    (EntityType::EducationProfile, EDUCATION_PROFILE),
+    (EntityType::EducationGoal, EDUCATION_GOAL),
+    (EntityType::LearningPath, LEARNING_PATH),
+    (EntityType::School, SCHOOL),
+    (EntityType::Program, PROGRAM),
+    (EntityType::ProgramComparison, PROGRAM_COMPARISON),
+    (
+        EntityType::EducationRecommendation,
+        EDUCATION_RECOMMENDATION,
+    ),
+    // Family (migration 131).
+    (EntityType::FamilyProfile, FAMILY_PROFILE),
+    (EntityType::Dependent, DEPENDENT),
+    (EntityType::SpouseProfile, SPOUSE_PROFILE),
+    (EntityType::GuardianshipPlan, GUARDIANSHIP_PLAN),
+    (EntityType::EstatePlan, ESTATE_PLAN),
+    (EntityType::InsuranceProfile, INSURANCE_PROFILE),
+    (EntityType::CollegePlanning, COLLEGE_PLANNING),
+    (EntityType::FamilyRecommendation, FAMILY_RECOMMENDATION),
+    // Decision Engine (migration 134).
+    (EntityType::LifeDecision, LIFE_DECISION),
+    (EntityType::DecisionScenario, DECISION_SCENARIO),
+    (EntityType::Document, DOCUMENT),
+    (EntityType::DocumentField, DOCUMENT_FIELD),
+];
+
+// ── Semantic classification ─────────────────────────────────────────────────────────────────────
+
+/// What a relationship MEANS, independent of which domain it belongs to.
+///
+/// Retrieval needs this. A query planner deciding how far to walk and which edges matter cannot work
+/// from 61 opaque strings — "why did you recommend that" needs provenance edges, "how am I trending"
+/// needs time-series edges, and the difference is semantic, not lexical. Deriving it from the name
+/// would be guesswork (`LOGGED` and `HAS_SNAPSHOT` share no prefix yet mean nearly the same thing;
+/// `HAS_GOAL` and `HAS_DEBT` share one and do not).
+///
+/// So it is DECLARED, here, beside the edges themselves — one classification, exported to every tier,
+/// rather than a Python transcript that silently disagrees.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EdgeFamily {
+    /// The user owns/holds this thing. The backbone of "what do I have".
+    Ownership,
+    /// Provenance and reasoning: why a recommendation exists, what it assumed, what it traded off.
+    Evidence,
+    /// Change over time: logs, snapshots, tracked metrics, contributions.
+    Progress,
+    /// Who the user is: profiles, skills, credentials, relationships.
+    Identity,
+    /// Intent: goals, targets, plans, pursuits.
+    Planning,
+    /// Source documents and the fields extracted from them. Carries provenance INTO the life model,
+    /// which is why it is not folded into Ownership.
+    Document,
+    /// The normalizer's fallback for an unmapped entity. Deliberately its own family so it can be
+    /// ranked last and never widens a walk on its own.
+    Association,
+}
+
+impl EdgeFamily {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            EdgeFamily::Ownership => "ownership",
+            EdgeFamily::Evidence => "evidence",
+            EdgeFamily::Progress => "progress",
+            EdgeFamily::Identity => "identity",
+            EdgeFamily::Planning => "planning",
+            EdgeFamily::Document => "document",
+            EdgeFamily::Association => "association",
+        }
     }
+
+    /// Default evidential weight for the family. A concrete type may override (see [`edge_weight`]).
+    pub fn base_weight(&self) -> f32 {
+        match self {
+            EdgeFamily::Evidence => 0.90,
+            EdgeFamily::Ownership => 0.85,
+            EdgeFamily::Planning => 0.80,
+            EdgeFamily::Identity => 0.75,
+            EdgeFamily::Document => 0.70,
+            EdgeFamily::Progress => 0.65,
+            EdgeFamily::Association => 0.25,
+        }
+    }
+}
+
+/// The semantic family of a relationship type.
+///
+/// EXHAUSTIVE over everything [`REGISTRY`] emits — `manifest_covers_every_relationship` fails the build
+/// if a new edge is added without classifying it. That test is the mechanism preventing the drift this
+/// module just recovered from: an unclassified edge cannot quietly default to "unreachable".
+pub fn family_of(rel_type: &str) -> EdgeFamily {
+    match rel_type {
+        // Ownership — the user holds this.
+        "OWNS_ACCOUNT"
+        | "HAS_ASSET"
+        | "HAS_DEBT"
+        | "HAS_HOLDING"
+        | "HAS_LIABILITY"
+        | "HAS_INCOME_SOURCE"
+        | "HAS_INSURANCE_PLAN"
+        | "HAS_INSURANCE_PROFILE"
+        | "HAS_SPENDING_ACCOUNT"
+        | "HAS_PORTFOLIO_ITEM"
+        | "HAS_BUDGET_CATEGORY"
+        | "HAS_EXPENSE_CATEGORY"
+        | "HAS_TRANSACTION" => EdgeFamily::Ownership,
+
+        // Evidence — provenance and the reasoning behind advice.
+        "HAS_EVIDENCE" | "HAS_ASSUMPTION" | "HAS_TRADEOFF" | "REQUIRES_REVIEW"
+        | "HAS_RECOMMENDATION" | "HAS_DECISION" => EdgeFamily::Evidence,
+
+        // Progress — anything whose meaning is "over time".
+        "LOGGED"
+        | "HAS_SNAPSHOT"
+        | "TRACKS_METRIC"
+        | "CONTRIBUTES_TO"
+        | "HAS_SCENARIO"
+        | "HAS_COMPENSATION"
+        | "HAS_COMPENSATION_PROJECTION" => EdgeFamily::Progress,
+
+        // Identity — who the user is and what they can do.
+        "HAS_CAREER" | "HAS_EDUCATION" | "HAS_FAMILY" | "HAS_WELLNESS" | "HAS_SKILL"
+        | "HAS_PROFICIENCY" | "HAS_CREDENTIAL" | "HAS_CERTIFICATION" | "HAS_DEGREE"
+        | "HAS_EXPERIENCE" | "HAS_RESUME" | "HAS_DEPENDENT" | "HAS_SPOUSE" | "COVERS_DEPENDENT" => {
+            EdgeFamily::Identity
+        }
+
+        // Planning — intent, targets, and the plans that serve them.
+        "HAS_GOAL"
+        | "HAS_HEALTH_GOAL"
+        | "HAS_EDUCATION_GOAL"
+        | "PURSUING"
+        | "TARGETS_ROLE"
+        | "HAS_LEARNING_PATH"
+        | "HAS_SKILL_GAP"
+        | "HAS_ESTATE_PLAN"
+        | "HAS_COLLEGE_PLAN"
+        | "HAS_GUARDIANSHIP_PLAN"
+        | "HAS_APPLICATION"
+        | "HAS_INTERVIEW"
+        | "INCLUDES_INTERVIEW"
+        | "CONSIDERS_SCHOOL"
+        | "EVALUATES_PROGRAM"
+        | "HAS_PROGRAM_COMPARISON"
+        | "OFFERS"
+        | "HAS_BENEFIT_DEADLINE" => EdgeFamily::Planning,
+
+        // Document — source material and extracted fields.
+        "HAS_DOCUMENT" | "HAS_EXTRACTED_FIELD" => EdgeFamily::Document,
+
+        // Fallback.
+        "RELATED_TO" => EdgeFamily::Association,
+
+        // An edge added to REGISTRY but never classified. Association is the SAFE default — it is
+        // followable but ranked near-worthless, so a forgotten classification degrades quality rather
+        // than making data invisible. `manifest_covers_every_relationship` fails the build anyway.
+        _ => EdgeFamily::Association,
+    }
+}
+
+/// Evidential weight of a concrete relationship type: the family's base, with narrow overrides where a
+/// specific edge is stronger or weaker than its family average.
+pub fn edge_weight(rel_type: &str) -> f32 {
+    match rel_type {
+        // A recommendation's own evidence is the strongest link in the graph — it is what lets the
+        // advisor cite WHY rather than merely assert.
+        "HAS_EVIDENCE" => 1.00,
+        // An extracted field is only as good as the extraction; it carries a confidence of its own.
+        "HAS_EXTRACTED_FIELD" => 0.65,
+        _ => family_of(rel_type).base_weight(),
+    }
+}
+
+/// Every distinct relationship type the registry can emit, sorted and de-duplicated.
+pub fn all_relationship_types() -> Vec<&'static str> {
+    let mut out: Vec<&'static str> = REGISTRY
+        .iter()
+        .flat_map(|(_, edges)| edges.iter().map(|e| e.rel_type))
+        .collect();
+    // The normalizer's fallback for unmapped entities never appears in REGISTRY, but it IS written to
+    // the graph — omitting it is what left it rankable-but-unreachable in the retrieval tier.
+    out.push("RELATED_TO");
+    out.sort_unstable();
+    out.dedup();
+    out
+}
+
+/// The exported ontology contract, as JSON.
+///
+/// This is what makes core-api's retrieval ontology-DERIVED rather than ontology-INSPIRED. Written to
+/// `ontology/generated/relationship_manifest.json`, verified in CI, and loaded by the Python planner.
+pub fn relationship_manifest() -> String {
+    let mut rows: Vec<String> = Vec::new();
+    for rel in all_relationship_types() {
+        let fam = family_of(rel);
+        rows.push(format!(
+            "    {{ \"rel_type\": \"{}\", \"family\": \"{}\", \"weight\": {:.2} }}",
+            rel,
+            fam.as_str(),
+            edge_weight(rel)
+        ));
+    }
+    format!(
+        "{{\n  \"_generated_by\": \"apps/ingestion-worker/src/ontology.rs :: relationship_manifest()\",\n  \
+\"_do_not_edit\": \"Regenerate with: cargo test -p ingestion-worker export_relationship_manifest -- --ignored\",\n  \
+\"version\": 1,\n  \"relationships\": [\n{}\n  ]\n}}\n",
+        rows.join(",\n")
+    )
 }
 
 /// Whether the ontology registry owns this entity's relationship emission.
@@ -574,5 +780,171 @@ mod career_tests {
         assert!(d
             .iter()
             .any(|e| e.rel_type == "COVERS_DEPENDENT" && !e.required));
+    }
+}
+
+#[cfg(test)]
+mod manifest_tests {
+    use super::*;
+
+    /// The manifest lives INSIDE the core-api Python package, not in `ontology/`, because that is the
+    /// only place it actually ships: core-api's Dockerfile does `COPY app ./app` with the service
+    /// directory as its build context, so a file at the repo root would be absent from the image and
+    /// the planner would fall back at runtime — in production only, where it is hardest to notice.
+    /// One canonical copy, in the consumer, kept honest by `manifest_on_disk_matches_the_registry`.
+    const MANIFEST_PATH: &str =
+        "../lifenavigator-core-api/app/grounding/semantic/ontology_manifest.json";
+
+    /// THE DRIFT GATE.
+    ///
+    /// core-api's retrieval planner loads the generated manifest. If someone adds a relationship to
+    /// `REGISTRY` and does not regenerate, the graph gains an edge type traversal cannot follow — which
+    /// is exactly how 24 of 61 relationship types (including every Document Intelligence edge) became
+    /// invisible to retrieval while every test passed.
+    ///
+    /// This fails the build on that. Regenerate with:
+    ///   cargo test -p ingestion-worker export_relationship_manifest -- --ignored
+    #[test]
+    fn manifest_on_disk_matches_the_registry() {
+        let expected = relationship_manifest();
+        let actual = std::fs::read_to_string(MANIFEST_PATH).unwrap_or_else(|e| {
+            panic!(
+                "cannot read {MANIFEST_PATH}: {e}. Generate it with: \
+                    cargo test -p ingestion-worker export_relationship_manifest -- --ignored"
+            )
+        });
+        assert_eq!(
+            actual.trim(),
+            expected.trim(),
+            "\n\nThe ontology manifest is STALE — the registry declares relationships the generated \
+             contract does not.\n\
+             core-api's traversal reads that contract, so every un-exported edge type is one the \
+             advisor cannot follow.\n\n\
+             Regenerate:  cargo test -p ingestion-worker export_relationship_manifest -- --ignored\n"
+        );
+    }
+
+    /// Every relationship the registry can emit has a DECLARED family — not the `_` fallback.
+    ///
+    /// Without this, adding an edge and forgetting to classify it silently lands it in `Association`,
+    /// weight 0.25, ranked below everything. It would be followable but effectively invisible, which is
+    /// the quiet version of the bug this whole change exists to fix.
+    #[test]
+    fn manifest_covers_every_relationship() {
+        let classified: &[&str] = &[
+            "OWNS_ACCOUNT",
+            "HAS_ASSET",
+            "HAS_DEBT",
+            "HAS_HOLDING",
+            "HAS_LIABILITY",
+            "HAS_INCOME_SOURCE",
+            "HAS_INSURANCE_PLAN",
+            "HAS_INSURANCE_PROFILE",
+            "HAS_SPENDING_ACCOUNT",
+            "HAS_PORTFOLIO_ITEM",
+            "HAS_BUDGET_CATEGORY",
+            "HAS_EXPENSE_CATEGORY",
+            "HAS_TRANSACTION",
+            "HAS_EVIDENCE",
+            "HAS_ASSUMPTION",
+            "HAS_TRADEOFF",
+            "REQUIRES_REVIEW",
+            "HAS_RECOMMENDATION",
+            "HAS_DECISION",
+            "LOGGED",
+            "HAS_SNAPSHOT",
+            "TRACKS_METRIC",
+            "CONTRIBUTES_TO",
+            "HAS_SCENARIO",
+            "HAS_COMPENSATION",
+            "HAS_COMPENSATION_PROJECTION",
+            "HAS_CAREER",
+            "HAS_EDUCATION",
+            "HAS_FAMILY",
+            "HAS_WELLNESS",
+            "HAS_SKILL",
+            "HAS_PROFICIENCY",
+            "HAS_CREDENTIAL",
+            "HAS_CERTIFICATION",
+            "HAS_DEGREE",
+            "HAS_EXPERIENCE",
+            "HAS_RESUME",
+            "HAS_DEPENDENT",
+            "HAS_SPOUSE",
+            "COVERS_DEPENDENT",
+            "HAS_GOAL",
+            "HAS_HEALTH_GOAL",
+            "HAS_EDUCATION_GOAL",
+            "PURSUING",
+            "TARGETS_ROLE",
+            "HAS_LEARNING_PATH",
+            "HAS_SKILL_GAP",
+            "HAS_ESTATE_PLAN",
+            "HAS_COLLEGE_PLAN",
+            "HAS_GUARDIANSHIP_PLAN",
+            "HAS_APPLICATION",
+            "HAS_INTERVIEW",
+            "INCLUDES_INTERVIEW",
+            "CONSIDERS_SCHOOL",
+            "EVALUATES_PROGRAM",
+            "HAS_PROGRAM_COMPARISON",
+            "OFFERS",
+            "HAS_BENEFIT_DEADLINE",
+            "HAS_DOCUMENT",
+            "HAS_EXTRACTED_FIELD",
+            "RELATED_TO",
+        ];
+        for rel in all_relationship_types() {
+            assert!(
+                classified.contains(&rel),
+                "relationship {rel:?} is emitted by the registry but has no declared EdgeFamily.\n\
+                 Add it to `family_of` AND to this list. Leaving it unclassified makes it\n\
+                 Association/0.25 — followable but ranked below everything, i.e. invisible."
+            );
+        }
+    }
+
+    /// RELATED_TO must be in the exported vocabulary. It never appears in REGISTRY (the normalizer
+    /// emits it as a fallback), and omitting it is precisely why retrieval could weight it but never
+    /// traverse it.
+    #[test]
+    fn fallback_edge_is_in_the_vocabulary() {
+        assert!(all_relationship_types().contains(&"RELATED_TO"));
+        assert_eq!(family_of("RELATED_TO"), EdgeFamily::Association);
+        assert!(edge_weight("RELATED_TO") < edge_weight("HAS_EVIDENCE"));
+    }
+
+    /// Evidence outranks association by a wide margin — the property traversal's ranking depends on.
+    #[test]
+    fn evidence_outranks_association() {
+        assert!(edge_weight("HAS_EVIDENCE") >= 1.0);
+        assert!(edge_weight("HAS_EVIDENCE") > edge_weight("LOGGED"));
+        assert!(edge_weight("LOGGED") > edge_weight("RELATED_TO"));
+    }
+
+    /// The table and the lookup cannot disagree — the lookup IS the table.
+    #[test]
+    fn registry_table_backs_the_lookup() {
+        for (et, edges) in REGISTRY {
+            assert_eq!(
+                incoming_edges(et).len(),
+                edges.len(),
+                "{et:?} lookup disagrees with the table"
+            );
+        }
+        assert!(REGISTRY.len() >= 70, "registry unexpectedly small");
+    }
+
+    /// Writes the manifest. Ignored by default so a normal `cargo test` never mutates the repo.
+    #[test]
+    #[ignore]
+    fn export_relationship_manifest() {
+        let path = std::path::Path::new(MANIFEST_PATH);
+        std::fs::create_dir_all(path.parent().unwrap()).expect("create ontology/generated");
+        std::fs::write(path, relationship_manifest()).expect("write manifest");
+        eprintln!(
+            "wrote {} relationship types -> {MANIFEST_PATH}",
+            all_relationship_types().len()
+        );
     }
 }

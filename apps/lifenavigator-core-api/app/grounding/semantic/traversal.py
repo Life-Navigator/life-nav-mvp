@@ -31,7 +31,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from .planner import QueryPlan, allowed_edge_types
+from .planner import EDGE_WEIGHT_FROM_ONTOLOGY, QueryPlan, allowed_edge_types
 
 log = logging.getLogger("core.graphrag.traversal")
 
@@ -41,22 +41,11 @@ _SAFE_REL = re.compile(r"^[A-Z][A-Z0-9_]{1,48}$")
 # Edge weights — not all relationships carry equal evidential value. `HAS_EVIDENCE` is a grounded,
 # provenance-carrying link; `RELATED_TO` is the worker's fallback for an unmapped entity and means almost
 # nothing. Weighting by type is the cheapest large win over unweighted traversal.
-EDGE_WEIGHT: dict[str, float] = {
-    "HAS_EVIDENCE": 1.00, "HAS_ASSUMPTION": 0.85, "HAS_TRADEOFF": 0.85, "REQUIRES_REVIEW": 0.80,
-    "HAS_RECOMMENDATION": 0.90, "HAS_DECISION": 0.85,
-    "HAS_GOAL": 0.90, "HAS_DEBT": 0.85, "HAS_ASSET": 0.85, "OWNS_ACCOUNT": 0.85,
-    "HAS_HOLDING": 0.80, "HAS_INCOME_SOURCE": 0.85, "HAS_LIABILITY": 0.85,
-    "HAS_INSURANCE_PLAN": 0.75, "HAS_SPENDING_ACCOUNT": 0.75, "HAS_PORTFOLIO_ITEM": 0.75,
-    "TRACKS_METRIC": 0.70, "HAS_SNAPSHOT": 0.65, "LOGGED": 0.55, "CONTRIBUTES_TO": 0.80,
-    "HAS_SCENARIO": 0.75,
-    "HAS_CAREER": 0.80, "HAS_EDUCATION": 0.80, "HAS_FAMILY": 0.80, "HAS_SKILL": 0.65,
-    "HAS_CREDENTIAL": 0.70, "HAS_DEGREE": 0.75, "HAS_EXPERIENCE": 0.70,
-    "HAS_DEPENDENT": 0.85, "HAS_SPOUSE": 0.85,
-    "PURSUING": 0.85, "TARGETS_ROLE": 0.80, "HAS_LEARNING_PATH": 0.70,
-    "HAS_SKILL_GAP": 0.75, "HAS_ESTATE_PLAN": 0.85, "HAS_COLLEGE_PLAN": 0.80,
-    "HAS_GUARDIANSHIP_PLAN": 0.85,
-    "RELATED_TO": 0.25,   # the worker's fallback — deliberately near-worthless
-}
+# Edge weights come from the SAME generated ontology contract the planner reads, so a relationship
+# cannot be traversable-but-unweighted or weighted-but-untraversable. Both states existed: this table
+# previously carried 38 hand-written entries against a 61-type vocabulary, and RELATED_TO had a weight
+# here while appearing in no family — rankable, never reachable.
+EDGE_WEIGHT: dict[str, float] = dict(EDGE_WEIGHT_FROM_ONTOLOGY)
 _DEFAULT_EDGE_WEIGHT = 0.40
 # Each additional hop multiplies confidence down. Two hops from a seed is materially weaker evidence.
 HOP_DECAY = 0.55

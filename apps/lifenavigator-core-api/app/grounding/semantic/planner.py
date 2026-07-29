@@ -21,9 +21,11 @@ able to widen tenant access.
 """
 from __future__ import annotations
 
+import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Optional
 
 
@@ -104,17 +106,75 @@ class QueryPlan:
                 f"budget={self.node_budget} central={self.include_central}")
 
 
-# Edge families, keyed to the relationship types the Rust ontology registry actually emits.
-EDGE_FAMILY: dict[str, tuple[str, ...]] = {
-    "ownership": ("HAS_GOAL", "HAS_DEBT", "HAS_ASSET", "OWNS_ACCOUNT", "HAS_HOLDING", "HAS_INCOME_SOURCE",
-                  "HAS_LIABILITY", "HAS_INSURANCE_PLAN", "HAS_SPENDING_ACCOUNT", "HAS_PORTFOLIO_ITEM"),
-    "evidence":  ("HAS_EVIDENCE", "HAS_ASSUMPTION", "HAS_TRADEOFF", "REQUIRES_REVIEW",
-                  "HAS_RECOMMENDATION", "HAS_DECISION"),
-    "progress":  ("TRACKS_METRIC", "HAS_SNAPSHOT", "LOGGED", "CONTRIBUTES_TO", "HAS_SCENARIO"),
-    "identity":  ("HAS_CAREER", "HAS_EDUCATION", "HAS_FAMILY", "HAS_SKILL", "HAS_CREDENTIAL",
-                  "HAS_DEGREE", "HAS_EXPERIENCE", "HAS_DEPENDENT", "HAS_SPOUSE"),
-    "planning":  ("PURSUING", "TARGETS_ROLE", "HAS_LEARNING_PATH", "HAS_SKILL_GAP", "HAS_ESTATE_PLAN",
-                  "HAS_COLLEGE_PLAN", "HAS_GUARDIANSHIP_PLAN"),
+# ── The ontology contract ────────────────────────────────────────────────────────────────────────
+#
+# THIS USED TO BE A HAND-WRITTEN DICT, AND IT WAS WRONG.
+#
+# It listed 37 relationship types. The ingestion worker's registry — the thing that actually writes
+# edges to Neo4j — emits 61. The 24 missing ones were written to the graph on every ingest and were
+# unreachable by traversal, because an edge type absent from this dict is absent from the generated
+# Cypher. Whole capabilities were invisible to the advisor: HAS_DOCUMENT and HAS_EXTRACTED_FIELD (all
+# of Document Intelligence), HAS_TRANSACTION, HAS_CERTIFICATION, HAS_HEALTH_GOAL, HAS_EDUCATION_GOAL,
+# HAS_INTERVIEW, CONSIDERS_SCHOOL. RELATED_TO was worse than missing: it had a weight in
+# traversal.EDGE_WEIGHT but no family here, so it could be ranked and never reached.
+#
+# Nothing detected this. Two vocabularies in two languages, with no shared artifact, drifted for as
+# long as they both existed — which is the predictable outcome, not bad luck.
+#
+# So the vocabulary is now DERIVED. `ontology_manifest.json` is generated from the Rust registry
+# (`apps/ingestion-worker/src/ontology.rs :: relationship_manifest()`), and a Rust test fails the build
+# if the file and the registry disagree. Adding an edge type in the worker without regenerating breaks
+# CI; regenerating updates traversal automatically. There is one vocabulary now, and this file reads it
+# rather than restating it.
+#
+# Regenerate:  cargo test -p ingestion-worker export_relationship_manifest -- --ignored
+
+_MANIFEST_PATH = Path(__file__).with_name("ontology_manifest.json")
+
+
+def _load_ontology() -> tuple[dict[str, tuple[str, ...]], dict[str, float]]:
+    """Read the generated contract into (families, weights).
+
+    Fails LOUDLY on a missing or malformed manifest. The tempting alternative — fall back to a built-in
+    list — would recreate exactly the bug this replaced: a silent second vocabulary that looks like it
+    works. A graph-grounded advisor with no ontology should refuse to start, not quietly retrieve less.
+    """
+    try:
+        data = json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
+        rows = data["relationships"]
+        if not rows:
+            raise ValueError("manifest contains no relationships")
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(
+            f"ontology manifest unreadable at {_MANIFEST_PATH}: {exc}. "
+            "Traversal cannot be ontology-derived without it. Regenerate with: "
+            "cargo test -p ingestion-worker export_relationship_manifest -- --ignored"
+        ) from exc
+
+    families: dict[str, list[str]] = {}
+    weights: dict[str, float] = {}
+    for row in rows:
+        rel, fam = row["rel_type"], row["family"]
+        families.setdefault(fam, []).append(rel)
+        weights[rel] = float(row["weight"])
+    return {k: tuple(v) for k, v in families.items()}, weights
+
+
+EDGE_FAMILY, EDGE_WEIGHT_FROM_ONTOLOGY = _load_ontology()
+
+# Which families each query intent should traverse. This is a RETRIEVAL policy, not an ontology fact —
+# the ontology says what an edge means; this says which meanings matter for a given question — so it
+# stays here, expressed in families rather than in 61 individual type names.
+INTENT_FAMILIES: dict[str, tuple[str, ...]] = {
+    "lookup":   ("ownership", "identity", "document"),
+    "compare":  ("ownership", "planning", "evidence", "document"),
+    # `document` belongs here too: documents are DATED artifacts. "How has my coverage changed?" is
+    # answered by two policy documents a year apart, and excluding them made the one intent most likely
+    # to need dated evidence the one intent that could not see any.
+    "temporal": ("progress", "ownership", "document"),
+    "causal":   ("evidence", "ownership", "document"),
+    "scenario": ("planning", "ownership", "progress", "evidence", "document"),
+    "broad":    ("ownership", "identity", "planning", "progress", "document"),
 }
 
 
@@ -168,19 +228,23 @@ def classify_intent(text: str) -> Intent:
 
 # Per-intent retrieval shape. Budgets are deliberately small: an unbounded traversal on a dense personal
 # graph is a latency and cost incident, and the advisor's p50 is already the dominant user complaint.
+#
+# `families` comes from INTENT_FAMILIES above so the intent→family policy is stated once. Every intent
+# now includes the `document` family: an uploaded will, policy or statement is evidence about the user's
+# life, and omitting it is why a document could change the life model yet never reach an answer.
 _SHAPE: dict[Intent, dict] = {
     Intent.LOOKUP:   dict(seed_limit=6,  max_hops=1, node_budget=40,  central=False,
-                          families=("ownership", "identity"), evidence=False),
+                          families=INTENT_FAMILIES["lookup"], evidence=False),
     Intent.COMPARE:  dict(seed_limit=10, max_hops=2, node_budget=120, central=True,
-                          families=("ownership", "evidence", "planning"), evidence=True),
+                          families=INTENT_FAMILIES["compare"], evidence=True),
     Intent.TEMPORAL: dict(seed_limit=8,  max_hops=2, node_budget=100, central=False,
-                          families=("progress", "ownership"), evidence=False),
+                          families=INTENT_FAMILIES["temporal"], evidence=False),
     Intent.CAUSAL:   dict(seed_limit=6,  max_hops=2, node_budget=100, central=False,
-                          families=("evidence",), evidence=True),
+                          families=INTENT_FAMILIES["causal"], evidence=True),
     Intent.SCENARIO: dict(seed_limit=10, max_hops=2, node_budget=120, central=True,
-                          families=("planning", "ownership", "evidence"), evidence=True),
+                          families=INTENT_FAMILIES["scenario"], evidence=True),
     Intent.BROAD:    dict(seed_limit=10, max_hops=1, node_budget=60,  central=True,
-                          families=("ownership", "identity", "planning"), evidence=False),
+                          families=INTENT_FAMILIES["broad"], evidence=False),
 }
 
 

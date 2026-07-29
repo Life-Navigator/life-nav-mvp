@@ -52,6 +52,11 @@ jobs:
               - 'apps/api-gateway/**'
             ingestion_worker:
               - 'apps/ingestion-worker/**'
+              # The generated ontology manifest lives in core-api (it ships in that image) but is OWNED
+              # by the worker's registry, and the Rust test `manifest_on_disk_matches_the_registry` is
+              # what enforces they agree. Without this line, hand-editing the manifest would skip the
+              # only check that can catch it — the exact drift this contract exists to prevent.
+              - 'apps/lifenavigator-core-api/app/grounding/semantic/ontology_manifest.json'
 
   # ── CI: core-api (FastAPI) pytest ──────────────────────────────────────────
   test-core-api:

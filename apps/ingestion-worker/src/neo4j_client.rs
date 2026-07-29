@@ -379,8 +379,10 @@ mod tests {
     #[test]
     fn build_params_makes_metadata_neo4j_safe() {
         let mut c = sample_canon();
-        c.attributes
-            .insert("metadata".into(), serde_json::json!({"mode": "subscription"}));
+        c.attributes.insert(
+            "metadata".into(),
+            serde_json::json!({"mode": "subscription"}),
+        );
         let p = Neo4jClient::build_params(&c);
         let attrs = p.get("attrs").and_then(|a| a.as_object()).unwrap();
         // the object value must have been stringified, not left as a map
