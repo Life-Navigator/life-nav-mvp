@@ -1,0 +1,148 @@
+{
+  "$schema_version": "1.0.0",
+  "operation_id": "BASE-2026-0730-01",
+  "environment": "production",
+  "mode": "read_only_reconciliation",
+  "code_commit": "da8c7428",
+  "branch": "graphrag/data-contract-remediation",
+  "collected_at": "2026-07-30",
+  "mutations_performed": 0,
+  "execution_route": {
+    "neo4j": "in-service via flyctl ssh console -a lifenavigator-core-api (credentials never left the trusted environment)",
+    "qdrant": "direct HTTPS from workstation using session-scoped key held in a 0600 file outside the repo"
+  },
+
+  "qdrant": {
+    "collections": {
+      "life_navigator": {
+        "points_count": 2218,
+        "indexed_vectors_count": 1706,
+        "status": "green",
+        "vector_size": 3072,
+        "distance": "Cosine",
+        "payload_indexes": ["user_id", "domain", "tenant_id", "entity_type", "access_scope"],
+        "points_missing_tenant_id": 0,
+        "points_missing_user_id": 0,
+        "points_missing_domain": 0,
+        "distinct_tenants": 251,
+        "access_scope_distribution": { "personal": 2218 }
+      },
+      "ln_central": {
+        "points_count": 0,
+        "indexed_vectors_count": 0,
+        "status": "green",
+        "vector_size": 3072,
+        "distance": "Cosine",
+        "finding": "EMPTY. The central knowledge layer has no content. Bears directly on master-plan Phase 12 claim #10 and the Phase 5A central-store disposition."
+      }
+    },
+    "domain_distribution": {
+      "financial": 1583,
+      "career": 154,
+      "general": 152,
+      "health": 111,
+      "education": 78,
+      "documents": 75,
+      "family": 49,
+      "decision": 16
+    },
+    "domain_filter_measurement": {
+      "description": "The defect this branch repairs, measured against production.",
+      "domain=finance": 0,
+      "domain=financial": 1583,
+      "no_filter": 2218,
+      "unreachable_share_when_filtering_on_finance": 0.7137
+    }
+  },
+
+  "neo4j": {
+    "database": "personal",
+    "total_nodes": 2506,
+    "total_relationships": 3208,
+    "nodes_missing_tenant_id": 0,
+    "distinct_tenants": 268,
+    "relationships_carrying_tenant_id": 0,
+    "entity_labelled_nodes": 0,
+    "related_to_edges": 148,
+    "distinct_relationship_types": 40,
+    "top_relationship_types": {
+      "HAS_TRANSACTION": 1951,
+      "OWNS_ACCOUNT": 419,
+      "RELATED_TO": 148,
+      "HAS_GOAL": 83,
+      "HAS_CAREER": 66,
+      "HAS_EVIDENCE": 63,
+      "HAS_FAMILY": 53,
+      "HAS_EXTRACTED_FIELD": 53,
+      "HAS_ASSUMPTION": 46,
+      "HAS_EDUCATION": 38
+    }
+  },
+
+  "contract_verification": {
+    "domain_manifest_covers_live_values": true,
+    "live_domain_values_absent_from_manifest": [],
+    "manifest_alias_present": { "finance": "financial" },
+    "manifest_canonical_values_not_observed_live": [
+      "arcana",
+      "attribution",
+      "calibration",
+      "conversation",
+      "decision_impact",
+      "estate",
+      "goal_progress",
+      "goals",
+      "insurance",
+      "jobs",
+      "lifestyle",
+      "probability",
+      "provider",
+      "xai"
+    ],
+    "note": "Declared-but-unobserved values are expected for a young corpus and are NOT evidence of drift. The gate that matters is the inverse (live values absent from the manifest), which is empty."
+  },
+
+  "open_anomalies": [
+    {
+      "id": "ANOM-1",
+      "severity": "medium",
+      "finding": "Tenant-count divergence across stores: Neo4j 268 vs Qdrant 251 (delta 17).",
+      "interpretation": "UNEXPLAINED. Per directive, unexplained store differences are NOT treated as deletable orphans. Requires explanation before any backfill or cleanup is designed.",
+      "action": "investigate; do not delete"
+    },
+    {
+      "id": "ANOM-2",
+      "severity": "medium",
+      "finding": "Zero nodes carry the :Entity label.",
+      "interpretation": "The authorized ':Entity labels on confirmed retrievable entity nodes' migration has a starting population of 0, so its expected affected count must be derived from a defined retrievability predicate, not assumed.",
+      "action": "define predicate before dry run"
+    },
+    {
+      "id": "ANOM-3",
+      "severity": "medium",
+      "finding": "No relationship carries tenant_id (0 of 3,208).",
+      "interpretation": "Traversal tenant-safety depends entirely on node properties. The master plan's Phase 5C requirement of tenant-safety property tests ('no cross-tenant path, ever') must therefore be enforced at node level in Cypher; an edge-level guard is not available.",
+      "action": "feed into Phase 5C design"
+    },
+    {
+      "id": "ANOM-4",
+      "severity": "low",
+      "finding": "Qdrant indexed_vectors_count 1,706 < points_count 2,218 (512 unindexed).",
+      "interpretation": "Consistent with Qdrant's indexing threshold on small collections; not necessarily a defect. Recorded so a later delta is interpretable.",
+      "action": "monitor"
+    }
+  ],
+
+  "invariants_established": [
+    "qdrant.life_navigator.points_count == 2218",
+    "qdrant.life_navigator.vector_size == 3072 (matches production embedding model; NOT the retired 768-dim default)",
+    "qdrant points missing tenant_id/user_id/domain == 0",
+    "qdrant access_scope == 'personal' for 100% of points (no Provider/Arcana B2B content in the personal collection)",
+    "neo4j.total_nodes == 2506",
+    "neo4j.total_relationships == 3208",
+    "neo4j nodes missing tenant_id == 0",
+    "cross-tenant RELATED_TO edges == 0"
+  ],
+
+  "reconciliation_command": "re-run this read-only baseline and diff against this artifact; any change to an invariant above is a stop condition"
+}

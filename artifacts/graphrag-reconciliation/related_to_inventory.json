@@ -1,0 +1,87 @@
+{
+  "$schema_version": "1.0.0",
+  "operation_id": "RT-INV-2026-0730-01",
+  "environment": "production",
+  "mode": "read_only_reconciliation",
+  "code_commit": "da8c7428",
+  "branch": "graphrag/data-contract-remediation",
+  "collected_at": "2026-07-30",
+  "execution_route": "flyctl ssh console -a lifenavigator-core-api (in-service; credentials never left the trusted environment)",
+  "neo4j_database": "personal",
+  "mutations_performed": 0,
+
+  "totals": {
+    "related_to_edges": 148,
+    "total_relationships": 3208,
+    "related_to_share_of_all_edges": 0.0461,
+    "distinct_shapes": 1,
+    "edges_carrying_properties": 0,
+    "cross_tenant_edges": 0,
+    "distinct_source_tenants": 148,
+    "distinct_target_tenants": 148,
+    "edges_per_tenant": 1
+  },
+
+  "provenance_availability": {
+    "relationship_properties": [],
+    "note": "RELATED_TO relationships carry ZERO properties. No created_at, no source record id, no ingestion batch, no normalizer version. Edge-level provenance for these 148 edges DOES NOT EXIST and cannot be recovered from the graph alone.",
+    "recoverable_from": "Node-level metadata on the PersonaProfile endpoint (user_id, entity_id, tenant_id, metadata, created_at, updated_at) plus the upstream source record."
+  },
+
+  "equivalence_classes": [
+    {
+      "class_id": "RT-C1",
+      "edge_count": 148,
+      "share_of_related_to": 1.0,
+      "source_label": "UserProfile",
+      "source_entity_type": null,
+      "target_label": "PersonaProfile",
+      "target_entity_type": "persona_profile",
+      "normalizer_branch": "unmapped-entity-type fallback",
+      "normalizer_evidence": {
+        "registry_membership": "absent",
+        "domain_classification": "Domain::Root (apps/ingestion-worker/src/ontology.rs:749)",
+        "mechanism": "EntityType::PersonaProfile has no REGISTRY edge rule, so normalization falls through to the RELATED_TO fallback documented at ontology.rs:383-384",
+        "basis": "source-confirmed emitting branch, NOT endpoint-type inference"
+      },
+      "creation_metadata": "none on the edge; node-level created_at/updated_at present on the PersonaProfile endpoint",
+      "likely_intended_relationship": "HAS_PERSONA",
+      "intended_relationship_family": "ownership",
+      "intended_relationship_status": "CANDIDATE — not present in the authoritative catalog; must be added to REGISTRY before any remap is valid",
+      "classification": "recoverable_through_source_replay",
+      "classification_rationale": "The shape is perfectly homogeneous and the emitting branch is confirmed in source, which makes the mapping deterministic in principle. It is NOT classified as deterministically_remappable because (a) the directive prohibits remapping from endpoint types alone, (b) the edge carries no provenance to corroborate a per-edge decision, and (c) the target relationship type does not yet exist in the registry. The normalizer must be fixed first, then affected source records replayed.",
+      "confidence_in_remapping": "high_on_shape / blocked_on_catalog",
+      "tenant_isolation": "clean — 1 edge per tenant, 0 cross-tenant"
+    }
+  ],
+
+  "classification_summary": {
+    "deterministically_remappable": 0,
+    "recoverable_through_source_replay": 148,
+    "legitimately_generic": 0,
+    "incomplete_or_erroneous_ingestion": 0,
+    "unresolved": 0
+  },
+
+  "reporting_requirements": {
+    "total_fallback_edges": 148,
+    "count_by_source_and_target_type": { "UserProfile->PersonaProfile": 148 },
+    "count_safely_migratable_today": 0,
+    "count_requiring_reingestion": 148,
+    "count_intentionally_generic": 0,
+    "unresolved_count": 0
+  },
+
+  "invariants": [
+    "RELATED_TO remains NON-TRAVERSABLE; this inventory does not change its traversability",
+    "cross_tenant_edges must remain 0",
+    "total_relationships must not decline without an approved deletion",
+    "no RELATED_TO edge may be retired before its typed replacement is verified present on the same endpoints"
+  ],
+
+  "blocked_on": [
+    "HAS_PERSONA absent from the authoritative relationship catalog (REGISTRY)",
+    "credential rotation prerequisite (exposed Supabase credential + Management API PAT) — unmet, gates all write-enabled remediation",
+    "no mutation authorized in this session (read-only baseline elected)"
+  ]
+}

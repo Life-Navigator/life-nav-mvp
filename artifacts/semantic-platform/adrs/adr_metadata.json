@@ -1,0 +1,370 @@
+{
+  "$schema_version": "1.0.0",
+  "generated_at": "2026-07-30",
+  "code_commit": "da8c7428",
+  "branch": "graphrag/data-contract-remediation",
+  "evidence_base": "docs/semantic-platform/FINAL_TECHNICAL_DESIGN_REVIEW.md",
+  "package_status": "all_proposed",
+  "production_mutations_performed": 0,
+  "graph_grounding_enabled": false,
+  "adrs": [
+    {
+      "id": "ADR-001",
+      "title": "Transaction data placement and graph aggregation",
+      "file": "docs/semantic-platform/adrs/ADR-001-transaction-data-placement.md",
+      "status": "Proposed",
+      "severity": "Critical",
+      "owner": "Graph Platform",
+      "reviewers": ["Data Platform", "Finance Domain", "Security"],
+      "dependencies": ["ADR-002", "ADR-004", "ADR-008"],
+      "selected_option": "Account-period summary nodes only; stop emitting user-anchored HAS_TRANSACTION",
+      "rejected_options": [
+        "Continue as-is (HB: unbounded growth)",
+        "Remove all transaction nodes",
+        "Separate time-series system (HB: ops complexity)",
+        "Derived financial-state nodes only (HB: auditability)"
+      ],
+      "implementation_effort": "medium",
+      "operational_risk": "medium",
+      "reversible": true,
+      "migration_required": true,
+      "production_mutation_required": true,
+      "approval_state": "pending",
+      "unresolved_blockers": ["OQ-1", "OQ-11"]
+    },
+    {
+      "id": "ADR-002",
+      "title": "Provenance substrate and granularity",
+      "file": "docs/semantic-platform/adrs/ADR-002-provenance-substrate-and-granularity.md",
+      "status": "Proposed",
+      "severity": "Critical",
+      "owner": "Graph Platform",
+      "reviewers": ["Security", "Privacy/Governance", "Data Platform"],
+      "dependencies": ["ADR-001", "ADR-010"],
+      "selected_option": "Hybrid batch/per-assertion relational provenance stored outside Neo4j",
+      "rejected_options": [
+        "Inline edge properties",
+        "Full in-graph assertion reification (HB: doubles graph, mandates rebuild)",
+        "Per-edge relational assertions",
+        "Event-log-only (HB: cannot satisfy deletion proof)",
+        "Object-store documents"
+      ],
+      "implementation_effort": "high",
+      "operational_risk": "medium",
+      "reversible": true,
+      "migration_required": true,
+      "production_mutation_required": true,
+      "approval_state": "pending",
+      "unresolved_blockers": ["OQ-2"],
+      "supersedes": [
+        "PROVENANCE_MODEL.md \u00a72",
+        "PROVENANCE_MODEL.md \u00a72.1",
+        "PROVENANCE_MODEL.md \u00a75"
+      ]
+    },
+    {
+      "id": "ADR-003",
+      "title": "Principal- and context-aware traversal authorization",
+      "file": "docs/semantic-platform/adrs/ADR-003-principal-context-traversal-authorization.md",
+      "status": "Proposed",
+      "severity": "Critical",
+      "owner": "Security",
+      "reviewers": ["Graph Platform", "Privacy/Governance", "Agent Platform"],
+      "dependencies": [],
+      "selected_option": "Context x principal permission matrix exported in manifest v3",
+      "rejected_options": [
+        "Boolean traversable (HB: agent #2 inherits agent #1 rights)",
+        "Context-only",
+        "Principal-only",
+        "External policy engine (disproportionate)",
+        "Hardcoded per-agent policy (HB: divergence)"
+      ],
+      "implementation_effort": "low",
+      "operational_risk": "low",
+      "reversible": true,
+      "migration_required": false,
+      "production_mutation_required": false,
+      "approval_state": "pending",
+      "unresolved_blockers": [],
+      "blocks": ["ADR-008", "ADR-011"]
+    },
+    {
+      "id": "ADR-004",
+      "title": "Known-absent and adversarial retrieval evaluation",
+      "file": "docs/semantic-platform/adrs/ADR-004-known-absent-adversarial-evaluation.md",
+      "status": "Proposed",
+      "severity": "High",
+      "owner": "AI/Retrieval",
+      "reviewers": ["Graph Platform", "Security", "Privacy"],
+      "dependencies": [],
+      "selected_option": "Hybrid synthetic generation + human review, six mandatory categories",
+      "rejected_options": [
+        "Template queries from existing entities (HB: cannot measure abstention)",
+        "Human-authored only",
+        "Synthetic only",
+        "Production trace sampling (HB: privacy)"
+      ],
+      "implementation_effort": "medium",
+      "operational_risk": "none",
+      "reversible": true,
+      "migration_required": false,
+      "production_mutation_required": false,
+      "approval_state": "pending",
+      "unresolved_blockers": ["OQ-4"]
+    },
+    {
+      "id": "ADR-005",
+      "title": "Vector-layer trust, review state, and poisoning controls",
+      "file": "docs/semantic-platform/adrs/ADR-005-vector-layer-trust-and-poisoning-controls.md",
+      "status": "Proposed",
+      "severity": "High",
+      "owner": "Security",
+      "reviewers": ["AI/Retrieval", "Document Intelligence", "Privacy"],
+      "dependencies": ["ADR-002", "ADR-010"],
+      "selected_option": "Indexed Qdrant payload trust fields filtered during vector search",
+      "rejected_options": [
+        "Retrieve all and post-filter (HB: top-k starvation)",
+        "Separate collections",
+        "Separate namespaces",
+        "Do not embed unreviewed documents (HB: destroys review loop)"
+      ],
+      "implementation_effort": "medium",
+      "operational_risk": "low",
+      "reversible": true,
+      "migration_required": true,
+      "production_mutation_required": true,
+      "production_mutation_class": "qdrant_payload_only_no_vector_change",
+      "approval_state": "pending",
+      "unresolved_blockers": ["OQ-5", "CONFLICT-1"]
+    },
+    {
+      "id": "ADR-006",
+      "title": "Canonical business identity and entity resolution",
+      "file": "docs/semantic-platform/adrs/ADR-006-canonical-business-identity.md",
+      "status": "Proposed",
+      "severity": "High",
+      "owner": "Data Platform",
+      "reviewers": ["Graph Platform", "Domain owners", "Privacy"],
+      "dependencies": ["ADR-002", "ADR-010"],
+      "selected_option": "Deterministic tenant-local composite keys + alias table + human review for sensitive classes",
+      "rejected_options": [
+        "Source-record identity only",
+        "Global canonical identity (HB: cross-tenant join path)",
+        "Probabilistic resolution",
+        "Human review for all classes"
+      ],
+      "implementation_effort": "medium",
+      "operational_risk": "low",
+      "reversible": true,
+      "migration_required": false,
+      "production_mutation_required": false,
+      "approval_state": "pending",
+      "unresolved_blockers": ["OQ-6"]
+    },
+    {
+      "id": "ADR-007",
+      "title": "Secret management and credential incident closure",
+      "file": "docs/semantic-platform/adrs/ADR-007-secret-management-and-credential-incident-closure.md",
+      "status": "Proposed",
+      "severity": "Critical",
+      "owner": "Security",
+      "reviewers": ["Platform Ops", "Engineering Lead"],
+      "dependencies": [],
+      "selected_option": "Rotate all exposed + least-privilege scoped tokens + secret-store delivery",
+      "rejected_options": [
+        "Rotate newly exposed only",
+        "Rotate plus git history rewrite (HB: migration cost, values already inert)",
+        "Accept risk (HB: live org-scoped token)"
+      ],
+      "implementation_effort": "low",
+      "operational_risk": "low",
+      "reversible": false,
+      "migration_required": false,
+      "production_mutation_required": false,
+      "approval_state": "containment_authorized_independently",
+      "unresolved_blockers": ["OQ-12"],
+      "gates": "blocks_all_write_enabled_work"
+    },
+    {
+      "id": "ADR-008",
+      "title": "Safe production traversal verification",
+      "file": "docs/semantic-platform/adrs/ADR-008-safe-production-traversal-verification.md",
+      "status": "Proposed",
+      "severity": "High",
+      "owner": "AI/Retrieval",
+      "reviewers": ["Security", "Graph Platform", "Privacy"],
+      "dependencies": ["ADR-003", "ADR-004"],
+      "selected_option": "Out-of-band read-only diagnostic (Phase A), then in-service shadow (Phase B)",
+      "rejected_options": [
+        "Enable globally (HB: inverts evaluation discipline)",
+        "Enable for a user cohort",
+        "Production replica",
+        "Synthetic tenant only (HB: cannot reproduce the defect)"
+      ],
+      "implementation_effort": "low",
+      "operational_risk": "low",
+      "reversible": true,
+      "migration_required": false,
+      "production_mutation_required": false,
+      "approval_state": "pending",
+      "unresolved_blockers": [],
+      "invariant": "GRAPH_GROUNDING_ENABLED remains unset regardless of outcome"
+    },
+    {
+      "id": "ADR-009",
+      "title": "API gateway retirement",
+      "file": "docs/semantic-platform/adrs/ADR-009-api-gateway-retirement.md",
+      "status": "Proposed",
+      "severity": "Medium",
+      "owner": "Platform Ops",
+      "reviewers": ["Security", "AI/Retrieval", "Architecture"],
+      "dependencies": ["ADR-007"],
+      "selected_option": "Retire outright; nothing left to harvest",
+      "rejected_options": [
+        "Retain as fallback (HB: unmaintained public service with service-role key)",
+        "Harvest then retire (empty work)",
+        "Convert to central retrieval service",
+        "Keep dormant"
+      ],
+      "implementation_effort": "low",
+      "operational_risk": "low",
+      "reversible": true,
+      "migration_required": false,
+      "production_mutation_required": false,
+      "approval_state": "pending",
+      "unresolved_blockers": ["OQ-7"],
+      "supersedes": [
+        "REMEDIATION_MASTER_PLAN.md correction C-B",
+        "KNOWLEDGE_GRAPH_REFERENCE_ARCHITECTURE.md \u00a77 harvest requirement"
+      ]
+    },
+    {
+      "id": "ADR-010",
+      "title": "Minimal stored confidence model",
+      "file": "docs/semantic-platform/adrs/ADR-010-minimal-stored-confidence-model.md",
+      "status": "Proposed",
+      "severity": "High",
+      "owner": "AI/Retrieval",
+      "reviewers": ["Graph Platform", "Security", "Data Platform"],
+      "dependencies": ["ADR-002"],
+      "selected_option": "Three stored components (source, extractor, resolution); rest computed per request",
+      "rejected_options": [
+        "Seven stored components",
+        "Single scalar (HB: destroys explainability of uncertainty)",
+        "Full Bayesian model (HB: no calibration data)",
+        "No stored confidence (HB: citation gating impossible)"
+      ],
+      "implementation_effort": "low",
+      "operational_risk": "low",
+      "reversible": true,
+      "migration_required": false,
+      "production_mutation_required": false,
+      "approval_state": "pending",
+      "unresolved_blockers": ["OQ-8"],
+      "supersedes": [
+        "CONFIDENCE_MODEL.md \u00a72",
+        "CONFIDENCE_MODEL.md \u00a73 Bayesian combination"
+      ]
+    },
+    {
+      "id": "ADR-011",
+      "title": "Catalog-based semantic superclass hierarchy",
+      "file": "docs/semantic-platform/adrs/ADR-011-catalog-semantic-superclass-hierarchy.md",
+      "status": "Proposed",
+      "severity": "Medium",
+      "owner": "Graph Platform",
+      "reviewers": ["AI/Retrieval", "Security", "Domain owners"],
+      "dependencies": ["ADR-003"],
+      "selected_option": "superclass field in node class spec, exported in manifest, expanded by planner",
+      "rejected_options": [
+        "Multiple Neo4j labels (HB: graph-wide migration for 5.1% of nodes)",
+        "Separate ontology graph",
+        "Runtime hardcoded families (HB: policy as code)",
+        "OWL class hierarchy"
+      ],
+      "implementation_effort": "low",
+      "operational_risk": "low",
+      "reversible": true,
+      "migration_required": false,
+      "production_mutation_required": false,
+      "approval_state": "pending",
+      "unresolved_blockers": [],
+      "supersedes": ["SEMANTIC_DATA_MODEL.md \u00a74", "SEMANTIC_PLATFORM_BACKLOG.md SP-032"]
+    }
+  ],
+  "conflicts": [
+    {
+      "id": "CONFLICT-1",
+      "between": ["ADR-005", "ADR-002", "ADR-010"],
+      "description": "Qdrant payload necessarily duplicates authoritative assertion state; the two copies can drift",
+      "resolution": "Postgres authoritative; Qdrant payload is a derived security-relevant projection. Drift is ASYMMETRIC: postgres_allow->qdrant_block = availability defect; postgres_block->qdrant_allow = security incident triggering quarantine. Separate metrics, separate alerts, separate runbooks. Fail-safe write ordering; 60s propagation SLO.",
+      "status": "resolved_with_asymmetric_severity_pending_signoff",
+      "invariant": "no_authoritative_disallow_may_be_represented_as_allow_in_qdrant"
+    },
+    {
+      "id": "CONFLICT-2",
+      "between": ["ADR-001", "ADR-011"],
+      "description": "ADR-001 may reduce TransactionSummary's role, weakening the Observation superclass grouping",
+      "resolution": "Low impact; revisit after ADR-001 lands",
+      "status": "accepted"
+    },
+    {
+      "id": "CONFLICT-3",
+      "between": ["ADR-003", "ADR-011"],
+      "description": "Both modify the manifest schema; separate bumps would force two loader migrations",
+      "resolution": "Combine into a single v3 bump",
+      "status": "resolved_by_sequencing"
+    }
+  ],
+  "open_questions_blocking": [
+    "OQ-1",
+    "OQ-11",
+    "OQ-12",
+    "OQ-2",
+    "OQ-4",
+    "OQ-5",
+    "OQ-6",
+    "OQ-7",
+    "OQ-9"
+  ],
+  "open_questions_non_blocking": ["OQ-3", "OQ-8", "OQ-10"],
+  "preserved_strengths_verified": [
+    "exactly_one_graph_writer_rust",
+    "python_graphrag_clients_read_only",
+    "traversal_constrains_both_endpoints_by_tenant",
+    "caller_tenant_override_rejected",
+    "relationship_vocabulary_enumerable",
+    "unknown_relationship_types_fail_closed",
+    "catalog_to_manifest_drift_ci_gated",
+    "semantic_family_does_not_grant_traversal",
+    "provider_b2b_excluded_from_personal_traversal",
+    "rrf_exists_in_serving_retrieval",
+    "graph_grounding_disabled"
+  ],
+  "review_verdict": {
+    "date": "2026-07-30",
+    "outcome": "approved_to_enter_review",
+    "blanket_approval": false,
+    "conditions": [
+      "all_adrs_remain_proposed",
+      "per_record_vote_required",
+      "d1_containment_immediate",
+      "oq7_and_oq9_hard_blockers",
+      "adr003_does_not_decide_provider_permissions",
+      "adr004_may_reject_graph_traversal",
+      "no_production_mutation_from_approval_alone",
+      "each_accepted_adr_gets_separate_implementation_and_verification_gate"
+    ]
+  },
+  "oq9_method": "classify_into_9_buckets_before_any_repair; buckets 2,3,5,7,9 escalate to Stage 0 blocker",
+  "rejection_evidence_doc": "docs/semantic-platform/adrs/ADR_REJECTION_EVIDENCE.md",
+  "supporting_documents": [
+    "ADR_INDEX.md",
+    "ADR_DECISION_SUMMARY.md",
+    "ADR_CONSISTENCY_MATRIX.md",
+    "ADR_IMPLEMENTATION_SEQUENCE.md",
+    "ADR_OPEN_QUESTIONS.md",
+    "ADR_REVIEW_AGENDA.md",
+    "ADR_REJECTION_EVIDENCE.md"
+  ]
+}
