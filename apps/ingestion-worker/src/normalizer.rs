@@ -1329,107 +1329,13 @@ fn relationships_for(
     }
     // Legacy typed-label match for not-yet-migrated domains; unmapped types fall
     // back to RELATED_TO. Migrate these into the ontology registry over time.
-    let user_label: &str = match et {
-        EntityType::Goal => "HAS_GOAL",
-        EntityType::Constraint => "HAS_CONSTRAINT",
-        EntityType::Capability => "HAS_CAPABILITY",
-        EntityType::Motivation => "HAS_MOTIVATION",
-        EntityType::DecisionPreference => "HAS_DECISION_PREFERENCE",
-        EntityType::DomainRiskTolerance => "HAS_RISK_TOLERANCE",
-        EntityType::Decision => "MADE_DECISION",
-        EntityType::Recommendation => "RECEIVED_RECOMMENDATION",
-        EntityType::Action => "TOOK_ACTION",
-        EntityType::Outcome => "OBSERVED_OUTCOME",
-        EntityType::HealthMetric => "HAS_HEALTH_METRIC",
-        EntityType::HealthInsurancePlan => "HAS_INSURANCE_PLAN",
-        EntityType::CareerProfile => "HAS_CAREER_PROFILE",
-        EntityType::EducationRecord => "HAS_EDUCATION_RECORD",
-        EntityType::WearableMetric => "HAS_WEARABLE_METRIC",
-        EntityType::ArcanaLeadPackage => "GENERATED_ARCANA_LEAD",
-        // Added in 074
-        EntityType::LifeVision => "HAS_LIFE_VISION",
-        EntityType::CommitmentLevel => "HAS_COMMITMENT_LEVEL",
-        EntityType::LifeEvent => "EXPERIENCED_LIFE_EVENT",
-        EntityType::GoalDiscoveryTurn => "HAS_DISCOVERY_TURN",
-        EntityType::GoalInterpretation => "HAS_GOAL_INTERPRETATION",
-        EntityType::OptimizerRun => "HAS_OPTIMIZER_RUN",
-        EntityType::OptimizerAllocation => "HAS_ALLOCATION",
-        EntityType::OptimizerRecommendation => "RECEIVED_RECOMMENDATION",
-        EntityType::LifeScenario => "HAS_SCENARIO",
-        EntityType::LifeScenarioVersion => "HAS_SCENARIO_VERSION",
-        EntityType::LifeScenarioDecision => "SCENARIO_DECISION",
-        EntityType::LifeScenarioOutput => "HAS_SCENARIO_OUTPUT",
-        EntityType::LifeTrajectorySnapshot => "HAS_TRAJECTORY_SNAPSHOT",
-        EntityType::EstateProfile => "HAS_ESTATE_PROFILE",
-        EntityType::EstateBeneficiary => "HAS_BENEFICIARY",
-        EntityType::InsuranceDocument => "HAS_INSURANCE_DOCUMENT",
-        EntityType::InsuranceDocumentFact => "HAS_INSURANCE_FACT",
-        EntityType::BenefitProfile => "HAS_BENEFIT_PROFILE",
-        EntityType::HealthAlertEvent => "OBSERVED_HEALTH_ALERT",
-        EntityType::UserFinancialProfile => "HAS_FINANCIAL_PROFILE",
-        EntityType::FinancingPreference => "HAS_FINANCING_PREFERENCE",
-        EntityType::EducationIntake => "HAS_EDUCATION_INTAKE",
-        EntityType::Injury => "HAS_INJURY",
-        EntityType::CandidateMatch => "MATCHED_TO_JOB",
-        // Decision-intelligence completion (migration 080).
-        EntityType::GoalProgressSnapshot => "HAS_GOAL_PROGRESS_SNAPSHOT",
-        EntityType::GoalProgressEvent => "GOAL_PROGRESS_EVENT",
-        EntityType::GoalProgressScore => "HAS_GOAL_PROGRESS_SCORE",
-        EntityType::GoalProgressPrediction => "PREDICTED_GOAL_PROGRESS",
-        EntityType::CrossDomainImpact => "CROSS_DOMAIN_IMPACT",
-        EntityType::OutcomeAttribution => "ATTRIBUTED_OUTCOME",
-        EntityType::PredictionCalibration => "CALIBRATION_OBSERVATION",
-        EntityType::RecommendationAccuracy => "RECOMMENDATION_ACCURACY",
-        EntityType::AdvisorAccuracy => "ADVISOR_ACCURACY_SNAPSHOT",
-        EntityType::RecommendationQualityMetric => "RECOMMENDATION_QUALITY_METRIC",
-        EntityType::PathwayEffectiveness => "EFFECTIVE_PATHWAY",
-        // Decision impact + probability (migration 081).
-        EntityType::GoalProbabilityDistribution => "HAS_PROBABILITY_DISTRIBUTION",
-        EntityType::GoalProbabilitySnapshot => "HAS_PROBABILITY_SNAPSHOT",
-        EntityType::GoalDecisionImpact => "CHANGES_PROBABILITY_OF",
-        EntityType::GoalPathwayProbability => "HAS_PATHWAY_PROBABILITY",
-        EntityType::GoalFutureState => "PROJECTS_FUTURE_STATE",
-        EntityType::DecisionMarginalImpact => "RANKED_MARGINAL_IMPACT",
-        EntityType::TrajectoryVarianceFactor => "TRAJECTORY_VARIANCE_FACTOR",
-        // XAI + Trust Layer (migration 082).
-        EntityType::RecommendationAuditTrail => "AUDITED_BY",
-        EntityType::WhyChain => "HAS_WHY_CHAIN",
-        EntityType::EvidenceLink => "SUPPORTED_BY",
-        EntityType::CounterfactualScenario => "COUNTERFACTUAL_OF",
-        EntityType::RecommendationAssumption => "ASSUMED_BY",
-        // Conversation Intelligence (migration 084).
-        EntityType::DiscoverySession => "HAS_DISCOVERY_SESSION",
-        EntityType::AssumptionChallenge => "CHALLENGED_BY",
-        EntityType::ConversationTrace => "TRACED_BY",
-        // Provider GraphRAG (migration 085).
-        EntityType::ProviderProfile => "HAS_PROVIDER_PROFILE",
-        EntityType::ProviderEngagement => "HAS_PROVIDER_ENGAGEMENT",
-        EntityType::ProviderConsentScope => "HAS_CONSENT_SCOPE",
-        EntityType::ProviderRecommendation => "RECOMMENDED_BY_PROVIDER",
-        EntityType::ProviderOutcome => "PROVIDER_OUTCOME",
-        EntityType::ProviderKnowledgeEntry => "AUTHORED_KNOWLEDGE",
-        EntityType::ProviderAnalytics => "ANALYZED_BY_PROVIDER",
-        // Sprint C — Arcana Health & Performance.
-        EntityType::ArcanaProfile => "HAS_ARCANA_PROFILE",
-        EntityType::ArcanaAssessment => "HAS_ARCANA_ASSESSMENT",
-        EntityType::ArcanaGoal => "HAS_ARCANA_GOAL",
-        EntityType::ArcanaConstraint => "HAS_ARCANA_CONSTRAINT",
-        EntityType::ArcanaCapability => "HAS_ARCANA_CAPABILITY",
-        EntityType::ArcanaMotivation => "HAS_ARCANA_MOTIVATION",
-        EntityType::ArcanaReadiness => "HAS_ARCANA_READINESS",
-        EntityType::SupplementProtocol => "HAS_SUPPLEMENT_PROTOCOL",
-        EntityType::TrainingProtocol => "HAS_TRAINING_PROTOCOL",
-        EntityType::HealthMilestone => "HAS_HEALTH_MILESTONE",
-        EntityType::BiometricObservation => "HAS_BIOMETRIC_OBSERVATION",
-        EntityType::LabResult => "HAS_LAB_RESULT",
-        EntityType::WearableConnection => "HAS_WEARABLE_CONNECTION",
-        EntityType::ArcanaInsuranceDocument => "HAS_ARCANA_INSURANCE_DOCUMENT",
-        EntityType::LeadPackageConsent => "GRANTED_LEAD_CONSENT",
-        EntityType::ConciergePreference => "HAS_CONCIERGE_PREFERENCE",
-        EntityType::ArcanaMembership => "HAS_ARCANA_MEMBERSHIP",
-        // Finance is handled by the ontology registry above (early return).
-        _ => "RELATED_TO",
-    };
+    // The legacy mapping now lives in `ontology::LEGACY_USER_EDGES` — an enumerable table rather than
+    // an inline `match`. A `match` cannot be walked, so the manifest generator could not see what it
+    // emitted: 86 relationship types were writable but absent from the catalog and therefore
+    // untraversable. Reading the table here keeps one source of truth for the vocabulary.
+    let user_label: &str =
+        crate::ontology::legacy_user_edge(et).unwrap_or("RELATED_TO");
+
 
     // Non-registry domains: the single user -> entity edge.
     // (:UserProfile)-[:LABEL]->(:Entity).

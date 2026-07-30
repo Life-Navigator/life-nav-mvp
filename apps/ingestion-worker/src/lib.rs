@@ -16,6 +16,7 @@ pub mod ontology;
 pub mod processor;
 pub mod qdrant_client;
 pub mod queue;
+pub mod relationship_catalog;
 pub mod relationships;
 pub mod supabase_client;
 pub mod telemetry;

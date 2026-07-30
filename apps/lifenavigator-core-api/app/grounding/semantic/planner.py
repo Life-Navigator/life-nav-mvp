@@ -132,8 +132,8 @@ class QueryPlan:
 _MANIFEST_PATH = Path(__file__).with_name("ontology_manifest.json")
 
 
-def _load_ontology() -> tuple[dict[str, tuple[str, ...]], dict[str, float]]:
-    """Read the generated contract into (families, weights).
+def _load_ontology() -> tuple[dict[str, tuple[str, ...]], dict[str, float], frozenset[str]]:
+    """Read the generated contract into (families, weights, personal-advisor-traversable).
 
     Fails LOUDLY on a missing or malformed manifest. The tempting alternative — fall back to a built-in
     list — would recreate exactly the bug this replaced: a silent second vocabulary that looks like it
@@ -153,14 +153,20 @@ def _load_ontology() -> tuple[dict[str, tuple[str, ...]], dict[str, float]]:
 
     families: dict[str, list[str]] = {}
     weights: dict[str, float] = {}
+    traversable: set[str] = set()
     for row in rows:
         rel, fam = row["rel_type"], row["family"]
         families.setdefault(fam, []).append(rel)
         weights[rel] = float(row["weight"])
-    return {k: tuple(v) for k, v in families.items()}, weights
+        # FAIL CLOSED. A row with no explicit `traversable` decision is NOT traversable. Defaulting to
+        # True would let a relationship acquire personal-advisor reach because someone forgot to decide
+        # — which is how the provider/B2B edges would otherwise have entered personal retrieval.
+        if row.get("traversable") is True:
+            traversable.add(rel)
+    return {k: tuple(v) for k, v in families.items()}, weights, frozenset(traversable)
 
 
-EDGE_FAMILY, EDGE_WEIGHT_FROM_ONTOLOGY = _load_ontology()
+EDGE_FAMILY, EDGE_WEIGHT_FROM_ONTOLOGY, PERSONAL_ADVISOR_TRAVERSABLE = _load_ontology()
 
 # Which families each query intent should traverse. This is a RETRIEVAL policy, not an ontology fact —
 # the ontology says what an edge means; this says which meanings matter for a given question — so it
@@ -276,6 +282,13 @@ def allowed_edge_types(plan: QueryPlan) -> tuple[str, ...]:
 
     An allowlist, not a denylist: a relationship type that is not in the ontology cannot be traversed,
     so a malformed or injected edge label cannot widen the walk.
+
+    Family membership alone is NOT sufficient. Every candidate is additionally filtered through the
+    catalog's per-context traversal policy (`PERSONAL_ADVISOR_TRAVERSABLE`), because this planner serves
+    the PERSONAL advisor context only. Provider/Arcana B2B edges carry ordinary families — `identity`,
+    `evidence`, `progress` — so a family-only allowlist would pull provider-operational data into a
+    user's personal retrieval. Contexts other than the personal advisor need their own planner and their
+    own authorization design; they do not get one by widening this filter.
     """
     types: list[str] = []
     for fam in plan.edge_families:
@@ -283,4 +296,8 @@ def allowed_edge_types(plan: QueryPlan) -> tuple[str, ...]:
     if plan.wants_evidence:
         types.extend(EDGE_FAMILY["evidence"])
     seen: set[str] = set()
-    return tuple(t for t in types if not (t in seen or seen.add(t)))
+    return tuple(
+        t
+        for t in types
+        if t in PERSONAL_ADVISOR_TRAVERSABLE and not (t in seen or seen.add(t))
+    )

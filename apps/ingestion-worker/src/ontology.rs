@@ -252,6 +252,130 @@ const DECISION_SCENARIO: &[IncomingEdge] = &[fk("HAS_SCENARIO", "life_decision",
 const DOCUMENT: &[IncomingEdge] = &[user("HAS_DOCUMENT")];
 const DOCUMENT_FIELD: &[IncomingEdge] = &[fk("HAS_EXTRACTED_FIELD", "document", "document_id")];
 
+// ── Legacy user-anchored edges (NOT YET registry-migrated) ──────────────────
+//
+// WHY THIS TABLE EXISTS
+// ---------------------
+// `normalizer::relationships_for` carried this mapping as an inline `match`. That put it OUTSIDE
+// `REGISTRY`, and `all_relationship_types()` walks only `REGISTRY` — so every relationship below was
+// emitted into Neo4j while being absent from the generated manifest, and therefore absent from the
+// retrieval allowlist the planner derives from it. Those edges were writable but never traversable.
+//
+// This was not hypothetical: `HAS_EDUCATION_RECORD` has 16 live edges in production and appeared in no
+// manifest. The other 85 types below are latent instances of the same defect — unreachable the moment
+// their domain gets data.
+//
+// The table is the SINGLE source of truth; the normalizer now reads it via `legacy_user_edge`. Keeping
+// the mapping here is what lets `all_relationship_types()` — and thus the manifest, the planner
+// allowlist, and the drift gate — see the whole vocabulary rather than the registry-shaped half of it.
+//
+// These edges are all `EdgeFrom::UserAnchor` in effect: the legacy match emitted a single typed edge
+// from the tenant's UserProfile. FK/inter-entity edges belong in `REGISTRY` proper — migrating a domain
+// out of this table and into `REGISTRY` is how it gains richer edges.
+pub const LEGACY_USER_EDGES: &[(EntityType, &str)] = &[
+    (EntityType::Goal, "HAS_GOAL"),
+    (EntityType::Constraint, "HAS_CONSTRAINT"),
+    (EntityType::Capability, "HAS_CAPABILITY"),
+    (EntityType::Motivation, "HAS_MOTIVATION"),
+    (EntityType::DecisionPreference, "HAS_DECISION_PREFERENCE"),
+    (EntityType::DomainRiskTolerance, "HAS_RISK_TOLERANCE"),
+    (EntityType::Decision, "MADE_DECISION"),
+    (EntityType::Recommendation, "RECEIVED_RECOMMENDATION"),
+    (EntityType::Action, "TOOK_ACTION"),
+    (EntityType::Outcome, "OBSERVED_OUTCOME"),
+    (EntityType::HealthMetric, "HAS_HEALTH_METRIC"),
+    (EntityType::HealthInsurancePlan, "HAS_INSURANCE_PLAN"),
+    (EntityType::CareerProfile, "HAS_CAREER_PROFILE"),
+    (EntityType::EducationRecord, "HAS_EDUCATION_RECORD"),
+    (EntityType::WearableMetric, "HAS_WEARABLE_METRIC"),
+    (EntityType::ArcanaLeadPackage, "GENERATED_ARCANA_LEAD"),
+    (EntityType::LifeVision, "HAS_LIFE_VISION"),
+    (EntityType::CommitmentLevel, "HAS_COMMITMENT_LEVEL"),
+    (EntityType::LifeEvent, "EXPERIENCED_LIFE_EVENT"),
+    (EntityType::GoalDiscoveryTurn, "HAS_DISCOVERY_TURN"),
+    (EntityType::GoalInterpretation, "HAS_GOAL_INTERPRETATION"),
+    (EntityType::OptimizerRun, "HAS_OPTIMIZER_RUN"),
+    (EntityType::OptimizerAllocation, "HAS_ALLOCATION"),
+    (EntityType::OptimizerRecommendation, "RECEIVED_RECOMMENDATION"),
+    (EntityType::LifeScenario, "HAS_SCENARIO"),
+    (EntityType::LifeScenarioVersion, "HAS_SCENARIO_VERSION"),
+    (EntityType::LifeScenarioDecision, "SCENARIO_DECISION"),
+    (EntityType::LifeScenarioOutput, "HAS_SCENARIO_OUTPUT"),
+    (EntityType::LifeTrajectorySnapshot, "HAS_TRAJECTORY_SNAPSHOT"),
+    (EntityType::EstateProfile, "HAS_ESTATE_PROFILE"),
+    (EntityType::EstateBeneficiary, "HAS_BENEFICIARY"),
+    (EntityType::InsuranceDocument, "HAS_INSURANCE_DOCUMENT"),
+    (EntityType::InsuranceDocumentFact, "HAS_INSURANCE_FACT"),
+    (EntityType::BenefitProfile, "HAS_BENEFIT_PROFILE"),
+    (EntityType::HealthAlertEvent, "OBSERVED_HEALTH_ALERT"),
+    (EntityType::UserFinancialProfile, "HAS_FINANCIAL_PROFILE"),
+    (EntityType::FinancingPreference, "HAS_FINANCING_PREFERENCE"),
+    (EntityType::EducationIntake, "HAS_EDUCATION_INTAKE"),
+    (EntityType::Injury, "HAS_INJURY"),
+    (EntityType::CandidateMatch, "MATCHED_TO_JOB"),
+    (EntityType::GoalProgressSnapshot, "HAS_GOAL_PROGRESS_SNAPSHOT"),
+    (EntityType::GoalProgressEvent, "GOAL_PROGRESS_EVENT"),
+    (EntityType::GoalProgressScore, "HAS_GOAL_PROGRESS_SCORE"),
+    (EntityType::GoalProgressPrediction, "PREDICTED_GOAL_PROGRESS"),
+    (EntityType::CrossDomainImpact, "CROSS_DOMAIN_IMPACT"),
+    (EntityType::OutcomeAttribution, "ATTRIBUTED_OUTCOME"),
+    (EntityType::PredictionCalibration, "CALIBRATION_OBSERVATION"),
+    (EntityType::RecommendationAccuracy, "RECOMMENDATION_ACCURACY"),
+    (EntityType::AdvisorAccuracy, "ADVISOR_ACCURACY_SNAPSHOT"),
+    (EntityType::RecommendationQualityMetric, "RECOMMENDATION_QUALITY_METRIC"),
+    (EntityType::PathwayEffectiveness, "EFFECTIVE_PATHWAY"),
+    (EntityType::GoalProbabilityDistribution, "HAS_PROBABILITY_DISTRIBUTION"),
+    (EntityType::GoalProbabilitySnapshot, "HAS_PROBABILITY_SNAPSHOT"),
+    (EntityType::GoalDecisionImpact, "CHANGES_PROBABILITY_OF"),
+    (EntityType::GoalPathwayProbability, "HAS_PATHWAY_PROBABILITY"),
+    (EntityType::GoalFutureState, "PROJECTS_FUTURE_STATE"),
+    (EntityType::DecisionMarginalImpact, "RANKED_MARGINAL_IMPACT"),
+    (EntityType::TrajectoryVarianceFactor, "TRAJECTORY_VARIANCE_FACTOR"),
+    (EntityType::RecommendationAuditTrail, "AUDITED_BY"),
+    (EntityType::WhyChain, "HAS_WHY_CHAIN"),
+    (EntityType::EvidenceLink, "SUPPORTED_BY"),
+    (EntityType::CounterfactualScenario, "COUNTERFACTUAL_OF"),
+    (EntityType::RecommendationAssumption, "ASSUMED_BY"),
+    (EntityType::DiscoverySession, "HAS_DISCOVERY_SESSION"),
+    (EntityType::AssumptionChallenge, "CHALLENGED_BY"),
+    (EntityType::ConversationTrace, "TRACED_BY"),
+    (EntityType::ProviderProfile, "HAS_PROVIDER_PROFILE"),
+    (EntityType::ProviderEngagement, "HAS_PROVIDER_ENGAGEMENT"),
+    (EntityType::ProviderConsentScope, "HAS_CONSENT_SCOPE"),
+    (EntityType::ProviderRecommendation, "RECOMMENDED_BY_PROVIDER"),
+    (EntityType::ProviderOutcome, "PROVIDER_OUTCOME"),
+    (EntityType::ProviderKnowledgeEntry, "AUTHORED_KNOWLEDGE"),
+    (EntityType::ProviderAnalytics, "ANALYZED_BY_PROVIDER"),
+    (EntityType::ArcanaProfile, "HAS_ARCANA_PROFILE"),
+    (EntityType::ArcanaAssessment, "HAS_ARCANA_ASSESSMENT"),
+    (EntityType::ArcanaGoal, "HAS_ARCANA_GOAL"),
+    (EntityType::ArcanaConstraint, "HAS_ARCANA_CONSTRAINT"),
+    (EntityType::ArcanaCapability, "HAS_ARCANA_CAPABILITY"),
+    (EntityType::ArcanaMotivation, "HAS_ARCANA_MOTIVATION"),
+    (EntityType::ArcanaReadiness, "HAS_ARCANA_READINESS"),
+    (EntityType::SupplementProtocol, "HAS_SUPPLEMENT_PROTOCOL"),
+    (EntityType::TrainingProtocol, "HAS_TRAINING_PROTOCOL"),
+    (EntityType::HealthMilestone, "HAS_HEALTH_MILESTONE"),
+    (EntityType::BiometricObservation, "HAS_BIOMETRIC_OBSERVATION"),
+    (EntityType::LabResult, "HAS_LAB_RESULT"),
+    (EntityType::WearableConnection, "HAS_WEARABLE_CONNECTION"),
+    (EntityType::ArcanaInsuranceDocument, "HAS_ARCANA_INSURANCE_DOCUMENT"),
+    (EntityType::LeadPackageConsent, "GRANTED_LEAD_CONSENT"),
+    (EntityType::ConciergePreference, "HAS_CONCIERGE_PREFERENCE"),
+    (EntityType::ArcanaMembership, "HAS_ARCANA_MEMBERSHIP"),
+];
+
+/// The legacy user-anchored relationship for an entity type, if it has one.
+///
+/// Returns `None` for registry-mapped entities (which own their edges) and for genuinely unmapped
+/// types, which still fall back to `RELATED_TO` in the normalizer.
+pub fn legacy_user_edge(et: &EntityType) -> Option<&'static str> {
+    LEGACY_USER_EDGES
+        .iter()
+        .find(|(k, _)| k == et)
+        .map(|(_, rel)| *rel)
+}
+
 /// Registry lookup: the declared incoming edges for an entity type.
 ///
 /// Returns a non-empty slice for entities the ontology registry owns (finance
@@ -488,6 +612,53 @@ pub fn family_of(rel_type: &str) -> EdgeFamily {
         // Document — source material and extracted fields.
         "HAS_DOCUMENT" | "HAS_EXTRACTED_FIELD" => EdgeFamily::Document,
 
+        // ── Legacy user-anchored edges (see LEGACY_USER_EDGES) ──────────────────────────────────
+        // Classified here so none of them falls through to the Association default, which would make
+        // them followable but ranked near-worthless.
+
+        // Identity — stable descriptions of who the user is / what they hold.
+        "HAS_CAREER_PROFILE" | "HAS_EDUCATION_RECORD" | "HAS_EDUCATION_INTAKE" | "HAS_LIFE_VISION"
+        | "HAS_FINANCIAL_PROFILE" | "HAS_ESTATE_PROFILE" | "HAS_BENEFIT_PROFILE" | "HAS_BENEFICIARY"
+        | "HAS_CAPABILITY" | "HAS_CONSTRAINT" | "HAS_MOTIVATION" | "HAS_DECISION_PREFERENCE"
+        | "HAS_RISK_TOLERANCE" | "HAS_COMMITMENT_LEVEL" | "HAS_FINANCING_PREFERENCE"
+        | "HAS_INJURY" | "HAS_WEARABLE_CONNECTION" => EdgeFamily::Identity,
+
+        // Planning — intent, protocols, targets, projections.
+        "HAS_SUPPLEMENT_PROTOCOL" | "HAS_TRAINING_PROTOCOL" | "HAS_HEALTH_MILESTONE"
+        | "MATCHED_TO_JOB" | "PROJECTS_FUTURE_STATE" | "HAS_PATHWAY_PROBABILITY"
+        | "HAS_SCENARIO_VERSION" | "HAS_SCENARIO_OUTPUT" | "SCENARIO_DECISION" | "HAS_ALLOCATION"
+        | "HAS_OPTIMIZER_RUN" | "HAS_GOAL_INTERPRETATION" => EdgeFamily::Planning,
+
+        // Progress — measurements, snapshots, and anything whose meaning is "over time".
+        "HAS_HEALTH_METRIC" | "HAS_WEARABLE_METRIC" | "HAS_BIOMETRIC_OBSERVATION" | "HAS_LAB_RESULT"
+        | "HAS_TRAJECTORY_SNAPSHOT" | "HAS_GOAL_PROGRESS_SNAPSHOT" | "HAS_GOAL_PROGRESS_SCORE"
+        | "GOAL_PROGRESS_EVENT" | "PREDICTED_GOAL_PROGRESS" | "HAS_PROBABILITY_DISTRIBUTION"
+        | "HAS_PROBABILITY_SNAPSHOT" | "TRAJECTORY_VARIANCE_FACTOR" | "OBSERVED_OUTCOME"
+        | "OBSERVED_HEALTH_ALERT" | "EXPERIENCED_LIFE_EVENT" | "TOOK_ACTION"
+        | "CALIBRATION_OBSERVATION" | "ADVISOR_ACCURACY_SNAPSHOT" | "RECOMMENDATION_ACCURACY"
+        | "RECOMMENDATION_QUALITY_METRIC" | "EFFECTIVE_PATHWAY" | "ATTRIBUTED_OUTCOME"
+        | "CROSS_DOMAIN_IMPACT" | "CHANGES_PROBABILITY_OF"
+        | "RANKED_MARGINAL_IMPACT" => EdgeFamily::Progress,
+
+        // Evidence — decisions, reasoning chains, and their provenance.
+        "MADE_DECISION" | "RECEIVED_RECOMMENDATION" | "HAS_WHY_CHAIN" | "SUPPORTED_BY" | "ASSUMED_BY"
+        | "AUDITED_BY" | "COUNTERFACTUAL_OF" | "CHALLENGED_BY" | "TRACED_BY"
+        | "HAS_DISCOVERY_SESSION" | "HAS_DISCOVERY_TURN" => EdgeFamily::Evidence,
+
+        // Document — source material and facts extracted from it.
+        "HAS_INSURANCE_DOCUMENT" | "HAS_INSURANCE_FACT"
+        | "HAS_ARCANA_INSURANCE_DOCUMENT" => EdgeFamily::Document,
+
+        // Provider / Arcana (B2B + concierge). Declared for vocabulary completeness and drift
+        // detection, but `is_traversable` excludes them from personal retrieval — they describe the
+        // service relationship around the user, not facts inside the user's life model.
+        "HAS_PROVIDER_PROFILE" | "HAS_PROVIDER_ENGAGEMENT" | "HAS_CONSENT_SCOPE"
+        | "RECOMMENDED_BY_PROVIDER" | "PROVIDER_OUTCOME" | "AUTHORED_KNOWLEDGE"
+        | "ANALYZED_BY_PROVIDER" | "HAS_ARCANA_PROFILE" | "HAS_ARCANA_ASSESSMENT" | "HAS_ARCANA_GOAL"
+        | "HAS_ARCANA_CONSTRAINT" | "HAS_ARCANA_CAPABILITY" | "HAS_ARCANA_MOTIVATION"
+        | "HAS_ARCANA_READINESS" | "HAS_ARCANA_MEMBERSHIP" | "GENERATED_ARCANA_LEAD"
+        | "GRANTED_LEAD_CONSENT" | "HAS_CONCIERGE_PREFERENCE" => EdgeFamily::Association,
+
         // Fallback.
         "RELATED_TO" => EdgeFamily::Association,
 
@@ -517,6 +688,11 @@ pub fn all_relationship_types() -> Vec<&'static str> {
         .iter()
         .flat_map(|(_, edges)| edges.iter().map(|e| e.rel_type))
         .collect();
+    // Legacy user-anchored edges are emitted by the normalizer for not-yet-migrated domains. They are
+    // written to the graph exactly like registry edges, so excluding them here is what made 86 emittable
+    // relationship types — including the 16 live `HAS_EDUCATION_RECORD` edges — absent from the manifest
+    // and therefore unreachable by traversal. See `LEGACY_USER_EDGES`.
+    out.extend(LEGACY_USER_EDGES.iter().map(|(_, rel)| *rel));
     // The normalizer's fallback for unmapped entities never appears in REGISTRY, but it IS written to
     // the graph — omitting it is what left it rankable-but-unreachable in the retrieval tier.
     out.push("RELATED_TO");
@@ -534,16 +710,30 @@ pub fn relationship_manifest() -> String {
     for rel in all_relationship_types() {
         let fam = family_of(rel);
         rows.push(format!(
-            "    {{ \"rel_type\": \"{}\", \"family\": \"{}\", \"weight\": {:.2} }}",
+            "    {{ \"rel_type\": \"{}\", \"family\": \"{}\", \"weight\": {:.2}, \
+\"lifecycle\": \"{}\", \"traversable\": {} }}",
             rel,
             fam.as_str(),
-            edge_weight(rel)
+            edge_weight(rel),
+            crate::relationship_catalog::spec_for(rel)
+                .map(|sp| match sp.lifecycle {
+                    crate::relationship_catalog::RelLifecycle::Implemented => "implemented",
+                    crate::relationship_catalog::RelLifecycle::Planned => "planned",
+                    crate::relationship_catalog::RelLifecycle::Deprecated => "deprecated",
+                    crate::relationship_catalog::RelLifecycle::Unsupported => "unsupported",
+                    crate::relationship_catalog::RelLifecycle::DerivedOnly => "derived_only",
+                })
+                .unwrap_or("undeclared"),
+            crate::relationship_catalog::is_traversable_in(
+                rel,
+                crate::relationship_catalog::QueryContext::PersonalAdvisor
+            )
         ));
     }
     format!(
         "{{\n  \"_generated_by\": \"apps/ingestion-worker/src/ontology.rs :: relationship_manifest()\",\n  \
 \"_do_not_edit\": \"Regenerate with: cargo test -p ingestion-worker export_relationship_manifest -- --ignored\",\n  \
-\"version\": 1,\n  \"relationships\": [\n{}\n  ]\n}}\n",
+\"version\": 2,\n  \"relationships\": [\n{}\n  ]\n}}\n",
         rows.join(",\n")
     )
 }
@@ -860,75 +1050,92 @@ mod manifest_tests {
     /// the quiet version of the bug this whole change exists to fix.
     #[test]
     fn manifest_covers_every_relationship() {
-        let classified: &[&str] = &[
-            "OWNS_ACCOUNT",
-            "HAS_ASSET",
-            "HAS_DEBT",
-            "HAS_HOLDING",
-            "HAS_LIABILITY",
-            "HAS_INCOME_SOURCE",
-            "HAS_INSURANCE_PLAN",
-            "HAS_INSURANCE_PROFILE",
-            "HAS_SPENDING_ACCOUNT",
-            "HAS_PORTFOLIO_ITEM",
-            "HAS_BUDGET_CATEGORY",
-            "HAS_EXPENSE_CATEGORY",
-            "HAS_TRANSACTION",
-            "HAS_EVIDENCE",
-            "HAS_ASSUMPTION",
-            "HAS_TRADEOFF",
-            "REQUIRES_REVIEW",
-            "HAS_RECOMMENDATION",
-            "HAS_DECISION",
-            "LOGGED",
-            "HAS_SNAPSHOT",
-            "TRACKS_METRIC",
-            "CONTRIBUTES_TO",
-            "HAS_SCENARIO",
-            "HAS_COMPENSATION",
-            "HAS_COMPENSATION_PROJECTION",
-            "HAS_CAREER",
-            "HAS_EDUCATION",
-            "HAS_FAMILY",
-            "HAS_WELLNESS",
-            "HAS_SKILL",
-            "HAS_PROFICIENCY",
-            "HAS_CREDENTIAL",
-            "HAS_CERTIFICATION",
-            "HAS_DEGREE",
-            "HAS_EXPERIENCE",
-            "HAS_RESUME",
-            "HAS_DEPENDENT",
-            "HAS_SPOUSE",
-            "COVERS_DEPENDENT",
-            "HAS_GOAL",
-            "HAS_HEALTH_GOAL",
-            "HAS_EDUCATION_GOAL",
-            "PURSUING",
-            "TARGETS_ROLE",
-            "HAS_LEARNING_PATH",
-            "HAS_SKILL_GAP",
-            "HAS_ESTATE_PLAN",
-            "HAS_COLLEGE_PLAN",
-            "HAS_GUARDIANSHIP_PLAN",
-            "HAS_APPLICATION",
-            "HAS_INTERVIEW",
-            "INCLUDES_INTERVIEW",
-            "CONSIDERS_SCHOOL",
-            "EVALUATES_PROGRAM",
-            "HAS_PROGRAM_COMPARISON",
-            "OFFERS",
-            "HAS_BENEFIT_DEADLINE",
-            "HAS_DOCUMENT",
-            "HAS_EXTRACTED_FIELD",
-            "RELATED_TO",
-        ];
-        for rel in all_relationship_types() {
+        // The catalog — not a second hand-maintained list — is the classification gate now.
+        //
+        // This test previously compared `family_of` against a literal list inside the test. That could
+        // only ever cover what someone remembered to paste, and it silently ignored the normalizer's
+        // legacy emitter entirely: 86 emittable relationship types were absent from the manifest while
+        // this test passed. Asserting against `emittable_relationship_types()` means the gate is derived
+        // from the emitters themselves, so a new edge in ANY enumerable emitter fails CI until it is
+        // declared with an explicit policy.
+        use crate::relationship_catalog::{emittable_relationship_types, spec_for};
+
+        let undeclared: Vec<&str> = emittable_relationship_types()
+            .into_iter()
+            .filter(|r| spec_for(r).is_none())
+            .collect();
+        assert!(
+            undeclared.is_empty(),
+            "executable code can emit {} relationship type(s) with no catalog row: {:?}\n\n\
+             Every emittable relationship needs an explicit RelationshipSpec in \
+             `relationship_catalog::CATALOG` — including its traversal policy. There is no default \
+             policy, because a default would let a new edge acquire permissions nobody decided.\n",
+            undeclared.len(),
+            undeclared
+        );
+    }
+
+    /// Requirement: a manifest relationship must carry an explicit traversal-policy decision.
+    ///
+    /// "Explicit" means the spec names the contexts allowed to follow it. An EMPTY `permitted_contexts`
+    /// is a valid, deliberate decision (no context may traverse) — what is not allowed is a row that
+    /// never considered the question, which `max_hops > 0` with no contexts would represent.
+    #[test]
+    fn every_catalog_row_has_an_explicit_traversal_policy() {
+        use crate::relationship_catalog::CATALOG;
+        let incoherent: Vec<&str> = CATALOG
+            .iter()
+            .filter(|s| s.max_hops > 0 && s.permitted_contexts.is_empty())
+            .map(|s| s.rel_type)
+            .collect();
+        assert!(
+            incoherent.is_empty(),
+            "relationship(s) are hop-expandable but permit no query context, which is not a \
+             decision — it is an omission: {:?}",
+            incoherent
+        );
+    }
+
+    /// Provider/Arcana B2B edges must never default into personal-advisor retrieval.
+    #[test]
+    fn provider_b2b_edges_are_not_personal_advisor_eligible() {
+        use crate::relationship_catalog::{Classification, CATALOG};
+        let leaked: Vec<&str> = CATALOG
+            .iter()
+            .filter(|s| {
+                s.classification == Classification::ProviderB2b && s.personal_advisor_eligible()
+            })
+            .map(|s| s.rel_type)
+            .collect();
+        assert!(
+            leaked.is_empty(),
+            "provider/B2B relationship(s) are personal-advisor eligible. These describe the service \
+             relationship around a user, not facts inside their life model; enabling them needs a \
+             separate authorization, tenancy and query-context design: {:?}",
+            leaked
+        );
+    }
+
+    /// Fail-closed: an undeclared relationship gets no inferred policy in any context.
+    ///
+    /// This is the behavioural half of the CI gate above. Even if a row were somehow missing, traversal
+    /// planning must refuse rather than guess.
+    #[test]
+    fn undeclared_relationship_is_refused_in_every_context() {
+        use crate::relationship_catalog::{is_traversable_in, spec_for, QueryContext};
+        const FAKE: &str = "ZZ_NOT_A_REAL_RELATIONSHIP";
+        assert!(spec_for(FAKE).is_none());
+        for ctx in [
+            QueryContext::PersonalAdvisor,
+            QueryContext::ProviderAdvisor,
+            QueryContext::OrgAdministrator,
+            QueryContext::InternalAudit,
+            QueryContext::CentralKnowledge,
+        ] {
             assert!(
-                classified.contains(&rel),
-                "relationship {rel:?} is emitted by the registry but has no declared EdgeFamily.\n\
-                 Add it to `family_of` AND to this list. Leaving it unclassified makes it\n\
-                 Association/0.25 — followable but ranked below everything, i.e. invisible."
+                !is_traversable_in(FAKE, ctx),
+                "undeclared relationship was traversable in {:?} — the planner inferred a policy",
+                ctx
             );
         }
     }
