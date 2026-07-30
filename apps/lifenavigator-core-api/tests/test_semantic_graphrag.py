@@ -172,8 +172,16 @@ def test_lookup_plan_is_cheap():
 
 
 def test_domain_detection_and_hint_precedence():
-    assert "finance" in plan_query("how much debt do I have?").domains
+    # CANONICAL value is "financial" — what the worker writes and what 1,583 live points carry.
+    # This assertion previously expected "finance", a value NO writer produces: the test encoded the
+    # defect, which is part of why a filter matching zero rows looked healthy for so long.
+    assert "financial" in plan_query("how much debt do I have?").domains
     assert plan_query("tell me more", domain_hint="health").domains[0] == "health"
+
+
+def test_legacy_domain_spelling_is_normalized_not_passed_through():
+    """An API caller using the legacy spelling must be canonicalized, never filtered on verbatim."""
+    assert plan_query("tell me more", domain_hint="finance").domains[0] == "financial"
 
 
 def test_mentions_exclude_sentence_starters():

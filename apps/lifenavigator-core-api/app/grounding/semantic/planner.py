@@ -29,6 +29,9 @@ from pathlib import Path
 from typing import Optional
 
 
+from .domains import normalize_domain  # noqa: E402
+
+
 class Intent(str, Enum):
     LOOKUP = "lookup"        # a single fact about one entity
     COMPARE = "compare"      # two or more options weighed against each other
@@ -39,8 +42,10 @@ class Intent(str, Enum):
 
 
 # Domain lexicon — matches the `domain` property the ingestion worker writes on every node.
+# Keys are CANONICAL domain values (see domains.py / domain_vocabulary.rs). This dict previously keyed
+# "finance", which no writer produces — every filter built from it matched zero rows.
 _DOMAIN_TERMS: dict[str, tuple[str, ...]] = {
-    "finance": ("money", "cash", "save", "saving", "savings", "debt", "loan", "mortgage", "invest",
+    "financial": ("money", "cash", "save", "saving", "savings", "debt", "loan", "mortgage", "invest",
                 "investment", "retire", "retirement", "401k", "ira", "budget", "income", "salary",
                 "net worth", "afford", "expense", "tax", "portfolio", "interest", "credit"),
     "health":  ("health", "weight", "fitness", "exercise", "workout", "sleep", "diet", "nutrition",
@@ -260,6 +265,8 @@ def plan_query(message: str, *, domain_hint: Optional[str] = None) -> QueryPlan:
     intent = classify_intent(text)
     shape = _SHAPE[intent]
     domains = _detect_domains(text)
+    # An API caller may still pass the legacy spelling; normalize before it reaches a filter.
+    domain_hint = normalize_domain(domain_hint) if domain_hint else None
     if domain_hint and domain_hint not in domains:
         # The orchestrator's routed domain is a strong signal; put it first.
         domains = (domain_hint,) + domains

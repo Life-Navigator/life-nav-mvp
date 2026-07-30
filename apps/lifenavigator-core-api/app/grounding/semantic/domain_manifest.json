@@ -1,0 +1,32 @@
+{
+  "_generated_by": "apps/ingestion-worker/src/domain_vocabulary.rs :: domain_manifest()",
+  "_do_not_edit": "Regenerate with: cargo test -p ingestion-worker export_domain_manifest -- --ignored",
+  "version": 1,
+  "canonical": [
+    "arcana",
+    "attribution",
+    "calibration",
+    "career",
+    "conversation",
+    "decision",
+    "decision_impact",
+    "documents",
+    "education",
+    "estate",
+    "family",
+    "financial",
+    "general",
+    "goal_progress",
+    "goals",
+    "health",
+    "insurance",
+    "jobs",
+    "lifestyle",
+    "probability",
+    "provider",
+    "xai"
+  ],
+  "aliases": {
+    "finance": "financial"
+  }
+}

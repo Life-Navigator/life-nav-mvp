@@ -34,6 +34,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from .domains import normalize_domain
 from .fusion import DEFAULT_THRESHOLD, Candidate, fuse
 from .planner import QueryPlan, plan_query
 from .traversal import build_lexical_seed_cypher, traverse
@@ -149,9 +150,11 @@ class SemanticGraphRAG:
             return []
         try:
             vector = await self._gemini.embed(plan.query)
+            # Canonicalize before the filter. A non-canonical value here matches nothing and reports
+            # success — the defect that made 71% of the corpus unreachable. None => no domain filter.
             hits = await self._qdrant.search_personal(
                 vector, user_id=user_id, limit=plan.seed_limit,
-                domain=(plan.domains[0] if plan.domains else None),
+                domain=normalize_domain(plan.domains[0]) if plan.domains else None,
             ) or []
             trace.vector_seeds = len(hits)
             return hits
@@ -193,7 +196,7 @@ class SemanticGraphRAG:
             vector = await self._gemini.embed(plan.query)
             hits = await self._central.search_central(
                 vector, limit=max(3, plan.seed_limit // 2),
-                domain=(plan.domains[0] if plan.domains else None),
+                domain=normalize_domain(plan.domains[0]) if plan.domains else None,
             ) or []
             trace.central_hits = len(hits)
             return hits

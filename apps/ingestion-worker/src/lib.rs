@@ -7,6 +7,7 @@
 //! Runtime composition lives in `src/main.rs`.
 
 pub mod config;
+pub mod domain_vocabulary;
 pub mod entities;
 pub mod errors;
 pub mod gemini_client;

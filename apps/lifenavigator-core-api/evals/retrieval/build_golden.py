@@ -72,7 +72,8 @@ from app.grounding.semantic import SemanticGraphRAG  # noqa: E402
 # Deterministic sampling — a golden set that reshuffles on every run is not a baseline.
 SEED = 20260729
 
-DOMAINS = ("finance", "health", "career", "education", "family")
+# CANONICAL domain values (domain_vocabulary.rs). "finance" here silently produced zero-hit filters.
+DOMAINS = ("financial", "health", "career", "education", "family")
 
 # Query templates per intent. `{e}` is filled with a real entity title from the tenant's own graph, so
 # every generated query is answerable from that tenant's data rather than being a generic prompt.
