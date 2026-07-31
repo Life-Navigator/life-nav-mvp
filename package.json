@@ -13,7 +13,14 @@
     "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
     "clean": "turbo run clean && rm -rf node_modules",
     "db:gen-types": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > packages/supabase/src/database.types.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "verify": "bash scripts/verify.sh",
+    "verify:all": "bash scripts/verify.sh --all",
+    "verify:web": "pnpm --filter @life-navigator/web run lint && pnpm --filter @life-navigator/web run type-check && pnpm --filter @life-navigator/web run test",
+    "verify:core-api": "cd apps/lifenavigator-core-api && .venv/bin/python -m pytest tests/ -q",
+    "verify:worker": "cd apps/ingestion-worker && cargo test --lib",
+    "verify:invariants": "cd apps/lifenavigator-core-api && .venv/bin/python -m pytest tests/test_architectural_invariants.py -q",
+    "verify:ci-contract": "cd apps/lifenavigator-core-api && .venv/bin/python -m pytest tests/test_required_checks.py -q"
   },
   "devDependencies": {
     "@turbo/gen": "^2.0.0",

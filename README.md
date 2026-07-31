@@ -39,7 +39,27 @@ cp .env.example .env.local
 
 # Run development server
 pnpm dev
+
+# Verify your checkout (no credentials required)
+pnpm verify
 ```
+
+### Verification
+
+`pnpm verify` runs the beta-critical suites offline — web lint/type-check/tests, core-api tests,
+and the ingestion-worker tests plus ontology drift gates. Every datastore is faked, so it proves
+**contract** behaviour, not live integration.
+
+| Command                                                 | Scope                                                                                  |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `pnpm verify`                                           | beta-critical packages — **must be green**                                             |
+| `pnpm verify:all`                                       | + non-beta packages (`@life-navigator/mobile` is **known red**: broken tsconfig paths) |
+| `pnpm verify:web` / `verify:core-api` / `verify:worker` | narrower                                                                               |
+| `pnpm verify:invariants`                                | architectural invariants only                                                          |
+| `pnpm verify:ci-contract`                               | required-check contract only                                                           |
+
+Prerequisites not installed by `pnpm install`: a Rust toolchain (worker) and a Python 3.12 venv at
+`apps/lifenavigator-core-api/.venv` (core-api).
 
 ## Security
 

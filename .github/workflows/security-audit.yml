@@ -6,6 +6,10 @@ on:
     - cron: '0 9 * * 1'
   workflow_dispatch: # Allow manual trigger
 
+# Least privilege for GITHUB_TOKEN (B-20).
+permissions:
+  contents: read
+
 jobs:
   audit:
     name: Dependency Security Audit

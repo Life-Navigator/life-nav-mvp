@@ -30,7 +30,25 @@ Enforced by: `apps/lifenavigator-core-api/tests/test_required_checks.py` (34 tes
 | Browser smoke                | `E2E Tests`                       | on PR/main              | **yes**  |
 | Build/package                | `Build`                           | no                      | yes      |
 
-## Gaps
+## Gap status (updated 2026-07-30, Prompt 2A.1)
+
+| Gap                                   | Status                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **CI-1** unpinned mutable action refs | ✅ **CLOSED** — all 3 pinned to immutable SHAs; contract now asserts **zero** mutable refs |
+| **CI-3** default workflow permissions | ✅ **CLOSED** — every workflow declares `permissions:`; contract asserts zero missing      |
+| CI-2 manifest drift path-filtered     | open, mitigated + regression-guarded                                                       |
+| CI-4 no unconditional worker job      | open                                                                                       |
+| CI-5 deploy gating                    | no action needed                                                                           |
+
+### Pins applied (B-19)
+
+| Action          | Was       | Now                                                                                                                                                                                                 |
+| --------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| trufflehog      | `@main`   | `@6f3c981e…` (v3.96.0)                                                                                                                                                                              |
+| setup-flyctl ×3 | `@master` | `@ed8efb33…` (v1.6)                                                                                                                                                                                 |
+| rust-toolchain  | `@stable` | `@e97e2d8c…` (v1) **+ explicit `toolchain: stable`** — for this action the branch name doubles as the toolchain selector, so a naive SHA pin would have silently changed which Rust version CI used |
+
+## Gaps (original)
 
 **CI-1 · Unpinned third-party actions on MUTABLE refs — HIGH.**
 `trufflesecurity/trufflehog@main`, `superfly/flyctl-actions/setup-flyctl@master`,

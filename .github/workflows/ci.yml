@@ -15,6 +15,11 @@ env:
   NODE_VERSION: '20'
   PNPM_VERSION: '9'
 
+# Least privilege for GITHUB_TOKEN (B-20). Anything not listed is `none`. Jobs needing more declare
+# it at job scope — see `e2e-tests`, which downloads a build artifact via the Actions API.
+permissions:
+  contents: read
+
 jobs:
   # ── Quality Gates (parallel) ────────────────────────────────────────
   lint:
@@ -114,6 +119,9 @@ jobs:
   # ── E2E Tests ───────────────────────────────────────────────────────
   e2e-tests:
     name: E2E Tests
+    permissions:
+      contents: read
+      actions: read
     runs-on: ubuntu-latest
     needs: build
     # Only run on PRs to main or pushes to main (skip on mvp to save CI minutes)
@@ -209,7 +217,9 @@ jobs:
       # TruffleHog verified-only pass: high-confidence, provider-verified secrets (AWS, GitHub, Stripe…).
       # Kept because its false-positive rate is ~0.
       - name: TruffleHog (verified secrets)
-        uses: trufflesecurity/trufflehog@main
+        # Pinned to an immutable SHA (B-19). `@main` executed whatever upstream pushed next, in
+        # CI, with repository access. Tag preserved for maintainability.
+        uses: trufflesecurity/trufflehog@6f3c981e7b77f235fd2702dd74af25fc4b72bf11 # v3.96.0
         with:
           extra_args: --only-verified
 

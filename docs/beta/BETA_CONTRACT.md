@@ -133,6 +133,20 @@ files a bug the team must triage.
 
 ---
 
+## 6b. Mobile is out of beta scope — recorded decision (2026-07-30)
+
+`@life-navigator/mobile` is **not** part of the cloud web beta. Evidence, not preference:
+
+- **0 test files** and `jest` was never a dependency — its `test: jest` script could only ever fail
+- **`type-check` is genuinely broken** — tsconfig paths resolve into `../web/apps/web/...` (a doubled
+  path), producing real TS errors
+- No canonical journey (J1–J5) runs on mobile
+
+**Consequence for verification:** `pnpm verify` covers beta-critical packages and must be green.
+`pnpm verify:all` includes mobile lint/type-check and is **expected red today** — the strongest
+meaningful mobile validation available, run honestly rather than excluded silently. Mobile's `test`
+script now states plainly that no suite is configured instead of invoking a missing runner (B-21).
+
 ## 7. Beta gates — falsifiable
 
 Launch only when all are true on the release candidate:

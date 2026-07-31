@@ -107,7 +107,11 @@ jobs:
         working-directory: apps/ingestion-worker
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      # Pinned to an immutable SHA (B-19). NOTE: for this action the branch name doubles as the
+      # toolchain selector, so `toolchain:` must now be passed explicitly to preserve behaviour.
+      - uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
+        with:
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/ingestion-worker
@@ -150,7 +154,8 @@ jobs:
       ADMIN_EMAILS: ${{ secrets.ADMIN_EMAILS }}
     steps:
       - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # Pinned to an immutable SHA (B-19); `@master` was a mutable ref on a deploy path.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # v1.6
       - name: Stage secrets from GitHub
         run: ./scripts/ci/fly_secrets.sh core-api
       - run: flyctl deploy --remote-only
@@ -180,7 +185,8 @@ jobs:
       NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # Pinned to an immutable SHA (B-19); `@master` was a mutable ref on a deploy path.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # v1.6
       - name: Stage secrets from GitHub
         run: ./scripts/ci/fly_secrets.sh api-gateway
       - run: flyctl deploy --remote-only
@@ -212,7 +218,8 @@ jobs:
       WORKER_POLL_INTERVAL_SECONDS: ${{ vars.WORKER_POLL_INTERVAL_SECONDS }}
     steps:
       - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      # Pinned to an immutable SHA (B-19); `@master` was a mutable ref on a deploy path.
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # v1.6
       - name: Stage secrets from GitHub
         run: ./scripts/ci/fly_secrets.sh ingestion-worker
       - run: flyctl deploy --remote-only
