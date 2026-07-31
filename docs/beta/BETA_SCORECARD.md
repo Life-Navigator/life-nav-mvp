@@ -106,6 +106,17 @@ Not everything is unknown. These are verified and reproducible:
 | Rollback exercised outside production         | **no**                                    | ❌ externally blocked                          |
 | Unpinned CI actions on mutable refs           | **3** (guarded, not pinned)               | ⚠️ gap CI-1                                    |
 
+## 6c. R-3 response reporting (2026-07-31)
+
+| Fact                                   | Value                         | Status                                     |
+| -------------------------------------- | ----------------------------- | ------------------------------------------ |
+| Categorized advisor-response reporting | 7 categories, owner-scoped    | ✅ **Implemented**, ❌ not deployed        |
+| Ownership predicate                    | mutation-proven (4 mutations) | ✅ contract-verified, ❌ not live-verified |
+| Migration `20260731000000`             | written                       | ❌ **never applied**                       |
+| UI report action                       | **not built**                 | ❌ R-3 not operationally complete          |
+| Review-queue surface                   | schema ready, no UI           | ❌                                         |
+| Beta decision                          | **NO-GO unchanged**           | —                                          |
+
 ## 7. Reading the scorecard
 
 **Backend correctness is well-evidenced. Product behaviour is not evidenced at all.** 1,062 backend

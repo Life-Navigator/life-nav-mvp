@@ -10,6 +10,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from ..auth import AuthenticatedUser
 from ..dependencies import authenticated, get_analytics_service, get_platform_access, get_supabase
 from ..models.common import UserContext
+from ..services.response_reports import ReportRejected, ResponseReportService
 from ..services.analytics import EVENT_TYPES, AnalyticsService
 from ..services.pilot_service import FeedbackService, PilotAnalyticsService
 from ..services.platform_access import PlatformAccess
@@ -87,3 +88,39 @@ async def advisor_metrics(
         raise HTTPException(status_code=403, detail="Admin access required")
     await access.log_admin_access(ctx, user.email, "/v1/admin/advisor-metrics", "granted")
     return await svc.advisor_metrics()
+
+
+@router.post("/advisor/response-report", status_code=201)
+async def report_advisor_response(
+    user: AuthenticatedUser = Depends(authenticated),
+    sb=Depends(get_supabase),
+    payload: dict = Body(...),
+):
+    """Report a specific advisor response (audit finding R-3).
+
+    Body carries exactly three fields — `turn_id`, `category`, `explanation`. Identity, tenant,
+    deployment, model and evidence metadata are resolved SERVER-SIDE; anything identity-shaped in
+    the body is ignored, matching the established pattern in `submit_feedback` above.
+
+    Returns 404 both when the turn does not exist and when it belongs to someone else, so a caller
+    holding another tenant's turn_id learns nothing. That is deliberate, not an oversight.
+    """
+    svc = ResponseReportService(sb)
+    try:
+        result = await svc.submit(
+            authenticated_user_id=str(user.user_id),
+            turn_id=str((payload or {}).get("turn_id") or ""),
+            category=str((payload or {}).get("category") or ""),
+            explanation=(payload or {}).get("explanation"),
+        )
+    except ReportRejected as exc:
+        reason = str(exc)
+        if reason in ("invalid category", "explanation too long"):
+            raise HTTPException(status_code=400, detail=reason) from exc
+        # "not found" and "not yours" collapse to the same response — no enumeration oracle.
+        raise HTTPException(status_code=404, detail="Response not found") from exc
+    return {
+        "report_id": result.report_id,
+        "duplicate": result.duplicate,
+        "status": "received",
+    }
