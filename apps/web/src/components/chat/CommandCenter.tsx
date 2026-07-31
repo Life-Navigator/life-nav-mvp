@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { emitLifeModelUpdated } from '@/lib/lifeModel/refreshBus';
 import { StreamedAdvisorMessage } from '@/components/chat/AdvisorMessage';
+import { ReportResponseAction } from '@/components/chat/ReportResponseAction';
 import {
   chatClient,
   type Project,
@@ -639,6 +640,12 @@ export default function CommandCenter({
                 {agentName(m.agent, agents)}
               </div>
             )}
+            {/* R-3/B-22: report THIS response. Rendered only for a completed assistant message that
+                carries a server-issued turn_id, so it can never bind to a neighbouring turn, a user
+                message, or a legacy response saved before the contract existed. */}
+            {m.role === 'assistant' && m.content ? (
+              <ReportResponseAction turnId={m.turn_id} messageIndex={i} />
+            ) : null}
             {m.role === 'assistant' &&
               (() => {
                 const cites = m.citations || [];

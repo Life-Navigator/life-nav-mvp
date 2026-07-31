@@ -45,6 +45,44 @@ from `send-server.ts`'s `SendResult`. Extending only the latter left
 Worth noting: **the type-checker found this, not a test.** A JS-only change would have shipped a
 silently-undefined `turn_id` and made every response unreportable at runtime.
 
+## Slice 3C — action, dialog, accessibility (41 tests)
+
+| Area                                                                       | Tests |
+| -------------------------------------------------------------------------- | ----- |
+| Seven categories submitted with the correct turn id                        | 7     |
+| Only three allowed fields on the wire                                      | 1     |
+| Explanation optional / validation / category required                      | 3     |
+| Success + report reference, duplicate explanation                          | 2     |
+| Double-submit prevention (via in-flight guard, not the disabled attribute) | 1     |
+| Failure states: 400/401/404/429/5xx/network                                | 6     |
+| **Explanation preserved across a recoverable failure**                     | 1     |
+| Stale response after unmount                                               | 1     |
+| Privacy: no traces/prompts/model config/turn id rendered                   | 2     |
+| Dialog semantics, group label, per-option labels                           | 2     |
+| Focus entry, Escape, Escape-blocked-while-submitting, focus restoration    | 4     |
+| **jest-axe: initial, validation, success, error/retry**                    | 4     |
+| Action visibility (turn id present / legacy / empty)                       | 3     |
+| Missing-turn diagnostics + payload privacy                                 | 4     |
+| Per-message binding                                                        | 2     |
+
+**Zero serious/critical axe findings** across all four dialog states.
+
+## Slice 3C mutation proofs
+
+| #   | Mutation                                 | Result                       |
+| --- | ---------------------------------------- | ---------------------------- |
+| M-1 | Action appears without                   | **2 failed** ✅              |
+| M-2 | Repeated submits create two requests     | **1 failed** ✅ _(see note)_ |
+| M-3 | Dialog accessible name removed           | **5 failed** ✅              |
+| M-4 | Focus restoration removed                | **1 failed** ✅              |
+| M-5 | Recoverable error clears the explanation | **1 failed** ✅              |
+| M-6 | Internal turn id rendered to the user    | **1 failed** ✅              |
+
+**M-2 initially did NOT fail.** The first version of the double-submit test clicked the button,
+whose attribute already blocked the second click — so the test passed whether or not the
+in-flight guard existed. It now submits the **form** directly, bypassing , and the
+mutation is detected. Recorded because a test that cannot fail is worse than no test.
+
 ## Not tested in this slice
 
 Dialog behaviour, focus management, accessibility, browser E2E, streamed-response lifecycle,
