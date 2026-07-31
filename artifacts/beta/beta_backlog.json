@@ -1,0 +1,235 @@
+{
+  "$schema_version": "1.0.0",
+  "generated_at": "2026-07-30",
+  "branch": "graphrag/data-contract-remediation",
+  "head": "22f90f22",
+  "authoritative_review": "docs/semantic-platform/FINAL_TECHNICAL_DESIGN_REVIEW.md",
+  "prompt": 1,
+  "production_code_written": false,
+  "application_exercised": false,
+  "application_exercise_blocker": "no .env.local, no credentials; all product-behaviour metrics UNMEASURED not estimated",
+
+  "context": {
+    "prior_beta": "First-5 launched 2026-07-01 (GO) at lifenavigator.tech, 5 synthetic personas, invite-key gate, triage captured",
+    "surface": {
+      "web_pages": 189,
+      "api_routes": 320,
+      "dashboard_subroutes": 138,
+      "web_test_files": 116,
+      "browser_e2e_specs": 2,
+      "core_api_tests": 977,
+      "worker_tests": 85
+    },
+    "central_thesis": "the beta blocker is surface area versus proof, not missing features"
+  },
+
+  "persona": {
+    "type": "individual",
+    "evidence": "5 individual personas in docs/beta/personas",
+    "excluded": ["employer", "portal", "enterprise workflows"]
+  },
+  "promise": "LifeNavigator answers questions about your actual life using evidence you can open and verify, and tells you plainly when it does not know.",
+
+  "journeys": [
+    {
+      "id": "J1",
+      "name": "first-use onboarding",
+      "completion": "UNMEASURED",
+      "risk": "two onboarding paradigms coexist"
+    },
+    {
+      "id": "J2",
+      "name": "first knowledge connection",
+      "completion": "UNMEASURED",
+      "risk": "no user-visible ingestion state model"
+    },
+    {
+      "id": "J3",
+      "name": "first grounded answer",
+      "completion": "UNMEASURED",
+      "risk": "zero-fabrication gate has no instrument; graph traversal disabled"
+    },
+    {
+      "id": "J4",
+      "name": "return use",
+      "completion": "UNMEASURED",
+      "risk": "no canonical return surface identified"
+    },
+    {
+      "id": "J5",
+      "name": "privacy control support",
+      "completion": "UNMEASURED",
+      "risk": "deletion across 4 stores unproven; ANOM-1 may indicate prior failure"
+    }
+  ],
+
+  "p0": [
+    {
+      "id": "P0-1",
+      "item": "credential closure with rejection proof",
+      "owner": "Security",
+      "blocks": "all write-enabled work",
+      "effort": "1-2d",
+      "prompt": 2,
+      "adr_blocked": false,
+      "debt": "D-1"
+    },
+    {
+      "id": "P0-2",
+      "item": "push 26 commits, open PR, restore remote branch",
+      "owner": "Eng Lead",
+      "effort": "15m",
+      "prompt": 2,
+      "adr_blocked": false
+    },
+    {
+      "id": "P0-3",
+      "item": "classify ~120 off-journey dashboard routes",
+      "owner": "Product+Eng",
+      "effort": "2-3d",
+      "prompt": 2,
+      "adr_blocked": false,
+      "note": "beta support cost scales with reachable surface"
+    },
+    {
+      "id": "P0-4",
+      "item": "verify GoTrue public signup actually disabled",
+      "owner": "Security",
+      "effort": "1h",
+      "prompt": 2,
+      "adr_blocked": false
+    },
+    {
+      "id": "P0-5",
+      "item": "establish journey baselines",
+      "owner": "Eng",
+      "effort": "2d",
+      "prompt": 2,
+      "adr_blocked": false
+    },
+    {
+      "id": "P0-6",
+      "item": "ANOM-1 tenant divergence classified",
+      "owner": "Data Platform",
+      "effort": "1-2d",
+      "prompt": 2,
+      "adr_blocked": false,
+      "debt": "D-7",
+      "rule": "never delete unexplained divergence"
+    },
+    {
+      "id": "P0-7",
+      "item": "retrieval golden set incl known-absent",
+      "owner": "AI/Retrieval",
+      "effort": "2-2.5w",
+      "prompt": 7,
+      "adr_blocked": true,
+      "adr": "ADR-004",
+      "adr_status": "Needs Revision",
+      "debt": "D-5/D-8"
+    },
+    {
+      "id": "P0-8",
+      "item": "zero-fabrication gate",
+      "owner": "AI/Retrieval",
+      "effort": "with P0-7",
+      "prompt": 13,
+      "adr_blocked": true,
+      "adr": "ADR-004",
+      "note": "this is the beta promise"
+    },
+    {
+      "id": "P0-9",
+      "item": "truthful deletion UX",
+      "owner": "Privacy",
+      "effort": "1w",
+      "prompt": 10,
+      "adr_blocked": true,
+      "adr": "ADR-002"
+    },
+    {
+      "id": "P0-10",
+      "item": "E2E for J1-J5 against staging",
+      "owner": "QA",
+      "effort": "2w",
+      "prompt": 13,
+      "adr_blocked": false
+    }
+  ],
+
+  "p1_count": 20,
+  "p1_adr_blocked": [
+    "P1-12 vector trust filter (ADR-005 + CONF-A)",
+    "P1-17 manifest fidelity (ADR-003, Session 1 candidate)"
+  ],
+
+  "beta_gates": [
+    {
+      "id": "G1",
+      "gate": "cross-tenant leakage",
+      "threshold": 0,
+      "status": "ENFORCED",
+      "evidence": "Sprint 1 mutation-proven invariants"
+    },
+    {
+      "id": "G2",
+      "gate": "known-absent fabrication",
+      "threshold": 0,
+      "status": "NO_INSTRUMENT",
+      "blocked_by": "ADR-004"
+    },
+    { "id": "G3", "gate": "J1-J3 unaided completion", "threshold": "80%", "status": "UNMEASURED" },
+    { "id": "G4", "gate": "citations resolve", "threshold": "100%", "status": "UNMEASURED" },
+    { "id": "G5", "gate": "ingestion success", "threshold": "95%", "status": "UNMEASURED" },
+    { "id": "G6", "gate": "credential closure", "threshold": "rejection proof", "status": "OPEN" },
+    { "id": "G7", "gate": "ANOM-1 classified", "threshold": "0 unclassified", "status": "OPEN" },
+    {
+      "id": "G8",
+      "gate": "deletion truthfulness",
+      "threshold": "proven or honestly disclosed",
+      "status": "OPEN"
+    },
+    {
+      "id": "G9",
+      "gate": "accessibility",
+      "threshold": "0 serious/critical",
+      "status": "UNMEASURED"
+    },
+    {
+      "id": "G10",
+      "gate": "p95 answer latency",
+      "threshold": "TBD by load test",
+      "status": "NO_BASELINE"
+    }
+  ],
+
+  "cohort": {
+    "internal": 5,
+    "external_first": 15,
+    "entry": "invite-key only",
+    "observation_weeks": 4,
+    "expansion_rule": "data, not enthusiasm"
+  },
+
+  "out_of_scope": [
+    "enterprise/employer workflows",
+    "central/collective knowledge (ln_central empty)",
+    "multi-agent",
+    "marketplace",
+    "billing beyond entitlement hooks",
+    "graph-vendor abstraction",
+    "custom rules engine",
+    "multi-model embedding routing",
+    "autonomous agents"
+  ],
+
+  "exit_gate_status": {
+    "one_persona": true,
+    "one_promise": true,
+    "journeys_le_5": true,
+    "every_p0_p1_maps_to_journey_or_risk": true,
+    "every_item_has_owner_and_evidence": true,
+    "adr_blocked_items_visible": true,
+    "no_generic_polish_bucket": true
+  }
+}
