@@ -1,0 +1,340 @@
+{
+  "$schema_version": "1.0.0",
+  "generated_at": "2026-07-30",
+  "code_commit": "ac41b5e7",
+  "branch": "graphrag/data-contract-remediation",
+  "role": "technical_program_lead",
+  "authority": "no_redesign_conflicts_escalate_as_adr_amendments",
+
+  "readiness_verdict": {
+    "outcome": "NO_ADR_MAY_BEGIN_IMPLEMENTATION",
+    "adrs_accepted": 0,
+    "adrs_total": 11,
+    "adrs_proposed": 11,
+    "approval_rows_pending": 26,
+    "adrs_with_unresolved_blockers": 8,
+    "blocking_open_questions": 11,
+    "blocking_open_questions_owned": 0,
+    "stage_0_domain_contract": "committed_120f301a_963_and_85_tests_green",
+    "stage_0_credentials": "not_closed_no_rejected_old_token_proof",
+    "production_mutations_performed": 0,
+    "graph_grounding_enabled": false
+  },
+
+  "escalated_conflicts": [
+    {
+      "id": "CONF-A",
+      "type": "architectural_ordering_conflict",
+      "between": ["ADR-005", "ADR-002"],
+      "description": "ADR-005 requires every Qdrant payload trust state to be traceable to an authoritative Postgres record, and schedules backfill in Stage 3. ADR-002 (which creates those records) lands in Stage 5. At backfill time the authoritative source does not exist.",
+      "options": [
+        "a) backfill from source_system only; record interim state; add traceability_pending payload state cleared in Stage 5",
+        "b) move ADR-005 backfill after Stage 5"
+      ],
+      "recommendation": "a",
+      "resolution_authority": "reviewers_security_and_graph_platform",
+      "status": "escalated_unresolved",
+      "blocks": ["WP-300"]
+    }
+  ],
+
+  "work_packages": [
+    {
+      "id": "WP-010",
+      "title": "Architectural invariant automation",
+      "adr": null,
+      "unconditional": true,
+      "activation": "none_required",
+      "effort": "3-4d",
+      "risk": "low",
+      "owner": "Graph Platform",
+      "production_mutation": false,
+      "reversible": true,
+      "terminal_stage": "S2",
+      "startable_today": true
+    },
+    {
+      "id": "WP-000",
+      "title": "Stage 0 credential closure",
+      "adr": "ADR-007",
+      "unconditional": true,
+      "activation": "containment_authorized_independently",
+      "effort": "1-2d",
+      "risk": "medium",
+      "owner": "Security",
+      "production_mutation": false,
+      "reversible": false,
+      "terminal_stage": "production",
+      "startable_today": true
+    },
+    {
+      "id": "WP-100",
+      "title": "Retrieval golden set",
+      "adr": "ADR-004",
+      "activation": "ADR-004 accepted AND OQ-4 resolved",
+      "effort": "2-2.5w",
+      "risk": "low",
+      "owner": "AI/Retrieval",
+      "production_mutation": false,
+      "reversible": true,
+      "terminal_stage": "S2",
+      "startable_today": false
+    },
+    {
+      "id": "WP-110",
+      "title": "Manifest v3 (policy + superclass)",
+      "adr": "ADR-003+ADR-011",
+      "activation": "BOTH accepted; single schema bump per CONFLICT-3",
+      "effort": "1-1.5w",
+      "risk": "low-medium",
+      "owner": "Security + Graph Platform",
+      "production_mutation": false,
+      "reversible": true,
+      "terminal_stage": "S8",
+      "startable_today": false
+    },
+    {
+      "id": "WP-120",
+      "title": "Identity declarations",
+      "adr": "ADR-006",
+      "activation": "ADR-006 accepted AND OQ-6 resolved",
+      "effort": "1-2w",
+      "risk": "low",
+      "owner": "Data Platform",
+      "production_mutation": false,
+      "reversible": true,
+      "terminal_stage": "S3",
+      "startable_today": false
+    },
+    {
+      "id": "WP-200",
+      "title": "Traversal verification",
+      "adr": "ADR-008",
+      "activation": "ADR-008 accepted AND WP-110 complete",
+      "effort": "3-5d",
+      "risk": "low",
+      "owner": "AI/Retrieval",
+      "production_mutation": false,
+      "reversible": true,
+      "terminal_stage": "S4",
+      "may_terminate": true,
+      "startable_today": false
+    },
+    {
+      "id": "WP-300",
+      "title": "Vector trust plumbing",
+      "adr": "ADR-005",
+      "activation": "ADR-005 accepted AND CONF-A ruled AND OQ-5 resolved AND WP-510 complete",
+      "effort": "TBD_post_ruling",
+      "risk": "medium",
+      "owner": "Security",
+      "production_mutation": true,
+      "production_mutation_class": "qdrant_payload_only",
+      "reversible": true,
+      "terminal_stage": "S8",
+      "startable_today": false,
+      "scaffolded_only": true
+    },
+    {
+      "id": "WP-400",
+      "title": "Transaction emission correction",
+      "adr": "ADR-001",
+      "activation": "ADR-001 accepted AND OQ-1+OQ-11 resolved AND WP-100 baseline",
+      "effort": "1w",
+      "risk": "low",
+      "owner": "Graph Platform",
+      "production_mutation": false,
+      "reversible": true,
+      "terminal_stage": "S7",
+      "startable_today": false
+    },
+    {
+      "id": "WP-500",
+      "title": "Provenance schema and forward writes",
+      "adr": "ADR-002",
+      "activation": "ADR-002 accepted AND OQ-2 resolved AND WP-010 DA-1 landed",
+      "effort": "3-4w",
+      "risk": "medium",
+      "owner": "Graph Platform + Data Platform",
+      "production_mutation": true,
+      "reversible": true,
+      "terminal_stage": "S7",
+      "startable_today": false,
+      "scaffolded_only": true
+    },
+    {
+      "id": "WP-510",
+      "title": "Confidence fields",
+      "adr": "ADR-010",
+      "activation": "ADR-010 accepted; ships with WP-500",
+      "effort": "1w",
+      "risk": "low",
+      "owner": "AI/Retrieval",
+      "production_mutation": false,
+      "reversible": true,
+      "terminal_stage": "S7",
+      "startable_today": false
+    },
+    {
+      "id": "WP-600",
+      "title": "Historical migrations",
+      "adr": "ADR-001+ADR-002+SP-030",
+      "activation": "WP-000 closed AND WP-400+WP-500 complete AND rollback rehearsed",
+      "effort": "2-3w",
+      "risk": "high",
+      "owner": "Graph Platform",
+      "production_mutation": true,
+      "reversible": true,
+      "terminal_stage": "S7",
+      "startable_today": false,
+      "scaffolded_only": true,
+      "note": "first true production mutations; bounded by batch size, not cohort; no feature flag"
+    },
+    {
+      "id": "WP-700",
+      "title": "Gateway retirement",
+      "adr": "ADR-009",
+      "activation": "ADR-009 accepted AND OQ-7 resolved AND 7-day zero traffic AND 410 shim shipped",
+      "effort": "1w+7d",
+      "risk": "low",
+      "owner": "Platform Ops",
+      "production_mutation": false,
+      "reversible": true,
+      "terminal_stage": "S7",
+      "may_terminate": true,
+      "startable_today": false
+    }
+  ],
+
+  "dependencies": {
+    "hard": [
+      ["WP-000", "all_write_enabled"],
+      ["WP-110", "WP-200"],
+      ["WP-110", "WP-120_superclass"],
+      ["WP-100", "WP-200_acceptance"],
+      ["WP-100", "WP-400_acceptance"],
+      ["WP-500", "WP-510"],
+      ["WP-510", "WP-300"],
+      ["WP-500", "WP-300_traceability"],
+      ["WP-000", "WP-700"]
+    ],
+    "soft": [
+      ["WP-010", "WP-500"],
+      ["WP-400", "WP-500"],
+      ["WP-120", "WP-500"]
+    ],
+    "circular": [],
+    "apparent_cycle_resolved": "ADR-001<->ADR-002 is acceptance-sequencing and cost-estimation only; neither depends on the other's implementation",
+    "critical_path": ["WP-000", "WP-110", "WP-200", "WP-400", "WP-500", "WP-600"],
+    "evidence_path": ["WP-100"],
+    "parallel_now": ["WP-010", "all_9_blocking_OQ_investigations"]
+  },
+
+  "verification_gates": {
+    "universal": [
+      "G-01 compilation",
+      "G-02 unit tests (>=963 core-api, >=85 worker)",
+      "G-03 drift gates",
+      "G-04 secret scan + canary",
+      "G-05 invariant checks",
+      "G-06 rehearsed reversibility"
+    ],
+    "contract": [
+      "G-10 manifest fidelity",
+      "G-11 personal-advisor parity == 119",
+      "G-12 version rejection",
+      "G-13 zero wildcard grants",
+      "G-14 superclass expansion subset"
+    ],
+    "data_plane": [
+      "G-20 tenant isolation",
+      "G-21 cross-tenant edges = 0",
+      "G-22 idempotency",
+      "G-23 count reconciliation",
+      "G-24 dangling refs = 0",
+      "G-25 orphan assertions = 0",
+      "G-26 embedding dimension",
+      "G-27 payload completeness",
+      "G-28 dangerous drift = 0 (security)",
+      "G-29 conservative drift (availability)",
+      "G-30 quarantine fires"
+    ],
+    "evaluation": [
+      "G-40 golden set exists",
+      "G-41 production-path proof",
+      "G-42 fabrication = 0",
+      "G-43 cross-tenant leakage = 0",
+      "G-44 temporal leakage = 0",
+      "G-45 no regression",
+      "G-46 non-seed paths (may legitimately fail)",
+      "G-47 reproducibility"
+    ],
+    "operational": [
+      "G-50 index usage",
+      "G-51 latency",
+      "G-52 capacity (no baseline yet)",
+      "G-53 error classification",
+      "G-54 credential rejection proof",
+      "G-55 consumer verification",
+      "G-56 deletion completeness"
+    ],
+    "standing_rule": "a gate never demonstrated failing on a bad fixture is decoration"
+  },
+
+  "rollout_stages": [
+    "S1 development",
+    "S2 internal integration",
+    "S3 read-only production validation",
+    "S4 shadow",
+    "S5 limited tenant",
+    "S6 pilot",
+    "S7 broader rollout",
+    "S8 GA"
+  ],
+  "packages_that_may_terminate_before_production": [
+    "WP-200",
+    "WP-700",
+    "WP-011_superclass_expansion"
+  ],
+
+  "risk_register_top": [
+    {
+      "id": "R-01",
+      "risk": "implementation momentum pressures review into unexamined acceptance",
+      "likelihood": "H",
+      "impact": "H",
+      "owner": "Program Lead"
+    },
+    {
+      "id": "R-02",
+      "risk": "write work starts before credential closure",
+      "likelihood": "M",
+      "impact": "H",
+      "owner": "Security"
+    },
+    {
+      "id": "R-08",
+      "risk": "partial batch migration leaves graph in mixed state",
+      "likelihood": "M",
+      "impact": "H",
+      "owner": "Graph Platform"
+    }
+  ],
+
+  "acceptance_criteria_coverage": {
+    "tests_specified": 59,
+    "tests_existing": 6,
+    "gap": 53,
+    "buildable_today_without_adr": ["T-01", "T-03", "T-05", "T-14", "T-15", "T-24"],
+    "highest_value_missing_test": "T-01 two-tenant fixture: no returned path contains a foreign node"
+  },
+
+  "success_criteria_status": {
+    "every_task_maps_to_approved_adr": "N/A_zero_approved",
+    "every_adr_maps_to_measurable_work": true,
+    "every_production_change_has_rollback": true,
+    "invariants_automatically_verified_where_practical": "9_of_14_automatable_today_4_unprotected",
+    "every_blocker_has_owner_evidence_review_date": false,
+    "no_work_begins_without_dependency_graph_satisfied": true
+  }
+}
