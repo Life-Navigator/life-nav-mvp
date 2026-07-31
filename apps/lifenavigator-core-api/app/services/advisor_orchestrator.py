@@ -929,6 +929,13 @@ class AdvisorOrchestrator:
         # actually ran on the deployed web path (provider_called + model + empty fallback_cause = real LLM turn).
         base["provider_called"] = tr.get("provider_called", False)
         base["fallback_cause"] = tr.get("fallback_cause", "")
+        # turn_id on the RESPONSE (audit finding R-3 / B-22). The browser cannot report a specific
+        # advisor response without a server-issued identifier for it, and identifiers must never be
+        # minted in the browser. This is the single return path for every converse() branch —
+        # discovery, disabled and enhanced — so every advisor turn becomes reportable here or
+        # nowhere. It is an opaque handle: the reporting endpoint re-resolves ownership and all
+        # evidence server-side from analytics.advisor_turns, so exposing it grants no read access.
+        base["turn_id"] = tr.get("turn_id", "")
         base["route_path"] = tr.get("route_path", "")
         base["latency_ms"] = tr["latency_ms"]
         # Structured, metadata-only log (no message/response/raw → no PII). Every fallback is now attributable

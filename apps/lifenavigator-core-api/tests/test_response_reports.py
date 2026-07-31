@@ -225,3 +225,43 @@ async def test_a_different_category_is_a_new_report(svc):
     second = await service.submit(authenticated_user_id=USER_A, turn_id=TURN_A,
                                   category="privacy_concern")
     assert not second.duplicate and len(sb.reports) == 2
+
+
+# ── turn_id propagation (B-22 precondition) ──────────────────────────────────────────────────────
+
+def test_advisor_response_contract_exposes_turn_id():
+    """R-3/B-22 · The browser cannot report a response it cannot identify.
+
+    `turn_id` was generated for telemetry only and never left the server — zero web files
+    referenced it. `_finish()` is the single return path for every `converse()` branch, so
+    stamping it there makes every advisor turn reportable, or none.
+
+    It is an opaque handle. `/v1/analytics/advisor/response-report` re-resolves ownership and all
+    evidence server-side, so exposing it grants no read access to anything.
+    """
+    import inspect
+
+    from app.services.advisor_orchestrator import AdvisorOrchestrator
+
+    src = inspect.getsource(AdvisorOrchestrator._finish)
+    assert 'base["turn_id"]' in src, (
+        "_finish no longer stamps turn_id onto the response. Without it the UI cannot bind a report "
+        "to a specific advisor turn, and identifiers must never be generated in the browser."
+    )
+
+
+def test_turn_id_is_not_generated_in_the_browser():
+    """Identifiers are server-issued. A client-minted id would be unverifiable and forgeable."""
+    from pathlib import Path
+
+    web = Path(__file__).resolve().parents[3] / "apps" / "web" / "src"
+    if not web.exists():  # pragma: no cover
+        import pytest as _pytest
+        _pytest.skip("web app not present")
+    offenders = [
+        str(f) for f in web.rglob("*.ts*")
+        if "node_modules" not in str(f)
+        and any(tok in f.read_text(encoding="utf-8", errors="ignore")
+                for tok in ("turnId = uuid", "turn_id: uuid", "generateTurnId"))
+    ]
+    assert not offenders, f"turn_id appears to be minted client-side in: {offenders}"
