@@ -1,0 +1,72 @@
+{
+  "audited_commit": "5fbdef00",
+  "deployed_web": "dpl_8ctNCH5UraEWCN37rVLLC5s4SAqA",
+  "deployed_api": "lifenavigator-core-api.fly.dev",
+  "audit_date": "2026-07-30",
+  "decision": "NO_GO",
+  "decision_basis": "audit_not_performable_zero_of_ten_hard_gates_verified",
+  "reversible": true,
+  "credentials_available": false,
+  "customer_data_accessed": false,
+  "gates": {
+    "A": "UNMEASURED",
+    "B": "UNMEASURED",
+    "C": "PARTIAL",
+    "D": "PARTIAL",
+    "E": "UNMEASURED",
+    "F": "PARTIAL",
+    "G": "PARTIAL",
+    "H": "PARTIAL",
+    "I": "UNMEASURED",
+    "J": "PARTIAL"
+  },
+  "tally": {
+    "PASS": 0,
+    "FAIL": 0,
+    "PARTIAL": 5,
+    "UNMEASURED": 5
+  },
+  "automatic_no_go_verified": [],
+  "automatic_no_go_at_risk": [
+    "#4 problematic responses cannot be reported (no categorized response-level report)"
+  ],
+  "measured": {
+    "healthz": {
+      "code": 200,
+      "seconds": 0.269
+    },
+    "readyz": {
+      "code": 200,
+      "seconds": 0.124,
+      "services": {
+        "supabase": true,
+        "qdrant": true,
+        "neo4j": true,
+        "gemini": true
+      }
+    },
+    "web": {
+      "code": 200,
+      "seconds": 0.48
+    }
+  },
+  "blocking_invitations": [
+    "R-1 tenant isolation probe",
+    "R-2 primary journey completion",
+    "R-3 categorized advisor-response report",
+    "R-4 named incident owner",
+    "R-5 audit the deployed RC"
+  ],
+  "access_required": [
+    "2 synthetic beta accounts in different tenants",
+    "deployed commit confirmation",
+    "read access to one feedback record",
+    "named beta incident owner"
+  ],
+  "recommended_cohort": {
+    "internal": 5,
+    "external_first": "10-15",
+    "gate": "invite-only via ops.beta_invites"
+  },
+  "graph_grounding_enabled": false
+}
