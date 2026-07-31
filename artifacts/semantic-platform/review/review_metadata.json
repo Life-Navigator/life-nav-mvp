@@ -1,0 +1,341 @@
+{
+  "$schema_version": "1.0.0",
+  "generated_at": "2026-07-30",
+  "code_commit": "6be5860f",
+  "role": "independent_technical_review_facilitator",
+  "state": "pre_session_1",
+
+  "headline": {
+    "recommendation": "decide_3_of_11_in_session_1",
+    "rationale": "Preparing eleven packets for a session that can responsibly resolve three would produce eight decisions made on absent evidence.",
+    "adrs_accepted": 0,
+    "blocking_questions_owned": 0,
+    "blocking_questions_total": 11,
+    "binding_rule": "no ADR reaches Accepted while a rejection trigger lacks owner+method+date+escalation",
+    "consequence": "no acceptance is valid until Session 1 Block A assigns owners"
+  },
+
+  "sessions": [
+    {
+      "id": 1,
+      "duration_min": 120,
+      "adrs": ["ADR-007", "ADR-003", "ADR-011"],
+      "convene_gate": "security_lead_available",
+      "blocks": [
+        {
+          "id": "A",
+          "min": 15,
+          "purpose": "assign owners to 11 blocking questions",
+          "type": "administrative"
+        },
+        { "id": "B", "min": 25, "adr": "ADR-007", "expected": "Accept" },
+        { "id": "C", "min": 45, "adr": "ADR-003", "expected": "Accept" },
+        { "id": "D", "min": 20, "adr": "ADR-011", "expected": "Accept_flag_off" },
+        {
+          "id": "E",
+          "min": 10,
+          "purpose": "record disposition of remaining 8",
+          "type": "no_debate"
+        },
+        { "id": "F", "min": 5, "purpose": "close and schedule" }
+      ]
+    },
+    {
+      "id": 2,
+      "adrs": ["ADR-004", "ADR-008"],
+      "convene_gate": "OQ-4 resolved AND ADR-003 accepted",
+      "date": null
+    },
+    {
+      "id": 3,
+      "adrs": ["ADR-002", "ADR-010", "ADR-001", "ADR-006"],
+      "convene_gate": "OQ-2, OQ-11, OQ-1, OQ-6 resolved",
+      "date": null
+    },
+    {
+      "id": 4,
+      "adrs": ["ADR-005", "ADR-009"],
+      "convene_gate": "CONF-A ruled AND OQ-5, OQ-7 resolved",
+      "date": null
+    }
+  ],
+  "scheduling_rule": "sessions 2-4 have no dates by design; scheduling against a calendar rather than resolved evidence invites approval under schedule pressure",
+
+  "adr_status": [
+    {
+      "id": "ADR-003",
+      "status": "Proposed",
+      "session": 1,
+      "recommended": "Accept",
+      "owner": "Security",
+      "blocking": [],
+      "evidence_quality": 5,
+      "reversible": true,
+      "production_mutation": false,
+      "implementation_ready_on_accept": true,
+      "conditions": [
+        "119-parity hard gate",
+        "dual-emit one release",
+        "provider permissions out of scope",
+        "evaluation is a distinct context"
+      ]
+    },
+    {
+      "id": "ADR-007",
+      "status": "Proposed",
+      "session": 1,
+      "recommended": "Accept",
+      "owner": "Security",
+      "blocking": ["OQ-12 (closure only, not this decision)"],
+      "evidence_quality": 5,
+      "reversible": false,
+      "production_mutation": false,
+      "implementation_ready_on_accept": true,
+      "conditions": [
+        "OQ-12 owned",
+        "eight-step closure sequence adopted",
+        "gateway service-role key revoked immediately"
+      ]
+    },
+    {
+      "id": "ADR-011",
+      "status": "Proposed",
+      "session": 1,
+      "recommended": "Accept_flag_off",
+      "owner": "Graph Platform",
+      "blocking": [],
+      "evidence_quality": 3,
+      "reversible": true,
+      "production_mutation": false,
+      "implementation_ready_on_accept": true,
+      "conditions": ["single parent", "depth <= 2", "ships flag-off", "enablement gated on ADR-004"]
+    },
+    {
+      "id": "ADR-004",
+      "status": "Proposed",
+      "session": 2,
+      "recommended": "Defer",
+      "owner": "AI/Retrieval",
+      "blocking": ["OQ-4"],
+      "evidence_quality": 4,
+      "note": "cheapest unblock; gates ADR-001 and ADR-008 acceptance criteria"
+    },
+    {
+      "id": "ADR-008",
+      "status": "Proposed",
+      "session": 2,
+      "recommended": "Defer",
+      "owner": "AI/Retrieval",
+      "blocking": ["requires ADR-003 shipped"],
+      "evidence_quality": 4,
+      "note": "reviewers must confirm 'traversal adds nothing' is an acceptable published outcome"
+    },
+    {
+      "id": "ADR-002",
+      "status": "Proposed",
+      "session": 3,
+      "recommended": "Needs_Revision",
+      "owner": "Graph Platform",
+      "blocking": ["OQ-2"],
+      "evidence_quality": 3,
+      "minimum_missing_evidence": "worker queue semantics + one live ingest trace proving batch homogeneity",
+      "note": "central storage argument collapses if OQ-2 negative; strengthened by Sprint 1 single-writer enforcement"
+    },
+    {
+      "id": "ADR-010",
+      "status": "Proposed",
+      "session": 3,
+      "recommended": "Defer",
+      "owner": "AI/Retrieval",
+      "blocking": ["requires ADR-002 decided", "OQ-8"],
+      "evidence_quality": 4
+    },
+    {
+      "id": "ADR-001",
+      "status": "Proposed",
+      "session": 3,
+      "recommended": "Needs_Revision",
+      "owner": "Graph Platform",
+      "blocking": ["OQ-11", "OQ-1"],
+      "evidence_quality": 4,
+      "minimum_missing_evidence": "read-dependency inventory for 1-hop user->HAS_TRANSACTION"
+    },
+    {
+      "id": "ADR-006",
+      "status": "Proposed",
+      "session": 3,
+      "recommended": "Needs_Revision",
+      "owner": "Data Platform",
+      "blocking": ["OQ-6"],
+      "evidence_quality": 3,
+      "minimum_missing_evidence": "entity_id derivation in normalizer.rs; may reduce ADR to documentation"
+    },
+    {
+      "id": "ADR-005",
+      "status": "Proposed",
+      "session": 4,
+      "recommended": "Needs_Revision",
+      "owner": "Security",
+      "blocking": ["CONF-A", "OQ-5"],
+      "evidence_quality": 3,
+      "minimum_missing_evidence": "CONF-A policy ruling (a or b) from Security + Graph Platform"
+    },
+    {
+      "id": "ADR-009",
+      "status": "Proposed",
+      "session": 4,
+      "recommended": "Needs_Revision",
+      "owner": "Platform Ops",
+      "blocking": ["OQ-7"],
+      "evidence_quality": 4,
+      "minimum_missing_evidence": "read-only central Neo4j inventory; 7-day traffic observation",
+      "note": "ln_central empty proves nothing about central Neo4j - different stores"
+    }
+  ],
+
+  "blocking_questions": [
+    {
+      "id": "OQ-1",
+      "class": "inspection",
+      "effort_days": 0.5,
+      "blocks": ["ADR-001"],
+      "owner": null,
+      "date": null
+    },
+    {
+      "id": "OQ-2",
+      "class": "inspection+observation",
+      "effort_days": 1,
+      "blocks": ["ADR-002"],
+      "owner": null,
+      "date": null,
+      "decisive": true
+    },
+    {
+      "id": "OQ-4",
+      "class": "inspection",
+      "effort_days": 1,
+      "blocks": ["ADR-004"],
+      "owner": null,
+      "date": null
+    },
+    {
+      "id": "OQ-5",
+      "class": "inspection",
+      "effort_days": 0.5,
+      "blocks": ["ADR-005"],
+      "owner": null,
+      "date": null
+    },
+    {
+      "id": "OQ-6",
+      "class": "inspection",
+      "effort_days": 0.5,
+      "blocks": ["ADR-006"],
+      "owner": null,
+      "date": null
+    },
+    {
+      "id": "OQ-7",
+      "class": "production_observation",
+      "effort_days": 1,
+      "blocks": ["ADR-009"],
+      "owner": null,
+      "date": null
+    },
+    {
+      "id": "OQ-9",
+      "class": "production_observation",
+      "effort_days": 1.5,
+      "blocks": ["integrity_gates"],
+      "owner": null,
+      "date": null,
+      "escalation": "buckets 2/3/5/7/9 escalate to Engineering Lead; bucket 5 is a compliance finding"
+    },
+    {
+      "id": "OQ-11",
+      "class": "inspection",
+      "effort_days": 1,
+      "blocks": ["ADR-001"],
+      "owner": null,
+      "date": null
+    },
+    {
+      "id": "OQ-12",
+      "class": "production_observation",
+      "effort_days": 1.5,
+      "blocks": ["ADR-007_closure"],
+      "owner": null,
+      "date": null,
+      "escalation": "Engineering Lead; becomes an incident if any use is found"
+    },
+    {
+      "id": "CONF-A",
+      "class": "policy_decision",
+      "effort_days": null,
+      "blocks": ["ADR-005"],
+      "owner": null,
+      "date": null
+    },
+    {
+      "id": "IQ-3",
+      "class": "inspection",
+      "effort_days": 0.5,
+      "blocks": ["RES-1", "RES-2"],
+      "owner": null,
+      "date": null
+    }
+  ],
+  "blocking_questions_parallelizable": true,
+  "blocking_questions_elapsed_if_parallel_days": 2,
+
+  "reviewer_assignments": {
+    "Security": {
+      "owns": ["ADR-003", "ADR-005", "ADR-007"],
+      "reviews": ["ADR-001", "ADR-002", "ADR-008", "ADR-009", "ADR-010", "ADR-011"],
+      "contention": "highest"
+    },
+    "Graph Platform": {
+      "owns": ["ADR-001", "ADR-002", "ADR-011"],
+      "reviews": ["ADR-003", "ADR-006", "ADR-008", "ADR-010"]
+    },
+    "AI/Retrieval": {
+      "owns": ["ADR-004", "ADR-008", "ADR-010"],
+      "reviews": ["ADR-001", "ADR-003", "ADR-005", "ADR-009", "ADR-011"]
+    },
+    "Data Platform": {
+      "owns": ["ADR-006"],
+      "reviews": ["ADR-001", "ADR-002", "ADR-005", "ADR-010"]
+    },
+    "Platform Ops": { "owns": ["ADR-009"], "reviews": ["ADR-007"] },
+    "Privacy/Governance": {
+      "reviews": ["ADR-002", "ADR-003", "ADR-004", "ADR-005", "ADR-006", "ADR-007", "ADR-008"]
+    },
+    "Engineering Lead": { "role": "escalation_authority", "required": ["session_1"] }
+  },
+
+  "cross_validation": {
+    "session_1_acceptances_invalidate_other_adrs": false,
+    "contradictions_found": 1,
+    "contradiction_ids": ["CONF-A"],
+    "couplings_requiring_explicit_confirmation": [
+      "ADR-011 expansion must not widen ADR-003 access (property-tested)",
+      "ADR-003 and ADR-011 must be accepted together or neither (shared manifest v3)"
+    ],
+    "assumptions_upgraded_by_sprint_1": [
+      "single graph writer: assumed -> automatically enforced (strengthens ADR-002)",
+      "both-endpoint tenant binding: assumed -> automatically enforced (strengthens ADR-003, ADR-008)"
+    ],
+    "new_finding": "Sprint 1 single-writer scan excludes apps/api-gateway (RES-2) - strengthens ADR-009 case but does not unblock OQ-7"
+  },
+
+  "health_indicators": {
+    "decisions_made_on_absent_evidence": 0,
+    "adrs_accepted_without_owners": 0,
+    "architectural_conflicts_hidden": 0,
+    "blocking_questions_unowned": 11,
+    "invariants_protected_by_memory_alone": 0,
+    "production_mutations_before_closure": 0,
+    "red_indicators": 1
+  }
+}
