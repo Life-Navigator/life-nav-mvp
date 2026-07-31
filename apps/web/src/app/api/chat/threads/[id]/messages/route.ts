@@ -10,7 +10,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const userId = await authedUserId();
   if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const { id } = await params;
-  return NextResponse.json({ messages: await getMessages(userId, id) });
+  const rows = await getMessages(userId, id);
+  // B-25: lift the persisted turn id out of metadata so history responses are reportable.
+  // ASSISTANT ONLY — a user or system message must never carry an advisor turn id. Nothing else
+  // from metadata is exposed: it may hold diagnostic fields the client has no business seeing.
+  const messages = rows.map((m: Record<string, unknown>) => {
+    const meta = (m.metadata ?? {}) as Record<string, unknown>;
+    const turnId =
+      m.role === 'assistant' && typeof meta.turn_id === 'string' ? meta.turn_id : undefined;
+    const { metadata: _drop, ...rest } = m;
+    return turnId ? { ...rest, turn_id: turnId } : rest;
+  });
+  return NextResponse.json({ messages });
 }
 
 // POST — send a message in this thread. Routes to advisor mode (with the thread's/selected agent),

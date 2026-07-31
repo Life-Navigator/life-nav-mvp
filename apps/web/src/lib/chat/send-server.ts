@@ -166,7 +166,10 @@ export async function sendAdvisorTurn(args: {
       content: assistant,
       agent: answeredAgent,
       citations,
-      metadata: { llm_status },
+      // B-25: persist the server-issued turn id so a RELOADED conversation stays reportable.
+      // Stored in the existing metadata JSONB — chat.messages has no turn_id column, and adding
+      // one is a schema change this does not need. Never derived from order/timestamp/thread id.
+      metadata: { llm_status, ...(turn_id ? { turn_id } : {}) },
     });
   }
 

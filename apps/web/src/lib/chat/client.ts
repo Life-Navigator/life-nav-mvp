@@ -39,6 +39,12 @@ export interface ChatMessage {
   content: string;
   agent: string | null;
   citations: Citation[];
+  /**
+   * Server-issued advisor turn id, restored from persisted metadata (B-25). Assistant messages
+   * only. Absent for user/system messages and for legacy advisor messages saved before the
+   * contract existed — those stay readable, they are simply not reportable.
+   */
+  turn_id?: string;
 }
 
 export interface Reasoning {

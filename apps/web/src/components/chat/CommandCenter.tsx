@@ -409,6 +409,9 @@ export default function CommandCenter({
           .map((m) => ({
             role: m.role as 'user' | 'assistant',
             content: m.content,
+            // B-25: reloaded advisor responses stay reportable. Server-issued only; the route
+            // already restricts it to assistant messages.
+            turn_id: m.turn_id,
             agent: m.agent,
             citations: m.citations,
           }))
