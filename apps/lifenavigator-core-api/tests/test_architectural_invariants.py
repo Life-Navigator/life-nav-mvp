@@ -318,74 +318,173 @@ async def test_i4_empty_tenant_is_refused():
 
 # ────────────────────────────────────────────────── I-10 · no raw-string relationship emission
 
-_REL_LITERAL = re.compile(r"^[A-Z][A-Z0-9_]{3,}$")
+# Cypher-aware extraction. The first version of this gate tokenized on whitespace and reported ZERO
+# literals in `retriever.py`, because Cypher writes them as `-[:HAS_EVIDENCE]->` — no whitespace
+# boundary. That false negative is why this module now parses relationship *syntax* rather than words.
+#
+# Forms handled:
+#   [:TYPE]              anonymous relationship
+#   -[r:TYPE]->          bound variable
+#   [:A|B|C]             alternation
+#   [:`Odd Type`]        backtick-quoted
+#   [r:TYPE*1..3]        with a range quantifier
+_REL_CLAUSE = re.compile(r"\[\s*\w*\s*:\s*([^\]]+?)\s*(?:\*[^\]]*)?\]")
+_REL_NAME = re.compile(r"`([^`]+)`|([A-Za-z_][A-Za-z0-9_]*)")
+# An f-string that interpolates the relationship slot: `[r:{rels}]` — dynamic, undetectable by literal
+# analysis, so it must come from the catalog. traversal.py legitimately does this.
+_INTERPOLATED_REL = re.compile(r"\[\s*\w*\s*:\s*\{")
 
-# Retrieval modules must derive relationship types from the generated manifest, never inline them.
-_CATALOG_DERIVED_MODULES = [
-    APP / "grounding" / "semantic" / "traversal.py",
-    APP / "grounding" / "semantic" / "planner.py",
-    APP / "grounding" / "semantic" / "engine.py",
-    APP / "grounding" / "semantic" / "fusion.py",
-]
+
+def _relationship_literals_in(text: str) -> set[str]:
+    """Relationship type names appearing as literals inside Cypher relationship syntax."""
+    out: set[str] = set()
+    for clause in _REL_CLAUSE.findall(text):
+        if "{" in clause:      # interpolated — not a literal
+            continue
+        for tick, plain in _REL_NAME.findall(clause):
+            name = tick or plain
+            if name:
+                out.add(name)
+    return out
 
 
 def _manifest_relationship_types() -> set[str]:
-    """The authoritative relationship vocabulary, read from the generated manifest.
+    """The authoritative vocabulary, from the generated manifest.
 
-    Checking literals against *this* set rather than against a shape regex is what makes the test
-    precise: `MATCH`, `RETURN`, `ORDER`, `DESC` are uppercase tokens in Cypher but are not
-    relationship types, and flagging them produced false failures when this test was first written.
-    A literal is an offender only if it is a real relationship type that should have come from here.
+    Membership here — not an uppercase-shape heuristic — is what makes the check exact. `MATCH`,
+    `RETURN`, `ORDER` are uppercase Cypher keywords and are not relationship types.
     """
     import json
 
-    path = APP / "grounding" / "semantic" / "ontology_manifest.json"
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads((APP / "grounding" / "semantic" / "ontology_manifest.json").read_text("utf-8"))
     return {r["rel_type"] for r in data["relationships"]}
 
 
-# RELATED_TO may be named in prose/policy contexts; it is asserted non-traversable below.
-_ALLOWED = {"RELATED_TO"}
+def _all_python_modules() -> list[Path]:
+    return sorted(APP.rglob("*.py"))
 
 
-def test_i10_no_raw_relationship_literals_in_retrieval_modules():
-    """I-10 · Relationship types come from the generated catalog, never from inline strings.
-
-    Regression caught: someone writes `rels = "HAS_GOAL|HAS_EVIDENCE"` instead of deriving from the
-    manifest. This is the exact defect class that produced this workstream twice — the hand-written
-    EDGE_FAMILY dict (24 edge types unreachable) and the "finance" literal (1,583 points unreachable).
-
-    Policy as code cannot be enumerated, diffed, versioned, or drift-gated. Policy as data can.
-    """
+def _literals_by_module() -> dict[str, set[str]]:
+    """Every manifest relationship type appearing as a Cypher literal, per module — whole app."""
     vocabulary = _manifest_relationship_types()
-    assert vocabulary, "manifest yielded no relationship types — the contract is unreadable"
-    offenders: list[str] = []
-    for path in _CATALOG_DERIVED_MODULES:
-        if not path.exists():
-            continue
+    found: dict[str, set[str]] = {}
+    for path in _all_python_modules():
+        hits: set[str] = set()
         for literal in _python_string_literals(path):
-            for token in re.split(r"[|,\s]+", literal.strip()):
-                if token in vocabulary and token not in _ALLOWED:
-                    offenders.append(f"{path.name}: {token!r}")
-    assert not offenders, (
-        "Raw relationship-type literal(s) in retrieval code — derive from the generated manifest "
-        "instead (invariant I-10):\n" + "\n".join(sorted(set(offenders)))
+            hits |= _relationship_literals_in(literal) & vocabulary
+        if hits:
+            found[str(path.relative_to(APP.parent))] = hits
+    return found
+
+
+# ── Known exceptions — PINNED, not whitelisted ──────────────────────────────────────────────────
+#
+# `retriever.py` is the LEGACY flat retriever, live as the GRAPH_RETRIEVAL_V2=false rollback path
+# (dependencies.py:341-343, advisor_context.py:490). It hardcodes a fixed recommendation subgraph.
+#
+# WHY THIS IS NOT GENERATED FROM THE MANIFEST TODAY:
+# the manifest is a FLAT list of relationship types with family/weight/traversable. It carries no
+# notion of *subgraph shape* — that `HAS_EVIDENCE` binds `(e:Evidence)`, `HAS_TRADEOFF` binds
+# `(t:Tradeoff)`, and each lands in a distinct OPTIONAL MATCH with its own RETURN projection.
+# Deriving this Cypher from the manifest requires deciding how structure is expressed in the
+# contract, which is an architectural decision, not a refactor. Attempting it would change the
+# query and therefore the rollback path's behaviour.
+#
+# RECORDED DEPENDENCY: a manifest/catalog extension expressing subgraph shape. No accepted ADR
+# covers it. Until then these five are pinned EXACTLY — the test below fails if the set changes in
+# either direction, so this cannot grow silently and cannot be quietly deleted either.
+_KNOWN_EXCEPTIONS: dict[str, set[str]] = {
+    "app/grounding/retriever.py": {
+        "HAS_RECOMMENDATION", "HAS_EVIDENCE", "HAS_ASSUMPTION", "HAS_TRADEOFF", "REQUIRES_REVIEW",
+    },
+}
+
+
+def test_i10_extractor_detects_every_cypher_relationship_form():
+    """The extractor must catch the forms the previous whitespace tokenizer missed."""
+    cases = {
+        "MATCH (a)-[:HAS_EVIDENCE]->(b)":            {"HAS_EVIDENCE"},
+        "MATCH (a)-[r:HAS_GOAL]->(b)":               {"HAS_GOAL"},
+        "MATCH (a)-[:HAS_GOAL|HAS_EVIDENCE]-(b)":    {"HAS_GOAL", "HAS_EVIDENCE"},
+        "MATCH (a)-[:`HAS_GOAL`]->(b)":              {"HAS_GOAL"},
+        "MATCH (a)-[r:HAS_GOAL*1..3]->(b)":          {"HAS_GOAL"},
+        "OPTIONAL MATCH (r)-[:REQUIRES_REVIEW]->(b)": {"REQUIRES_REVIEW"},
+        "MATCH (a)-[r:{rels}]-(b)":                  set(),   # interpolated -> catalog-derived
+        "MATCH (n) RETURN n ORDER BY x DESC":        set(),   # keywords are not relationships
+    }
+    for cypher, expected in cases.items():
+        assert _relationship_literals_in(cypher) == expected, f"extractor failed on: {cypher}"
+
+
+def test_i10_no_unexpected_raw_relationship_literals_app_wide():
+    """I-10 · Relationship types come from the generated catalog, never raw literals.
+
+    Scope is the WHOLE app, not the four semantic modules the first version of this gate covered.
+    Anything outside the pinned exceptions is a violation.
+    """
+    found = _literals_by_module()
+    unexpected = {
+        mod: sorted(types - _KNOWN_EXCEPTIONS.get(mod, set()))
+        for mod, types in found.items()
+        if types - _KNOWN_EXCEPTIONS.get(mod, set())
+    }
+    assert not unexpected, (
+        "Raw relationship-type literal(s) outside the pinned exceptions — derive from the generated "
+        f"manifest instead (invariant I-10):\n{unexpected}"
+    )
+
+
+def test_i10_known_exceptions_are_pinned_exactly():
+    """The exception set may not grow — and may not silently shrink either.
+
+    A whitelist that can grow is not a control. Pinning both directions means removing a literal is
+    also a deliberate, reviewed act (it would mean the rollback path changed).
+    """
+    found = _literals_by_module()
+    for mod, expected in _KNOWN_EXCEPTIONS.items():
+        actual = found.get(mod, set())
+        assert actual == expected, (
+            f"Pinned exception drift in {mod}.\n  expected: {sorted(expected)}\n"
+            f"  actual:   {sorted(actual)}\n"
+            "Adding a literal here requires review; removing one means the rollback path changed."
+        )
+
+
+def test_i10_every_cypher_building_module_is_covered():
+    """Guards against the scope defect that caused the original false negative.
+
+    If a new module starts building Cypher, this fails until it is acknowledged — the previous gate
+    silently covered only four files.
+    """
+    builders = {
+        str(p.relative_to(APP.parent))
+        for p in _all_python_modules()
+        if any("MATCH (" in lit for lit in _python_string_literals(p))
+    }
+    assert builders == {"app/grounding/retriever.py", "app/grounding/semantic/traversal.py"}, (
+        f"The set of Cypher-building modules changed: {sorted(builders)}. Every one must be covered "
+        "by I-10 enforcement; update this assertion deliberately."
     )
 
 
 def test_i10_edge_types_are_derived_from_the_manifest_not_hardcoded():
-    """I-10 · The allowed edge set for a plan is manifest-derived and non-empty."""
     plan = plan_query("what are my goals?")
     edges = allowed_edge_types(plan)
     assert edges, "allowed_edge_types returned nothing — the manifest-derived path is broken"
-    assert all(_REL_LITERAL.match(e) for e in edges), f"malformed relationship types: {edges}"
+    assert set(edges) <= _manifest_relationship_types(), "traversal proposed a non-manifest type"
+
+
+def test_i10_traversal_uses_interpolation_not_literals():
+    """The semantic engine must build its relationship clause from the catalog, never inline it."""
+    src = (APP / "grounding" / "semantic" / "traversal.py").read_text("utf-8")
+    assert _INTERPOLATED_REL.search(src), "traversal.py no longer interpolates its relationship types"
+    literals = set()
+    for lit in _python_string_literals(APP / "grounding" / "semantic" / "traversal.py"):
+        literals |= _relationship_literals_in(lit) & _manifest_relationship_types()
+    assert not literals, f"traversal.py hardcodes relationship types: {sorted(literals)}"
 
 
 def test_i10_related_to_is_never_traversable():
-    """I-10 / policy · RELATED_TO is a compatibility fallback carrying no semantics.
-
-    It is declared in the catalog as non-traversable. Making it traversable would let untyped
-    fallback edges influence retrieval, which RELATED_TO_REMEDIATION.md explicitly forbids.
-    """
+    """RELATED_TO is a compatibility fallback carrying no semantics; it must stay non-traversable."""
     for query in ("what are my goals?", "how much debt do I have?", "compare these schools"):
         assert "RELATED_TO" not in allowed_edge_types(plan_query(query))

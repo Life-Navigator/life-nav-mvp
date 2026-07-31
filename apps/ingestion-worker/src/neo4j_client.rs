@@ -326,6 +326,80 @@ mod tests {
         }
     }
 
+    /// Two tenants, IDENTICAL upstream source id (investigation B / OQ-6).
+    ///
+    /// Root `entity_id` is INHERITED from the source record (`normalizer.rs:41`), not constructed,
+    /// so it is NOT tenant-qualified on its own. These tests answer whether that matters at the
+    /// persistence boundary. It does not — every storage key is COMPOSITE:
+    ///   Neo4j merges on `{ tenant_id, entity_id }`; Qdrant point ids hash `tenant|type|id`.
+    /// If either ever drops the tenant, the failure is a cross-tenant overwrite.
+    fn colliding_pair() -> (CanonicalGraphObject, CanonicalGraphObject) {
+        let shared = "plaid-txn-00000000";
+        let (mut a, mut b) = (sample_canon(), sample_canon());
+        a.tenant_id = Uuid::parse_str("11111111-1111-1111-1111-111111111111").unwrap();
+        b.tenant_id = Uuid::parse_str("22222222-2222-2222-2222-222222222222").unwrap();
+        a.entity_id = shared.into();
+        b.entity_id = shared.into();
+        (a, b)
+    }
+
+    /// The NODE merge clause only. A `contains` over the whole statement passes even when the node
+    /// key loses tenant_id, because the relationship TARGET merge still carries it — the first
+    /// version of this test had that hole and mutation M-10 exposed it.
+    fn node_merge_clause(cypher: &str) -> String {
+        cypher
+            .split("MERGE (n:")
+            .nth(1)
+            .expect("no node MERGE clause")
+            .chars()
+            .take_while(|c| *c != ')')
+            .collect()
+    }
+
+    #[test]
+    fn identical_source_ids_across_tenants_cannot_merge_the_same_neo4j_node() {
+        let (a, b) = colliding_pair();
+        assert_eq!(a.entity_id, b.entity_id);
+        assert_ne!(a.tenant_id, b.tenant_id);
+
+        let clause = node_merge_clause(&Neo4jClient::merge_cypher_for(&a));
+        assert!(
+            clause.contains("tenant_id: $tenant_id"),
+            "NODE merge key is not tenant-qualified — two tenants sharing an upstream source id \
+             would merge into ONE node (cross-tenant overwrite). clause: {clause}"
+        );
+        assert!(clause.contains("entity_id: $entity_id"), "clause: {clause}");
+
+        let (pa, pb) = (Neo4jClient::build_params(&a), Neo4jClient::build_params(&b));
+        assert_ne!(pa.get("tenant_id"), pb.get("tenant_id"));
+        assert_eq!(pa.get("entity_id"), pb.get("entity_id"));
+    }
+
+    #[test]
+    fn identical_source_ids_across_tenants_cannot_overwrite_the_same_qdrant_point() {
+        let (a, b) = colliding_pair();
+        assert_ne!(
+            a.qdrant_point_id(),
+            b.qdrant_point_id(),
+            "COLLISION: two tenants sharing an upstream source id resolve to the SAME Qdrant point \
+             id — one tenant's upsert would overwrite the other's vector"
+        );
+    }
+
+    #[test]
+    fn relationship_targets_are_also_tenant_qualified() {
+        // A tenant-qualified node key is worthless if the relationship TARGET merge is not.
+        let (a, _) = colliding_pair();
+        let cypher = Neo4jClient::merge_cypher_for(&a);
+        let mut checked = 0;
+        for seg in cypher.split("MERGE (t:").skip(1) {
+            let head: String = seg.chars().take_while(|c| *c != ')').collect();
+            assert!(head.contains("tenant_id: $tenant_id"), "target MERGE untenanted: {head}");
+            checked += 1;
+        }
+        assert!(checked > 0, "fixture exercised no relationship target");
+    }
+
     #[test]
     fn cypher_includes_tenant_filter() {
         let c = sample_canon();

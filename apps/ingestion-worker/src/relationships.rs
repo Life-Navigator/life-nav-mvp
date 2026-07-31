@@ -253,3 +253,79 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod transaction_granularity_tests {
+    //! Investigation C — does the worker aggregate transactions?
+    //!
+    //! `TransactionSummary` is NAMED a summary, but `entities.rs:57-61` documents that
+    //! `finance.transactions` emits `entity_type='transaction'` (aliased in). This fixture measures
+    //! what the worker actually produces for several transactions on ONE account across TWO periods.
+    //!
+    //! Result: the worker performs NO period bucketing, NO account grouping, NO aggregation, and NO
+    //! consolidation. Each source record yields its own node and its own edge pair. Granularity is
+    //! therefore decided ENTIRELY upstream, by whatever `finance.transactions` emits — not here.
+    use crate::entities::EntityType;
+    use crate::relationships::registry_relationships;
+    use serde_json::json;
+
+    fn attrs(v: serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
+        v.as_object().unwrap().clone()
+    }
+
+    fn txn(account: &str, period: &str) -> Vec<crate::entities::Relationship> {
+        registry_relationships(
+            &EntityType::TransactionSummary,
+            "user-1",
+            &attrs(json!({ "account_id": account, "period": period })),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn each_transaction_record_emits_its_own_edge_pair_no_aggregation() {
+        // Same account, two periods, three records.
+        let a = txn("acct-1", "2026-06");
+        let b = txn("acct-1", "2026-06");   // same account AND same period
+        let c = txn("acct-1", "2026-07");
+
+        // Two edges per record: user-anchored + account-anchored (ontology.rs:93-96).
+        for (name, r) in [("a", &a), ("b", &b), ("c", &c)] {
+            assert_eq!(r.len(), 2, "{name}: expected 2 edges per record, got {}", r.len());
+            assert!(r.iter().any(|x| x.label == "HAS_TRANSACTION"
+                && x.target_entity_type == "user_profile"));
+            assert!(r.iter().any(|x| x.label == "HAS_TRANSACTION"
+                && x.target_entity_type == "financial_account"));
+        }
+
+        // Two records in the SAME account+period produce identical edge shape — the worker does not
+        // consolidate them. Node identity comes from the inherited entity_id, so two source rows =
+        // two nodes. Growth is therefore PER SOURCE RECORD.
+        assert_eq!(a.len(), b.len());
+        assert_eq!(
+            a.iter().map(|x| x.label.as_str()).collect::<Vec<_>>(),
+            b.iter().map(|x| x.label.as_str()).collect::<Vec<_>>(),
+            "same account+period yields the same edges — no period bucketing exists"
+        );
+
+        // Total for 3 records on 1 account = 6 edges. If the worker bucketed by account-period we
+        // would expect 2 nodes (2 periods) and 4 edges.
+        let total: usize = a.len() + b.len() + c.len();
+        assert_eq!(total, 6, "3 records -> 6 edges: confirms no aggregation");
+    }
+
+    #[test]
+    fn account_fk_absent_means_only_the_user_edge_is_emitted() {
+        // Documents the fallback: without account_id there is no inter-entity edge, so the
+        // user-anchored edge is the ONLY path to the node. Relevant to ADR-001, which proposes
+        // removing that edge: records lacking account_id would become unreachable by traversal.
+        let r = registry_relationships(
+            &EntityType::TransactionSummary,
+            "user-1",
+            &attrs(json!({})),
+        )
+        .unwrap();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r[0].target_entity_type, "user_profile");
+    }
+}

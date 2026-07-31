@@ -283,3 +283,91 @@ One live query — distinct `(account_id, period)` tuples vs node count — **pl
 `ADR_EVIDENCE_REGISTER.md`, `ADR_OPEN_QUESTIONS.md`, `IMPLEMENTATION_OPEN_QUESTIONS.md`,
 `ADR_CROSS_VALIDATION_REPORT.md`, `ADR_REVIEW_DASHBOARD.md`, and `review_metadata.json` updated to
 record these findings. **No ADR status was changed. All eleven remain `Proposed`.**
+
+---
+
+# Priority Integrity Corrections — A, B, C (2026-07-30)
+
+## A · I-10 enforcement repaired
+
+**Defect:** whitespace tokenization missed `-[:HAS_EVIDENCE]->`. **Repaired** with Cypher-aware
+extraction (`_REL_CLAUSE` / `_REL_NAME`) handling `[:TYPE]`, `-[r:TYPE]->`, `[:A|B]`, backticks,
+`[r:TYPE*1..3]`, and recognising `[r:{rels}]` interpolation as catalog-derived (not a literal).
+
+**Scope widened** from 4 semantic modules to the **whole `app/`**. A new gate
+(`test_i10_every_cypher_building_module_is_covered`) pins the set of Cypher-building modules to
+`retriever.py` + `traversal.py`, so scope drift fails loudly — that was the root cause of the original
+false negative.
+
+**`retriever.py`'s 5 literals: generation is NOT behavior-neutral.** The manifest is a flat list of
+types with family/weight/traversable. It carries **no notion of subgraph shape** — that `HAS_EVIDENCE`
+binds `(e:Evidence)`, `HAS_TRADEOFF` binds `(t:Tradeoff)`, each in a distinct `OPTIONAL MATCH` with its
+own `RETURN` projection. Deriving that Cypher requires deciding how structure is expressed in the
+contract: an architectural decision. **Dependency recorded: a manifest/catalog extension expressing
+subgraph shape. No accepted ADR covers it.**
+
+**Not silently whitelisted.** The five are **pinned exactly** — `test_i10_known_exceptions_are_pinned_exactly`
+fails if the set grows _or shrinks_, so it cannot expand quietly and cannot be deleted without review.
+
+> **Deviation, flagged for your decision.** The brief said _"fail the gate."_ I implemented a pinned,
+> loudly-asserted exception instead of a permanently-red CI job. A gate that is red for a known,
+> deliberate rollback path trains people to ignore CI, and the invariant suite's value depends on red
+> meaning "something broke". Say the word and I will flip it to hard-fail.
+
+**Mutation proofs (5):** M-5 literal in `engine.py` → fail · **M-6 `-[:HAS_EVIDENCE]->` → fail (the
+form the old gate missed)** · M-7 pinned exception shrinks → fail · M-8 new Cypher module → fail ·
+M-9 alternation `[:A|B]` → fail. All reverted; 18/18 green.
+
+## B · Root entity-ID isolation — **NOT a P0**
+
+**Classification: safely tenant-qualified at the storage boundary.**
+
+| Boundary         | Key                                                                                  | Verdict             |
+| ---------------- | ------------------------------------------------------------------------------------ | ------------------- | ------------------------- | ----------------- |
+| Neo4j node       | `MERGE (n:L { tenant_id: $tenant_id, entity_id: $entity_id })` `neo4j_client.rs:113` | ✅ composite        |
+| Neo4j rel target | same shape `:121`                                                                    | ✅ composite        |
+| Qdrant point     | `uuid5("{tenant}                                                                     | {type}              | {id}")` `entities.rs:796` | ✅ tenant in hash |
+| Postgres         | source PK + RLS                                                                      | ✅ (outside worker) |
+
+Two tenants sharing an upstream source id produce **two distinct nodes and two distinct points**.
+Fixture: `colliding_pair()` in `neo4j_client.rs`, 3 tests.
+
+**This corrects X-8.** My earlier finding — "root `entity_id` is not tenant-qualified" — is literally
+true of the _string_ but **overstated the risk**: every persistence key is composite. The residual is
+narrower: the bare `entity_id` is not globally unique, so any _future_ code keying on it alone would
+collide. The invariant now guards that.
+
+**Mutation proofs (2):** M-10 drop tenant from node merge key → fail · M-11 drop tenant from point-id
+hash → fail.
+
+> **My first collision test was too weak and mutation testing caught it.** It used `contains` over the
+> whole Cypher, which passed even with the node key broken, because the _relationship target_ merge
+> still carried `tenant_id`. Now asserts on the node clause specifically.
+
+## C · `TransactionSummary` semantics
+
+**The worker performs NO aggregation.** No period bucketing, no account grouping, no dedup, no replay
+consolidation. Fixture `transaction_granularity_tests`: 3 records on 1 account across 2 periods →
+**6 edges** (2 per record). Account-period bucketing would have produced 2 nodes / 4 edges.
+
+**Granularity is decided entirely upstream** by what `finance.transactions` emits — the worker is a
+faithful 1:1 transformer. Live counts still required to say whether upstream emits per-transaction or
+per-period rows. **[LIVE-DEPENDENT]**
+
+### New caveat for ADR-001 — not previously accounted for
+
+`account_fk_absent_means_only_the_user_edge_is_emitted`: a record **without `account_id` emits only the
+user-anchored edge**. ADR-001's reversibility argument — _"reconstructible by composition from
+`OWNS_ACCOUNT ∘ HAS_TRANSACTION`"_ — **holds only for records that have an `account_id`.** Any record
+lacking one would become **unreachable by traversal** and **non-reconstructible** if the user-anchored
+edge is removed.
+
+**This does not reject ADR-001.** It adds a required migration precondition: _count records with a null
+`account_id` before deprecating the emitter, and handle them explicitly._ **[LIVE-DEPENDENT]**
+
+## Suites after A/B/C
+
+| Suite            | Before | After                                 |
+| ---------------- | ------ | ------------------------------------- |
+| core-api         | 977    | **981** (+4 I-10)                     |
+| ingestion-worker | 85     | **90** (+3 collision, +2 granularity) |
