@@ -151,6 +151,37 @@ jobs:
   # ── Ontology Validation ────────────────────────────────────────────
   # (The graphrag-pipeline py_compile step was removed with that app — it's superseded by the Rust
   #  ingestion-worker. The ontology TTL files it consumed are still validated here.)
+  # ── Architectural Invariants ────────────────────────────────────────
+  # Deliberately UNCONDITIONAL — no paths-filter. These are global properties of the system, not
+  # per-app concerns: an invariant that only runs when one directory changes is not an invariant.
+  # A cross-tenant leak can be introduced by a change that never touches core-api's test paths.
+  #
+  # Invariants enforced (docs/semantic-platform/implementation/IMPLEMENTATION_DECISION_AUDIT.md):
+  #   I-1  the Rust ingestion worker is the ONLY graph writer
+  #   I-2  the Python Neo4j client is read-only
+  #   I-3  every traversal node pattern binds tenant_id — both endpoints
+  #   I-4  a caller cannot override the bound tenant
+  #   I-10 relationship types come from the generated catalog, never raw string literals
+  #
+  # Every one of these is proven to FAIL on a deliberately broken input; see
+  # docs/semantic-platform/implementation/INVARIANT_TEST_RESULTS.md.
+  architectural-invariants:
+    name: Architectural Invariants
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/lifenavigator-core-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/lifenavigator-core-api/requirements-dev.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Enforce architectural invariants
+        run: python -m pytest tests/test_architectural_invariants.py -q
+
   validate-ontology:
     name: Validate Ontology
     runs-on: ubuntu-latest
