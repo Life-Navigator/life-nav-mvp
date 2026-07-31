@@ -69,6 +69,12 @@ export interface Handoff {
 
 export interface SendResult {
   assistant_message: string;
+  /**
+   * Server-issued advisor turn id (R-3 / B-22). Optional: a deployment predating the contract
+   * returns none, and such a response is simply not reportable — never invalid. Never generated
+   * or substituted in the browser.
+   */
+  turn_id?: string;
   citations: Citation[];
   agent: string | null;
   thread_id?: string | null;

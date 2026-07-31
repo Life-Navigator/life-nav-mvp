@@ -77,6 +77,20 @@ function ThinkingProgress({ name }: { name: string }) {
 interface UiMessage {
   role: 'user' | 'assistant';
   content: string;
+  /**
+   * Server-issued advisor turn identifier (audit finding R-3 / B-22).
+   *
+   * ONLY ever populated from `res.turn_id` on a successful advisor response. It is never generated,
+   * derived from an array index, timestamp, conversation id or UUID in the browser — a client-minted
+   * id would be unverifiable and forgeable, and the reporting endpoint re-resolves ownership from it.
+   *
+   * Optional because historical messages predate the contract, and a conversation loaded from
+   * history has no turn_id yet (chatClient.getMessages does not return one). Those responses simply
+   * are not reportable; they are NOT rejected.
+   *
+   * Present only on assistant messages. Never set on user, loading or error messages.
+   */
+  turn_id?: string;
   agent?: string | null;
   citations?: Citation[];
   reasoning?: Reasoning | null;
@@ -447,6 +461,8 @@ export default function CommandCenter({
           {
             role: 'assistant',
             content: res.assistant_message,
+            // Server-issued only. Absent on older deployments -> response is simply not reportable.
+            turn_id: res.turn_id,
             agent: res.agent,
             citations: res.citations,
             reasoning: res.reasoning,

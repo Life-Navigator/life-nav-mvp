@@ -28,6 +28,22 @@ the id grants no read access to anything.
 
 Two tests pin this: the contract stamp itself, and that no web file mints a `turn_id` client-side.
 
+## 2b. Slice 3A — client propagation and typed client (IMPLEMENTED)
+
+| Item                                                                                  | Status      |
+| ------------------------------------------------------------------------------------- | ----------- |
+| `UiMessage.turn_id` (snake_case, matching every API-sourced field)                    | ✅          |
+| Propagated at `CommandCenter.tsx:465` from `res.turn_id` only                         | ✅          |
+| `chatClient.SendResult.turn_id` + `send-server.ts SendResult.turn_id`                 | ✅          |
+| Typed client `lib/advisor/responseReport.ts`                                          | ✅ 27 tests |
+| Next proxy `/api/life/advisor/response-report` — **field allowlist, not passthrough** | ✅          |
+| 4 mutation proofs                                                                     | ✅          |
+
+**History path documented, not silently broken:** `chatClient.getMessages` does not return
+`turn_id`, so a reloaded conversation has no reportable turns. Those responses are **not
+rejected** — they simply lack the action. Closing that needs a message-history contract change,
+recorded as B-25 rather than forced here.
+
 ## 3. What was NOT built — and why
 
 | Item                                                   | Status          |

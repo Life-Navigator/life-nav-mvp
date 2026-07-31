@@ -5,6 +5,13 @@ import { appendUserMessage, appendAssistantMessage } from './store';
 export interface SendResult {
   status: number;
   assistant_message: string;
+  /**
+   * Server-issued advisor turn identifier (audit finding R-3 / B-22). Stamped by the core API in
+   * `_finish()`, the single return path for every advisor branch. Optional because a deployment
+   * predating that contract returns none — such a response is simply not reportable, not invalid.
+   * NEVER generated or substituted here.
+   */
+  turn_id?: string;
   citations: unknown[];
   agent: string | null;
   degraded?: boolean; // advisor produced no text; user message still persisted + thread continuable
@@ -103,6 +110,8 @@ export async function sendAdvisorTurn(args: {
     }
   }
   const assistant = typeof turn.assistant_message === 'string' ? turn.assistant_message : '';
+  // Pass through only when the server actually issued one. No fallback, no synthesis.
+  const turn_id = typeof turn.turn_id === 'string' && turn.turn_id ? turn.turn_id : undefined;
   const citations = Array.isArray(turn.citations) ? (turn.citations as unknown[]) : [];
   const answeredAgent = (typeof turn.agent === 'string' ? turn.agent : args.agent) ?? null;
   const llm_status = typeof turn.llm_status === 'string' ? turn.llm_status : undefined;
@@ -183,6 +192,7 @@ export async function sendAdvisorTurn(args: {
     // bubble, but the user's message is already saved and the thread is continuable.
     degraded: !assistant,
     assistant_message: assistant,
+    turn_id,
     citations,
     agent: answeredAgent,
     llm_status,
