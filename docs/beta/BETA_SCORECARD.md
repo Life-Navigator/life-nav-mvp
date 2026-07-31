@@ -92,6 +92,20 @@ Not everything is unknown. These are verified and reproducible:
 
 ---
 
+## 6b. Prompt 2A additions (2026-07-30)
+
+| Fact                                          | Value                                     | Status                                         |
+| --------------------------------------------- | ----------------------------------------- | ---------------------------------------------- |
+| Required checks specified + machine-validated | **10**                                    | ✅ implemented, **not operationally observed** |
+| Branch protection active                      | **false**                                 | ❌ externally blocked (B-17, repo admin)       |
+| Fresh checkout: `pnpm install`                | **PASS** (3.7s, frozen lockfile)          | ✅ locally verified                            |
+| Fresh checkout: verification command          | **NONE DEFINED**                          | ❌ gap F-1                                     |
+| Fresh checkout: `pnpm test`                   | **FAILS** (`@life-navigator/mobile#test`) | ❌ gap F-2                                     |
+| Offline backend tests                         | **1,016 core-api + 90 worker**            | ✅ locally verified                            |
+| Preview environment                           | **does not exist**                        | ❌ externally blocked                          |
+| Rollback exercised outside production         | **no**                                    | ❌ externally blocked                          |
+| Unpinned CI actions on mutable refs           | **3** (guarded, not pinned)               | ⚠️ gap CI-1                                    |
+
 ## 7. Reading the scorecard
 
 **Backend correctness is well-evidenced. Product behaviour is not evidenced at all.** 1,062 backend

@@ -180,6 +180,32 @@ depth ≥ 2.
 4. Retire; then remove historical user-anchored edges in bounded batches with dry-run and preflight.
 5. Reconcile counts against expected reduction.
 
+## Verified migration preconditions (added 2026-07-30 — investigation C)
+
+Repository-verified; **ADR status unchanged (`Proposed`)**. Evidence:
+`docs/semantic-platform/review/OQ_INVESTIGATION_FINDINGS.md` §C; fixture
+`ingestion-worker/src/relationships.rs::transaction_granularity_tests`.
+
+1. **The worker performs NO aggregation.** No period bucketing, account grouping, dedup, or replay
+   consolidation. 3 records on 1 account across 2 periods produce **6 edges** (2 per record);
+   account-period bucketing would produce 4. **[VERIFIED]**
+2. **Granularity is controlled upstream** by whatever `finance.transactions` emits
+   (`entities.rs:57-61` — `#[serde(alias = "transaction")]`). The worker is a 1:1 transformer, so the
+   30% reduction estimate in this ADR depends on an upstream property, not a worker property.
+3. **A record without `account_id` receives ONLY the user-anchored edge** — verified by
+   `account_fk_absent_means_only_the_user_edge_is_emitted`.
+4. **Therefore removal of the user-anchored edge would make such records unreachable**, and — because
+   there is no `OWNS_ACCOUNT ∘ HAS_TRANSACTION` path for them — **non-reconstructible**. This
+   qualifies the Rollback section's "fully reconstructible by composition" claim: it holds **only for
+   records that carry an `account_id`**.
+5. **REQUIRED PRECONDITION:** a census of `TransactionSummary` records with a null/missing
+   `account_id`, and an explicit disposition for them, **before** the emitter is deprecated.
+   **[LIVE-DEPENDENT]** — blocks WP-400 step 2.
+
+Also verified (OQ-11): **zero serving-tier consumers name `HAS_TRANSACTION`**. One indirect consumer
+exists — `allowed_edge_types` selects by family, never by name. The ADR's rejection trigger did not
+fire; migration step 1 reduces to a verification step.
+
 ## Backfill plan
 
 None. This is a removal, not a backfill. Summary-granularity normalization, if OQ-1 shows drift, is a

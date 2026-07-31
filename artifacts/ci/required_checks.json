@@ -1,0 +1,165 @@
+{
+  "$schema_version": "1.0.0",
+  "generated_at": "2026-07-30",
+  "purpose": "Exact, stable GitHub check names that branch protection MUST require on the default branch. Validated by tests/test_required_checks.py — renaming a job here or in the workflow fails CI.",
+  "branch_protection_active": false,
+  "branch_protection_blocker": "requires repository-admin permission (B-17); not claimable from the repository",
+
+  "required": [
+    {
+      "check": "Architectural Invariants",
+      "workflow": "ci.yml",
+      "job": "architectural-invariants",
+      "enforces": [
+        "I-1 single graph writer",
+        "I-2 read-only python clients",
+        "I-3 both-endpoint tenant binding",
+        "I-4 no tenant override",
+        "I-10 no raw relationship literals"
+      ],
+      "conditional": false,
+      "needs_secrets": false,
+      "blocking_rationale": "loss is a cross-tenant data breach"
+    },
+    {
+      "check": "Secrets Scan",
+      "workflow": "ci.yml",
+      "job": "secrets-scan",
+      "enforces": ["credential leakage"],
+      "conditional": false,
+      "needs_secrets": false,
+      "blocking_rationale": "LN-SEC-2026-0729-01 precedent"
+    },
+    {
+      "check": "Validate Migrations",
+      "workflow": "ci.yml",
+      "job": "validate-migrations",
+      "enforces": ["database migration validity"],
+      "conditional": false,
+      "needs_secrets": false,
+      "blocking_rationale": "a bad migration is not rollback-safe"
+    },
+    {
+      "check": "Validate Ontology",
+      "workflow": "ci.yml",
+      "job": "validate-ontology",
+      "enforces": ["ontology files present"],
+      "conditional": false,
+      "needs_secrets": false
+    },
+    {
+      "check": "Verify Governance Coverage",
+      "workflow": "ci.yml",
+      "job": "verify-governance",
+      "enforces": ["governance coverage"],
+      "conditional": false,
+      "needs_secrets": false
+    },
+    {
+      "check": "Lint",
+      "workflow": "ci.yml",
+      "job": "lint",
+      "conditional": false,
+      "needs_secrets": false
+    },
+    {
+      "check": "Type Check",
+      "workflow": "ci.yml",
+      "job": "typecheck",
+      "conditional": false,
+      "needs_secrets": false
+    },
+    {
+      "check": "Unit Tests",
+      "workflow": "ci.yml",
+      "job": "unit-tests",
+      "conditional": false,
+      "needs_secrets": false
+    },
+    {
+      "check": "Dependency Audit",
+      "workflow": "ci.yml",
+      "job": "dependency-audit",
+      "conditional": false,
+      "needs_secrets": false
+    },
+    {
+      "check": "Build",
+      "workflow": "ci.yml",
+      "job": "build",
+      "conditional": false,
+      "needs_secrets": true,
+      "note": "consumes build-time env; acceptable because it cannot pass without them and failure is loud"
+    }
+  ],
+
+  "recommended_not_required": [
+    {
+      "check": "Test core-api",
+      "workflow": "deploy-fly.yml",
+      "job": "test-core-api",
+      "reason_not_required": "path-filtered; a required check that can skip creates an ambiguous state. The unconditional Architectural Invariants job covers the invariant subset."
+    },
+    {
+      "check": "Check ingestion-worker",
+      "workflow": "deploy-fly.yml",
+      "job": "check-ingestion-worker",
+      "reason_not_required": "path-filtered; owns the manifest drift gate. See gap CI-2."
+    },
+    {
+      "check": "E2E Tests",
+      "workflow": "ci.yml",
+      "job": "e2e-tests",
+      "reason_not_required": "needs secrets; would block PRs from forks"
+    }
+  ],
+
+  "known_gaps": [
+    {
+      "id": "CI-1",
+      "severity": "high",
+      "finding": "Unpinned third-party actions on MUTABLE refs: trufflesecurity/trufflehog@main, superfly/flyctl-actions/setup-flyctl@master, dtolnay/rust-toolchain@stable",
+      "risk": "a compromised upstream executes in CI with repository access on the next run",
+      "credential_independent_fix": true
+    },
+    {
+      "id": "CI-2",
+      "severity": "medium",
+      "finding": "The generated-manifest drift gate lives in the path-filtered worker job, so it only runs when apps/ingestion-worker/** or the manifest changes",
+      "mitigation": "the manifest path is already in the worker filter; a change to the Python READER is covered by test-core-api",
+      "credential_independent_fix": false
+    },
+    {
+      "id": "CI-3",
+      "severity": "medium",
+      "finding": "ci.yml and security-audit.yml declare no top-level permissions, inheriting the repository default",
+      "risk": "GITHUB_TOKEN may hold write scopes no job needs",
+      "credential_independent_fix": true
+    },
+    {
+      "id": "CI-4",
+      "severity": "low",
+      "finding": "No worker (cargo) test job runs unconditionally; worker tests are path-filtered only",
+      "risk": "a change outside apps/ingestion-worker that invalidates a worker assumption is not caught",
+      "credential_independent_fix": true
+    },
+    {
+      "id": "CI-5",
+      "severity": "info",
+      "finding": "Deploy jobs are correctly gated to push+main and are not required checks",
+      "credential_independent_fix": false
+    }
+  ],
+
+  "admin_instructions": {
+    "note": "REPOSITORY ADMIN ONLY. Not performed; branch_protection_active remains false.",
+    "steps": [
+      "Settings → Branches → Branch protection rules → main",
+      "Enable 'Require status checks to pass before merging'",
+      "Enable 'Require branches to be up to date before merging'",
+      "Add each name in required[] EXACTLY as written in the 'check' field",
+      "Do NOT add any name from recommended_not_required[] — those can legitimately skip",
+      "Verify by opening a PR that touches apps/lifenavigator-core-api and confirming all required checks appear"
+    ]
+  }
+}

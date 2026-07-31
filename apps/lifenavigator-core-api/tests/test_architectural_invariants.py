@@ -488,3 +488,27 @@ def test_i10_related_to_is_never_traversable():
     """RELATED_TO is a compatibility fallback carrying no semantics; it must stay non-traversable."""
     for query in ("what are my goals?", "how much debt do I have?", "compare these schools"):
         assert "RELATED_TO" not in allowed_edge_types(plan_query(query))
+
+
+def test_i10_exception_cannot_be_copied_into_another_module():
+    """The exception is scoped to ONE module and may not spread.
+
+    An exception that can be copied is not an exception, it is a precedent. `retriever.py` is
+    excepted because it predates the catalog contract and is the rollback path; nothing else is.
+
+    Owner: Graph Platform · Removal trigger: a manifest/catalog extension expressing subgraph shape
+    (no accepted ADR — see OQ_INVESTIGATION_FINDINGS.md §A) · Backlog: B-15/B-16 adjacent.
+    """
+    assert set(_KNOWN_EXCEPTIONS) == {"app/grounding/retriever.py"}, (
+        f"The I-10 exception set gained or lost a module: {sorted(_KNOWN_EXCEPTIONS)}. Exactly one "
+        "module is excepted. Adding another requires an architectural decision, not a test edit."
+    )
+    # And prove the enforcement is path-keyed: the same literals elsewhere are still violations.
+    vocabulary = _manifest_relationship_types()
+    excepted = _KNOWN_EXCEPTIONS["app/grounding/retriever.py"]
+    assert excepted <= vocabulary, "the excepted set drifted out of the manifest vocabulary"
+    sample = "OPTIONAL MATCH (r)-[:HAS_EVIDENCE]->(e:Evidence)"
+    assert _relationship_literals_in(sample) & vocabulary, (
+        "the extractor no longer detects the excepted forms — copying them elsewhere would go "
+        "unnoticed"
+    )
