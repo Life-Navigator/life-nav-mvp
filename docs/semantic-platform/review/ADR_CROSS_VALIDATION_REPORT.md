@@ -95,6 +95,16 @@ ruling_, not a measurement.
 
 ---
 
+## 6b. Findings from credential-free investigation (2026-07-30)
+
+| #   | Finding                                                                               | Effect                                                                                                                                            |
+| --- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| X-5 | `retriever.py` (legacy rollback path) hardcodes 5 relationship literals               | **New accepted exception.** If the catalog changes those types the rollback path silently diverges — the one place divergence is least affordable |
+| X-6 | api-gateway has 0 write-Cypher; RES-2 severity **Medium → Low**                       | Weakens urgency for ADR-009; the retirement case rests on attack surface + service-role holder, not write risk                                    |
+| X-7 | Qdrant payload carries **no** trust/review field                                      | **Confirms ADR-005's premise.** Backfill must derive from `source_system` as designed                                                             |
+| X-8 | Root `entity_id` inherited from source, **not tenant-qualified**                      | **New input to ADR-006.** Cross-tenant id collision prevented only by source-id uniqueness — a property outside the worker                        |
+| X-9 | No aggregation period defined for `TransactionSummary`; fed by `finance.transactions` | **Strengthens ADR-001.** Growth may be per-transaction, worse than assumed                                                                        |
+
 ## 7. Recommendation
 
 **Cross-validation raises no objection to accepting ADR-003, ADR-007, or ADR-011 in Session 1**, subject

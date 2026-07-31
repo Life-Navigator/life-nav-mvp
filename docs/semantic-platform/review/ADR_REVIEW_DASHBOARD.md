@@ -23,6 +23,11 @@
 
 **0 of 11 Accepted. 0 of 11 blocking questions owned.**
 
+**Update 2026-07-30 — credential-free investigations (`OQ_INVESTIGATION_FINDINGS.md`):**
+OQ-5 and IQ-3 **fully answered**; OQ-11 **substantially answered**; OQ-6 and OQ-1 **partially**.
+No ADR status changed. ADR-005's premise is confirmed; ADR-001 is strengthened and its migration
+work reduced; ADR-006 shrinks but does not collapse. Remaining gaps are live-data only.
+
 ---
 
 ## 2. Approval progress

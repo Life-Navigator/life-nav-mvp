@@ -4,7 +4,6 @@
   "code_commit": "6be5860f",
   "role": "independent_technical_review_facilitator",
   "state": "pre_session_1",
-
   "headline": {
     "recommendation": "decide_3_of_11_in_session_1",
     "rationale": "Preparing eleven packets for a session that can responsibly resolve three would produce eight decisions made on absent evidence.",
@@ -14,7 +13,6 @@
     "binding_rule": "no ADR reaches Accepted while a rejection trigger lacks owner+method+date+escalation",
     "consequence": "no acceptance is valid until Session 1 Block A assigns owners"
   },
-
   "sessions": [
     {
       "id": 1,
@@ -28,16 +26,35 @@
           "purpose": "assign owners to 11 blocking questions",
           "type": "administrative"
         },
-        { "id": "B", "min": 25, "adr": "ADR-007", "expected": "Accept" },
-        { "id": "C", "min": 45, "adr": "ADR-003", "expected": "Accept" },
-        { "id": "D", "min": 20, "adr": "ADR-011", "expected": "Accept_flag_off" },
+        {
+          "id": "B",
+          "min": 25,
+          "adr": "ADR-007",
+          "expected": "Accept"
+        },
+        {
+          "id": "C",
+          "min": 45,
+          "adr": "ADR-003",
+          "expected": "Accept"
+        },
+        {
+          "id": "D",
+          "min": 20,
+          "adr": "ADR-011",
+          "expected": "Accept_flag_off"
+        },
         {
           "id": "E",
           "min": 10,
           "purpose": "record disposition of remaining 8",
           "type": "no_debate"
         },
-        { "id": "F", "min": 5, "purpose": "close and schedule" }
+        {
+          "id": "F",
+          "min": 5,
+          "purpose": "close and schedule"
+        }
       ]
     },
     {
@@ -60,7 +77,6 @@
     }
   ],
   "scheduling_rule": "sessions 2-4 have no dates by design; scheduling against a calendar rather than resolved evidence invites approval under schedule pressure",
-
   "adr_status": [
     {
       "id": "ADR-003",
@@ -192,7 +208,6 @@
       "note": "ln_central empty proves nothing about central Neo4j - different stores"
     }
   ],
-
   "blocking_questions": [
     {
       "id": "OQ-1",
@@ -288,7 +303,6 @@
   ],
   "blocking_questions_parallelizable": true,
   "blocking_questions_elapsed_if_parallel_days": 2,
-
   "reviewer_assignments": {
     "Security": {
       "owns": ["ADR-003", "ADR-005", "ADR-007"],
@@ -307,13 +321,18 @@
       "owns": ["ADR-006"],
       "reviews": ["ADR-001", "ADR-002", "ADR-005", "ADR-010"]
     },
-    "Platform Ops": { "owns": ["ADR-009"], "reviews": ["ADR-007"] },
+    "Platform Ops": {
+      "owns": ["ADR-009"],
+      "reviews": ["ADR-007"]
+    },
     "Privacy/Governance": {
       "reviews": ["ADR-002", "ADR-003", "ADR-004", "ADR-005", "ADR-006", "ADR-007", "ADR-008"]
     },
-    "Engineering Lead": { "role": "escalation_authority", "required": ["session_1"] }
+    "Engineering Lead": {
+      "role": "escalation_authority",
+      "required": ["session_1"]
+    }
   },
-
   "cross_validation": {
     "session_1_acceptances_invalidate_other_adrs": false,
     "contradictions_found": 1,
@@ -328,7 +347,6 @@
     ],
     "new_finding": "Sprint 1 single-writer scan excludes apps/api-gateway (RES-2) - strengthens ADR-009 case but does not unblock OQ-7"
   },
-
   "health_indicators": {
     "decisions_made_on_absent_evidence": 0,
     "adrs_accepted_without_owners": 0,
@@ -337,5 +355,34 @@
     "invariants_protected_by_memory_alone": 0,
     "production_mutations_before_closure": 0,
     "red_indicators": 1
+  },
+  "credential_free_investigation": {
+    "date": "2026-07-30",
+    "commit": "a64c7a4c",
+    "findings": "docs/semantic-platform/review/OQ_INVESTIGATION_FINDINGS.md",
+    "read_only": true,
+    "adr_status_changed": false,
+    "fully_answered": ["OQ-5", "IQ-3"],
+    "substantially_answered": ["OQ-11"],
+    "partially_answered": ["OQ-6", "OQ-1"],
+    "adr_impact": {
+      "ADR-001": "strengthened; 0 named consumers so WP-400 re-pointing reduces to verification; no aggregation period defined",
+      "ADR-005": "premise confirmed; Qdrant payload has no trust field (absent, not dormant)",
+      "ADR-006": "reduced but not collapsed; root entity_id inherited and NOT tenant-qualified; idx-based child ids unstable across normalizer reordering",
+      "ADR-009": "RES-2 severity Medium->Low; api-gateway has 0 write-Cypher"
+    },
+    "new_findings": [
+      "X-5 legacy retriever hardcodes 5 relationship literals (accepted exception, drift risk on rollback path)",
+      "X-6 RES-2 downgraded",
+      "X-7 trust fields absent from Qdrant payload",
+      "X-8 root entity_id not tenant-qualified",
+      "X-9 TransactionSummary has no defined aggregation period"
+    ],
+    "methodology_defect_found": "Sprint 1 I-10 gate tokenizes on whitespace and would miss literals inside Cypher punctuation",
+    "remaining_live_evidence": [
+      "OQ-1 distinct (account_id, period) tuples vs node count",
+      "OQ-6 source-table key definition (schema read)",
+      "OQ-11 query logs (optional; absence-in-code may suffice)"
+    ]
   }
 }

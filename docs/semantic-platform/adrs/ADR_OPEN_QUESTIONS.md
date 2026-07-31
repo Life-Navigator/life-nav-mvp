@@ -3,6 +3,11 @@
 **Date:** 2026-07-30. Unresolved assumptions that must be answered before the ADRs they affect can move
 from `Proposed` to `Accepted`. Each states how to resolve it and what changes if the answer is negative.
 
+> **2026-07-30 — credential-free investigation complete.** See
+> `docs/semantic-platform/review/OQ_INVESTIGATION_FINDINGS.md`.
+> **OQ-5 and IQ-3 fully answered. OQ-11 substantially answered. OQ-6 and OQ-1 partial.**
+> No ADR status changed; remaining gaps are live-data only.
+
 ---
 
 | ID        | Question                                                                                             | Affects                | Blocking?                          | How to resolve                                                                                 | If negative                                                                                                        |

@@ -3,6 +3,11 @@
 **Date:** 2026-07-30 · Phase 11. **0 of 9 blocking questions currently have an owner.** That is the
 programme's actual critical path — not any engineering task.
 
+> **2026-07-30 — credential-free investigation complete.** See
+> `docs/semantic-platform/review/OQ_INVESTIGATION_FINDINGS.md`.
+> **OQ-5 and IQ-3 fully answered. OQ-11 substantially answered. OQ-6 and OQ-1 partial.**
+> No ADR status changed; remaining gaps are live-data only.
+
 Classification per the brief: _Implementation blocker · Operational blocker · Architectural blocker ·
 Research item · Deferred._
 

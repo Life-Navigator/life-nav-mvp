@@ -31,6 +31,18 @@ parallelised: ~2 days. This is the cheapest unblock available to the programme.
 
 ---
 
+## 1b. Credential-free investigations completed 2026-07-30
+
+Findings: `OQ_INVESTIGATION_FINDINGS.md`. **No ADR status changed.**
+
+| OQ        | State                         | Outcome                                                                                                                                                                                 |
+| --------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **OQ-5**  | ✅ **FULLY ANSWERED**         | Qdrant payload has 12 fields; trust/review state **ABSENT**, not dormant. Confirms ADR-005 premise                                                                                      |
+| **OQ-11** | ✅ **substantially answered** | **0 named consumers** in serving code; one indirect family-based consumer. Does **not** reject ADR-001 — its trigger did not fire. Reduces WP-400 re-pointing to a verification step    |
+| **OQ-6**  | 🟡 partial                    | Children + point ids deterministic & tenant-scoped; **root `entity_id` is inherited from source and NOT tenant-qualified**; `idx`-based child ids unstable across normalizer reordering |
+| **OQ-1**  | 🟡 partial                    | **No aggregation period defined anywhere**; source is `finance.transactions` (per-transaction rows). Live count still required                                                          |
+| **IQ-3**  | ✅ **FULLY ANSWERED**         | api-gateway: 0 write-Cypher → RES-2 **Medium→Low**. 5 relationship literals in **legacy `retriever.py`** = accepted exception with drift risk                                           |
+
 ## 2. Evidence already verified — no further work
 
 | Claim                                              | Evidence                                          | Verified      |
