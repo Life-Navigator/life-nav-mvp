@@ -266,7 +266,8 @@ def get_platform_access(
     supabase: SupabaseClient = Depends(get_supabase),
     settings: Settings = Depends(get_settings),
 ) -> PlatformAccess:
-    return PlatformAccess(supabase=supabase, admin_emails=settings.admin_email_set())
+    return PlatformAccess(supabase=supabase, admin_emails=settings.admin_email_set(),
+                          response_reviewer_emails=settings.response_reviewer_email_set())
 
 
 def get_life_discovery(supabase: SupabaseClient = Depends(get_supabase)) -> LifeDiscoveryService:

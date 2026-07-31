@@ -24,12 +24,31 @@ def _now() -> str:
 
 
 class PlatformAccess:
-    def __init__(self, supabase: SupabaseClient, admin_emails: set[str]) -> None:
+    def __init__(self, supabase: SupabaseClient, admin_emails: set[str],
+                 response_reviewer_emails: Optional[set[str]] = None) -> None:
         self._sb = supabase
         self._admins = admin_emails
+        self._response_reviewers = response_reviewer_emails or set()
 
     def is_admin(self, email: Optional[str]) -> bool:
         return email is not None and email.lower() in self._admins
+
+    def can_review_advisor_responses(self, email: Optional[str]) -> bool:
+        """The narrow `advisor_response_reviewer` capability (R-3 / B-23).
+
+        Platform admins inherit it EXPLICITLY — the inheritance is written here, in one place, so
+        it is visible and testable rather than implied by an unrelated admin check scattered across
+        routes. The converse does NOT hold: a reviewer is never an admin, and every other admin
+        endpoint keeps using `is_admin`, so review access cannot widen into administration.
+
+        Matching is exact and normalized against a configured set. Never a domain rule, never a
+        substring, never a client-supplied claim — a domain rule would grant review access to every
+        future account on that domain.
+        """
+        if email is None:
+            return False
+        normalized = email.lower()
+        return normalized in self._admins or normalized in self._response_reviewers
 
     async def get_settings(self, ctx: UserContext) -> dict[str, Any]:
         rows = await self._sb.select("user_settings", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema=PLATFORM)

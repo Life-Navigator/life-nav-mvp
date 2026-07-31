@@ -71,9 +71,18 @@ class Settings(BaseSettings):
 
     # Comma-separated allow-list of admin emails (platform-wide metrics access).
     admin_emails: str = ""
+    # Narrow `advisor_response_reviewer` capability (R-3 / B-23). Comma-separated, exact emails.
+    # Reviewers get response-review permissions ONLY — never broader platform administration.
+    # Admins inherit this capability explicitly (see PlatformAccess.can_review_advisor_responses).
+    response_reviewer_emails: str = ""
 
     def admin_email_set(self) -> set[str]:
         return {e.strip().lower() for e in self.admin_emails.split(",") if e.strip()}
+
+    def response_reviewer_email_set(self) -> set[str]:
+        """Exact, normalized reviewer identities. No domain or substring matching — a domain-wide
+        rule would silently grant review access to every future account on that domain."""
+        return {e.strip().lower() for e in self.response_reviewer_emails.split(",") if e.strip()}
 
 
 @lru_cache(maxsize=1)

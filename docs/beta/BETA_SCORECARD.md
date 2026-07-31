@@ -117,6 +117,18 @@ Not everything is unknown. These are verified and reproducible:
 | Review-queue surface                   | schema ready, no UI           | ❌                                         |
 | Beta decision                          | **NO-GO unchanged**           | —                                          |
 
+## 6d. R-3 status (2026-07-31)
+
+| Component                          | Status                                 |
+| ---------------------------------- | -------------------------------------- |
+| Reporting backend + ownership      | ✅ Implemented, mutation-proven        |
+| turn_id contract + history         | ✅ Implemented                         |
+| User reporting UI + a11y           | ✅ Implemented, 0 serious/critical axe |
+| Reviewer capability + APIs + audit | ✅ Implemented, 7 mutations proven     |
+| Reviewer UI (B-27)                 | ❌ not built                           |
+| Deployed verification              | ❌ pending                             |
+| Beta decision                      | **NO-GO unchanged**                    |
+
 ## 7. Reading the scorecard
 
 **Backend correctness is well-evidenced. Product behaviour is not evidenced at all.** 1,062 backend

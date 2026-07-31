@@ -11,6 +11,7 @@ from ..auth import AuthenticatedUser
 from ..dependencies import authenticated, get_analytics_service, get_platform_access, get_supabase
 from ..models.common import UserContext
 from ..services.response_reports import ReportRejected, ResponseReportService
+from ..services.response_review import ResponseReviewService, ReviewForbidden, ReviewRejected
 from ..services.analytics import EVENT_TYPES, AnalyticsService
 from ..services.pilot_service import FeedbackService, PilotAnalyticsService
 from ..services.platform_access import PlatformAccess
@@ -124,3 +125,81 @@ async def report_advisor_response(
         "duplicate": result.duplicate,
         "status": "received",
     }
+
+
+# ── Advisor-response report REVIEW (R-3 / B-23) ──────────────────────────────────────────────────
+# Guarded by the narrow `advisor_response_reviewer` capability, NOT by is_admin. Admins inherit it
+# explicitly inside PlatformAccess; reviewers gain nothing beyond these three endpoints.
+
+def _review_service(sb, access) -> ResponseReviewService:
+    return ResponseReviewService(sb, access)
+
+
+@router.get("/admin/response-reports")
+async def list_response_reports(
+    user: AuthenticatedUser = Depends(authenticated),
+    sb=Depends(get_supabase),
+    access: PlatformAccess = Depends(get_platform_access),
+    category: str = "", review_status: str = "", severity: str = "",
+    deployment_version: str = "", prompt_version: str = "", model_name: str = "",
+    assigned_to: str = "", limit: int = 25, offset: int = 0,
+):
+    """Review queue. Returns queue columns ONLY — no question or response snapshot."""
+    ctx = UserContext(user_id=user.user_id)
+    try:
+        return await _review_service(sb, access).list_reports(
+            ctx, user.email,
+            filters={"category": category, "review_status": review_status, "severity": severity,
+                     "deployment_version": deployment_version, "prompt_version": prompt_version,
+                     "model_name": model_name, "assigned_to": assigned_to},
+            limit=limit, offset=offset,
+        )
+    except ReviewForbidden as exc:
+        raise HTTPException(status_code=403, detail="Response review access required") from exc
+
+
+@router.get("/admin/response-reports/{report_id}")
+async def get_response_report(
+    report_id: str,
+    user: AuthenticatedUser = Depends(authenticated),
+    sb=Depends(get_supabase),
+    access: PlatformAccess = Depends(get_platform_access),
+):
+    """One report's preserved evidence plus its append-only audit history."""
+    ctx = UserContext(user_id=user.user_id)
+    try:
+        return await _review_service(sb, access).get_report(ctx, user.email, report_id)
+    except ReviewForbidden as exc:
+        raise HTTPException(status_code=403, detail="Response review access required") from exc
+    except ReviewRejected as exc:
+        raise HTTPException(status_code=404, detail="Report not found") from exc
+
+
+@router.patch("/admin/response-reports/{report_id}")
+async def update_response_report(
+    report_id: str,
+    user: AuthenticatedUser = Depends(authenticated),
+    sb=Depends(get_supabase),
+    access: PlatformAccess = Depends(get_platform_access),
+    payload: dict = Body(...),
+):
+    """Assignment, severity, status transition, note, duplicate linkage, escalation.
+
+    Evidence columns are unreachable: the service builds its patch from these fields only, so no
+    request shape can edit a question snapshot, a reporter, a tenant or a turn id. There is no
+    delete endpoint.
+    """
+    ctx = UserContext(user_id=user.user_id)
+    body = payload or {}
+    try:
+        return await _review_service(sb, access).update_review(
+            ctx, user.email, report_id,
+            assigned_to=body.get("assigned_to"), severity=body.get("severity"),
+            review_status=body.get("review_status"), note=body.get("note"),
+            duplicate_of=body.get("duplicate_of"), escalate=bool(body.get("escalate")),
+        )
+    except ReviewForbidden as exc:
+        raise HTTPException(status_code=403, detail="Response review access required") from exc
+    except ReviewRejected as exc:
+        detail = str(exc)
+        raise HTTPException(status_code=404 if detail == "not found" else 400, detail=detail) from exc
