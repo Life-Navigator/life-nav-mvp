@@ -1,7 +1,8 @@
 # Gate Table — 5-user invite-only beta, target 2026-08-02
 
 **Prompt 0 preflight SHA:** `e8b0dac4e4417fe58c2dbf2ea291903ec97bbdab` — **no longer the candidate**
-**Frozen candidate SHA:** recorded at freeze (see `release-manifest.md §0` for the full taxonomy)
+**Release-infrastructure SHA:** `65cfd1a1ad63384058284eea6824e70836575bea`
+**Frozen candidate SHA:** tag `beta-candidate-2026-08-02` (see `release-manifest.md §0` for the full taxonomy)
 **Tested SHA:** _(none — no gate has yet been executed against a deployed candidate)_
 **Generated:** 2026-07-31 (Prompt 0) · **Updated:** 2026-07-31 (Prompt 1A)
 
