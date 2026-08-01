@@ -1,0 +1,39 @@
+{
+  "all_dependencies_healthy": true,
+  "authenticated_checks_pending": [
+    "auth.login",
+    "advisor.chat",
+    "report.submit",
+    "consent.record",
+    "download.document",
+    "flags.state",
+    "version.sha"
+  ],
+  "candidate_sha": "e8b0dac4e4417fe58c2dbf2ea291903ec97bbdab",
+  "gate": "SMOKE deployed dependencies",
+  "generated_at": "2026-08-01T05:26:53.656542+00:00",
+  "graph_grounding_expected": "false",
+  "graph_grounding_observed": "REQUIRES FLY_API_TOKEN \u2014 cannot read runtime flags without platform access",
+  "note": "A healthy /readyz proves dependencies are reachable from the API. It proves nothing about tenant isolation or answer quality.",
+  "unauthenticated": [
+    {
+      "body": "{\"status\":\"ok\"}",
+      "latency_s": 0.231,
+      "name": "api.healthz",
+      "status": 200
+    },
+    {
+      "body": "{\"status\":\"ok\",\"services\":{\"supabase\":true,\"qdrant\":true,\"neo4j\":true,\"gemini\":true}}",
+      "latency_s": 0.138,
+      "name": "api.readyz",
+      "status": 200
+    },
+    {
+      "body": "<!DOCTYPE html><html data-dpl-id=\"dpl_8ctNCH5UraEWCN37rVLLC5s4SAqA\" lang=\"en\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" href=\"/_next/static/media/5f402bd2d8eef81a-s.p.16whm0euli40m.woff2?dpl=dpl_8ctNCH5UraEWCN37rVLLC5s4SAqA\" as=\"font\" crossorigin=\"\" type=\"font/woff2\"/><link rel=\"preload\" href=\"/_next/static/media/797e433ab",
+      "latency_s": 0.34,
+      "name": "web.home",
+      "status": 200
+    }
+  ],
+  "verdict": "PARTIAL \u2014 unauthenticated only"
+}

@@ -1,0 +1,27 @@
+{
+  "candidate_sha": "e8b0dac4e4417fe58c2dbf2ea291903ec97bbdab",
+  "checks": [
+    {
+      "detail": "{\"detail\":\"Not Found\"}",
+      "http_status": 404,
+      "reason": "unexpected HTTP 404",
+      "tier": "core-api",
+      "url": "https://lifenavigator-core-api.fly.dev/version",
+      "verdict": "FAIL"
+    },
+    {
+      "detail": "{\"error\":\"Unauthorized\",\"code\":\"unauthenticated\"}",
+      "http_status": 401,
+      "reason": "unexpected HTTP 401",
+      "tier": "web",
+      "url": "https://lifenavigator.tech/api/version",
+      "verdict": "FAIL"
+    }
+  ],
+  "expected_candidate_sha": "e8b0dac4e4417fe58c2dbf2ea291903ec97bbdab",
+  "gate": "R-5 deployed SHA proof",
+  "generated_at": "2026-08-01T05:51:50.404973+00:00",
+  "note": "Both tiers must report the candidate SHA. A 503 means the build forgot to inject it \u2014 that is a failure, not an unknown.",
+  "tiers_checked": 2,
+  "verdict": "FAIL"
+}

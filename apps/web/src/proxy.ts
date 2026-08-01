@@ -25,6 +25,11 @@ function isPublicRoute(path: string): boolean {
   if (path.startsWith('/auth/')) return true;
   if (path.startsWith('/api/auth')) return true;
   if (path.startsWith('/api/waitlist')) return true; // public access-request form (no auth required)
+  // Release identity (Gate H). Deliberately unauthenticated: its entire purpose is letting anyone —
+  // including an auditor with no credentials — prove which commit is serving. Gated behind auth it
+  // would prove nothing. It returns only the commit SHA, build time and environment name; never
+  // infrastructure detail. See src/app/api/version/route.ts.
+  if (path === '/api/version') return true;
   if (path.startsWith('/_next')) return true;
   if (path.startsWith('/static')) return true;
   if (path.includes('/favicon')) return true;

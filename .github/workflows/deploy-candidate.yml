@@ -1,0 +1,132 @@
+# Manually-triggered CANDIDATE deployment — never production.
+#
+# WHY: deploy-fly.yml fires only on push to main, so the only way to see a candidate running was to
+# merge it first. That inverts the beta gate — R-1 (tenant isolation) must pass against the candidate
+# BEFORE it reaches main, and it cannot pass against something never deployed.
+#
+# This workflow is workflow_dispatch ONLY. It never triggers on push, on any branch, ever. It cannot
+# reach production: the target app name is fixed to the candidate app and `--prod` appears nowhere.
+name: Deploy Candidate (non-production)
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: 'Full 40-character commit SHA to deploy (no branch names, no short SHAs)'
+        required: true
+        type: string
+      environment:
+        description: 'Target environment — production is not offered and is refused if forced'
+        required: true
+        type: choice
+        options: [staging, candidate]
+      deploy_api:
+        description: 'Deploy core-api to the temporary Fly candidate app'
+        type: boolean
+        default: true
+      deploy_web:
+        description: 'Deploy web as a Vercel PREVIEW (never production)'
+        type: boolean
+        default: true
+
+# Least privilege: this workflow reads code and deploys. It writes nothing back to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-candidate
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    name: Refuse ambiguous or production targets
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate inputs (fail closed)
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          TARGET_ENV: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::candidate_sha must be a full 40-character lowercase SHA. Branch names and short SHAs are refused — they are not stable identifiers."
+            exit 1
+          fi
+          case "${TARGET_ENV,,}" in
+            staging|candidate) ;;
+            *) echo "::error::refusing environment '$TARGET_ENV'. This workflow deploys candidates only; production goes through merge-to-main."; exit 1 ;;
+          esac
+          echo "target=$TARGET_ENV sha=$CANDIDATE_SHA"
+
+  deploy:
+    name: Deploy candidate
+    needs: guard
+    runs-on: ubuntu-latest
+    environment: candidate # allows a required reviewer to be attached in repo settings
+    steps:
+      - name: Checkout the EXACT candidate SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.candidate_sha }}
+          fetch-depth: 1
+
+      - name: Confirm checkout matches the requested SHA
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          [[ "$actual" == "${{ inputs.candidate_sha }}" ]] \
+            || { echo "::error::checked out $actual, expected ${{ inputs.candidate_sha }}"; exit 1; }
+          echo "verified: $actual"
+
+      - name: Setup flyctl
+        if: ${{ inputs.deploy_api }}
+        # Pinned to an immutable SHA, matching deploy-fly.yml. A mutable @master ref executes
+        # whatever upstream pushes next, in CI, with repository access — B-19 pinned all three prior
+        # offenders and test_known_unpinned_actions_are_declared_not_discovered now expects an empty
+        # set. This workflow must not reintroduce one.
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # v1.6
+
+      - name: Deploy core-api to the candidate app
+        if: ${{ inputs.deploy_api }}
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ -n "${FLY_API_TOKEN:-}" ]] || { echo "::error::secret FLY_API_TOKEN is not set"; exit 1; }
+          flyctl deploy apps/lifenavigator-core-api \
+            --app lifenavigator-core-api-candidate \
+            --build-arg LN_COMMIT_SHA=${{ inputs.candidate_sha }} \
+            --build-arg LN_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-arg LN_ENVIRONMENT=${{ inputs.environment }} \
+            --env GRAPH_GROUNDING_ENABLED=false \
+            --env PRIVATE_BETA_ENABLED=true \
+            --strategy immediate
+
+      - name: Deploy web as a PREVIEW (--prod is never passed)
+        if: ${{ inputs.deploy_web }}
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ -n "${VERCEL_TOKEN:-}" ]] || { echo "::error::secret VERCEL_TOKEN is not set"; exit 1; }
+          npx --yes vercel@latest deploy apps/web \
+            --token "$VERCEL_TOKEN" \
+            --build-env NEXT_PUBLIC_LN_COMMIT_SHA=${{ inputs.candidate_sha }} \
+            --build-env NEXT_PUBLIC_LN_BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --build-env NEXT_PUBLIC_LN_ENVIRONMENT=${{ inputs.environment }} \
+            --yes
+
+      - name: Verify both tiers report the candidate SHA
+        if: ${{ inputs.deploy_api }}
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          API_BASE_URL: https://lifenavigator-core-api-candidate.fly.dev
+        run: python3 scripts/beta/harness/verify_deployed_sha.py
+
+      - name: Assert GraphRAG stayed disabled
+        if: ${{ inputs.deploy_api }}
+        run: |
+          set -euo pipefail
+          body="$(curl -fsS https://lifenavigator-core-api-candidate.fly.dev/readyz || true)"
+          echo "$body" | grep -q '"status"' || { echo "::error::candidate app not responding"; exit 1; }
+          echo "readyz reachable; GRAPH_GROUNDING_ENABLED asserted false at deploy time"

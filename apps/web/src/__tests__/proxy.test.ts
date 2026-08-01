@@ -66,6 +66,17 @@ describe('Proxy (auth gating)', () => {
     expect(NextResponse.redirect).not.toHaveBeenCalled();
   });
 
+  it('leaves /api/version reachable without authentication (Gate H release identity)', async () => {
+    // An identity endpoint behind auth proves nothing: the whole point is that an auditor with no
+    // credentials can verify which commit is serving.
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+
+    const req = createMockRequest('/api/version');
+    await proxy(req);
+
+    expect(NextResponse.redirect).not.toHaveBeenCalled();
+  });
+
   it('redirects unauthenticated users from protected routes to login', async () => {
     mockGetUser.mockResolvedValue({ data: { user: null } });
 

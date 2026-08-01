@@ -14,8 +14,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // B-25: lift the persisted turn id out of metadata so history responses are reportable.
   // ASSISTANT ONLY — a user or system message must never carry an advisor turn id. Nothing else
   // from metadata is exposed: it may hold diagnostic fields the client has no business seeing.
-  const messages = rows.map((m: Record<string, unknown>) => {
-    const meta = (m.metadata ?? {}) as Record<string, unknown>;
+  const messages = rows.map((m) => {
+    const meta = ((m as { metadata?: unknown }).metadata ?? {}) as Record<string, unknown>;
     const turnId =
       m.role === 'assistant' && typeof meta.turn_id === 'string' ? meta.turn_id : undefined;
     const { metadata: _drop, ...rest } = m;

@@ -102,7 +102,24 @@ const securityHeaders = [
   }
 ];
 
+// ── Release identity (GET /api/version, Gate H) ───────────────────────────────────────────────────
+// Bake the commit SHA into the BUILD rather than reading it at request time. Vercel sets
+// VERCEL_GIT_COMMIT_SHA during the build; re-exporting it here freezes it into the output, so the
+// endpoint reports the commit that produced the bundle — not whatever the serving environment holds.
+// Only non-sensitive build metadata may be added here: everything in `env` is inlined into the
+// client bundle and is therefore public by construction.
+const releaseIdentityEnv = {
+  NEXT_PUBLIC_LN_COMMIT_SHA:
+    process.env.NEXT_PUBLIC_LN_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || '',
+  NEXT_PUBLIC_LN_BUILD_TIME:
+    process.env.NEXT_PUBLIC_LN_BUILD_TIME || new Date().toISOString(),
+  NEXT_PUBLIC_LN_ENVIRONMENT:
+    process.env.NEXT_PUBLIC_LN_ENVIRONMENT || process.env.VERCEL_ENV || 'development',
+  NEXT_PUBLIC_LN_APP_VERSION: process.env.NEXT_PUBLIC_LN_APP_VERSION || '',
+};
+
 const nextConfig: NextConfig = {
+  env: releaseIdentityEnv,
   reactStrictMode: true,
   images: {
     remotePatterns: [

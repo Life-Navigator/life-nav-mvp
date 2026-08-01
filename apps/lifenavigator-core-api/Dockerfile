@@ -27,8 +27,24 @@ RUN chmod +x ./entrypoint.sh
 # as `core` made every Vertex token fetch fail with EACCES on that socket -> the advisor fell back for ALL users.
 RUN useradd --system --uid 10001 core && chown -R core:core /app
 
+# ── Release identity (GET /version, Gate H) ───────────────────────────────────────────────────────
+# INJECTED AT BUILD TIME. The image has no .git, so /version cannot derive this at runtime — that is
+# the point: a runtime git read reports whatever tree the process sits in, which in a container is a
+# lie and in a dev shell is the uncommitted tree. Pass with:
+#   --build-arg LN_COMMIT_SHA=$(git rev-parse HEAD) --build-arg LN_BUILD_TIME=$(date -u +%FT%TZ)
+# Left EMPTY by default on purpose: /version returns 503 in staging/production when the SHA is
+# absent, so a build that forgot to inject it fails loudly instead of serving "unknown".
+ARG LN_COMMIT_SHA=""
+ARG LN_BUILD_TIME=""
+ARG LN_APP_VERSION=""
+ARG LN_ENVIRONMENT="production"
+
 ENV PORT=8080 \
-    LOG_LEVEL=info
+    LOG_LEVEL=info \
+    LN_COMMIT_SHA=${LN_COMMIT_SHA} \
+    LN_BUILD_TIME=${LN_BUILD_TIME} \
+    LN_APP_VERSION=${LN_APP_VERSION} \
+    LN_ENVIRONMENT=${LN_ENVIRONMENT}
 
 EXPOSE 8080
 

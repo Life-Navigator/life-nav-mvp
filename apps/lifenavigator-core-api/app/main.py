@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import get_settings
-from .routers import benefits, career_domain, chat, decision, documents, education_domain, family_domain, finance, health, health_domain, analytics, life as life_discovery_router, life_graph, life_profile, military, plaid, platform_router, readiness, recommendations, reports, share, tools
+from .routers import benefits, career_domain, chat, decision, documents, education_domain, family_domain, finance, health, health_domain, analytics, life as life_discovery_router, life_graph, life_profile, military, plaid, platform_router, readiness, recommendations, reports, share, tools, version
 
 
 def _configure_logging(level: str) -> None:
@@ -52,6 +52,9 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router)
+    # Release identity (/version). Registered beside health because it answers the same class of
+    # question — "what is running?" — and Gate H depends on it being reachable without credentials.
+    app.include_router(version.router)
     app.include_router(health_domain.router)
     app.include_router(career_domain.router)
     app.include_router(education_domain.router)
