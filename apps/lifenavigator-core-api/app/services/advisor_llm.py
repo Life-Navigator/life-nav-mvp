@@ -364,6 +364,59 @@ def parse_advisor_json(raw: str) -> Optional[dict[str, Any]]:
             return None
 
 
+def _max_output_for(_model_name: str = "") -> Optional[int]:
+    """Configured output ceiling, or None for no cap (the default — see model_registry).
+
+    Takes the model name only so call sites read naturally; the cap is currently global. It is NOT
+    derived from `MODELS[*].max_tokens` — that field is documentation, and its 2048 value is one this
+    repo has already proven truncates advisor plans into fallback.
+    """
+    from . import model_registry as _reg  # local import: avoids a module-import cycle
+    try:
+        return _reg.advisor_max_output_tokens()
+    except Exception:  # noqa: BLE001 — a config lookup must never break a turn
+        return None
+
+
+def _accepts_max_output(fn: Any) -> bool:
+    """True when `fn` accepts a `max_output_tokens` keyword.
+
+    Checked by SIGNATURE rather than by calling and catching TypeError. A try/call/retry would be
+    the obvious shortcut, but a TypeError raised *inside* the client after the HTTP request had
+    already gone out would make the retry a second billed generation. Inspecting first cannot
+    double-bill. The result is cached per function object, so this costs one `signature()` call per
+    client class, not one per turn.
+
+    This exists because the kwarg is new: older/stub clients (and test doubles) define
+    `generate_with_usage(system, user, temperature=None)` and must keep working untouched.
+    """
+    # Unwrap to the underlying function: a bound method is a NEW object on every attribute access and
+    # hashes per instance, so caching the bound method would never hit (a fresh wrapper is built per
+    # request via DI). The plain function is shared by the class.
+    key = getattr(fn, "__func__", fn)
+    cached = _MAX_OUTPUT_SUPPORT.get(key)
+    if cached is not None:
+        return cached
+    try:
+        import inspect  # noqa: PLC0415
+        params = inspect.signature(fn).parameters
+        ok = "max_output_tokens" in params or any(
+            p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+        )
+    except (TypeError, ValueError):  # un-introspectable callable → assume the old signature
+        ok = False
+    try:
+        _MAX_OUTPUT_SUPPORT[key] = ok
+    except TypeError:  # unhashable callable — correctness over caching
+        pass
+    return ok
+
+
+# Keyed by the bound method's underlying function, so the cache is per client CLASS, not per instance
+# (a fresh wrapper is constructed per request via DI — an instance-keyed cache would never hit).
+_MAX_OUTPUT_SUPPORT: dict[Any, bool] = {}
+
+
 def _temperature_for(plan: dict[str, Any]) -> float:
     return TEMPERATURE.get(str(plan.get("intent") or "discovery"), _DEFAULT_TEMPERATURE)
 
@@ -402,7 +455,19 @@ class GeminiAdvisorLLM:
         user = json.dumps({"guardrails": context.prompt_dict(), "constraints": plan}, ensure_ascii=False, default=str)
         prompt = f"GUARDRAILS_AND_CONSTRAINTS:\n{user}\n\nReason within these guardrails and return the JSON object now."
         try:
-            raw, usage = await self._g.generate_with_usage(_system_for(context), prompt, temperature=_temperature_for(plan))
+            # Cap output tokens from the registry's per-model ceiling. Output is the expensive side of
+            # the bill (e.g. $2.50/1M out vs $0.30/1M in on 2.5-flash) and was previously uncapped, so
+            # one pathological generation had no upper bound. None → the client omits the field, so an
+            # unregistered model keeps today's behaviour rather than getting a guessed limit. The
+            # kwarg is only passed to clients whose signature accepts it, so older clients and test
+            # doubles keep working unchanged.
+            _gwu = self._g.generate_with_usage
+            _cap = _max_output_for(self.model_name)
+            if _cap is not None and _accepts_max_output(_gwu):
+                raw, usage = await _gwu(_system_for(context), prompt,
+                                        temperature=_temperature_for(plan), max_output_tokens=_cap)
+            else:
+                raw, usage = await _gwu(_system_for(context), prompt, temperature=_temperature_for(plan))
             self.last_usage, self.last_raw = usage, raw or ""
             out = parse_advisor_json(raw)
             if out is None:
@@ -499,10 +564,28 @@ class VertexClaudeAdvisorLLM:
                 data = r.json()
             raw = "".join(b.get("text", "") for b in (data.get("content") or []) if b.get("type") == "text")
             u = data.get("usage") or {}
+            # Anthropic and Gemini report cached tokens with DIFFERENT semantics, and the cost model
+            # assumes one of them:
+            #   Gemini    `cachedContentTokenCount` is a SUBSET of `promptTokenCount`.
+            #   Anthropic `cache_read_input_tokens` is SEPARATE from `input_tokens` and additive.
+            # llm_cost.cost_usd_micros treats cached as a subset (it subtracts to get the uncached
+            # remainder), so Anthropic's counts are normalized to the subset convention here by
+            # folding cache reads back into the prompt total. Reporting `input_tokens` alone would
+            # undercount a cache-heavy turn's prompt size and, once Phase 1 lands, make caching look
+            # like it reduced total tokens rather than their price.
+            # `cache_creation_input_tokens` is likewise separate, and cache WRITES bill at a premium
+            # (~1.25x input). Omitting them made a cache-priming turn — the first turn of every
+            # conversation — look free, which would flatter Phase 1 exactly where it costs most.
+            _cache_read = int(u.get("cache_read_input_tokens") or 0)
+            _cache_write = int(u.get("cache_creation_input_tokens") or 0)
+            _in = int(u.get("input_tokens") or 0) + _cache_read + _cache_write
+            _out = int(u.get("output_tokens") or 0)
             self.last_usage = {
-                "prompt_tokens": int(u.get("input_tokens") or 0),
-                "completion_tokens": int(u.get("output_tokens") or 0),
-                "total_tokens": int((u.get("input_tokens") or 0) + (u.get("output_tokens") or 0)),
+                "prompt_tokens": _in,
+                "completion_tokens": _out,
+                "total_tokens": _in + _out,
+                "cached_prompt_tokens": _cache_read,
+                "cache_write_prompt_tokens": _cache_write,
             }
             self.last_raw = raw or ""
             return parse_advisor_json(raw)

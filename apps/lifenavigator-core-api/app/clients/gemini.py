@@ -42,6 +42,61 @@ async def _request_with_retry(
     return resp
 
 
+# ── Shared request/response shapes (AI Studio and Vertex speak the same generateContent dialect) ──
+# Both clients built these inline and drifted: only one of them needs to learn a new usage field for
+# the other to start under-reporting. One definition each, used by both.
+
+def _generation_config(temperature: Optional[float], max_output_tokens: Optional[int]) -> dict[str, Any]:
+    """`generationConfig`, or {} when nothing is constrained (so the key is omitted entirely).
+
+    `maxOutputTokens` matters for cost, not just safety: output tokens are the expensive side of the
+    bill (e.g. $2.50/1M out vs $0.30/1M in on 2.5-flash), and without a cap a single pathological
+    generation is unbounded. The advisor's own ceiling comes from model_registry's per-model
+    `max_tokens`, so the cap travels with the model rather than being guessed here.
+    """
+    cfg: dict[str, Any] = {}
+    if temperature is not None:
+        cfg["temperature"] = float(temperature)
+    if max_output_tokens is not None and int(max_output_tokens) > 0:
+        cfg["maxOutputTokens"] = int(max_output_tokens)
+    return cfg
+
+
+def _usage_from(data: dict[str, Any]) -> dict[str, int]:
+    """Normalize Gemini's `usageMetadata` into billed tokens.
+
+    THINKING TOKENS ARE OUTPUT TOKENS.
+    ----------------------------------
+    On Gemini 2.5 (flash and pro — both in the registry, and pro is the default generation model),
+    reasoning tokens are reported in `thoughtsTokenCount`, are **excluded** from
+    `candidatesTokenCount`, and are **billed at the output rate**. Reading `candidatesTokenCount`
+    alone therefore understates the expensive side of the bill — on thinking-heavy turns by a large
+    multiple, which is precisely the failure services/llm_cost.py exists to prevent.
+
+    So `completion_tokens` is candidates + thoughts: what is BILLED as output. `thoughts_tokens` is
+    carried alongside so "how much of this turn was reasoning?" stays answerable.
+
+    This also keeps the arithmetic self-consistent. Google's `totalTokenCount` includes thoughts, and
+    `TurnUsage.totals` recomputes `total = in + out`; with thoughts folded into output those two
+    agree. Had they not, the ledger would have silently disagreed with the provider's own total on
+    every thinking turn.
+
+    `cached_prompt_tokens` is the portion of `prompt_tokens` served from a prompt cache — the ONLY way
+    to verify prompt caching actually engaged, since a caching change that silently fails to cache
+    looks identical to one that works if you only read total tokens. It is priced differently, so the
+    ledger needs it separated, not merged.
+    """
+    u = data.get("usageMetadata") or {}
+    thoughts = int(u.get("thoughtsTokenCount") or 0)
+    return {
+        "prompt_tokens": int(u.get("promptTokenCount") or 0),
+        "completion_tokens": int(u.get("candidatesTokenCount") or 0) + thoughts,
+        "thoughts_tokens": thoughts,
+        "total_tokens": int(u.get("totalTokenCount") or 0),
+        "cached_prompt_tokens": int(u.get("cachedContentTokenCount") or 0),
+    }
+
+
 class GeminiClient:
     provider = "google_aistudio"  # API-key auth (AI Studio). See VertexGeminiClient for the ADC path.
 
@@ -83,32 +138,31 @@ class GeminiClient:
             r.raise_for_status()
             return r.json()["embedding"]["values"]
 
-    async def generate(self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None) -> str:
-        text, _ = await self.generate_with_usage(system_prompt, user_prompt, temperature)
+    async def generate(self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None,
+                       max_output_tokens: Optional[int] = None) -> str:
+        text, _ = await self.generate_with_usage(system_prompt, user_prompt, temperature,
+                                                 max_output_tokens=max_output_tokens)
         return text
 
     async def generate_with_usage(
-        self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None
+        self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None,
+        *, max_output_tokens: Optional[int] = None,
     ) -> tuple[str, dict[str, int]]:
-        """Like generate() but also returns token usage {prompt_tokens, completion_tokens, total_tokens}
-        from Gemini's usageMetadata — for advisor telemetry / cost metering."""
+        """Like generate() but also returns token usage from Gemini's usageMetadata —
+        {prompt_tokens, completion_tokens, total_tokens, cached_prompt_tokens} — for the cost ledger."""
         url = f"{GEMINI_BASE}/{self._generation_model}:generateContent?key={self._api_key}"
         payload: dict[str, Any] = {
             "systemInstruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
         }
-        if temperature is not None:
-            payload["generationConfig"] = {"temperature": float(temperature)}
+        cfg = _generation_config(temperature, max_output_tokens)
+        if cfg:
+            payload["generationConfig"] = cfg
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             r = await _request_with_retry(lambda: client.post(url, json=payload), label="generate")
             r.raise_for_status()
             data = r.json()
-        u = data.get("usageMetadata") or {}
-        usage = {
-            "prompt_tokens": int(u.get("promptTokenCount") or 0),
-            "completion_tokens": int(u.get("candidatesTokenCount") or 0),
-            "total_tokens": int(u.get("totalTokenCount") or 0),
-        }
+        usage = _usage_from(data)
         try:
             return data["candidates"][0]["content"]["parts"][0]["text"], usage
         except (KeyError, IndexError, TypeError):
@@ -174,12 +228,15 @@ class VertexGeminiClient:
         # Token refresh is blocking (network); keep it off the event loop.
         return await asyncio.to_thread(self._tp.token)
 
-    async def generate(self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None) -> str:
-        text, _ = await self.generate_with_usage(system_prompt, user_prompt, temperature)
+    async def generate(self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None,
+                       max_output_tokens: Optional[int] = None) -> str:
+        text, _ = await self.generate_with_usage(system_prompt, user_prompt, temperature,
+                                                 max_output_tokens=max_output_tokens)
         return text
 
     async def generate_with_usage(
-        self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None
+        self, system_prompt: str, user_prompt: str, temperature: Optional[float] = None,
+        *, max_output_tokens: Optional[int] = None,
     ) -> tuple[str, dict[str, int]]:
         if not self.configured:
             raise RuntimeError("VertexGeminiClient is not configured (VERTEX_PROJECT / model missing).")
@@ -188,20 +245,16 @@ class VertexGeminiClient:
             "systemInstruction": {"parts": [{"text": system_prompt}]},
             "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
         }
-        if temperature is not None:
-            payload["generationConfig"] = {"temperature": float(temperature)}
+        cfg = _generation_config(temperature, max_output_tokens)
+        if cfg:
+            payload["generationConfig"] = cfg
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             r = await _request_with_retry(
                 lambda: client.post(self._endpoint(), json=payload, headers=headers), label="vertex-generate")
             r.raise_for_status()
             data = r.json()
-        u = data.get("usageMetadata") or {}
-        usage = {
-            "prompt_tokens": int(u.get("promptTokenCount") or 0),
-            "completion_tokens": int(u.get("candidatesTokenCount") or 0),
-            "total_tokens": int(u.get("totalTokenCount") or 0),
-        }
+        usage = _usage_from(data)
         try:
             return data["candidates"][0]["content"]["parts"][0]["text"], usage
         except (KeyError, IndexError, TypeError):

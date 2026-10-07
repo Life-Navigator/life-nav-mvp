@@ -22,7 +22,14 @@ _DEFAULTS = {
     "GEMINI_PRO_ADVISOR_ENABLED": "false",
     "HEALTH_SAFETY_FALLBACK_ENABLED": "true",   # deterministic, no LLM — safe to keep ON always
     "MODEL_USAGE_LIMITS_ENABLED": "false",
-    "USAGE_TRACKING_ENABLED": "false",          # write per-turn usage to analytics.model_usage (needs migration)
+    # Monthly per-user CALL COUNTERS for plan/quota enforcement → analytics.model_usage.
+    # (That migration, 20260616120000_pilot_routing.sql, IS applied — the older "needs migration"
+    # note here was stale.)
+    "USAGE_TRACKING_ENABLED": "false",
+    # Per-CALL token+cost ledger → analytics.llm_call_usage. Enable once
+    # 20261007000000_llm_call_usage.sql has applied; until then every turn would POST to a table
+    # that does not exist and log a warning per turn.
+    "CALL_USAGE_LEDGER_ENABLED": "false",
 }
 
 
@@ -107,6 +114,51 @@ def model_enabled(model_id_key: str) -> bool:
 
 def is_premium(model_id_key: str) -> bool:
     return bool(MODELS.get(model_id_key, {}).get("premium"))
+
+
+def normalize_model_id(model_id: str) -> str:
+    """Canonical form of a model id, for table lookups.
+
+    Providers decorate the same model two ways: Vertex appends an `@snapshot`
+    (`claude-opus-4-5@20251101`) and the REST surface prefixes `models/`. Neither changes which model
+    ran. ONE normalizer so a lookup cannot succeed in the price table and fail in another (or vice
+    versa) because the two stripped different decorations.
+    """
+    m = (model_id or "").strip().lower()
+    if m.startswith("models/"):
+        m = m[len("models/"):]
+    return m.split("@", 1)[0]
+
+
+def advisor_max_output_tokens() -> Optional[int]:
+    """Output-token ceiling for advisor generation, from `ADVISOR_MAX_OUTPUT_TOKENS`. None = no cap.
+
+    DELIBERATELY NOT SOURCED FROM `MODELS[*].max_tokens`, AND DEFAULT OFF.
+    -----------------------------------------------------------------------
+    An earlier cut of this read `max_tokens` (2048 for every entry). That field had no consumers —
+    it was documentation — and 2048 is a value this repository has already proven unsafe TWICE:
+
+      * `advisor_llm.py` (VertexClaude body): "2048 truncated long plans (workout/nutrition/estate)
+        → invalid JSON → fallback … 4096 matches Gemini's effective output headroom."
+      * The default generation model is `gemini-2.5-pro` (config.py), a THINKING model. Google counts
+        thinking tokens against `maxOutputTokens`, so thoughts alone can exhaust a small budget and
+        the response comes back `finishReason: MAX_TOKENS` with no text part. That parses to None →
+        retry → fallback: the advisor silently degrades to deterministic counsel on exactly the long,
+        high-value answers, while billing THREE generations per turn instead of one.
+
+    So the cap is opt-in and lives in config, not in code: unset means today's behaviour exactly
+    (the client omits the field). If you set it, 4096 is the floor the Claude path needed, and a
+    thinking model wants materially more than its expected visible output. Changing generation
+    behaviour is not a measurement task — verify against the eval harness before enabling.
+    """
+    raw = os.environ.get("ADVISOR_MAX_OUTPUT_TOKENS", "").strip()
+    if not raw:
+        return None
+    try:
+        v = int(raw)
+    except ValueError:
+        return None
+    return v if v > 0 else None
 
 
 # ── Plan limits (placeholders — set real commercial values via env/DB, never hardcode finals) ──

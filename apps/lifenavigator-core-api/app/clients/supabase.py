@@ -129,13 +129,19 @@ class SupabaseClient:
     async def insert(
         self,
         table: str,
-        row: dict[str, Any],
+        row: dict[str, Any] | list[dict[str, Any]],
         *,
         schema: str = "public",
     ) -> list[dict[str, Any]]:
         """Service-role insert (write path). Returns the inserted row(s) or [] on
         error. ``schema`` selects a non-public schema via ``Content-Profile``.
         Callers MUST set ``user_id`` from the verified JWT, never the request body.
+
+        ``row`` may be a single dict or a LIST of dicts — PostgREST bulk-inserts an array in one
+        round-trip. The list form was always supported on the wire (the payload is handed to httpx
+        unchanged); the annotation said otherwise, so callers with many rows looped and paid a
+        request each. Rows in a list must share the same keys, as PostgREST derives the column set
+        from the first element.
         """
         if not self.configured:
             return []

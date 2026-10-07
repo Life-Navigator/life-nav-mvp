@@ -37,6 +37,7 @@ from .advisor_context import AdvisorContextBuilder
 from .advisor_llm import AdvisorLLM, ADVISOR_PROMPT_VERSION
 from .advisor_validator import classify_issues, try_redact_number_block, validate
 from . import fact_domain_sync
+from . import llm_cost
 from . import model_registry as reg
 from .model_router import detect_health_urgent, health_safety_response
 
@@ -623,6 +624,35 @@ class AdvisorOrchestrator:
         router) is tried once when the primary is unavailable — a provider-failure fallback that is invisible
         to the user. Shared by converse()/converse_stream() so both paths produce identical outcomes."""
         active = llm or self._llm
+        # Per-turn usage accumulator. EVERY provider call this turn records into it — see _record_call.
+        # Previously the turn's token counts came from `active.last_usage`, which each call OVERWROTE,
+        # so a turn that retried and repaired billed three generations and reported one. The
+        # accumulator is kept on `tr` (a transient key — _ADVISOR_TURNS_COLUMNS whitelists it out of
+        # the durable insert) so _finish can write the per-call ledger rows.
+        usage_acc = llm_cost.TurnUsage()
+        tr["_usage"] = usage_acc
+
+        def _record_call(reason: str, started: float, kind: str = "advisor.generate") -> None:
+            """Snapshot the model/provider that just ran. Read from `active` at call time, not once up
+            front: a model-fallback turn changes `active` mid-turn and the two models have different
+            prices, so attributing both calls to one model would misprice the turn.
+
+            Calls that never left the process are NOT recorded. Both wrappers short-circuit to None
+            when the provider is unconfigured (`last_error="not_available"`), issuing no HTTP request;
+            counting those would make `provider_calls` read 2 for a misconfigured deployment that
+            made zero round-trips, and `provider_calls` is only useful if it counts real ones.
+            """
+            if getattr(active, "last_error", "") == "not_available" or not getattr(active, "available", True):
+                return
+            usage_acc.record(
+                model=getattr(active, "model_name", "") or "",
+                provider=getattr(active, "provider", "") or "",
+                usage=getattr(active, "last_usage", {}) or {},
+                operation_kind=kind,
+                call_reason=reason,
+                latency_ms=int(round((time.perf_counter() - started) * 1000)),
+            )
+
         try:
             context = await self._ctx.build(ctx, message, base, history or [], agent=agent)
             lap("context_build")
@@ -632,25 +662,31 @@ class AdvisorOrchestrator:
             constraints = build_constraints(base, context)
             lap("plan")
             tr["provider_called"] = True  # we attempted the provider this turn (item 2 observability)
+            _t_call = time.perf_counter()
             out = await active.generate(context, constraints)
+            _record_call("initial", _t_call)
             if out is None:
                 # One retry: transient provider failures (502/timeout/truncated JSON) surface as None.
+                _t_call = time.perf_counter()
                 out = await active.generate(context, constraints)
+                _record_call("retry", _t_call)
                 tr["llm_retry"] = True
             if out is None and fallback_llm is not None:
                 # Provider-failure fallback: the routed primary is unavailable — drop to the fallback model
                 # once (still re-validated below). User never sees a provider error.
                 active = fallback_llm
+                _t_call = time.perf_counter()
                 out = await active.generate(context, constraints)
+                _record_call("model_fallback", _t_call)
                 tr["model_fallback"] = True
             lap("llm_generate")
             # Prove the runtime model/provider actually used this turn (Phase 2/8: metadata proves provider).
             tr["model"] = getattr(active, "model_name", "") or ""
             tr["provider"] = getattr(active, "provider", "") or ""
             base["model"], base["provider"] = tr["model"], tr["provider"]
-            usage = getattr(active, "last_usage", {}) or {}
-            tr["prompt_tokens"], tr["completion_tokens"], tr["total_tokens"] = (
-                usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0), usage.get("total_tokens", 0))
+            # Token/cost totals are NOT computed here. Repairs happen further down this method, so any
+            # total taken at this point is stale by the time the turn ends. _finish owns it — see the
+            # totals block there. `usage_acc` keeps accumulating via _record_call until then.
             tr["llm_response_raw"] = getattr(active, "last_raw", "") or ""
             tr["graph_edges_available"] = len(getattr(context, "relationship_edges", []) or [])
             last_error = getattr(active, "last_error", "") or ""
@@ -701,7 +737,9 @@ class AdvisorOrchestrator:
                 issues = classify_issues(out, context)
                 repair_plan = dict(constraints)
                 repair_plan["repair_note"] = _build_repair_note(issues, reasons)
+                _t_call = time.perf_counter()
                 out_r = await active.generate(context, repair_plan)
+                _record_call(f"repair_{attempt}", _t_call, kind="advisor.repair")
                 tr["repair_attempts"] = attempt
                 tr["repair_retry"] = True  # back-compat flag
                 if out_r is None:
@@ -925,6 +963,27 @@ class AdvisorOrchestrator:
         tr["latency_ms"] = round((time.perf_counter() - t0) * 1000, 1)
         tr["llm_status"] = base.get("llm_status") or tr.get("llm_status") or ""
         tr["advisor_response"] = base.get("assistant_message") or ""
+        # ── Token/cost totals: computed HERE and nowhere else ────────────────────────────────────
+        # _finish is the single return path for every converse() branch, and it runs AFTER the
+        # supervised repair loop. Totalling inside _enhance (as the first cut did) snapshotted the
+        # accumulator before repairs ran, so a repaired turn undercounted in analytics.advisor_turns
+        # while the per-call ledger had it right — two surfaces disagreeing about one turn's spend.
+        # Deriving both from the same accumulator at the same moment makes that divergence
+        # unrepresentable rather than merely fixed.
+        #
+        # The accumulator is POPPED, not read: it is a live object, and `tr` is attached to the API
+        # response as `_trace` when trace=true (an API-reachable Body param on /v1/life/*), where a
+        # non-serializable value becomes a 500 on every traced turn.
+        usage_acc = tr.pop("_usage", None)
+        if usage_acc is not None:
+            _t = usage_acc.totals
+            tr["prompt_tokens"] = _t["prompt_tokens"]
+            tr["completion_tokens"] = _t["completion_tokens"]
+            tr["total_tokens"] = _t["total_tokens"]
+            tr["cached_prompt_tokens"] = _t["cached_prompt_tokens"]
+            tr["provider_calls"] = len(usage_acc)
+            tr["cost_usd_micros"] = usage_acc.cost_usd_micros_total
+            tr["cost_fully_known"] = usage_acc.cost_fully_known
         # Surface key observability fields on the RESPONSE so the live regression (item 1) can assert the LLM
         # actually ran on the deployed web path (provider_called + model + empty fallback_cause = real LLM turn).
         base["provider_called"] = tr.get("provider_called", False)
@@ -975,6 +1034,31 @@ class AdvisorOrchestrator:
                 task.add_done_callback(_PENDING_WRITES.discard)
             except Exception:  # noqa: BLE001
                 pass
+        # Per-CALL cost ledger (Phase 0). One analytics.llm_call_usage row per provider call, so a
+        # retry/repair can never be overwritten by a later call the way `last_usage` was. Distinct from
+        # the monthly counters below: this is money, those are quota. Best-effort and non-blocking —
+        # a telemetry failure must never cost the user their answer.
+        #
+        # Flag-gated (default OFF) exactly like the sibling counter write, because the table arrives
+        # in an UNAPPLIED migration. Ungated, every advisor turn would POST to a non-existent table:
+        # SupabaseClient.insert swallows the failure but logs a warning, so a repo where unapplied
+        # migrations are a recurring condition would get one warning plus one wasted round-trip per
+        # turn, forever. Flip CALL_USAGE_LEDGER_ENABLED after 20261007000000_llm_call_usage.sql
+        # applies. The cost figures are on the structured `advisor_turn` log line regardless, so
+        # nothing is unobservable while the flag is off.
+        if (self._sb is not None and usage_acc is not None and len(usage_acc)
+                and reg.flag("CALL_USAGE_LEDGER_ENABLED")):
+            try:
+                import asyncio
+                rows = usage_acc.ledger_rows(
+                    user_id=str(ctx.user_id), turn_id=tr.get("turn_id"),
+                    conversation_id=tr.get("conversation_id"),
+                )
+                t = asyncio.ensure_future(self._persist_call_usage(rows))
+                _PENDING_WRITES.add(t)
+                t.add_done_callback(_PENDING_WRITES.discard)
+            except Exception:  # noqa: BLE001
+                pass
         # Best-effort usage ledger increment (atomic via analytics.bump_model_usage). Default OFF
         # (USAGE_TRACKING_ENABLED) and swallows errors → no behavior change until the migration is applied.
         if self._sb is not None and reg.flag("USAGE_TRACKING_ENABLED"):
@@ -993,6 +1077,19 @@ class AdvisorOrchestrator:
         try:
             await self._sb.insert("advisor_turns", row, schema="analytics")
         except Exception:  # noqa: BLE001 — table may not exist yet; logging still works
+            pass
+
+    async def _persist_call_usage(self, rows: list[dict[str, Any]]) -> None:
+        """Insert the per-call cost rows (migration 20261007000000_llm_call_usage).
+
+        Swallows errors for the same reason _persist does: before the migration is applied the table
+        does not exist, and a missing telemetry table must not surface as a failed advisor turn. The
+        cost figures are also on the structured `advisor_turn` log line, so nothing is unrecoverable
+        if this write is dropped.
+        """
+        try:
+            await self._sb.insert("llm_call_usage", rows, schema="analytics")
+        except Exception:  # noqa: BLE001
             pass
 
     async def _persist_usage(self, ctx: UserContext, tr: dict[str, Any]) -> None:
