@@ -981,6 +981,7 @@ class AdvisorOrchestrator:
             tr["completion_tokens"] = _t["completion_tokens"]
             tr["total_tokens"] = _t["total_tokens"]
             tr["cached_prompt_tokens"] = _t["cached_prompt_tokens"]
+            tr["thoughts_tokens"] = _t["thoughts_tokens"]
             tr["provider_calls"] = len(usage_acc)
             tr["cost_usd_micros"] = usage_acc.cost_usd_micros_total
             tr["cost_fully_known"] = usage_acc.cost_fully_known
@@ -1011,6 +1012,18 @@ class AdvisorOrchestrator:
             "llm_last_error": tr.get("llm_last_error", ""), "repair_attempts": tr.get("repair_attempts", 0),
             "repairs": tr["validator_repairs"], "latency_ms": tr["latency_ms"], "stages_ms": tr["stages_ms"],
             "tokens": tr["total_tokens"], "edges": tr["graph_edges_available"], "msg_len": len(tr.get("user_message") or ""),
+            # Cost, on the log line so it is observable in Fly logs TODAY — the durable per-call
+            # ledger is flag-gated behind an unapplied migration, and "what does a turn cost?" should
+            # not wait on that. `provider_calls` > 1 is the signal that a turn retried or repaired,
+            # which is the single biggest driver of per-turn cost.
+            "provider_calls": tr.get("provider_calls", 0),
+            "cost_usd_micros": tr.get("cost_usd_micros", 0),
+            "cost_known": tr.get("cost_fully_known", True),
+            # The prompt-caching scoreboard (Phase 1). cached==0 across traffic means the implicit
+            # cache is not engaging and the ~5.2k-token stable prefix is being re-billed every turn.
+            "prompt_tokens": tr.get("prompt_tokens", 0),
+            "cached_prompt_tokens": tr.get("cached_prompt_tokens", 0),
+            "thoughts_tokens": tr.get("thoughts_tokens", 0),
             # Which reference links we sent this user off to. Auditable today without waiting on the
             # advisor_turns column below — keys only, they're a closed set owned by advisor_sources.
             "sources": tr.get("sources", []),
