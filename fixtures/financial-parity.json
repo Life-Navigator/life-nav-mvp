@@ -1,0 +1,149 @@
+{
+  "_README": "Cross-language parity fixture for financial primitives. Python reader: apps/lifenavigator-core-api/tests/test_calculators.py. TypeScript reader: apps/web/src/lib/trajectory/__tests__/parity.test.ts. Both MUST read this file -- it is the forcing function that keeps the two financial engines agreeing. Values were derived from the formula definitions independently of either implementation and verified by month-by-month simulation.",
+  "_CONVENTIONS": {
+    "rates": "DECIMAL FRACTIONS (0.06 == 6%), never percents.",
+    "effective_monthly_rate": "(1+r)^(1/12)-1 -- for GROWTH: returns, inflation, income drift.",
+    "nominal_monthly_rate": "r/12 -- the LENDER convention for quoted APRs and amortization.",
+    "why_both": "A 6% APR mortgage really is billed at 0.5%/month, while a 6% annual return really does compound to exactly 6% over 12 months. Both are correct for their purpose. Do NOT unify them.",
+    "annuity": "Contributions are ANNUITY-DUE: contribute, THEN grow, so each contribution earns return in the month it is made. This matches projector.ts, which does `balance += contribution; balance *= 1 + rate`. The ordinary-annuity form understates the result by one month's growth."
+  },
+  "effective_monthly_rate": [
+    {
+      "annual_rate": 0.0,
+      "expected": 0.0
+    },
+    {
+      "annual_rate": 0.025,
+      "expected": 0.002059836269842741
+    },
+    {
+      "annual_rate": 0.03,
+      "expected": 0.0024662697723036864
+    },
+    {
+      "annual_rate": 0.05,
+      "expected": 0.0040741237836483535
+    },
+    {
+      "annual_rate": 0.06,
+      "expected": 0.004867550565343048
+    },
+    {
+      "annual_rate": 0.07,
+      "expected": 0.005654145387405274
+    },
+    {
+      "annual_rate": 0.08,
+      "expected": 0.00643403011000343
+    }
+  ],
+  "nominal_monthly_rate": [
+    {
+      "annual_rate": 0.0,
+      "expected": 0.0
+    },
+    {
+      "annual_rate": 0.0325,
+      "expected": 0.0027083333333333334
+    },
+    {
+      "annual_rate": 0.049,
+      "expected": 0.004083333333333334
+    },
+    {
+      "annual_rate": 0.055,
+      "expected": 0.004583333333333333
+    },
+    {
+      "annual_rate": 0.06,
+      "expected": 0.005
+    },
+    {
+      "annual_rate": 0.0749,
+      "expected": 0.006241666666666666
+    },
+    {
+      "annual_rate": 0.199,
+      "expected": 0.016583333333333335
+    },
+    {
+      "annual_rate": 0.22,
+      "expected": 0.018333333333333333
+    }
+  ],
+  "amortized_payment": [
+    {
+      "principal": 300000,
+      "apr": 0.06,
+      "term_months": 360,
+      "expected_monthly_payment": 1798.65
+    },
+    {
+      "principal": 250000,
+      "apr": 0.055,
+      "term_months": 360,
+      "expected_monthly_payment": 1419.47
+    },
+    {
+      "principal": 30000,
+      "apr": 0.0749,
+      "term_months": 60,
+      "expected_monthly_payment": 601.0
+    },
+    {
+      "principal": 12000,
+      "apr": 0.199,
+      "term_months": 36,
+      "expected_monthly_payment": 445.35
+    },
+    {
+      "principal": 500000,
+      "apr": 0.0325,
+      "term_months": 180,
+      "expected_monthly_payment": 3513.34
+    },
+    {
+      "principal": 12000,
+      "apr": 0.0,
+      "term_months": 24,
+      "expected_monthly_payment": 500.0
+    }
+  ],
+  "future_value": [
+    {
+      "present_value": 10000,
+      "monthly_contribution": 0,
+      "annual_return": 0.06,
+      "months": 120,
+      "expected": 17908.48
+    },
+    {
+      "present_value": 0,
+      "monthly_contribution": 500,
+      "annual_return": 0.07,
+      "months": 240,
+      "expected": 255203.03
+    },
+    {
+      "present_value": 25000,
+      "monthly_contribution": 750,
+      "annual_return": 0.05,
+      "months": 360,
+      "expected": 722071.95
+    },
+    {
+      "present_value": 100000,
+      "monthly_contribution": 0,
+      "annual_return": 0.06,
+      "months": 12,
+      "expected": 106000.0
+    },
+    {
+      "present_value": 0,
+      "monthly_contribution": 500,
+      "annual_return": 0.06,
+      "months": 1,
+      "expected": 502.43
+    }
+  ]
+}

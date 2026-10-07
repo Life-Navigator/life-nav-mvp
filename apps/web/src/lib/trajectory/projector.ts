@@ -30,9 +30,39 @@ import type {
 
 export const PROJECTOR_VERSION = 'v1';
 
-function monthlyRate(annualPct: number): number {
-  // Exact monthly compounding equivalent of an annual rate.
+/**
+ * Exact monthly compounding equivalent of an annual rate: (1+r)^(1/12) - 1.
+ *
+ * For GROWTH (investment returns, income drift, inflation). NOT for quoted APRs -- see
+ * `amortizedPayment`, which uses the lender convention apr/12. The two are different on purpose.
+ *
+ * Exported so `__tests__/parity.test.ts` can hold it to the shared fixture in
+ * `fixtures/financial-parity.json`, which the Python engine
+ * (`app/services/calculators`) is held to as well. That fixture is what keeps the two engines
+ * from drifting apart.
+ */
+export function monthlyRate(annualPct: number): number {
   return Math.pow(1 + annualPct, 1 / 12) - 1;
+}
+
+/**
+ * Level monthly payment that retires `principal` over `termMonths` at a quoted `apr`:
+ *
+ *     pmt = P*r / (1 - (1+r)^-n)        r = apr / 12
+ *
+ * Uses the LENDER convention (apr/12), not `monthlyRate` -- a 6% APR mortgage is billed at
+ * 0.5%/month. Zero APR is a real singularity in the closed form (the denominator collapses), so it
+ * amortizes to plain P/n.
+ *
+ * Extracted from the `home_purchase` branch below, which previously inlined this expression. It is
+ * exported so it has exactly one implementation here and is parity-tested against the Python
+ * `debt.amortized_payment`.
+ */
+export function amortizedPayment(principal: number, apr: number, termMonths: number): number {
+  if (termMonths <= 0) return 0;
+  if (apr === 0) return principal / termMonths;
+  const r = apr / 12;
+  return (principal * r) / (1 - Math.pow(1 + r, -termMonths));
 }
 
 function clamp(n: number, lo: number, hi: number): number {
@@ -107,9 +137,7 @@ function applyDecision(state: WorkingState, d: ScenarioDecision): Record<string,
       state.cash -= downPayment;
       state.home_equity += downPayment;
       if (mortgageBalance > 0) {
-        const r = mortgageApr / 12;
-        const n = mortgageTerm;
-        const monthlyPmt = (mortgageBalance * r) / (1 - Math.pow(1 + r, -n));
+        const monthlyPmt = amortizedPayment(mortgageBalance, mortgageApr, mortgageTerm);
         state.debts.push({
           label: 'mortgage',
           balance: mortgageBalance,
