@@ -507,6 +507,14 @@ def validate(result: Any, context: AdvisorContext) -> tuple[bool, dict[str, Any]
     #    they make advice concrete without fabricating the user's personal figures.
     strict_vals, scenario_vals, kept_derivs = verify_derivations(result.get("derivations"), context.allowed_numbers)
     allowed = context.allowed_numbers | strict_vals
+    # Phase 3: deterministic-calculator figures that rest on an ASSUMPTION (a projection, an
+    # estimated mortgage payment) join TIER 3, not Tier 1. They are grounded — computed server-side
+    # from the user's real data — but they are not the user's CURRENT money, so they stay blocked
+    # inside a possessive personal claim ("your balance will be $1.2M") while remaining usable as an
+    # illustration ("that projects to roughly $1.2M"). Putting them in `allowed` instead would let a
+    # 25-year projection be asserted as a present fact, which is the precise failure this tiering
+    # exists to prevent. getattr: contexts built before this field existed still validate.
+    scenario_vals = scenario_vals | set(getattr(context, "scenario_numbers", None) or set())
     benchmark_derived: set[str] = set()
     invented: set[str] = set()
     for _seg in _visible_segments(result):  # per SECTION — no cross-section window bleed
@@ -610,6 +618,10 @@ def classify_issues(result: Any, context: AdvisorContext) -> list[dict[str, Any]
         })
     strict, scenario, _kept = verify_derivations(result.get("derivations"), context.allowed_numbers)
     allowed = set(context.allowed_numbers) | strict
+    # Same Tier-3 union as validate(), so the repair instructions the model receives agree with what
+    # the gate actually enforces. If these diverged, the advisor would be told to fix a figure that
+    # was already acceptable (or vice versa) and the repair loop would thrash.
+    scenario = scenario | set(getattr(context, "scenario_numbers", None) or set())
     grounded = user_values(allowed)
     seen: set[str] = set()
     # Per SECTION, for the same reason validate() does — a hedge in what_we_still_need must not

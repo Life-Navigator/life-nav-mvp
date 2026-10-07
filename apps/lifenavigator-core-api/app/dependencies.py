@@ -362,8 +362,25 @@ def get_advisor_orchestrator(
                 retriever = Retriever(gemini=gemini, qdrant=get_qdrant(settings), neo4j=get_neo4j(settings))
         except Exception:  # noqa: BLE001 — grounding is optional; never block advisor construction
             retriever = None
+    # Phase 3: deterministic calculators (amortization, compound projection, interest-aware payoff) —
+    # the figures the number gate's derivation grammar cannot express, since it has no exponentiation.
+    #
+    # DEFAULT OFF, deliberately. This changes TWO things at once: what reaches the model on every
+    # finance turn, and what the validator admits (scenario results join the three-tier policy's
+    # Tier 3). The same reasoning the GRAPH_GROUNDING_ENABLED block above states applies with more
+    # force here — the honest gate is a measured win on the advisor eval harness, not a config edit.
+    # None → the advisor behaves exactly as it does today.
+    calculations: Any = None
+    if os.environ.get("ADVISOR_CALCULATORS_ENABLED", "false").lower() in ("1", "true", "yes"):
+        try:
+            from .services.advisor_calculations import AdvisorCalculationPlanner
+            calculations = AdvisorCalculationPlanner(
+                FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase))
+            )
+        except Exception:  # noqa: BLE001 — grounding is optional; never block advisor construction
+            calculations = None
     builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life, scenarios=scenarios,
-                                    retriever=retriever)
+                                    retriever=retriever, calculations=calculations)
     if use_claude:
         # Claude on Vertex. ADC by default (no API key); a static VERTEX_ACCESS_TOKEN still wins if set.
         from .clients.vertex_auth import AdcTokenProvider

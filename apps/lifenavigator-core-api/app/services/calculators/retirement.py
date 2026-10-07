@@ -14,24 +14,32 @@ from .base import (
     Assumption,
     CalcResult,
     CalculatorError,
+    from_registry,
     register,
     require_money,
     require_rate,
 )
 from .money import future_value
 
-# The "4% rule" (Bengen / Trinity study): a widely-cited planning heuristic for the first-year
-# withdrawal from a balanced portfolio with a ~30-year horizon. It is a BENCHMARK, not a guarantee,
-# and it is cited as such — `advisor_validator` treats public planning constants differently from
-# the user's own numbers precisely so figures like this can be used without being passed off as
-# personal data.
-_DEFAULT_WITHDRAWAL_RATE = 0.04
-_WITHDRAWAL_RATIONALE = (
-    "4% first-year withdrawal rate — the widely-cited Trinity/Bengen planning heuristic for a "
-    "~30-year retirement; a starting point for sizing, not a guarantee of sufficiency"
-)
-
+# The withdrawal rate comes from the CENTRAL assumption registry (`withdrawal_rate`, the "4% rule"),
+# not from a constant here — the registry is the one place the platform states what it assumes, and
+# it carries the basis text shown to the user. `advisor_validator` treats public planning constants
+# differently from the user's own numbers precisely so a figure like this can be used without being
+# passed off as personal data.
 _MAX_AGE = 120
+
+
+def _withdrawal(withdrawal_rate: float | None) -> tuple[float, tuple[Assumption, ...]]:
+    """Resolve the withdrawal rate, citing the registry when the caller did not supply one."""
+    if withdrawal_rate is None:
+        rate, cited = from_registry("withdrawal_rate")
+        if rate <= 0:
+            raise CalculatorError("registry withdrawal_rate must be greater than zero")
+        return rate, (cited,)
+    rate = require_rate("withdrawal_rate", withdrawal_rate)
+    if rate == 0:
+        raise CalculatorError("withdrawal_rate must be greater than zero")
+    return rate, (Assumption("withdrawal_rate", rate, "withdrawal rate supplied for this estimate"),)
 
 
 @register("retirement.projected_balance")
@@ -85,15 +93,7 @@ def sustainable_income(
     is meaningless until it is expressed as the income it replaces.
     """
     b = require_money("balance", balance, allow_zero=False)
-    if withdrawal_rate is None:
-        rate = _DEFAULT_WITHDRAWAL_RATE
-        assumptions = (Assumption("withdrawal_rate", rate, _WITHDRAWAL_RATIONALE),)
-    else:
-        rate = require_rate("withdrawal_rate", withdrawal_rate)
-        if rate == 0:
-            raise CalculatorError("withdrawal_rate must be greater than zero")
-        assumptions = (Assumption("withdrawal_rate", rate, "withdrawal rate used for this estimate"),)
-
+    rate, assumptions = _withdrawal(withdrawal_rate)
     annual = b * rate
     return CalcResult(
         calculator="retirement.sustainable_income",
@@ -117,15 +117,7 @@ def balance_needed(
     25x, which is the kind of figure that reframes a plan.
     """
     income = require_money("desired_annual_income", desired_annual_income, allow_zero=False)
-    if withdrawal_rate is None:
-        rate = _DEFAULT_WITHDRAWAL_RATE
-        assumptions = (Assumption("withdrawal_rate", rate, _WITHDRAWAL_RATIONALE),)
-    else:
-        rate = require_rate("withdrawal_rate", withdrawal_rate)
-        if rate == 0:
-            raise CalculatorError("withdrawal_rate must be greater than zero")
-        assumptions = (Assumption("withdrawal_rate", rate, "withdrawal rate used for this estimate"),)
-
+    rate, assumptions = _withdrawal(withdrawal_rate)
     needed = income / rate
     return CalcResult(
         calculator="retirement.balance_needed",

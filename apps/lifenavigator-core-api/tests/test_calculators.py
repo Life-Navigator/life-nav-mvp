@@ -195,14 +195,47 @@ def test_future_value_is_scenario_tier_and_carries_its_assumption():
     assert [a.key for a in r.assumptions] == ["annual_return"]
 
 
-def test_future_value_without_a_rate_records_the_default_as_an_assumption():
-    """An unstated rate must never look like the user's choice."""
+def test_future_value_without_a_rate_cites_the_CENTRAL_assumption_registry():
+    """An unstated rate must come from app/services/assumptions.py, never a constant in the
+    calculator module.
+
+    That registry states the rule outright: "no projection may invent an assumption inline". The
+    first cut of these calculators broke it, hardcoding a 5% "real (after-inflation)" return while
+    the registry's investment_return is 6% NOMINAL — two different numbers meaning two different
+    things, so the same user could get two different projections depending on which code path
+    answered. The registry's `basis` text is also what the user is shown, so the rationale is the
+    platform's stated reasoning rather than a sentence invented here.
+    """
+    from app.services import assumptions as A
+
     r = money.future_value(present_value=10_000, months=120)
     assert r.tier == C.SCENARIO
     assumption = r.assumptions[0]
-    assert assumption.key == "annual_return"
-    assert 0 < assumption.value <= 0.10
-    assert "real" in assumption.rationale.lower()  # states it is after inflation
+    assert assumption.key == "investment_return"
+    assert assumption.source == "registry"
+    assert assumption.value == A.value("investment_return")
+    assert r.inputs_used["annual_return"] == A.value("investment_return")
+    # The rationale carries the registry's own basis, verbatim.
+    assert A.get("investment_return").basis in assumption.rationale
+
+
+def test_a_caller_supplied_rate_is_marked_as_coming_from_the_caller():
+    """The registry/caller distinction has to survive into the citation, or an audit cannot tell
+    whose assumption produced the number."""
+    r = money.future_value(present_value=10_000, months=120, annual_return=0.08)
+    assert r.assumptions[0].source == "caller"
+    assert r.assumptions[0].value == 0.08
+
+
+def test_no_calculator_hardcodes_a_rate_the_registry_already_owns():
+    """Drift gate. A rate constant reintroduced into a calculator module would silently diverge from
+    the registry and nothing else would notice."""
+    import pathlib as _p
+    pkg = _p.Path(money.__file__).parent
+    for mod in ("money.py", "retirement.py", "debt.py"):
+        src = (pkg / mod).read_text()
+        for banned in ("_DEFAULT_REAL_RETURN", "_DEFAULT_WITHDRAWAL_RATE"):
+            assert banned not in src, f"{mod} reintroduced {banned}; use base.from_registry instead"
 
 
 def test_future_value_separates_contributions_from_growth():
@@ -325,9 +358,13 @@ def test_sustainable_income_defaults_to_the_four_percent_rule_and_says_so():
     assert r.value == 40_000.0
     assert r.detail["monthly"] == pytest.approx(3_333.33, abs=0.01)
     assert r.tier == C.SCENARIO
+    # Cited from the central registry, whose basis names Bengen/Trinity — the hedge is part of the
+    # number rather than something the prompt has to remember to add.
+    from app.services import assumptions as A
+    assert r.assumptions[0].key == "withdrawal_rate"
+    assert r.assumptions[0].source == "registry"
+    assert r.assumptions[0].value == A.value("withdrawal_rate")
     assert "4%" in r.assumptions[0].rationale
-    # Named as a heuristic, not a guarantee — the hedge is part of the number.
-    assert "guarantee" in r.assumptions[0].rationale.lower()
 
 
 def test_balance_needed_is_the_inverse_of_sustainable_income():
@@ -397,7 +434,9 @@ def test_results_are_json_serializable_for_the_context_packet():
     r = retirement.projected_balance(current_balance=120_000, current_age=40, target_age=65,
                                      monthly_contribution=1_000)
     json.dumps(r.as_dict())
-    assert r.as_dict()["assumptions"][0]["key"] == "annual_return"
+    cited = r.as_dict()["assumptions"][0]
+    assert cited["key"] == "investment_return"
+    assert cited["source"] == "registry"
 
 
 def test_every_calculator_is_deterministic():

@@ -16,31 +16,25 @@ from .base import (
     CalcResult,
     CalculatorError,
     effective_monthly_rate,
+    from_registry,
     register,
     require_money,
     require_months,
     require_rate,
 )
 
-# Used only when a caller asks for a projection WITHOUT naming a return. Deliberately conservative:
-# a long-run real (after-inflation) equity return, not a nominal headline figure, so a projection is
-# in today's dollars and does not flatter itself with inflation it then ignores.
-_DEFAULT_REAL_RETURN = 0.05
-_DEFAULT_REAL_RETURN_RATIONALE = (
-    "5%/yr real (after-inflation) return — a conservative long-run diversified-portfolio assumption; "
-    "results are in today's dollars"
-)
-
-
 def _return_rate(annual_return: float | None) -> tuple[float, tuple[Assumption, ...]]:
-    """Resolve the return rate, recording an Assumption when the caller did not supply one."""
+    """Resolve the return rate, recording an Assumption either way.
+
+    An unsupplied rate comes from the CENTRAL assumption registry (`investment_return`), never from a
+    constant in this module — see `base.from_registry` for why that distinction is load-bearing.
+    """
     if annual_return is None:
-        return _DEFAULT_REAL_RETURN, (
-            Assumption("annual_return", _DEFAULT_REAL_RETURN, _DEFAULT_REAL_RETURN_RATIONALE),
-        )
+        rate, cited = from_registry("investment_return")
+        return rate, (cited,)
     r = require_rate("annual_return", annual_return)
     # A caller-supplied rate is still an assumption about the future — it is just THEIR assumption.
-    return r, (Assumption("annual_return", r, "return rate used for this projection"),)
+    return r, (Assumption("annual_return", r, "return rate supplied for this projection"),)
 
 
 @register("money.future_value")

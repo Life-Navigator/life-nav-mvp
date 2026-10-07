@@ -77,14 +77,45 @@ class Assumption:
 
     `rationale` is user-facing: it is why the number is defensible, and it is what makes a scenario
     result honest rather than a figure pulled from nowhere.
+
+    `source` records WHERE the value came from: "registry" when it is the platform's canonical
+    assumption, or "caller" when the request supplied it. Build registry-backed assumptions with
+    `from_registry()` — never by hand.
     """
 
     key: str
     value: Any
     rationale: str
+    source: str = "caller"
 
     def as_dict(self) -> dict[str, Any]:
-        return {"key": self.key, "value": self.value, "rationale": self.rationale}
+        return {"key": self.key, "value": self.value, "rationale": self.rationale,
+                "source": self.source}
+
+
+def from_registry(key: str) -> tuple[float, Assumption]:
+    """The platform's canonical value for `key`, plus its citation.
+
+    `app/services/assumptions.py` is explicit that "no projection may invent an assumption inline;
+    if you need a number that isn't measured from the user's data, it comes from this registry and is
+    shown to the user." Calculators therefore do NOT carry their own default rates.
+
+    This matters beyond tidiness: the first cut of these calculators hardcoded a 5% "real
+    (after-inflation)" return while the registry's `investment_return` is 6% NOMINAL. Two different
+    numbers meaning two different things, so the same user could be shown two different retirement
+    projections depending on which code path answered — the exact divergence the registry exists to
+    prevent. The registry also carries each value's `basis`, so the rationale shown to the user is
+    the platform's stated reasoning rather than a sentence invented here.
+    """
+    from .. import assumptions as A  # local import: assumptions must not depend on calculators
+
+    cited = A.cite(key)
+    return float(cited["value"]), Assumption(
+        key=key,
+        value=float(cited["value"]),
+        rationale=f"{cited['label']} — {cited['basis']}",
+        source="registry",
+    )
 
 
 @dataclass(frozen=True)

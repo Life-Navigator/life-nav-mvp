@@ -28,6 +28,7 @@ _REGISTRY: dict[str, Assumption] = {a.key: a for a in [
     Assumption("home_appreciation", 0.035, "annual %", "Home appreciation", "Long-run U.S. home price growth roughly tracks inflation + ~1%.", "housing"),
     Assumption("mortgage_rate", 0.068, "annual %", "Mortgage rate", "Representative recent 30-year fixed rate; varies by credit + market.", "housing"),
     Assumption("down_payment_pct", 0.20, "% of price", "Down payment", "Conventional 20% to avoid PMI; many buyers put less down.", "housing"),
+    Assumption("mortgage_term_months", 360, "months", "Mortgage term", "A standard 30-year fixed term; 15-year terms carry a lower rate and a higher payment.", "housing"),
     Assumption("withdrawal_rate", 0.04, "% of assets", "Safe withdrawal rate", "The '4% rule' (Bengen 1994 / Trinity study) for a ~30-year retirement.", "retirement"),
     Assumption("retirement_replacement", 0.80, "% of income", "Retirement income replacement", "Common planning target of ~70-85% of pre-retirement income.", "retirement"),
     Assumption("life_expectancy", 92, "age", "Planning life expectancy", "Plan to ~92 to avoid outliving assets (above average to be safe).", "retirement"),

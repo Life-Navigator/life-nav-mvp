@@ -250,7 +250,11 @@ class AdvisorContext:
     domains_touched: list[str]
     missing_areas: list[str]
     discovery_pct: int
-    allowed_numbers: set[str]  # numbers the LLM may echo (validator guard)
+    allowed_numbers: set[str]  # numbers the LLM may echo (validator guard) — TIER 1, statable plainly
+    # TIER 3 of the validator's three-tier policy: computed figures that rest on an ASSUMPTION
+    # (projections, estimated mortgage payments). Admitted except inside a possessive personal
+    # claim, so they can make advice concrete without being asserted as the user's actual money.
+    scenario_numbers: set[str] = field(default_factory=set)
     # Classified facts — kept strictly separate so the LLM never collapses them.
     confirmed_facts: list[dict[str, Any]] = field(default_factory=list)
     assumptions: list[dict[str, Any]] = field(default_factory=list)
@@ -284,6 +288,9 @@ class AdvisorContext:
     # payoff, savings target, affordability band) computed by FinanceScenarioEngine — the numbers the LLM
     # INTERPRETS. None unless the turn is finance. Missing inputs are named gaps (needs_*), never fabricated.
     finance_scenarios: Optional[dict[str, Any]] = None
+    # Phase 3: deterministic calculator results (amortization, compound projections, interest-aware
+    # payoff) plus the named gaps the advisor should ASK about rather than assume.
+    calculations: Optional[dict[str, Any]] = None
 
     @property
     def relationships_available(self) -> bool:
@@ -323,6 +330,11 @@ class AdvisorContext:
             # arithmetic from finance.* ; `needs_*: true` marks a gap to ASK about, not to guess. Present only
             # on finance turns.
             "finance_scenarios": self.finance_scenarios,
+            # COMPUTED figures from deterministic calculators. Each carries `tier`: "strict" is
+            # arithmetic on the user's own numbers and may be stated plainly; "scenario" rests on an
+            # assumption and MUST read as an estimate with its assumptions named. `gaps` are
+            # questions to ask — never numbers to fill in.
+            "calculations": self.calculations,
             # Phase 8: grounded career/education facts the advisor MAY cite (and ONLY these for those
             # domains). Each carries domain/sourceTable/recordId/confidence for auditable citation.
             "domain_facts": self.domain_facts,
@@ -342,11 +354,15 @@ class AdvisorContext:
 
 class AdvisorContextBuilder:
     def __init__(self, supabase: Any, coverage: Any = None, life: Any = None, scenarios: Any = None,
-                 retriever: Any = None) -> None:
+                 retriever: Any = None, calculations: Any = None) -> None:
         self._sb = supabase
         self._coverage = coverage  # DiscoveryCoverageService (optional) — per-domain discovery scores
         self._life = life  # LifeDiscoveryService (optional) — real personal graph edges
         self._scenarios = scenarios  # FinanceScenarioEngine (optional) — deterministic finance figures
+        # Phase 3: AdvisorCalculationPlanner (optional) — the compound-interest / amortization /
+        # projection figures the number gate's derivation grammar cannot express. None → the advisor
+        # behaves exactly as before, so this is additive by construction.
+        self._calculations = calculations
         # WS-E: live GraphRAG retriever (Neo4j + Qdrant). None unless GRAPH_GROUNDING_ENABLED — until then the
         # advisor grounds on Supabase only. When present, build() adds user-scoped graph/vector evidence.
         self._retriever = retriever
@@ -467,6 +483,25 @@ class AdvisorContextBuilder:
                 allowed_numbers |= {str(n) for n in (finance_scenarios.get("allowed_numbers") or [])}
             except Exception:  # noqa: BLE001 — grounding is an enhancement; never break the turn
                 finance_scenarios = None
+        # Phase 3: the calculators the user's REAL data supports. Same scope test as the scenario
+        # packet, same best-effort posture, and the same contract on allowed_numbers — a computed
+        # figure the gate has not been told about is indistinguishable from a fabricated one, so
+        # registering it IS the wiring.
+        calculations: Optional[dict[str, Any]] = None
+        scenario_numbers: set[str] = set()
+        if self._calculations is not None and finance_in_scope:
+            try:
+                _cash_flow = (finance_scenarios or {}).get("cash_flow") or {}
+                calculations = await self._calculations.compute(
+                    ctx,
+                    home_price_goal=_parse_money(message),
+                    monthly_income=_cash_flow.get("monthly_income"),
+                    monthly_expenses=_cash_flow.get("monthly_expenses"),
+                )
+                allowed_numbers |= {str(n) for n in (calculations.get("allowed_numbers") or [])}
+                scenario_numbers |= {str(n) for n in (calculations.get("scenario_numbers") or [])}
+            except Exception:  # noqa: BLE001 — never break the turn for a grounding enhancement
+                calculations = None
         stage = base.get("pending_key") or ("complete" if base.get("complete") else "discovery")
         # turn_domains: the MESSAGE's topic for per-domain prompt guidance. route_domains returns a focused
         # subset, or all domains when ambiguous — treat the broad fallback (≥4) as "no specific topic".
@@ -510,6 +545,7 @@ class AdvisorContextBuilder:
             missing_areas=list(panel.get("missing_areas") or []),
             discovery_pct=int(panel.get("discovery_completion_pct") or 0),
             allowed_numbers=allowed_numbers,
+            scenario_numbers=scenario_numbers,
             confirmed_facts=self._confirmed(panel, cands),
             assumptions=[],  # the deterministic engine does not assume; if it ever does, surface it here
             discovery_scores=scores,
@@ -524,4 +560,5 @@ class AdvisorContextBuilder:
             turn_domains=turn_domains,
             graph_evidence=graph_evidence,
             finance_scenarios=finance_scenarios,
+            calculations=calculations,
         )
