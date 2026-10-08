@@ -112,7 +112,17 @@ SELECT
     CASE WHEN SUM(tokens_out) > 0
          THEN ROUND(100.0 * SUM(tokens_thoughts) / SUM(tokens_out), 2)
          ELSE 0 END                                AS thinking_share_pct,
-    ROUND(AVG(latency_ms)::numeric, 0)             AS avg_latency_ms
+    ROUND(AVG(latency_ms)::numeric, 0)             AS avg_latency_ms,
+    -- Output tokens per second of wall clock. The throughput question, answerable from the two
+    -- columns already here rather than from a vendor claim.
+    --
+    -- Note this counts BILLED output, which includes reasoning tokens. On a thinking model those
+    -- are generated and charged but never shown, so billed throughput can look healthy while the
+    -- user waits on a response that has not started arriving. Read it next to
+    -- thinking_share_pct — a high share means most of the wait is reasoning, not answer.
+    CASE WHEN SUM(latency_ms) > 0
+         THEN ROUND(1000.0 * SUM(tokens_out) / SUM(latency_ms), 1)
+         ELSE NULL END                             AS output_tokens_per_sec
 FROM analytics.llm_call_usage
 GROUP BY 1, 2, 3;
 
