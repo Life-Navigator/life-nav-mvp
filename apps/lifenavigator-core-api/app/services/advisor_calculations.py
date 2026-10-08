@@ -133,6 +133,18 @@ class AdvisorCalculationPlanner:
                 log.warning("calculator %s failed: %s", getattr(fn, "calc_id", fn), exc)
 
         # ── Cash flow ────────────────────────────────────────────────────────────────────────────
+        # Monthly income falls back to the resolver's canonical ANNUAL income / 12.
+        #
+        # Without this the strict tier was unreachable in production, and the confirmation pass is
+        # what surfaced it: `advisor_context` sources cash flow from `finance_scenarios.cash_flow`,
+        # but it calls that engine with `home_price_goal` ONLY — so its `monthly_income` is always
+        # None, so `money.monthly_surplus` could never fire, so EVERY figure the advisor got was a
+        # scenario. Deriving from the resolver (provenance-carrying, refuses to default) makes the
+        # strict path real instead of theoretical.
+        if monthly_income is None:
+            _annual = _present(inputs, "income")
+            if _annual:
+                monthly_income = float(_annual) / 12.0
         if monthly_income is not None and monthly_expenses is not None:
             run(money.monthly_surplus, monthly_income=monthly_income,
                 monthly_expenses=monthly_expenses)

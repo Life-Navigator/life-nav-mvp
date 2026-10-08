@@ -328,3 +328,39 @@ async def test_percent_apr_from_the_database_produces_a_sane_payoff():
     assert r is not None
     assert 40 <= r["value"] <= 55, r["value"]
     assert r["inputs_used"]["apr"] == pytest.approx(0.069)
+
+
+# ── Strict tier reachability (found by the Phase 2+3 confirmation pass) ──────────────────────────
+@pytest.mark.asyncio
+async def test_monthly_income_is_derived_from_the_resolvers_annual_income():
+    """Without this the strict tier was unreachable in production.
+
+    `advisor_context` sources cash flow from `finance_scenarios.cash_flow`, but it calls that engine
+    with `home_price_goal` ONLY — so its `monthly_income` is always None, so `money.monthly_surplus`
+    could never fire, so every figure the advisor received was a scenario. Deriving from the
+    resolver's canonical annual income makes the strict path real rather than theoretical.
+    """
+    p = AdvisorCalculationPlanner(_resolver(income=146_400))
+    out = await p.compute(_Ctx(), monthly_expenses=5_400)   # note: no monthly_income passed
+    r = _by_id(out, "money.monthly_surplus")
+    assert r is not None
+    assert r["inputs_used"]["monthly_income"] == pytest.approx(12_200.0)
+    assert r["value"] == 6_800.0
+    assert r["tier"] == "strict"
+    assert "6800" in out["allowed_numbers"]
+
+
+@pytest.mark.asyncio
+async def test_without_any_income_source_the_surplus_stays_an_honest_gap():
+    p = AdvisorCalculationPlanner(_resolver())
+    out = await p.compute(_Ctx(), monthly_expenses=5_400)
+    assert _by_id(out, "money.monthly_surplus") is None
+    assert _gap_for(out, "money.monthly_surplus") is not None
+
+
+@pytest.mark.asyncio
+async def test_an_explicit_monthly_income_still_wins_over_the_derived_one():
+    """A figure the user states this turn is more current than the annual income on file."""
+    p = AdvisorCalculationPlanner(_resolver(income=146_400))
+    out = await p.compute(_Ctx(), monthly_income=9_000, monthly_expenses=5_400)
+    assert _by_id(out, "money.monthly_surplus")["value"] == 3_600.0

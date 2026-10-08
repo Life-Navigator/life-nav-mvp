@@ -88,6 +88,51 @@ def _parse_money(message: str) -> Optional[float]:
     return best
 
 
+# A monthly amount the user states in the message — the only place expenses and debt payments come
+# from today. The canonical resolver has income and balances but no expense feed, so without this the
+# strict calculator tier is unreachable (see advisor_calculations' cash-flow note). Numbers the user
+# states are already grounded via `numbers_in`, so deriving from them keeps the trust story intact.
+#
+# DELIBERATELY NARROW: an amount counts only when a monthly cadence cue AND a matching
+# expense/payment cue sit near it. A bare "$5,400" is not an expense claim, and mis-reading a balance
+# as a monthly spend would produce a confidently wrong surplus.
+_MONTHLY_CUE = re.compile(r"\b(a|per|each)\s+month\b|\bmonthly\b|/\s?mo\b|\bm[o]?nth\b", re.IGNORECASE)
+_EXPENSE_CUE = re.compile(r"\b(spend\w*|spent|expenses?|costs?|budget|outgo\w*|bills?|burn)\b", re.IGNORECASE)
+_DEBT_PAY_CUE = re.compile(r"\b(pay\w*|payment|toward|towards|servicing)\b", re.IGNORECASE)
+_DEBT_WORD = re.compile(r"\b(debt|loans?|cards?|credit|student|mortgage|auto|car)\b", re.IGNORECASE)
+_MONTHLY_WINDOW = 48
+
+
+def _parse_monthly(message: str, kind: str) -> Optional[float]:
+    """A monthly expense (`kind="expense"`) or debt payment (`kind="debt"`) stated in the message.
+
+    Returns the amount only when the cadence cue and the topic cue are both within
+    ``_MONTHLY_WINDOW`` characters of the figure. Conservative by design: a missed amount becomes an
+    honest gap the advisor asks about, while a wrongly-claimed one silently poisons every figure
+    derived from it.
+    """
+    m = message or ""
+    topic = _EXPENSE_CUE if kind == "expense" else _DEBT_PAY_CUE
+    best: Optional[float] = None
+    for match in _MONEY.finditer(m):
+        raw, suf = match.group(1).replace(",", ""), (match.group(2) or "").lower()
+        try:
+            val = float(raw)
+        except ValueError:
+            continue
+        val *= {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000}.get(suf, 1)
+        # A monthly expense or payment in the tens of thousands is far more likely a balance.
+        if not (10 <= val <= 50_000):
+            continue
+        window = m[max(0, match.start() - _MONTHLY_WINDOW): match.end() + _MONTHLY_WINDOW]
+        if not (_MONTHLY_CUE.search(window) and topic.search(window)):
+            continue
+        if kind == "debt" and not _DEBT_WORD.search(window):
+            continue
+        best = val if best is None else min(best, val)
+    return best
+
+
 def numbers_in(*texts: Optional[str]) -> set[str]:
     """Numbers the user has stated, as strings the validator can match. Captures k/M/B suffixes and emits
     BOTH the bare digits and the magnitude-expanded form (so '$22k' allows the advisor to write '22' or
@@ -495,8 +540,13 @@ class AdvisorContextBuilder:
                 calculations = await self._calculations.compute(
                     ctx,
                     home_price_goal=_parse_money(message),
+                    # finance_scenarios' cash_flow is structurally empty here (it is computed with
+                    # home_price_goal only), so these fall through to the planner's resolver-derived
+                    # income and to what the user states in this message.
                     monthly_income=_cash_flow.get("monthly_income"),
-                    monthly_expenses=_cash_flow.get("monthly_expenses"),
+                    monthly_expenses=(_cash_flow.get("monthly_expenses")
+                                      or _parse_monthly(message, "expense")),
+                    monthly_debt_payment=_parse_monthly(message, "debt"),
                 )
                 allowed_numbers |= {str(n) for n in (calculations.get("allowed_numbers") or [])}
                 scenario_numbers |= {str(n) for n in (calculations.get("scenario_numbers") or [])}
