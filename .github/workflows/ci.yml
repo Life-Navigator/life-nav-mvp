@@ -283,6 +283,42 @@ jobs:
       - name: Secret-scanner canary (control must detect the threat)
         run: ./scripts/security/gitleaks_canary.sh
 
+  # ── Advisor evaluation harness (offline probes) ────────────────────────────
+  # The gate + routing probes need NO model, NO stores and NO credentials, so unlike
+  # advisor-eval.yml (which drives the deployed advisor with real users and real spend) this can run
+  # on every PR. It is the only check here that guards QUALITY rather than correctness: 1,300+ unit
+  # tests prove the code does what it says, and none of them notice when the number gate silently
+  # starts deleting true sentences from answers.
+  #
+  # It gates on REGRESSION against eval/baselines/*.json, not on perfection — there are documented
+  # divergences (a known over-block, three routing collisions) that are counted and visible rather
+  # than relabelled as correct. Re-baseline deliberately with `--save-baseline` when a rate improves.
+  advisor-eval-offline:
+    name: Advisor Eval (offline probes)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/lifenavigator-core-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: apps/lifenavigator-core-api/requirements-dev.txt
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Run offline eval probes
+        run: python -m eval.run --json /tmp/eval_scorecard.json
+
+      - name: Upload scorecard
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: advisor-eval-scorecard
+          path: /tmp/eval_scorecard.json
+          if-no-files-found: ignore
+
   dependency-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest

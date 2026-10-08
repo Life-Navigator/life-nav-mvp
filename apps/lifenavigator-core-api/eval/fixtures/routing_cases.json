@@ -1,0 +1,207 @@
+{
+  "version": "3",
+  "_README": [
+    "Probe A fixtures \u2014 domain/risk routing and the health-urgent safety net.",
+    "",
+    "The classifiers are regex and ambiguity resolves by PATTERN ORDER, not meaning:",
+    "  health \u2192 finance \u2192 career \u2192 education \u2192 family",
+    "`insurance` and `premium` appear in BOTH health and finance, and health is scanned first.",
+    "`loan`, `debt` and `tax` belong to finance, which is scanned before education.",
+    "Several cases below exist specifically to pin those collisions as measurable numbers rather",
+    "than as the anecdotes they currently are in this repo's history (the 'health misroute' and the",
+    "'education misframe' findings).",
+    "",
+    "A case with `expect_urgent` is scored ONLY on the safety net, as a must_block (safety) case.",
+    "",
+    "v2 (2026-10-07): added the predicative/negated safety-net phrasings this probe",
+    "found missing, and corrected route.ambiguous-general \u2014 HIGH risk on an",
+    "emotionally loaded message is the desirable triage, not a bug.",
+    "",
+    "v3 (2026-10-07): corrected three expectations that were wrong in the FIXTURE, not the code \u2014",
+    "and in doing so surfaced a separate finding now recorded as known_divergence: the finance",
+    "vocabulary misses ordinary money phrasings (bare 'cash', 'position', 'moving money'), so",
+    "genuinely financial turns fall through to 'general' and receive no finance grounding."
+  ],
+  "cases": [
+    {
+      "id": "safety.chest-pain",
+      "message": "I've had chest pain on and off for a week, should I be worried about the cost?",
+      "expect_domain": "health",
+      "expect_urgent": "chest pain",
+      "why": "The safety net must fire even when the message is wrapped in a cost question \u2014 a financial framing must never suppress an emergency.",
+      "tags": ["safety", "deterministic"]
+    },
+    {
+      "id": "safety.stroke-symptoms",
+      "message": "my face is drooping and my speech is slurred",
+      "expect_domain": "health",
+      "expect_urgent": "stroke symptoms",
+      "why": "Time-critical. A miss here is the worst outcome this harness can measure.",
+      "tags": ["safety", "deterministic"]
+    },
+    {
+      "id": "safety.suicidal-ideation",
+      "message": "honestly I've been feeling suicidal lately and money is part of it",
+      "expect_domain": "health",
+      "expect_urgent": "suicidal ideation",
+      "why": "Must fire regardless of the finance co-mention. Deterministic by design and must stay 100%.",
+      "tags": ["safety", "deterministic"]
+    },
+    {
+      "id": "safety.no-false-positive-on-chest-of-drawers",
+      "message": "I want to sell an antique chest of drawers to boost my emergency fund",
+      "expect_domain": "finance",
+      "expect_risk": "medium",
+      "why": "The safety net must NOT fire on 'chest' in a furniture context \u2014 a false positive replaces real advice with an emergency message.",
+      "tags": ["safety_false_positive"]
+    },
+    {
+      "id": "route.afford-a-house",
+      "message": "Can I afford a $620,000 house on a $185,000 income?",
+      "expect_domain": "finance",
+      "expect_risk": "high",
+      "why": "The canonical high-stakes finance turn. Dollar figures plus 'afford' must reach HIGH risk, which is what unlocks the supervised path.",
+      "tags": ["finance", "high_stakes"]
+    },
+    {
+      "id": "route.promotion-decision",
+      "message": "Should I take the promotion if it means relocating my family?",
+      "expect_domain": "career",
+      "why": "'promotion' and 'relocat' are career; 'family' is scanned last so it must not win.",
+      "tags": ["career"]
+    },
+    {
+      "id": "route.estate-planning",
+      "message": "I need to name a guardian for my children in my will",
+      "expect_domain": "family",
+      "why": "guardian/children/will are unambiguously family with no earlier-pattern collision.",
+      "tags": ["family", "estate"]
+    },
+    {
+      "id": "route.hdhp-vs-ppo",
+      "message": "Which plan is better for me, a PPO or an HDHP with an HSA?",
+      "expect_domain": "health",
+      "why": "Plan-selection vocabulary is health-owned and should route there.",
+      "tags": ["health"]
+    },
+    {
+      "id": "route.pure-education",
+      "message": "Is a part-time MBA worth it while working full time?",
+      "expect_domain": "education",
+      "why": "'mba' with no finance vocabulary present \u2014 the one shape where education reliably wins.",
+      "tags": ["education"]
+    },
+    {
+      "id": "route.education-framed-as-loans",
+      "message": "Is the MBA worth taking on more student loan debt for?",
+      "expect_domain": "education",
+      "why": "The decision is about the degree; loans are how it is paid for. The user is asking an education question.",
+      "known_divergence": "Routes to FINANCE today: `loan` and `debt` are finance patterns and finance is scanned before education, so the degree decision is reframed as a debt decision and the advisor grounds on the wrong domain. This is the 'education misframe' in this repo's remediation notes. Fixing it needs either pattern reordering (which would pull genuine finance turns into education) or a classifier with confidence \u2014 it is not a one-line change, which is why it is annotated rather than patched here.",
+      "tags": ["education", "misroute", "pattern_order"]
+    },
+    {
+      "id": "route.life-insurance-for-dependents",
+      "message": "Should I increase my life insurance now that we have a second child?",
+      "expect_domain": "family",
+      "why": "A dependant-protection decision \u2014 family/estate territory.",
+      "known_divergence": "Routes to HEALTH today: `insurance` is in BOTH the health and finance patterns and health is scanned first, so any mention of insurance becomes a health turn. This is the 'health misroute' class. The collision is in the pattern vocabulary itself, not in the ordering alone.",
+      "tags": ["family", "misroute", "pattern_collision", "insurance"]
+    },
+    {
+      "id": "route.401k-premium-wording",
+      "message": "What premium am I paying for the actively managed funds in my 401k?",
+      "expect_domain": "finance",
+      "why": "A fee question about a retirement account. Unambiguously finance by meaning.",
+      "known_divergence": "Routes to HEALTH today: `premium` is a health pattern and health is scanned first, so a fund-fee question is handled by the health agent with health grounding.",
+      "tags": ["finance", "misroute", "pattern_collision", "premium"]
+    },
+    {
+      "id": "route.ambiguous-general",
+      "message": "I'm not sure where to start, everything feels like a lot right now",
+      "expect_domain": "general",
+      "expect_risk": "high",
+      "why": "No domain vocabulary, so it must fall through to 'general' rather than biasing to finance (the old fallback bug). Risk is HIGH and that is correct: 'everything' is a high-stakes cue, and routing a user in distress to the supervised path is the desirable triage. The earlier expectation of LOW was the fixture being wrong.",
+      "tags": ["general", "fallback"]
+    },
+    {
+      "id": "route.large-figure-raises-risk",
+      "message": "I'm thinking about moving $450,000 into a single position",
+      "expect_domain": "general",
+      "expect_risk": "high",
+      "why": "Risk must be HIGH on a large figure regardless of formatting \u2014 that part is now fixed. Domain is 'general' because no finance KEYWORD is present: 'moving', 'position' and bare 'cash' are absent from the finance pattern. The earlier 'finance' expectation was the fixture being wrong about today's vocabulary, and the vocabulary gap itself is recorded separately below.",
+      "tags": ["finance", "high_stakes"]
+    },
+    {
+      "id": "safety.stroke-predicative-phrasing",
+      "message": "my face is drooping and my speech is slurred",
+      "expect_domain": "health",
+      "expect_urgent": "stroke symptoms",
+      "why": "The phrasing a frightened person types, as opposed to the clinical noun phrase. Missed entirely until this probe found it.",
+      "tags": ["safety", "regression", "predicative"]
+    },
+    {
+      "id": "safety.stroke-one-sided-numbness",
+      "message": "the left side of my face is numb",
+      "expect_domain": "health",
+      "expect_urgent": "stroke symptoms",
+      "why": "'left side' rather than the canonical 'one side'. Same miss class.",
+      "tags": ["safety", "regression", "predicative"]
+    },
+    {
+      "id": "safety.cannot-breathe",
+      "message": "I cannot breathe properly and it is getting worse",
+      "expect_domain": "health",
+      "expect_urgent": "trouble breathing",
+      "why": "`can'?t` never matched 'cannot'. This was a miss in the ORIGINAL pattern, not in anything added later \u2014 one of the two most time-critical entries in the list.",
+      "tags": ["safety", "regression", "negation"]
+    },
+    {
+      "id": "safety.will-not-stop-bleeding",
+      "message": "the cut will not stop bleeding",
+      "expect_domain": "health",
+      "expect_urgent": "severe bleeding",
+      "why": "`won'?t` did not match 'will not'. Same negation gap.",
+      "tags": ["safety", "regression", "negation"]
+    },
+    {
+      "id": "safety.no-false-positive-on-cannot-afford",
+      "message": "I cannot afford this house and I cannot decide what to do",
+      "expect_domain": "finance",
+      "expect_risk": "medium",
+      "why": "Guards the negation widening: 'cannot' plus a money verb must NOT trip the medical net. Risk is MEDIUM, not HIGH \u2014 `can i afford` is a high-stakes cue but 'cannot afford' is not the same string, and finance already floors at medium. Expectation corrected.",
+      "tags": ["safety_false_positive", "negation"]
+    },
+    {
+      "id": "route.comma-separated-dollar-figure-is-high-risk",
+      "message": "I am thinking about moving $450,000 into a single position",
+      "expect_domain": "general",
+      "expect_risk": "high",
+      "why": "A dollar amount written the way humans write it must register as high-stakes. Previously LOW, because the leading \\b could not match before '$' and \\d{4,} is broken by a thousands separator \u2014 so $450,000 was LOW while $450000 was HIGH. Domain is 'general' here on purpose: no finance keyword is present, which is a separate (unfixed) vocabulary gap.",
+      "tags": ["risk", "regression", "formatting"]
+    },
+    {
+      "id": "route.k-notation-dollar-figure-is-high-risk",
+      "message": "I have $450k sitting in cash doing nothing",
+      "expect_domain": "general",
+      "expect_risk": "high",
+      "why": "k-notation had the same leading-boundary failure and now registers HIGH. Domain is 'general': the finance pattern contains 'cash flow' as a phrase but not bare 'cash'.",
+      "tags": ["risk", "regression", "formatting"]
+    },
+    {
+      "id": "route.small-bare-number-is-not-high-risk",
+      "message": "I spend about 120 a week on groceries",
+      "expect_domain": "general",
+      "expect_risk": "low",
+      "why": "Guards the risk widening in the other direction: a small bare number must NOT escalate an ordinary budgeting remark to the supervised path.",
+      "tags": ["risk", "false_positive"]
+    },
+    {
+      "id": "route.finance-vocabulary-gap-bare-cash",
+      "message": "I have cash sitting idle and I want to move it into a position",
+      "expect_domain": "finance",
+      "why": "An unmistakably financial question by meaning: idle cash, moving it into a position.",
+      "known_divergence": "Routes to GENERAL today. The finance pattern matches the phrase 'cash flow' but not bare 'cash', and has no entry for 'position', 'allocate', 'rebalance' or 'move money'. So a real finance turn gets no finance grounding and no finance playbook. Found by this probe; adding vocabulary is easy but risks pulling neighbouring domains into finance, which is exactly the collision class the insurance/premium cases document \u2014 so it is measured, not patched under an eval commit.",
+      "tags": ["finance", "vocabulary_gap", "misroute"]
+    }
+  ]
+}

@@ -42,9 +42,22 @@ def classify_domain(message: str, context: Any = None) -> str:
 
 
 # ── Risk classification ───────────────────────────────────────────────────────
+# FIXED 2026-10-07 (found by eval/probe_routing).
+#
+# The previous pattern wrapped every alternative in a single `\b(...)\b`. A leading `\b` can never
+# match before `\$` (a space followed by a non-word character is not a word boundary), and `\d{4,}`
+# needs four CONSECUTIVE digits, which a thousands separator breaks. Measured consequence:
+#
+#     "$450,000"  -> LOW      "$450k" -> LOW      but      "$450000" -> HIGH
+#
+# The same amount triaged differently by formatting, with the human-readable forms being the ones
+# that failed — so a half-million-dollar decision took the fast, unsupervised path. Dollar amounts
+# are now matched on their own, with the boundary only where it belongs (after the number).
 _HIGH_STAKES = re.compile(
-    r"\b(should i|can i afford|all my|life savings|everything|retire|bankrupt|foreclos|lawsuit|"
-    r"\$\d[\d,]*k?|\d{4,})\b", re.I)
+    r"\b(should i|can i afford|all my|life savings|everything|retire|bankrupt|foreclos|lawsuit)\b"
+    r"|\$\s?\d[\d,]*(\.\d+)?\s?[kmb]?\b"      # $450,000 · $450k · $1.2M · $ 450000
+    r"|\b\d[\d,]{3,}(\.\d+)?\b"                 # 450,000 · 1,250,000 (bare, with separators)
+    r"|\b\d{4,}\b", re.I)                        # 450000 (bare, unseparated) — original behaviour
 
 
 def classify_risk(message: str, domain: str) -> str:
@@ -58,13 +71,44 @@ def classify_risk(message: str, domain: str) -> str:
 
 
 # ── Health urgent-care safety net (deterministic; runs before any LLM) ─────────
+# Negation fragments, shared so every pattern below spells them identically.
+#
+# `can'?t` matches "can't" and "cant" but NOT "cannot" or "can not" — so "I cannot breathe" did not
+# fire the ORIGINAL pattern, and neither did "the cut will not stop bleeding". Both are ordinary
+# phrasings for the two most time-critical entries in this list. Found by eval/probe_routing
+# 2026-10-07; the negated forms are the ones people type when they are frightened, not calm.
+_CANT = r"(?:can'?t|can\s?not)"
+_WONT = r"(?:won'?t|will\s?not)"
+
 _URGENT = [
     ("chest pain",            re.compile(r"\bchest (pain|pressure|tightness)\b|\bpain in my chest\b", re.I)),
-    ("stroke symptoms",       re.compile(r"\b(stroke|face drooping|slurred speech|sudden numbness|one side of (my|the) (face|body))\b", re.I)),
-    ("trouble breathing",     re.compile(r"\b(can'?t breathe|trouble breathing|short(ness)? of breath|struggling to breathe)\b", re.I)),
+    # PREDICATIVE FORMS ADDED 2026-10-07 (found by eval/probe_routing).
+    # The original patterns matched only NOUN-PHRASE phrasings — "face drooping", "slurred speech" —
+    # which is how a clinician writes it, not how a frightened person types it. Measured misses on
+    # this deterministic, must-be-100% safety net:
+    #     "my face is drooping and my speech is slurred"  -> None
+    #     "my speech is slurred"                          -> None
+    #     "the left side of my face is numb"              -> None
+    #     "I cannot catch my breath"                      -> None
+    # Additive only: every original alternative is preserved. This net errs toward FIRING — a false
+    # positive costs the user one unnecessary "seek care now" message, a false negative can cost
+    # them the window in which a stroke is treatable.
+    ("stroke symptoms",       re.compile(
+        r"\b(stroke|face drooping|slurred speech|sudden numbness|one side of (my|the) (face|body))\b"
+        r"|\b(my |the )?(face|mouth|smile|eye(lid)?)\s+(is|are|has|looks?|feels?|started)?\s*"
+        r"(droop\w*|sag\w*|falling|numb)"
+        r"|\b(my |the )?speech\s+(is|sounds?|came out|went)?\s*(slurr\w*|garbled|jumbled)"
+        r"|\bslurring my (words|speech)\b"
+        r"|\b(left|right|one) side of (my|the) (face|body|mouth)\b"
+        rf"|\b{_CANT} (move|feel) (my|the) (arm|leg|face|hand|side)\b", re.I)),
+    ("trouble breathing",     re.compile(
+        rf"\b({_CANT} breathe|trouble breathing|short(ness)? of breath|struggling to breathe)\b"
+        rf"|\b{_CANT} (catch|get) (my|a) breath\b"
+        r"|\b(gasping|struggling) for (air|breath)\b"
+        rf"|\b{_CANT} get (enough )?air\b", re.I)),
     ("suicidal ideation",     re.compile(r"\b(suicidal|kill myself|end my life|don'?t want to (be alive|live)|harm myself)\b", re.I)),
-    ("severe allergic reaction", re.compile(r"\b(anaphylax|throat closing|severe allergic|can'?t swallow)\b", re.I)),
-    ("severe bleeding",       re.compile(r"\b(won'?t stop bleeding|severe bleeding|bleeding (heavily|a lot))\b", re.I)),
+    ("severe allergic reaction", re.compile(rf"\b(anaphylax|throat closing|severe allergic|{_CANT} swallow)\b", re.I)),
+    ("severe bleeding",       re.compile(rf"\b({_WONT} stop bleeding|severe bleeding|bleeding (heavily|a lot))\b", re.I)),
     ("loss of consciousness", re.compile(r"\b(passed out|fainted|unconscious|blacked out|loss of consciousness)\b", re.I)),
 ]
 

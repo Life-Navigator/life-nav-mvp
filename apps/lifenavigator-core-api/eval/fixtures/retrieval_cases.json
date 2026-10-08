@@ -1,0 +1,64 @@
+{
+  "version": "0-stub",
+  "_README": [
+    "Probe B fixtures — semantic GraphRAG retrieval. INTENTIONALLY UNLABELLED.",
+    "",
+    "fly.toml gates GRAPH_GROUNDING_ENABLED on 'a measured win on the retrieval eval set'. This is",
+    "that file. The runner exists (eval/probe_retrieval.py); what is missing is the only part that",
+    "cannot be generated — a human judgement of which edges SHOULD come back for each query. If the",
+    "system could decide that, there would be nothing to measure.",
+    "",
+    "Each case below is a SHAPE, not a measurement. `labelled: false` makes the probe refuse to",
+    "score it, so the harness reports UNMEASURED rather than a number that would immediately be",
+    "used to justify flipping the flag.",
+    "",
+    "TO LABEL ONE: pick a real beta user, run the query, read the edges the engine returns, and",
+    "record (a) the edge ids that genuinely answer the question in `relevant_edge_ids`, and (b) ids",
+    "that must NOT come back in `irrelevant_edge_ids` — the second list is what stops a dragnet",
+    "retriever from scoring perfect recall while flooding the prompt at Opus input rates. Then set",
+    "`labelled: true`. Roughly 20-30 labelled cases across domains is enough to detect a real",
+    "regression; 5 is not."
+  ],
+  "cases": [
+    {
+      "id": "retrieval.finance-affordability-pulls-the-right-accounts",
+      "user_id": "REPLACE_WITH_REAL_BETA_USER_ID",
+      "query": "Can I afford a $650,000 house?",
+      "domain": "finance",
+      "relevant_edge_ids": [],
+      "irrelevant_edge_ids": [],
+      "labelled": false,
+      "why": "Should surface cash, debt and income edges. Must NOT drag in unrelated health or career edges — the classic dragnet failure, which costs input tokens and dilutes the prompt."
+    },
+    {
+      "id": "retrieval.cross-domain-goal-conflict",
+      "user_id": "REPLACE_WITH_REAL_BETA_USER_ID",
+      "query": "Can I retire at 55 and still pay for my kids' college?",
+      "domain": null,
+      "relevant_edge_ids": [],
+      "irrelevant_edge_ids": [],
+      "labelled": false,
+      "why": "The case typed traversal should win on: a CONFLICTS/COMPETES edge between a retirement goal and an education goal is exactly what flat vector search cannot find and the ontology exists to express."
+    },
+    {
+      "id": "retrieval.tenant-isolation-under-retrieval",
+      "user_id": "REPLACE_WITH_REAL_BETA_USER_ID",
+      "query": "What are my biggest financial risks?",
+      "domain": "finance",
+      "relevant_edge_ids": [],
+      "irrelevant_edge_ids": [],
+      "labelled": false,
+      "why": "Populate irrelevant_edge_ids with edges belonging to ANOTHER user. The engine claims cross-tenant traversal is unrepresentable rather than filtered; this is where that claim gets tested against a live graph instead of trusted."
+    },
+    {
+      "id": "retrieval.provenance-carrying-edges-only",
+      "user_id": "REPLACE_WITH_REAL_BETA_USER_ID",
+      "query": "Why do you think my retirement is off track?",
+      "domain": "finance",
+      "relevant_edge_ids": [],
+      "irrelevant_edge_ids": [],
+      "labelled": false,
+      "why": "Blocked on SP-010: 0 of 3,208 edges currently carry provenance, and the advisor may only cite what it can trace. Until provenance is populated this case cannot pass, which makes it the honest dependency between the graph work and the advisor work."
+    }
+  ]
+}
