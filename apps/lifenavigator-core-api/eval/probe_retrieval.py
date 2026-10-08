@@ -101,3 +101,105 @@ async def run(retriever: Any = None,
     results = [await evaluate_case(c, retriever) for c in cases]
     notes.append(f"{len(labelled)}/{len(cases)} cases labelled")
     return score(PROBE, fixture_version("retrieval_cases.json"), results, notes)
+
+# ── Synthetic mode: retrieval BEHAVIOUR, gateable in CI ───────────────────────────────────────────
+# Over a DECLARED graph (eval/graph_world.py) the ground truth is known, so behaviour can be asserted
+# without human labels and without live stores. This is what makes the engine's mechanics gateable
+# on every PR, while real-user relevance stays the human task above.
+#
+# It found a production bug the first time it ran. See SYNTHETIC_CASES[0].
+SYNTHETIC_CASES: list[dict[str, Any]] = [
+    {
+        "id": "synthetic.cross-domain-question-reaches-both-domains",
+        "query": "Can I retire at 55 and still fund college for my kids?",
+        "must_include": ["a-goal-college", "a-goal-retire"],
+        "must_exclude": ["a-unrelated-pet"],
+        "why": ("THE headline GraphRAG use case: a question spanning finance and education. Found a "
+                "real bug on first run — the engine filtered vector seeding to `plan.domains[0]`, so "
+                "a query planned as ('family','financial','education') was narrowed to `family`, "
+                "whose only node was a pet record. Zero seeds, zero evidence, with which domain won "
+                "decided by detection ORDER rather than by the question. Fixed in "
+                "engine._seed_domain_filter; this case is the regression guard."),
+    },
+    {
+        "id": "synthetic.typed-traversal-reaches-evidence-two-hops-out",
+        "query": "why is my monthly surplus limited?",
+        "must_include": ["a-constraint-cash", "a-evidence-surplus"],
+        "must_exclude": ["a-unrelated-pet"],
+        "why": ("What typed traversal is FOR: the evidence behind a constraint is two hops out and "
+                "flat vector search over titles cannot reach it. If this ever returns seeds only, "
+                "the walk has silently stopped — the exact degradation the dual row contract hides."),
+    },
+    {
+        "id": "synthetic.document-field-is-reachable-from-the-document",
+        "query": "what does my offer letter say about salary?",
+        "must_include": ["a-doc-offer", "a-field-salary"],
+        "must_exclude": ["a-unrelated-pet"],
+        "why": ("Document edges were among the 24 previously-unreachable types. An uploaded document "
+                "that cannot reach its own extracted fields is the documented reason a document "
+                "could change the life model yet never reach an answer."),
+    },
+    {
+        "id": "synthetic.non-traversable-edges-are-never-followed",
+        "query": "Can I retire at 55 and still fund college for my kids?",
+        "must_include": [],
+        "must_exclude": ["a-unrelated-pet"],
+        "why": ("The dragnet guard. a-goal-retire -RELATED_TO- a-unrelated-pet exists in the world, "
+                "and RELATED_TO is traversable=false in the manifest. Following it would flood the "
+                "prompt with irrelevant nodes at Opus input rates — recall is not free."),
+    },
+    {
+        "id": "synthetic.another-tenants-subgraph-never-appears",
+        "query": "Can I retire at 55 and still fund college for my kids?",
+        "must_include": ["a-goal-retire"],
+        "must_exclude": ["b-goal-retire", "b-constraint-cash"],
+        "why": ("Tenant isolation against a graph that CONTAINS another tenant, whose nodes are "
+                "titled to score highly on this exact query. Strictly stronger than a fake "
+                "returning one hardcoded row: a leak here would be found by the vector seeding. "
+                "`must_include` is non-empty on purpose — the first version of this case asserted "
+                "only exclusions and passed VACUOUSLY when retrieval returned nothing at all, which "
+                "is how a totally broken engine scores perfectly on isolation."),
+    },
+]
+
+
+def build_world_engine() -> tuple[Any, Any]:
+    """A real SemanticGraphRAG wired to the declared world. Returns (engine, neo4j_double)."""
+    from app.grounding.semantic import SemanticGraphRAG
+
+    from .graph_world import GraphWorld, WorldGemini, WorldNeo4j, WorldQdrant
+
+    world = GraphWorld.load()
+    neo = WorldNeo4j(world)
+    engine = SemanticGraphRAG(gemini=WorldGemini(), qdrant=WorldQdrant(world), neo4j=neo,
+                              central_qdrant=None)
+    return engine, neo
+
+
+async def run_synthetic() -> ProbeScore:
+    """Run the synthetic behaviour cases. Free, offline, no credentials."""
+    engine, neo = build_world_engine()
+    results: list[CaseResult] = []
+
+    for case in SYNTHETIC_CASES:
+        evidence, trace = await engine.retrieve(case["query"], user_id="user-a", limit=20)
+        got = [str(e.get("entity_id") or "") for e in (evidence or [])]
+        missing = [i for i in case["must_include"] if i not in got]
+        leaked = [i for i in case["must_exclude"] if i in got]
+        # A case asserting exclusions must still have retrieved SOMETHING, or it passes vacuously:
+        # a totally broken engine excludes everything.
+        vacuous = (not case["must_include"]) and not got
+
+        results.append(CaseResult(
+            case_id=case["id"], direction="must_pass",
+            expected=f"include {case['must_include']}, exclude {case['must_exclude']}",
+            actual=f"returned {got}",
+            ok=(not missing and not leaked and not vacuous),
+            detail={"missing": missing, "leaked": leaked, "vacuous": vacuous,
+                    "returned_count": len(got), "trace": trace.as_dict(), "why": case["why"]},
+        ))
+
+    notes = [f"{len(SYNTHETIC_CASES)} behaviour cases over the declared graph "
+             f"(eval/fixtures/graph_world.json) — no model, no stores, no credentials",
+             f"tenants the store was asked for: {sorted(neo.tenants_seen)}"]
+    return score("retrieval_synthetic", fixture_version("graph_world.json"), results, notes)

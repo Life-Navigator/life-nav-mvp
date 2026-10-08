@@ -1,6 +1,6 @@
 """Harness entry point.
 
-    python -m eval.run                          # gate + routing (free, offline) — what CI runs
+    python -m eval.run                          # gate + routing + retrieval_synthetic — what CI runs
     python -m eval.run --probe gate              # one probe
     python -m eval.run --save-baseline           # freeze current state as the comparison point
     python -m eval.run --json out.json           # machine-readable, for artifact upload
@@ -24,7 +24,7 @@ from .scorecard import ProbeScore, compare, render, save_baseline
 
 # Probes that need no model, no stores and no credentials. These are the CI set — everything else is
 # on demand, because an eval you cannot afford to run on every PR is an eval that runs once.
-OFFLINE = ("gate", "routing")
+OFFLINE = ("gate", "routing", "retrieval_synthetic")
 ALL = OFFLINE + ("retrieval",)
 
 
@@ -33,6 +33,11 @@ def _run_probe(name: str) -> ProbeScore:
         return probe_gate.run()
     if name == "routing":
         return probe_routing.run()
+    if name == "retrieval_synthetic":
+        # Retrieval BEHAVIOUR over the declared graph in eval/fixtures/graph_world.json. Needs no
+        # model, no stores and no credentials, so it belongs in the CI set — unlike `retrieval`,
+        # which needs live Neo4j+Qdrant and human relevance labels.
+        return asyncio.run(probe_retrieval.run_synthetic())
     if name == "retrieval":
         # No retriever is constructed here. Building one needs Neo4j + Qdrant credentials and
         # GRAPH_GROUNDING_ENABLED; the probe reports UNMEASURED rather than inventing a result, which

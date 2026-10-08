@@ -1,0 +1,179 @@
+{
+  "version": "3",
+  "_README": [
+    "Declared synthetic graph for offline retrieval evaluation (eval/graph_world.py).",
+    "",
+    "Ground truth is KNOWN because the world is declared, so a case can assert what traversal must",
+    "reach without any human labelling. That gates retrieval BEHAVIOUR in CI \u2014 distinct from",
+    "retrieval RELEVANCE on real users, which still needs labels (retrieval_cases.json).",
+    "",
+    "EVERY relationship type below is a REAL type from the generated ontology manifest, with its real",
+    "traversability. v1 of this file invented plausible-sounding types (CONFLICTS_WITH, SUPPORTS,",
+    "EVIDENCES) and _validate_rel_types would have rejected all of them \u2014 a fixture that cannot be",
+    "traversed proves nothing. Verified against the manifest; a drift gate keeps that honest.",
+    "",
+    "Two tenants on purpose. user-b's nodes are given titles that score HIGHLY on user-a's queries,",
+    "so a leak would be found by the vector seeding rather than merely being possible in theory.",
+    "",
+    "a-goal-retire -RELATED_TO- a-unrelated-pet is deliberately NON-traversable (RELATED_TO is",
+    "traversable=false in the manifest). A case asserts the pet never appears: the dragnet guard.",
+    "",
+    "v3: finance nodes use domain 'financial', the CANONICAL value \u2014 normalize_domain('finance')",
+    "returns 'financial', so storing 'finance' makes a node unreachable through the domain filter",
+    "while retrieval reports success. That is the data-side form of the defect the engine comment",
+    "calls out as having made 71% of the corpus unreachable. v2 of this fixture reproduced it exactly."
+  ],
+  "nodes": [
+    {
+      "entity_id": "a-person",
+      "tenant_id": "user-a",
+      "labels": ["Person"],
+      "domain": "general",
+      "title": "Account holder",
+      "summary": "the user",
+      "updated_at": "2026-09-30"
+    },
+    {
+      "entity_id": "a-goal-retire",
+      "tenant_id": "user-a",
+      "labels": ["Goal"],
+      "domain": "financial",
+      "title": "Retire at 55",
+      "summary": "early retirement target",
+      "updated_at": "2026-09-01"
+    },
+    {
+      "entity_id": "a-goal-college",
+      "tenant_id": "user-a",
+      "labels": ["Goal"],
+      "domain": "education",
+      "title": "Fund college for two kids",
+      "summary": "tuition due 2032 and 2035",
+      "updated_at": "2026-09-02"
+    },
+    {
+      "entity_id": "a-constraint-cash",
+      "tenant_id": "user-a",
+      "labels": ["Constraint"],
+      "domain": "financial",
+      "title": "Limited monthly surplus",
+      "summary": "little room after expenses",
+      "updated_at": "2026-08-10"
+    },
+    {
+      "entity_id": "a-tradeoff-retire",
+      "tenant_id": "user-a",
+      "labels": ["Tradeoff"],
+      "domain": "financial",
+      "title": "Retire earlier versus fund tuition",
+      "summary": "competing claims on the same surplus",
+      "updated_at": "2026-09-05"
+    },
+    {
+      "entity_id": "a-evidence-surplus",
+      "tenant_id": "user-a",
+      "labels": ["Evidence"],
+      "domain": "financial",
+      "title": "Cash flow statement",
+      "summary": "monthly surplus evidence",
+      "updated_at": "2026-09-10"
+    },
+    {
+      "entity_id": "a-doc-offer",
+      "tenant_id": "user-a",
+      "labels": ["Document"],
+      "domain": "career",
+      "title": "Offer letter",
+      "summary": "base salary and equity terms",
+      "updated_at": "2026-07-01"
+    },
+    {
+      "entity_id": "a-field-salary",
+      "tenant_id": "user-a",
+      "labels": ["DocumentField"],
+      "domain": "career",
+      "title": "Base salary field",
+      "summary": "extracted compensation figure",
+      "updated_at": "2026-07-01"
+    },
+    {
+      "entity_id": "a-unrelated-pet",
+      "tenant_id": "user-a",
+      "labels": ["Entity"],
+      "domain": "family",
+      "title": "Dog vet schedule",
+      "summary": "annual checkup",
+      "updated_at": "2026-05-01"
+    },
+    {
+      "entity_id": "b-goal-retire",
+      "tenant_id": "user-b",
+      "labels": ["Goal"],
+      "domain": "financial",
+      "title": "Retire at 55 early retirement target",
+      "summary": "ANOTHER TENANT, deliberately high-scoring",
+      "updated_at": "2026-09-25"
+    },
+    {
+      "entity_id": "b-constraint-cash",
+      "tenant_id": "user-b",
+      "labels": ["Constraint"],
+      "domain": "financial",
+      "title": "Limited monthly surplus little room after expenses",
+      "summary": "ANOTHER TENANT",
+      "updated_at": "2026-09-26"
+    }
+  ],
+  "edges": [
+    {
+      "src": "a-person",
+      "rel": "HAS_GOAL",
+      "dst": "a-goal-retire"
+    },
+    {
+      "src": "a-person",
+      "rel": "HAS_EDUCATION_GOAL",
+      "dst": "a-goal-college"
+    },
+    {
+      "src": "a-person",
+      "rel": "HAS_CONSTRAINT",
+      "dst": "a-constraint-cash"
+    },
+    {
+      "src": "a-goal-retire",
+      "rel": "CROSS_DOMAIN_IMPACT",
+      "dst": "a-goal-college"
+    },
+    {
+      "src": "a-goal-retire",
+      "rel": "HAS_TRADEOFF",
+      "dst": "a-tradeoff-retire"
+    },
+    {
+      "src": "a-constraint-cash",
+      "rel": "HAS_EVIDENCE",
+      "dst": "a-evidence-surplus"
+    },
+    {
+      "src": "a-person",
+      "rel": "HAS_DOCUMENT",
+      "dst": "a-doc-offer"
+    },
+    {
+      "src": "a-doc-offer",
+      "rel": "HAS_EXTRACTED_FIELD",
+      "dst": "a-field-salary"
+    },
+    {
+      "src": "a-goal-retire",
+      "rel": "RELATED_TO",
+      "dst": "a-unrelated-pet"
+    },
+    {
+      "src": "b-goal-retire",
+      "rel": "HAS_CONSTRAINT",
+      "dst": "b-constraint-cash"
+    }
+  ]
+}

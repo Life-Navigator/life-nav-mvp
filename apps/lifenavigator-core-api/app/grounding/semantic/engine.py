@@ -68,6 +68,30 @@ class RetrievalTrace:
         }
 
 
+def _seed_domain_filter(plan_domains: tuple[str, ...]) -> Optional[str]:
+    """The domain to filter vector seeding by, or None for no filter.
+
+    A SINGLE detected domain narrows the search usefully. MULTIPLE detected domains must NOT be
+    narrowed to the first of them — that is a cross-domain question, and filtering it to one of its
+    domains discards the others before retrieval has begun.
+
+    Found by eval/probe_retrieval against a declared graph. "Can I retire at 55 and still fund
+    college for my kids?" plans as ('family', 'financial', 'education') — all three correctly
+    detected — and taking the first element filtered the entire retrieval to `family`, whose only
+    node was an unrelated pet record. Zero seeds, zero evidence, on precisely the cross-domain
+    question that bounded typed traversal exists to answer. Which domain won was decided by
+    detection ORDER, not by the question.
+
+    Same failure SHAPE as the note below warns about — a filter that matches nothing and reports
+    success — reached by over-narrowing rather than by a non-canonical value.
+    """
+    if not plan_domains:
+        return None
+    if len(plan_domains) > 1:
+        return None  # cross-domain: let typed traversal narrow, not the seed filter
+    return normalize_domain(plan_domains[0])
+
+
 class SemanticGraphRAG:
     """Tenant-scoped semantic retrieval over the user's personal graph plus shared knowledge."""
 
@@ -154,7 +178,7 @@ class SemanticGraphRAG:
             # success — the defect that made 71% of the corpus unreachable. None => no domain filter.
             hits = await self._qdrant.search_personal(
                 vector, user_id=user_id, limit=plan.seed_limit,
-                domain=normalize_domain(plan.domains[0]) if plan.domains else None,
+                domain=_seed_domain_filter(plan.domains),
             ) or []
             trace.vector_seeds = len(hits)
             return hits
@@ -196,7 +220,7 @@ class SemanticGraphRAG:
             vector = await self._gemini.embed(plan.query)
             hits = await self._central.search_central(
                 vector, limit=max(3, plan.seed_limit // 2),
-                domain=normalize_domain(plan.domains[0]) if plan.domains else None,
+                domain=_seed_domain_filter(plan.domains),
             ) or []
             trace.central_hits = len(hits)
             return hits

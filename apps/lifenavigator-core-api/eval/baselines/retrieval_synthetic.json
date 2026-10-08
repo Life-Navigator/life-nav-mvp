@@ -1,0 +1,18 @@
+{
+  "failures": [],
+  "fixture_version": "3",
+  "known_divergences": 0,
+  "must_block_passed": 0,
+  "must_block_total": 0,
+  "must_pass_blocked": 0,
+  "must_pass_total": 5,
+  "notes": [
+    "5 behaviour cases over the declared graph (eval/fixtures/graph_world.json) \u2014 no model, no stores, no credentials",
+    "tenants the store was asked for: ['user-a']"
+  ],
+  "over_block_rate_pct": 0.0,
+  "probe": "retrieval_synthetic",
+  "refused_unscoreable": 0,
+  "status": "MEASURED",
+  "under_block_rate_pct": null
+}

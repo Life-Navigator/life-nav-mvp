@@ -10,6 +10,7 @@ whether its output means anything:
   * the probes call the PRODUCTION code, so the harness cannot drift from what ships.
 """
 import json
+import pathlib
 
 import pytest
 
@@ -227,13 +228,131 @@ def test_cli_json_output_is_machine_readable(tmp_path, monkeypatch):
 
 
 def test_the_offline_set_needs_no_credentials_model_or_network():
-    """The property that lets this run on every PR. If an offline probe ever needed a key, it would
-    quietly stop running and the gate would silently disappear."""
-    from eval.run import OFFLINE
-    assert set(OFFLINE) == {"gate", "routing"}
-    import eval.probe_gate as pg, eval.probe_routing as pr
+    """The property that lets this run on every PR. If an offline probe ever reached for a store or
+    a key it would quietly stop running in CI and the gate would silently disappear.
+
+    Checked by parsing IMPORTS rather than grepping source text — an earlier version grepped for
+    "Neo4jClient" and tripped on the word appearing in a docstring, which is a test that fails for
+    documentation rather than for behaviour.
+    """
+    import ast
     import inspect
-    for mod in (pg, pr):
-        src = inspect.getsource(mod)
-        for forbidden in ("httpx", "os.environ", "requests", "supabase"):
-            assert forbidden not in src, f"{mod.__name__} reaches for {forbidden}"
+
+    import eval.graph_world as gw
+    import eval.probe_gate as pg
+    import eval.probe_retrieval as prt
+    import eval.probe_routing as pr
+    from eval.run import OFFLINE
+
+    assert set(OFFLINE) == {"gate", "routing", "retrieval_synthetic"}
+
+    # Modules that imply a credential, a network call or a live store.
+    FORBIDDEN = {"httpx", "requests", "supabase", "aiohttp", "urllib.request", "socket"}
+
+    for mod in (pg, pr, prt, gw):
+        tree = ast.parse(inspect.getsource(mod))
+        imported: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported |= {a.name for a in node.names}
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported.add(node.module)
+        offending = {m for m in imported if any(m == f or m.startswith(f + ".") for f in FORBIDDEN)}
+        assert not offending, f"{mod.__name__} imports {offending}"
+        # The app's real store CLIENTS must not be imported either — the doubles stand in for them.
+        assert not {m for m in imported if m.startswith("app.clients")}, (
+            f"{mod.__name__} imports a real store client"
+        )
+
+
+# ── Synthetic graph retrieval (probe B, offline mode) ────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_synthetic_retrieval_behaviour_cases_all_pass():
+    """Retrieval BEHAVIOUR over a declared graph — the gate the existing 65 GraphRAG tests cannot
+    provide, because their fakes replay scripted rows rather than containing a graph."""
+    from eval import probe_retrieval
+    s = await probe_retrieval.run_synthetic()
+    assert s.measured
+    assert s.must_pass_blocked == 0, [r.case_id for r in s.results if not r.ok]
+
+
+@pytest.mark.asyncio
+async def test_the_cross_domain_regression_is_guarded():
+    """The bug this fixture found on first run: the engine filtered vector seeding to
+    plan.domains[0], so a query planned as ('family','financial','education') was narrowed to
+    `family` — whose only node was a pet record — and returned NOTHING on the headline cross-domain
+    question GraphRAG exists to answer."""
+    from eval.probe_retrieval import build_world_engine
+    engine, _ = build_world_engine()
+    evidence, _t = await engine.retrieve(
+        "Can I retire at 55 and still fund college for my kids?", user_id="user-a", limit=20)
+    ids = {e.get("entity_id") for e in evidence}
+    assert "a-goal-college" in ids and "a-goal-retire" in ids, ids
+    assert len(ids) >= 4
+
+
+def test_multi_domain_plans_are_not_narrowed_to_one_domain():
+    """Pinned on the helper directly, independent of any fixture."""
+    from app.grounding.semantic.engine import _seed_domain_filter
+    assert _seed_domain_filter(()) is None
+    assert _seed_domain_filter(("financial",)) == "financial"
+    assert _seed_domain_filter(("family", "financial", "education")) is None, (
+        "a cross-domain question must not be filtered to one of its domains"
+    )
+
+
+@pytest.mark.asyncio
+async def test_non_traversable_edges_are_never_followed():
+    """RELATED_TO is traversable=false in the manifest. Following it would flood the prompt with
+    irrelevant nodes at Opus input rates — recall is not free."""
+    from eval.probe_retrieval import build_world_engine
+    engine, _ = build_world_engine()
+    evidence, _t = await engine.retrieve(
+        "Can I retire at 55 and still fund college for my kids?", user_id="user-a", limit=20)
+    assert "a-unrelated-pet" not in {e.get("entity_id") for e in evidence}
+
+
+@pytest.mark.asyncio
+async def test_no_other_tenants_node_is_ever_returned():
+    """The world CONTAINS user-b, whose nodes are titled to score highly on this query — so a leak
+    would be caught by the vector seeding rather than being merely possible in theory."""
+    from eval.probe_retrieval import build_world_engine
+    engine, neo = build_world_engine()
+    evidence, _t = await engine.retrieve(
+        "Can I retire at 55 and still fund college for my kids?", user_id="user-a", limit=20)
+    ids = {e.get("entity_id") for e in evidence}
+    assert ids, "vacuous: nothing retrieved, so isolation would pass trivially"
+    assert not any(str(i).startswith("b-") for i in ids), ids
+    assert neo.tenants_seen == {"user-a"}
+
+
+def test_the_world_uses_only_real_manifest_relationship_types():
+    """An edge whose type is absent from the generated manifest is rejected by _validate_rel_types
+    and can never be traversed, so a world built from invented types proves nothing. v1 of this
+    fixture did exactly that — CONFLICTS_WITH, SUPPORTS and EVIDENCES do not exist."""
+    from eval.graph_world import GraphWorld
+    manifest = json.loads(
+        (pathlib.Path(__file__).parent.parent
+         / "app/grounding/semantic/ontology_manifest.json").read_text())
+    known = {r["rel_type"] for r in manifest["relationships"]}
+    unknown = sorted({e.rel for e in GraphWorld.load().edges} - known)
+    assert not unknown, f"fixture uses types absent from the manifest: {unknown}"
+
+
+def test_the_world_uses_canonical_domain_values():
+    """normalize_domain('finance') == 'financial'. Storing the non-canonical spelling makes a node
+    unreachable through the domain filter while retrieval still reports success — the data-side form
+    of the defect that made 71% of the corpus unreachable. v2 of this fixture reproduced it."""
+    from app.grounding.semantic.domains import normalize_domain
+    from eval.graph_world import GraphWorld
+    for n in GraphWorld.load().nodes.values():
+        assert normalize_domain(n.domain) == n.domain, (
+            f"{n.entity_id} has non-canonical domain {n.domain!r} "
+            f"(canonical: {normalize_domain(n.domain)!r})"
+        )
+
+
+def test_the_world_contains_a_second_tenant():
+    from eval.graph_world import GraphWorld
+    tenants = {n.tenant_id for n in GraphWorld.load().nodes.values()}
+    assert len(tenants) >= 2, "isolation cannot be tested against a single-tenant graph"
