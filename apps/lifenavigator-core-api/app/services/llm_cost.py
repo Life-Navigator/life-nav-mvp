@@ -32,7 +32,12 @@ DESIGN RULES
 """
 from __future__ import annotations
 
+import logging
+import os
+import re
 from typing import Optional
+
+log = logging.getLogger("core.llm_cost")
 
 # ── Provider slugs ────────────────────────────────────────────────────────────────────────────────
 # `ops.is_llm_provider(p)` (migration 090) accepts exactly: gemini | openai | anthropic | local | other.
@@ -91,9 +96,54 @@ def _normalize_model(model: str) -> str:
     return _reg.normalize_model_id(model)
 
 
+def _env_rate(model: str, field: str) -> Optional[float]:
+    """A per-model rate override from the environment, or None.
+
+    WHY THIS EXISTS: the table above carries Anthropic FIRST-PARTY rates, but Claude on Vertex AI is
+    partner-operated and billed on Google's own price list. With Opus serving every route, a wrong
+    rate does not produce a slightly-off report — it makes the entire cost ledger fiction, which
+    defeats the reason Phase 0 was built. An override means the real Vertex numbers can be set from
+    config the moment they are read off the GCP bill, with no deploy and no code edit.
+
+    Env shape (model id upper-cased, non-alphanumerics to underscore):
+        LLM_PRICE_CLAUDE_OPUS_4_8_IN=...        # USD per 1M input tokens
+        LLM_PRICE_CLAUDE_OPUS_4_8_OUT=...       # USD per 1M output tokens
+        LLM_PRICE_CLAUDE_OPUS_4_8_CACHED_IN=...
+        LLM_PRICE_CLAUDE_OPUS_4_8_CACHE_WRITE_IN=...
+    """
+    key = "LLM_PRICE_" + re.sub(r"[^A-Z0-9]+", "_", _normalize_model(model).upper()) + "_" + field.upper()
+    raw = (os.environ.get(key) or "").strip()
+    if not raw:
+        return None
+    try:
+        v = float(raw)
+    except ValueError:
+        log.warning("ignoring non-numeric price override %s=%r", key, raw)
+        return None
+    return v if v >= 0 else None
+
+
+def _rates(model: str) -> Optional[dict[str, Optional[float]]]:
+    """Effective rates for `model`: the table, with any environment override applied."""
+    base = _PRICES.get(_normalize_model(model))
+    if base is None:
+        # An override alone is enough to price a model the table has never heard of, so a new Vertex
+        # model can be metered the day it is enabled rather than silently logging cost_known=false.
+        in_r, out_r = _env_rate(model, "in"), _env_rate(model, "out")
+        if in_r is None or out_r is None:
+            return None
+        base = {"in": in_r, "out": out_r, "cached_in": None, "cache_write_in": None}
+    out = dict(base)
+    for field in ("in", "out", "cached_in", "cache_write_in"):
+        ov = _env_rate(model, field)
+        if ov is not None:
+            out[field] = ov
+    return out
+
+
 def price_known(model: str) -> bool:
-    """True when `model` has an entry in the price table."""
-    return _normalize_model(model) in _PRICES
+    """True when `model` can be priced — from the table or from an environment override."""
+    return _rates(model) is not None
 
 
 def cost_usd_micros(
@@ -123,7 +173,7 @@ def cost_usd_micros(
     `tokens_out` must already include any reasoning/thinking tokens: providers bill those at the
     output rate, and Gemini reports them OUTSIDE `candidatesTokenCount` (see clients/gemini.py).
     """
-    p = _PRICES.get(_normalize_model(model))
+    p = _rates(model)
     if p is None:
         return None
 
@@ -269,4 +319,16 @@ def describe_pricing() -> dict[str, object]:
     Exposed so "which prices is the ledger using?" is answerable at runtime instead of by reading
     this file, which is how a stale table goes unnoticed.
     """
-    return {"checked": _PRICES_CHECKED, "models": {k: dict(v) for k, v in _PRICES.items()}}
+    models: dict[str, object] = {}
+    for k in _PRICES:
+        eff = _rates(k) or {}
+        models[k] = {**eff, "overridden": eff != _PRICES[k]}
+    return {
+        "checked": _PRICES_CHECKED,
+        "models": models,
+        # Loud, because an Opus-everywhere configuration priced at first-party rates would report a
+        # confidently wrong bill. See _env_rate for the override shape.
+        "note": ("Claude rates are Anthropic FIRST-PARTY list prices. Claude on Vertex AI is "
+                 "partner-operated and billed on Google's price list — set LLM_PRICE_* overrides "
+                 "from the GCP bill before trusting any Claude cost figure."),
+    }

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from typing import Any, Optional, Protocol
 
@@ -495,6 +496,39 @@ class GeminiAdvisorLLM:
             return None
 
 
+def _env_flag(name: str, *, default: bool = False) -> bool:
+    raw = (os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return default
+    return raw in ("1", "true", "yes", "on")
+
+
+def _claude_system_blocks(system_text: str) -> Any:
+    """The system prompt as Anthropic expects it, optionally with a cache breakpoint.
+
+    WHY THIS IS NOT JUST A STRING
+    -----------------------------
+    Gemini 2.5 caches IMPLICITLY: automatic, free, no code. Anthropic has no implicit caching — it is
+    explicit `cache_control` breakpoints only. So moving the advisor to Claude silently LOSES a
+    discount the Gemini path got for free, re-billing the whole ~5.2k-token stable prefix at Opus
+    input rates on every single turn. That is the single largest avoidable cost in an
+    Opus-for-everything configuration.
+
+    Phase 1 already did the hard part: the prefix is byte-identical across turns, ordered first, and
+    comfortably clears the minimum cacheable size (see tests/test_prompt_cache_prefix.py). All that
+    was missing is the breakpoint.
+
+    DEFAULT OFF (CLAUDE_PROMPT_CACHE). Prompt caching for Claude on Vertex is preview and documented
+    as not behaving identically to the first-party API, and an unsupported field would 400 the turn
+    into a Gemini fallback — a silent quality loss. Flip it on and read
+    `cached_prompt_tokens` from the Phase 0 ledger: non-zero means it engaged, zero means this path
+    does not support it and nothing was lost by trying.
+    """
+    if not _env_flag("CLAUDE_PROMPT_CACHE"):
+        return system_text
+    return [{"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}]
+
+
 class VertexClaudeAdvisorLLM:
     """Claude Control Experiment: the SAME advisor (identical ADVISOR_SYSTEM prompt, identical user-prompt
     construction, identical JSON parsing) but routed to Claude on Vertex AI instead of Gemini. Nothing else
@@ -544,7 +578,7 @@ class VertexClaudeAdvisorLLM:
         user = json.dumps({"guardrails": context.prompt_dict(), "constraints": plan}, ensure_ascii=False, default=str)
         prompt = f"GUARDRAILS_AND_CONSTRAINTS:\n{user}\n\nReason within these guardrails and return the JSON object now."
         import httpx  # local import keeps module import-light and mirrors the gemini client's usage
-        body = {
+        body: dict[str, Any] = {
             "anthropic_version": "vertex-2023-10-16",
             # 2048 truncated long plans (workout/nutrition/estate) → invalid JSON → fallback. The advisor
             # JSON with a full plan can run larger; 4096 matches Gemini's effective output headroom.
@@ -552,9 +586,25 @@ class VertexClaudeAdvisorLLM:
             # NOTE: `temperature` is deprecated/rejected (HTTP 400) by newer Claude models (Opus 4.5+), which
             # manage sampling internally. Older models accepted it; omitting it is safe for all and avoids the
             # 400 → fallback. (Advisor JSON output stays well-formed without an explicit temperature.)
-            "system": _system_for(context),
+            "system": _claude_system_blocks(_system_for(context)),
             "messages": [{"role": "user", "content": prompt}],
         }
+        # ADAPTIVE THINKING — required, not an enhancement.
+        #
+        # On Opus 4.8 `{"type": "adaptive"}` is the ONLY on-mode, and OMITTING `thinking` runs the
+        # model WITHOUT thinking. Sending nothing (which is what this wrapper did) means paying Opus
+        # rates for non-thinking Opus: the most expensive model in the registry, delivering less than
+        # it is capable of. Controlled by CLAUDE_THINKING (default on) so a live 400 from Vertex can
+        # be switched off without a deploy.
+        _think = _env_flag("CLAUDE_THINKING", default=True)
+        if _think:
+            body["thinking"] = {"type": "adaptive"}
+        # EFFORT — the cost/quality dial WITHIN one model, which is the lever that matters when a
+        # single model serves every route. Off unless set, because the default (`high`) is what the
+        # benchmark score was measured at and silently lowering it would invalidate that number.
+        _effort = (os.environ.get("CLAUDE_EFFORT") or "").strip().lower()
+        if _effort in ("low", "medium", "high", "xhigh", "max"):
+            body["output_config"] = {"effort": _effort}
         try:
             token = await self._bearer()  # raises VertexAuthError loudly if ADC is unavailable
             async with httpx.AsyncClient(timeout=60.0) as client:

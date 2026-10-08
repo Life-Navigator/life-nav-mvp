@@ -46,13 +46,17 @@ def test_classify_risk():
 
 
 # ── Routing rules ───────────────────────────────────────────────────────────────
-def test_finance_high_stakes_routes_to_opus_when_premium_on(premium_on):
+def test_finance_high_stakes_routes_to_opus(premium_on):
     r = ModelRouter(_factory)
     d = r.route(message="Can I afford a $620k house on $185k income?", tier="premium")
     assert d.domain == "finance" and d.risk_level == "high"
     assert d.selected_role == "finance_high_stakes"
-    assert d.selected_model == "claude_opus_4_8" and d.premium is True
+    assert d.selected_model == "claude_opus_4_8"
     assert d.primary_llm == ("LLM", "claude_opus_4_8")
+    # `premium` is now False: Opus is THE model for every route (owner decision 2026-10-07), and that
+    # flag is a quota/routing gate rather than a statement about quality. Leaving it True kept Opus
+    # behind PREMIUM_ROUTING_ENABLED and counted every turn against a premium allowance.
+    assert d.premium is False
 
 
 def test_health_high_stakes_routes_to_opus_when_premium_on(premium_on):
@@ -99,16 +103,29 @@ def test_router_default_all_premium_off_uses_gemini():
 
 
 # ── Plan / token limit fallback ──────────────────────────────────────────────────
-def test_premium_budget_exhausted_falls_back(monkeypatch, premium_on):
+def test_an_exhausted_premium_allowance_no_longer_demotes_the_advisor(monkeypatch, premium_on):
+    """CHANGED BY THE OPUS-EVERYWHERE DECISION — and worth understanding before changing it back.
+
+    This used to assert graceful demotion off Opus once a premium allowance ran out. That behaviour
+    was right while Opus was an exception for high-stakes turns: the user kept a working advisor on
+    a cheaper model. With Opus as THE model, the same mechanism silently downgrades the product for
+    every user the moment a quota trips — and the free tier's allowance is 0, so it would trip
+    immediately for everyone.
+
+    Cost control for a single-model configuration is prompt caching, effort and an output cap, all
+    of which reduce the cost of a turn rather than the quality of it. If per-tier quotas are
+    reintroduced as a COMMERCIAL decision, this test is the right place to encode that intent — note
+    that `plan_limits` is explicitly documented as placeholder values, not final ones.
+    """
     monkeypatch.setenv("MODEL_USAGE_LIMITS_ENABLED", "true")
     monkeypatch.setenv("PLAN_PREMIUM_PREMIUM_CALLS", "2")
     led = InMemoryUsageLedger()
     led.increment("t1", "u1", "premium_calls", 2)  # at the cap
     r = ModelRouter(_factory, ledger=led)
     d = r.route(message="Can I afford a $620k house?", tier="premium", tenant_id="t1", user_id="u1")
-    assert d.budget_state == "exhausted"
-    assert d.selected_model != "claude_opus_4_8"  # graceful demotion, not failure
-    assert any("premium_budget_exhausted" in n for n in d.notes)
+    assert d.budget_state == "exhausted"          # the ledger still reports it
+    assert d.selected_model == "claude_opus_4_8"  # but it no longer demotes the model
+    assert not any("premium_budget_exhausted" in n for n in d.notes)
 
 
 def test_budget_states(monkeypatch):
@@ -128,11 +145,24 @@ def test_limits_off_means_always_available(premium_on):
     assert budget_state("plus", led, "t", "u") == "available"  # MODEL_USAGE_LIMITS_ENABLED off
 
 
-# ── Free tier never gets premium (no Opus, no Pro) ──────────────────────────────
-def test_free_tier_excluded_from_premium(premium_on):
+# ── Every tier gets Opus (owner decision: lead with the best model) ─────────────
+def test_free_tier_also_gets_opus(premium_on):
+    """Previously free tier was pinned to flash. "We need it for everything" includes the free tier,
+    and `_resolve` returns None for any tier absent from a model's `tiers` list — so excluding free
+    there routed the largest group of users straight past the model the product is built on."""
     r = ModelRouter(_factory)
     d = r.route(message="Can I afford a $620k house?", tier="free")
-    assert d.selected_model == "gemini_flash"  # free tier eligible only for flash/flash-lite
+    assert d.selected_model == "claude_opus_4_8"
+
+
+def test_a_vertex_outage_still_degrades_to_gemini_on_the_free_tier(premium_on, monkeypatch):
+    """The fallback has to remain reachable for every tier too, or an ADC outage returns nothing at
+    all to exactly the users with no alternative."""
+    monkeypatch.setenv("CLAUDE_OPUS_4_8_ENABLED", "false")
+    r = ModelRouter(_factory)
+    d = r.route(message="Can I afford a $620k house?", tier="free")
+    assert d.selected_model != "claude_opus_4_8"
+    assert d.selected_model is not None
 
 
 # ── Health urgent safety net (deterministic, 100% pass required) ────────────────

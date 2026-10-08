@@ -60,12 +60,21 @@ MODELS: dict[str, dict[str, Any]] = {
         "cost_estimate": 0.011, "latency_budget_ms": 27000, "tiers": ["plus", "premium", "enterprise"],
         "benchmark_score": 7.60, "trust_score": 8.7, "last_evaluated": "2026-06-16",
     },
+    # THE default advisor model on every route (owner decision 2026-10-07: best quality first, other
+    # models added as the product grows). `tiers` lists every tier and `premium` is False because
+    # neither is a quality statement — they are ROUTING gates. While Opus was an exception for
+    # high-stakes turns only, restricting it to premium/enterprise and counting it against a premium
+    # allowance was correct. Now that it serves everyone, those same gates would route every free and
+    # plus user straight past it: `ModelRouter._resolve` returns None when the tier is not listed,
+    # and `is_premium` + a 0 premium allowance sends the turn to the Gemini fallback. The cost
+    # control for a single-model configuration is caching + effort + an output cap, not tier gating.
     "claude_opus_4_8": {
         "provider": "vertex_anthropic", "model_id": "claude-opus-4-8",
         "enabled_flag": "CLAUDE_OPUS_4_8_ENABLED", "max_tokens": 2048, "timeout_s": 90,
-        "cost_estimate": 0.15, "latency_budget_ms": 26000, "tiers": ["premium", "enterprise"],
+        "cost_estimate": 0.15, "latency_budget_ms": 26000,
+        "tiers": ["free", "plus", "premium", "enterprise"],
         "benchmark_score": 8.84, "trust_score": 9.3, "last_evaluated": "2026-06-16",
-        "premium": True,  # counts against premium allowance
+        "premium": False,
     },
     # NOTE: claude_opus_4_7 deliberately absent — benchmark showed it unreliable (timeouts). Do not add.
     "health_safety_fallback": {
@@ -77,14 +86,22 @@ MODELS: dict[str, dict[str, Any]] = {
 }
 
 # ── Role → model (primary + fallback). Reference ROLES in code, never model names. ──
+# OPUS EVERYWHERE (owner decision 2026-10-07: lead with the best model; add cheaper tiers after
+# measuring them, as the product grows). Opus is the primary on every role.
+#
+# Gemini is retained as the FALLBACK on each role, and that is deliberate rather than leftover: the
+# Vertex path depends on ADC, and an auth or regional outage there would otherwise take the advisor
+# down entirely. A fallback that degrades quality beats one that returns nothing. `classification`
+# keeps a cheap primary on purpose — it is an internal routing decision, not user-facing advice, so
+# Opus would be paying reasoning prices to pick a label.
 ROLES: dict[str, dict[str, str]] = {
     "classification":      {"primary": "gemini_flash_lite", "fallback": "gemini_flash"},
-    "advisor_general":     {"primary": "gemini_2_5_pro",    "fallback": "gemini_flash"},
+    "advisor_general":     {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
     "finance_high_stakes": {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
     "health_high_stakes":  {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
-    "career":              {"primary": "gemini_2_5_pro",    "fallback": "gemini_flash"},
-    "education":           {"primary": "gemini_2_5_pro",    "fallback": "gemini_flash"},
-    "family":              {"primary": "gemini_2_5_pro",    "fallback": "gemini_flash"},
+    "career":              {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
+    "education":           {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
+    "family":              {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
     "report_writer":       {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
     "executive_review":    {"primary": "claude_opus_4_8",   "fallback": "gemini_2_5_pro"},
     # Critic role defined but DISABLED (benchmark pending) — see is_role_enabled / docs.
