@@ -142,6 +142,91 @@ _POSSESSIVE_LINK = re.compile(
     r"save|saved|put|withdraw|contribute|carry|took|take)\b",
     re.IGNORECASE,
 )
+# CLAUSE-BOUNDARY ATTACHMENT (2026-10-07, found by eval/probe_gate).
+#
+# The note above states the limitation plainly: the tight window is "the whole bound on how far a
+# possessive reaches; there is no clause-boundary logic". Measured cost of that:
+#
+#   "an estimated monthly mortgage payment is about $3,390.01, which is worth weighing against
+#    your cash position."
+#
+# A correctly-hedged Tier-3 estimate, blocked because "your" — belonging to *cash position*, in a
+# trailing relative clause — fell inside the radius. The validator already documents this class with
+# a near-identical example ("since you're closing next month, attorneys charge $1,500").
+#
+# The relaxation is DELIBERATELY ASYMMETRIC, and that asymmetry is the whole safety argument:
+#
+#   possessive BEFORE the figure  -> always attaches. "Your net worth is $1,284,500" has the
+#                                    possessive as the grammatical subject of the figure. Unchanged.
+#   possessive AFTER the figure   -> attaches ONLY if no clause boundary separates them. A trailing
+#                                    subordinate clause is talking about something else.
+#
+# Relaxing the leading case would be unsafe: "Your balance, which I calculated, is $987,654" puts
+# the possessive subject before a parenthetical, and splitting on the boundary there would un-gate a
+# genuine fabrication. Only the trailing direction is relaxed.
+_CLAUSE_BREAK = re.compile(
+    r",\s*(?:which|that|who|whom|whose|and|but|so|while|whereas|although|though|if|because|since)\b"
+    r"|[;:]"
+    r"|\s[—–]\s",
+    re.IGNORECASE,
+)
+
+
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+")
+
+
+def _sentence_start(text: str, pos: int) -> int:
+    """Index where the sentence containing `pos` begins."""
+    last = 0
+    for m in _SENTENCE_BREAK.finditer(text[:pos]):
+        last = m.end()
+    return last
+
+
+def _possessive_attaches(text: str, num_start: int, num_end: int, window: int,
+                         *, back_to_sentence: bool = False) -> bool:
+    """Does a possessive personal reference attach to the figure at [num_start, num_end)?
+
+    Looks BEFORE the figure (over `window`, or the whole sentence when `back_to_sentence`), and
+    AFTER it only up to the first clause break.
+
+    `back_to_sentence` is used for the TIER 3 allowance, and it closes a real hole. `_TIGHT_WINDOW`
+    is 44 characters, so a possessive subject separated from its figure by a long parenthetical was
+    never seen:
+
+        "Your mortgage payment, which I worked out from the figures you gave me, is $3,412.88."
+
+    Ungrounded that still blocked (as an unhedged $ figure), but a figure in Tier 3 took the
+    scenario allowance and passed — a possessive personal claim about the user's money, delivered as
+    fact. Phase 3 made that reachable by putting calculator projections into Tier 3, so the hole
+    widened as a side effect of grounding more figures.
+
+    Widening the window itself was the wrong fix: it would re-introduce the trailing-clause
+    over-block. Only the BACKWARD direction is extended, because backward is where the grammatical
+    subject lives — forward still stops at the first clause break, so
+    "...is about $3,390.01, which is worth weighing against your cash position" still passes.
+    """
+    back_from = _sentence_start(text, num_start) if back_to_sentence else max(0, num_start - window)
+    before = text[back_from: num_start]
+    if _POSSESSIVE_LINK.search(before):
+        return True
+
+    # Rewind to the last DIGIT before searching forward. `_FIN_NUM` can swallow trailing punctuation
+    # — it matches "$1,500," including the comma — which would push a clause-breaking comma outside
+    # the search region and make a trailing possessive look attached after all. Measured on
+    # "Attorneys typically charge $1,500, so your closing timeline matters.": the ", so" was inside
+    # the token, so the break was invisible and the market price stayed blocked.
+    end = num_end
+    while end > num_start and not text[end - 1].isdigit():
+        end -= 1
+
+    after = text[end: end + window]
+    brk = _CLAUSE_BREAK.search(after)
+    if brk:
+        after = after[: brk.start()]
+    return bool(_POSSESSIVE_LINK.search(after))
+
+
 _MONEY_CUE = re.compile(
     r"\b(net worth|salar(?:y|ies)|incomes?|savings?|saved|portfolio|balances?|retirement|401k|ira|"
     r"debts?|owe|owed|mortgages?|earn(?:ings?|ed)?|assets?|liabilit\w*|wealth|nest egg|cash|"
@@ -336,17 +421,35 @@ def _fabricated_personal_numbers(text: str, allowed: set[str], scenario: set[str
         # user's personal STAT (DTI / readiness / success probability / savings rate); $-amounts and bare
         # integers near a money cue stay gated as personal holdings. (ADVISOR_USEFULNESS)
         is_percent = tok.rstrip().endswith("%")
+        # `_possessive_attaches` replaces a bare search of the tight window: a possessive in a
+        # TRAILING clause that belongs to a different noun no longer captures the figure. The money
+        # cue is still matched across the whole tight window — narrowing that too would un-gate
+        # "your 401k is worth $X" where the cue precedes and the possessive follows.
+        attaches = _possessive_attaches(text, m.start(), m.end(), _TIGHT_WINDOW)
         if is_percent:
-            personal_holding = bool(_POSSESSIVE_LINK.search(tight) and _PERSONAL_STAT_PCT.search(tight))
+            personal_holding = bool(attaches and _PERSONAL_STAT_PCT.search(tight))
         else:
-            personal_holding = bool(_POSSESSIVE_LINK.search(tight) and _MONEY_CUE.search(tight))
+            personal_holding = bool(attaches and _MONEY_CUE.search(tight))
         if personal_holding:
             # Tier 1: a claim about the user's own money — must be grounded; a hedge word OR a benchmark
             # derivation does NOT excuse a possessive personal figure ("your tax bill will be $18,200").
             blocked.add(norm)
-        elif norm in scenario:
+        elif norm in scenario and not (
+            _possessive_attaches(text, m.start(), m.end(), _TIGHT_WINDOW, back_to_sentence=True)
+            # The money cue is matched at SENTENCE scope here, matching the possessive's scope. With
+            # the cue still bound to the 44-char window, "Your mortgage payment, which I worked out
+            # ..., is $3,412.88" slipped through: both "Your" AND "mortgage" sit outside that radius,
+            # so the possessive was found at sentence scope while its cue was not. Scoping one
+            # without the other is half a check.
+            and _MONEY_CUE.search(text[_sentence_start(text, m.start()): m.end() + _NUM_WINDOW])
+        ):
             # A verified benchmark/scenario calc (e.g. "a 20% down payment is $100,000") in non-possessive
             # prose — the arithmetic checks out against a stated base; allow.
+            #
+            # The Tier-3 allowance re-checks possessive attachment with a SENTENCE-scoped backward
+            # window. Tier 3 means "may illustrate, must not be claimed as the user's own", so a
+            # possessive subject anywhere earlier in the sentence disqualifies it even when it sits
+            # beyond the tight window — see `_possessive_attaches`.
             continue
         elif tok.startswith("$") and not _benchmark_cue(window):
             # Before blocking: a bounded benchmark-derivation of a grounded base (e.g. 20% of the stated

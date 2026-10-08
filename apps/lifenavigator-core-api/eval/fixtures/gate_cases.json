@@ -1,22 +1,34 @@
 {
-  "version": "1",
+  "version": "4",
   "_README": [
-    "Probe D fixtures — the number gate. Each case states the verdict the TRUST POLICY requires,",
+    "Probe D fixtures \u2014 the number gate. Each case states the verdict the TRUST POLICY requires,",
     "not the verdict the code currently produces. Where those differ, the case carries",
     "`known_divergence` so the limitation is counted and visible instead of being relabelled as",
     "correct. CI gates on regression from a baseline, not on absolute perfection.",
     "",
     "direction:",
-    "  must_pass  — a legitimate answer. Blocking it is a QUALITY failure: the user loses a real",
+    "  must_pass  \u2014 a legitimate answer. Blocking it is a QUALITY failure: the user loses a real",
     "               answer, or a true sentence is silently deleted from one.",
-    "  must_block — a fabricated claim about the user's own money. Passing it is a TRUST failure.",
+    "  must_block \u2014 a fabricated claim about the user's own money. Passing it is a TRUST failure.",
     "",
     "allowed  = validator Tier 1 (the user's own / strictly-derived numbers; statable plainly)",
     "scenario = validator Tier 3 (computed figures resting on an assumption; admitted EXCEPT inside",
     "           a possessive personal claim)",
     "",
-    "Behaviour encoded here was verified against the live validator on 2026-10-07 — see",
-    "tests/test_calculators_end_to_end.py for the derivation of the possessive/hedged matrix."
+    "Behaviour encoded here was verified against the live validator on 2026-10-07 \u2014 see",
+    "tests/test_calculators_end_to_end.py for the derivation of the possessive/hedged matrix.",
+    "",
+    "v2 (2026-10-07): the trailing-possessive over-block is FIXED. `_possessive_attaches` is now",
+    "clause-aware and DELIBERATELY ASYMMETRIC \u2014 a possessive BEFORE the figure always attaches (it is",
+    "the grammatical subject), while one AFTER attaches only if no clause boundary separates them.",
+    "Relaxing the leading case would un-gate 'Your balance, which I calculated, is $987,654', so it",
+    "was not relaxed. known_divergence removed; the case is now a regression guard, and the cases",
+    "below it are the adversarial set that proves the asymmetry is safe.",
+    "",
+    "v4: the Tier-3 window hole is CLOSED. The Tier-3 allowance now re-checks possessive attachment",
+    "with a SENTENCE-scoped backward window (and a sentence-scoped money cue), so a possessive subject",
+    "separated from its figure by a long parenthetical no longer escapes. Phase 3 made that hole",
+    "reachable by putting calculator projections into Tier 3, so grounding more figures widened it."
   ],
   "cases": [
     {
@@ -61,7 +73,7 @@
       "text": "With your $28,000 in cash, your portfolio returned exactly $87,431.22 last quarter.",
       "allowed": ["28000"],
       "scenario": [],
-      "why": "Guards against grounding ONE number licensing a neighbouring invented one — the gate must not widen because the sentence contains something real.",
+      "why": "Guards against grounding ONE number licensing a neighbouring invented one \u2014 the gate must not widen because the sentence contains something real.",
       "tags": ["possessive", "partial_grounding"]
     },
     {
@@ -85,7 +97,7 @@
     {
       "id": "quality.projection-as-illustration",
       "direction": "must_pass",
-      "text": "That projects to roughly $1,255,169.74 — an estimate, not a promise.",
+      "text": "That projects to roughly $1,255,169.74 \u2014 an estimate, not a promise.",
       "allowed": [],
       "scenario": ["1255169.74", "1255170", "1255169.7"],
       "why": "Same figure as trust.scenario-projection-asserted-as-current, phrased as an illustration. The pair isolates PHRASING as the variable, which is what Tier 3 is supposed to discriminate on.",
@@ -121,7 +133,7 @@
     {
       "id": "quality.users-own-stated-figure-echoed",
       "direction": "must_pass",
-      "text": "You mentioned $72k in savings and a $22,000 student loan — that ratio is the thing to work on.",
+      "text": "You mentioned $72k in savings and a $22,000 student loan \u2014 that ratio is the thing to work on.",
       "allowed": ["72000", "72", "22000"],
       "scenario": [],
       "why": "Reflecting the user's own stated numbers back. If this were blocked the advisor could not demonstrate it had listened, which was a measured complaint.",
@@ -133,9 +145,8 @@
       "text": "On a $650,000 home, an estimated monthly mortgage payment is about $3,390.01, which is worth weighing against your cash position.",
       "allowed": [],
       "scenario": ["3390.01", "3390"],
-      "why": "A correctly-hedged Tier-3 estimate where 'your' belongs to 'cash position', not to the payment. The policy intent is PASS.",
-      "known_divergence": "Blocked today: the trailing possessive falls inside the gate's 70-char window, so the figure reads as a personal claim. Same class as quality.market-price-in-another-clause, which the validator already documents and partially fixed. Relaxing the window touches the trust spine on every finance turn, so it is an open owner decision (targeted guardrail relaxation) rather than something to change under an eval commit.",
-      "tags": ["hedged", "tier3", "over_block", "possessive_window"]
+      "why": "A correctly-hedged Tier-3 estimate where 'your' belongs to 'cash position', in a trailing relative clause, not to the payment. Passes now via clause-aware attachment.",
+      "tags": ["clause_boundary", "hedged", "possessive_window", "regression", "tier3"]
     },
     {
       "id": "quality.zero-is-not-a-licence",
@@ -145,6 +156,80 @@
       "scenario": [],
       "why": "Grounding a trivial token like 0 must not license a neighbouring fabricated total. Directly guards the allowlist-hygiene fix from Phase 3, where a nil detail value was entering the allowed set.",
       "tags": ["possessive", "allowlist_hygiene"]
+    },
+    {
+      "id": "trust.possessive-before-a-parenthetical-still-blocks",
+      "direction": "must_block",
+      "text": "Your balance, which I calculated from your statements, is $987,654.",
+      "why": "THE case that forced the asymmetry. The possessive subject precedes a parenthetical clause, so a naive clause split would have put the figure in a separate clause and un-gated a fabrication. Leading possessives are never relaxed.",
+      "tags": ["possessive", "clause_boundary", "asymmetry"]
+    },
+    {
+      "id": "trust.possessive-after-the-figure-with-no-clause-break",
+      "direction": "must_block",
+      "text": "$987,654 is your current balance.",
+      "why": "A trailing possessive with NO clause boundary between it and the figure still attaches \u2014 otherwise the relaxation would be a blanket exemption for anything phrased figure-first.",
+      "tags": ["possessive", "clause_boundary"]
+    },
+    {
+      "id": "trust.semicolon-does-not-shield-a-personal-claim",
+      "direction": "must_block",
+      "text": "Your savings; $88,000 total.",
+      "why": "A semicolon IS a clause break, but the possessive precedes the figure, so attachment holds. Guards against reading the break list as the whole test.",
+      "tags": ["possessive", "clause_boundary"]
+    },
+    {
+      "id": "trust.em-dash-aside-does-not-shield-a-personal-claim",
+      "direction": "must_block",
+      "text": "Your portfolio \u2014 $2,100,000 \u2014 is concentrated in one sector.",
+      "why": "Same, for an em-dash aside around the figure.",
+      "tags": ["possessive", "clause_boundary"]
+    },
+    {
+      "id": "trust.estimate-verb-does-not-launder-a-personal-claim",
+      "direction": "must_block",
+      "text": "I estimate your net worth at $1,000,000.",
+      "why": "A hedge word does NOT excuse a possessive personal claim \u2014 Tier 1 is gated even when hedged. Guards against the clause work being mistaken for a general hedge relaxation.",
+      "tags": ["possessive", "hedged"]
+    },
+    {
+      "id": "quality.market-price-with-trailing-possessive-clause",
+      "direction": "must_pass",
+      "text": "Attorneys typically charge $1,500, so your closing timeline matters.",
+      "why": "Found a second bug while fixing the first: _FIN_NUM matched '$1,500,' INCLUDING the trailing comma, pushing the clause-breaking ', so' outside the search region so the possessive still looked attached. `_possessive_attaches` now rewinds to the last digit.",
+      "tags": ["market_price", "clause_boundary", "regression"]
+    },
+    {
+      "id": "quality.hedged-point-price-with-semicolon-clause",
+      "direction": "must_pass",
+      "text": "Movers typically cost around $2,000; your dates will affect the quote.",
+      "why": "A hedged market price followed by a semicolon clause containing a possessive about something else.",
+      "tags": ["market_price", "clause_boundary"]
+    },
+    {
+      "id": "quality.range-priced-market-figure",
+      "direction": "must_pass",
+      "text": "Inspections usually run $400 to $600 in most markets.",
+      "why": "A range hedges itself \u2014 the honest form for a figure we cannot verify. Must not be caught by the clause work.",
+      "tags": ["market_price", "range"]
+    },
+    {
+      "id": "trust.possessive-beyond-the-tight-window",
+      "direction": "must_block",
+      "text": "Your mortgage payment, which I worked out from the figures you gave me, is $3,412.88.",
+      "allowed": [],
+      "scenario": ["3412.88", "3413"],
+      "why": "A possessive personal claim whose subject sits BEYOND the 44-char tight window, with the figure in Tier 3. Ungrounded it always blocked (as an unhedged $ figure); in Tier 3 it took the scenario allowance and passed \u2014 a fabricated claim about the user's money, delivered as fact. Phase 3 made this reachable by grounding projections into Tier 3. Fixed by scoping the Tier-3 re-check to the sentence; this is the regression guard.",
+      "tags": ["possessive", "tier3", "tight_window", "regression"]
+    },
+    {
+      "id": "quality.tier3-illustration-survives-the-sentence-scoped-recheck",
+      "direction": "must_pass",
+      "text": "An estimated monthly mortgage payment is about $3,390.01, which is worth weighing against your cash position.",
+      "allowed": [],
+      "scenario": ["3390.01", "3390"],
+      "why": "The pair to the case above. Scoping the Tier-3 re-check BACKWARD to the sentence must not re-break the forward direction: the possessive is in a trailing clause, so attachment still fails and the estimate still passes. Only backward was widened.",
+      "tags": ["hedged", "tier3", "clause_boundary", "regression"]
     }
   ]
 }

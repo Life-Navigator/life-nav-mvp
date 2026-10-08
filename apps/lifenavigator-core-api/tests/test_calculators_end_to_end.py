@@ -310,32 +310,45 @@ async def test_disabled_planner_leaves_the_turn_byte_identical_to_today():
 
 # ── A pre-existing validator characteristic, surfaced by this confirmation ───────────────────────
 @pytest.mark.asyncio
-async def test_a_trailing_unrelated_possessive_still_over_blocks_a_valid_estimate():
-    """FINDING (pre-existing, not introduced by Phases 2-3): a correctly-hedged Tier-3 estimate is
-    blocked when an UNRELATED possessive clause follows it within the gate's 70-character window.
+async def test_a_trailing_unrelated_possessive_no_longer_over_blocks_a_valid_estimate():
+    """FIXED 2026-10-07. This test previously asserted the OPPOSITE — it pinned the over-block as
+    current behaviour and said failing would be "the signal to delete it, not to update it
+    silently". `_possessive_attaches` then made attachment clause-aware, so the instruction has been
+    honoured: the assertion is inverted rather than the expectation quietly relaxed.
 
         "an estimated monthly mortgage payment is about $3,390.01, which is worth weighing
          against your cash position."
 
-    The "your" belongs to *cash position*, not to the payment, and the figure is explicitly labelled
-    an estimate. `advisor_validator` already documents and partially fixed this class — its
-    POSSESSIVE ATTACHMENT note gives the near-identical example "since you're closing next month,
-    attorneys charge $1,500" — so this is the same known over-blocking, now with a concrete repro
-    against a calculator-grounded number.
-
-    Asserted as CURRENT behaviour rather than fixed here: relaxing the possessive window is a change
-    to the trust spine, it affects every finance turn and not just calculator figures, and the
-    owner-facing decision on targeted guardrail relaxation is explicitly open. Encoding it keeps the
-    limitation visible, and this test will fail loudly if someone narrows the window — which is the
-    signal to delete it, not to update it silently.
+    The "your" belongs to *cash position*, in a trailing relative clause. The relaxation is
+    asymmetric — a possessive BEFORE the figure still always attaches — and
+    tests/test_eval_harness.py plus eval/fixtures/gate_cases.json carry the adversarial set that
+    proves fabrications are still caught.
     """
     payment = await _mortgage_payment_for()
     sentence = (f"On a $650,000 home, an estimated monthly mortgage payment is about "
                 f"${payment:,.2f}, which is worth weighing against your cash position.")
     out = await _orch(_ScriptedLLM(_reply(reflection=sentence)), with_calculators=True).converse(
         _ctx(), MORTGAGE_MSG, trace=True)
-    assert out["llm_status"].startswith("fallback")
-    assert str(payment) in (out["_trace"].get("fallback_reason") or "")
+    assert out["llm_status"] == "enhanced", out["_trace"].get("validator_reason")
+    assert f"{payment:,.2f}" in out["assistant_message"]
+
+
+@pytest.mark.asyncio
+async def test_a_leading_possessive_is_still_blocked_after_the_relaxation():
+    """The safety half of the asymmetry, end to end through the real validator.
+
+    The possessive is kept CLOSE to the figure on purpose. `_TIGHT_WINDOW` is 44 characters and is
+    documented as "the whole bound on how far a possessive reaches", so a possessive further away
+    than that never attaches regardless of clause structure — a pre-existing limitation, recorded as
+    a known divergence in eval/fixtures/gate_cases.json rather than conflated with this assertion.
+    """
+    payment = await _mortgage_payment_for()
+    sentence = f"Your mortgage payment is ${payment:,.2f} every month."
+    out = await _orch(_ScriptedLLM(_reply(reflection=sentence)), with_calculators=True).converse(
+        _ctx(), MORTGAGE_MSG, trace=True)
+    assert f"{payment:,.2f}" not in out["assistant_message"], (
+        "a possessive personal claim survived the clause-boundary relaxation"
+    )
 
 
 def test_the_same_estimate_passes_once_the_possessive_tail_is_removed():
@@ -348,6 +361,11 @@ def test_the_same_estimate_passes_once_the_possessive_tail_is_removed():
     assert {"3390", "3390.01"} <= scenario, "registration itself is fine"
 
     clean = f"An estimated monthly mortgage payment is about ${payment:,.2f} at current rates."
-    tailed = f"An estimated monthly mortgage payment is about ${payment:,.2f}, against your cash position."
+    tailed = (f"An estimated monthly mortgage payment is about ${payment:,.2f}, which is worth "
+              f"weighing against your cash position.")
+    leading = f"Your mortgage payment is about ${payment:,.2f} a month."
     assert _fabricated_personal_numbers(clean, set(), scenario, set()) == set()
-    assert _fabricated_personal_numbers(tailed, set(), scenario, set()) == {"3390.01"}
+    # Both now pass: the trailing possessive sits in its own clause (fixed 2026-10-07).
+    assert _fabricated_personal_numbers(tailed, set(), scenario, set()) == set()
+    # And the leading possessive is still blocked — the asymmetry, in one place.
+    assert _fabricated_personal_numbers(leading, set(), scenario, set()) == {"3390.01"}

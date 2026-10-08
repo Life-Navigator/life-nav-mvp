@@ -1,5 +1,5 @@
 {
-  "version": "3",
+  "version": "4",
   "_README": [
     "Probe A fixtures \u2014 domain/risk routing and the health-urgent safety net.",
     "",
@@ -20,7 +20,13 @@
     "v3 (2026-10-07): corrected three expectations that were wrong in the FIXTURE, not the code \u2014",
     "and in doing so surfaced a separate finding now recorded as known_divergence: the finance",
     "vocabulary misses ordinary money phrasings (bare 'cash', 'position', 'moving money'), so",
-    "genuinely financial turns fall through to 'general' and receive no finance grounding."
+    "genuinely financial turns fall through to 'general' and receive no finance grounding.",
+    "",
+    "v4 (2026-10-07): the three routing collisions are FIXED \u2014 classify_domain now uses WEIGHTED",
+    "scoring instead of first-match, so shared vocabulary (insurance/premium/loan/debt) no longer",
+    "lets scan order decide the domain. known_divergence removed from those cases; they are now",
+    "regression guards. Four expectations updated: they encoded the old vocabulary gap, and now that",
+    "`cash`, `position` and `spend` are finance terms, finance is the correct answer."
   ],
   "cases": [
     {
@@ -95,25 +101,22 @@
       "id": "route.education-framed-as-loans",
       "message": "Is the MBA worth taking on more student loan debt for?",
       "expect_domain": "education",
-      "why": "The decision is about the degree; loans are how it is paid for. The user is asking an education question.",
-      "known_divergence": "Routes to FINANCE today: `loan` and `debt` are finance patterns and finance is scanned before education, so the degree decision is reframed as a debt decision and the advisor grounds on the wrong domain. This is the 'education misframe' in this repo's remediation notes. Fixing it needs either pattern reordering (which would pull genuine finance turns into education) or a classifier with confidence \u2014 it is not a one-line change, which is why it is annotated rather than patched here.",
-      "tags": ["education", "misroute", "pattern_order"]
+      "why": "The decision is about the degree; loans are how it is paid for. Weighted scoring gives education 4 (mba + student loan) against finance 2 (loan + debt), so the degree wins. The complement is deliberate: 'should I refinance my student loans' still routes to FINANCE, because there the subject IS the debt.",
+      "tags": ["education", "pattern_order", "regression"]
     },
     {
       "id": "route.life-insurance-for-dependents",
       "message": "Should I increase my life insurance now that we have a second child?",
       "expect_domain": "family",
-      "why": "A dependant-protection decision \u2014 family/estate territory.",
-      "known_divergence": "Routes to HEALTH today: `insurance` is in BOTH the health and finance patterns and health is scanned first, so any mention of insurance becomes a health turn. This is the 'health misroute' class. The collision is in the pattern vocabulary itself, not in the ordering alone.",
-      "tags": ["family", "misroute", "pattern_collision", "insurance"]
+      "why": "A dependant-protection decision. `life insurance` is STRONG for both family and finance on purpose \u2014 a protection product whose driver is usually dependants \u2014 so naming a child tips it to family (3 vs 2), while a bare 'should I buy life insurance?' falls to finance as the product question it then is.",
+      "tags": ["family", "insurance", "pattern_collision", "regression"]
     },
     {
       "id": "route.401k-premium-wording",
       "message": "What premium am I paying for the actively managed funds in my 401k?",
       "expect_domain": "finance",
-      "why": "A fee question about a retirement account. Unambiguously finance by meaning.",
-      "known_divergence": "Routes to HEALTH today: `premium` is a health pattern and health is scanned first, so a fund-fee question is handled by the health agent with health grounding.",
-      "tags": ["finance", "misroute", "pattern_collision", "premium"]
+      "why": "A fee question about a retirement account. `401k` is a STRONG finance term and `premium` only a WEAK health one, so finance wins 3-1 instead of losing to health on scan order.",
+      "tags": ["finance", "pattern_collision", "premium", "regression"]
     },
     {
       "id": "route.ambiguous-general",
@@ -126,9 +129,9 @@
     {
       "id": "route.large-figure-raises-risk",
       "message": "I'm thinking about moving $450,000 into a single position",
-      "expect_domain": "general",
+      "expect_domain": "finance",
       "expect_risk": "high",
-      "why": "Risk must be HIGH on a large figure regardless of formatting \u2014 that part is now fixed. Domain is 'general' because no finance KEYWORD is present: 'moving', 'position' and bare 'cash' are absent from the finance pattern. The earlier 'finance' expectation was the fixture being wrong about today's vocabulary, and the vocabulary gap itself is recorded separately below.",
+      "why": "Risk must be HIGH on a large figure regardless of formatting \u2014 that part is now fixed. Domain is now FINANCE: `position`/`cash` are finance vocabulary, which is the gap this probe found. The earlier 'general' expectation encoded that gap.",
       "tags": ["finance", "high_stakes"]
     },
     {
@@ -174,34 +177,33 @@
     {
       "id": "route.comma-separated-dollar-figure-is-high-risk",
       "message": "I am thinking about moving $450,000 into a single position",
-      "expect_domain": "general",
+      "expect_domain": "finance",
       "expect_risk": "high",
-      "why": "A dollar amount written the way humans write it must register as high-stakes. Previously LOW, because the leading \\b could not match before '$' and \\d{4,} is broken by a thousands separator \u2014 so $450,000 was LOW while $450000 was HIGH. Domain is 'general' here on purpose: no finance keyword is present, which is a separate (unfixed) vocabulary gap.",
+      "why": "A dollar amount written the way humans write it must register as high-stakes. Previously LOW, because the leading \\b could not match before '$' and \\d{4,} is broken by a thousands separator \u2014 so $450,000 was LOW while $450000 was HIGH. Domain is now FINANCE: `position`/`cash` are finance vocabulary, which is the gap this probe found. The earlier 'general' expectation encoded that gap.",
       "tags": ["risk", "regression", "formatting"]
     },
     {
       "id": "route.k-notation-dollar-figure-is-high-risk",
       "message": "I have $450k sitting in cash doing nothing",
-      "expect_domain": "general",
+      "expect_domain": "finance",
       "expect_risk": "high",
-      "why": "k-notation had the same leading-boundary failure and now registers HIGH. Domain is 'general': the finance pattern contains 'cash flow' as a phrase but not bare 'cash'.",
+      "why": "k-notation had the same leading-boundary failure and now registers HIGH. Domain is now FINANCE: `position`/`cash` are finance vocabulary, which is the gap this probe found. The earlier 'general' expectation encoded that gap.",
       "tags": ["risk", "regression", "formatting"]
     },
     {
       "id": "route.small-bare-number-is-not-high-risk",
       "message": "I spend about 120 a week on groceries",
-      "expect_domain": "general",
-      "expect_risk": "low",
-      "why": "Guards the risk widening in the other direction: a small bare number must NOT escalate an ordinary budgeting remark to the supervised path.",
+      "expect_domain": "finance",
+      "expect_risk": "medium",
+      "why": "Guards the risk widening: a small bare number must NOT escalate an ordinary budgeting remark to HIGH. It is finance/medium, not general/low \u2014 `spend` is finance vocabulary and finance floors at medium, which is correct for a budgeting statement.",
       "tags": ["risk", "false_positive"]
     },
     {
       "id": "route.finance-vocabulary-gap-bare-cash",
       "message": "I have cash sitting idle and I want to move it into a position",
       "expect_domain": "finance",
-      "why": "An unmistakably financial question by meaning: idle cash, moving it into a position.",
-      "known_divergence": "Routes to GENERAL today. The finance pattern matches the phrase 'cash flow' but not bare 'cash', and has no entry for 'position', 'allocate', 'rebalance' or 'move money'. So a real finance turn gets no finance grounding and no finance playbook. Found by this probe; adding vocabulary is easy but risks pulling neighbouring domains into finance, which is exactly the collision class the insurance/premium cases document \u2014 so it is measured, not patched under an eval commit.",
-      "tags": ["finance", "vocabulary_gap", "misroute"]
+      "why": "Unmistakably financial by meaning. Bare `cash` and `position` are now finance vocabulary, so this no longer falls through to 'general' with no finance grounding.",
+      "tags": ["finance", "regression", "vocabulary_gap"]
     }
   ]
 }

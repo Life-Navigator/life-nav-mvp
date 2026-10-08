@@ -18,26 +18,106 @@ from . import model_registry as reg
 
 # ── Domain classification (keyword/topic heuristic; cheap + deterministic; refine via the classifier model
 #    later). Maps to the registry roles. ──────────────────────────────────────────────────────────────────
-_DOMAIN_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("health",    re.compile(r"\b(health|insurance|hsa|fsa|ppo|hdhp|medicare|medicaid|deductible|premium|prescription|doctor|hospital|medical|wellness|therapy|copay)\b", re.I)),
-    ("finance",   re.compile(r"\b(invest|investment|retire|retirement|401k|ira|roth|debt|mortgage|loan|savings|emergency fund|net worth|portfolio|stock|tax|budget|cash flow|insurance|afford|down payment|inherit)\b", re.I)),
-    ("career",    re.compile(r"\b(job|career|promotion|raise|salary|manager|layoff|offer|equity|sabbatical|resign|counteroffer|relocat)\b", re.I)),
-    ("education",  re.compile(r"\b(mba|degree|college|tuition|student loan|bootcamp|certification|grad school|school)\b", re.I)),
-    ("family",    re.compile(r"\b(kids?|child|children|baby|divorce|guardian|estate|will|beneficiary|spouse|marriage|parent|aging|custody)\b", re.I)),
+# ── Domain classification ─────────────────────────────────────────────────────
+# WEIGHTED SCORING, not first-match. The previous design scanned an ordered list and returned the
+# first pattern that matched, which made SHARED vocabulary decide the domain by scan order rather
+# than by meaning. Three measured consequences (eval/probe_routing):
+#
+#   "Should I increase my life insurance now that we have a second child?"  -> health
+#   "What premium am I paying for the funds in my 401k?"                    -> health
+#   "Is the MBA worth taking on more student loan debt for?"                -> finance
+#
+# `insurance` and `premium` sat in BOTH health and finance with health scanned first, so any mention
+# of either became a health turn. `loan`/`debt` belong to finance, scanned before education, so a
+# question about whether a DEGREE is worth it was reframed as a debt question and grounded in the
+# wrong domain. Reordering cannot fix this: whichever domain goes first wins its shared words.
+#
+# So terms now carry weight. STRONG terms name something that belongs to exactly one domain (`ppo`,
+# `401k`, `guardian`, `mba`). WEAK terms are real signals that are shared or generic (`insurance`,
+# `premium`, `loan`, `debt`, `school`). The highest total wins; a tie falls back to the original
+# scan order, which keeps health first and therefore keeps the safety-sensitive bias.
+_STRONG, _WEAK = 2, 1
+
+_DOMAIN_TERMS: list[tuple[str, int, re.Pattern[str]]] = [
+    # ── health ──
+    ("health", _STRONG, re.compile(
+        r"\b(hsa|fsa|ppo|hdhp|medicare|medicaid|copay|deductible|prescription|doctor|hospital|"
+        r"medical|wellness|therapy|health insurance|dental|vision insurance|health plan|"
+        r"health care|healthcare)\b", re.I)),
+    ("health", _WEAK, re.compile(r"\b(health|insurance|premium|plan|coverage|benefits?)\b", re.I)),
+
+    # ── finance ──
+    # Vocabulary gap this probe found: bare `cash`, `position`, `allocate`, `rebalance` and
+    # `move money` were absent, so unmistakably financial questions fell through to `general` and
+    # received no finance grounding and no finance playbook.
+    ("finance", _STRONG, re.compile(
+        r"\b(401k|403b|ira|roth|net worth|emergency fund|down payment|cash flow|portfolio|"
+        r"brokerage|mutual funds?|index funds?|etfs?|rebalanc\w*|allocat\w*|capital gains|"
+        r"life insurance|disability insurance|umbrella policy|refinanc\w*|amorti\w*)\b", re.I)),
+    ("finance", _WEAK, re.compile(
+        r"\b(invest\w*|retire\w*|debt|mortgage|loan|savings?|saved|stocks?|bonds?|tax(es)?|budget|"
+        r"afford|inherit\w*|cash|position|funds?|interest rate|apr|equity|spend\w*|income)\b", re.I)),
+
+    # ── career ──
+    ("career", _STRONG, re.compile(
+        r"\b(promotion|layoff|counteroffer|sabbatical|resign\w*|relocat\w*|severance|"
+        r"performance review|job offer|offer letter)\b", re.I)),
+    ("career", _WEAK, re.compile(r"\b(job|career|raise|salary|manager|offer|work)\b", re.I)),
+
+    # ── education ──
+    # `student loan` counts for EDUCATION as well as finance: it is education debt, and letting
+    # finance own it exclusively is what reframed degree decisions as debt decisions.
+    ("education", _STRONG, re.compile(
+        r"\b(mba|degree|college|university|tuition|bootcamp|certification|grad school|"
+        r"graduate school|student loans?|undergrad\w*|phd|masters?)\b", re.I)),
+    ("education", _WEAK, re.compile(r"\b(school|course|study|studying|class(es)?|program)\b", re.I)),
+
+    # ── family ──
+    # `life insurance` and `disability insurance` are STRONG for family as well as finance, on
+    # purpose. They are protection products (finance) whose decision driver is usually dependants
+    # (family), and forcing a single owner gets one common phrasing wrong either way. Shared, the
+    # tie is broken by whatever else the message says: name a child and it is a dependant-protection
+    # question; name none and it falls to finance as the product question it then is.
+    ("family", _STRONG, re.compile(
+        r"\b(guardian\w*|custody|beneficiar\w*|estate plan\w*|divorce|adopt\w*|"
+        r"power of attorney|trust fund|dependents?|life insurance|disability insurance)\b", re.I)),
+    ("family", _WEAK, re.compile(
+        r"\b(kids?|child|children|baby|spouse|wife|husband|partner|marriage|married|parent|"
+        r"aging|family|will|estate)\b", re.I)),
 ]
+
+# Tie-break order. Health stays first so a genuinely ambiguous health signal keeps precedence — the
+# safety-sensitive bias the original ordering encoded, preserved deliberately.
+_DOMAIN_ORDER = ("health", "finance", "career", "education", "family")
+
+
+def domain_scores(message: str) -> dict[str, int]:
+    """Weighted score per domain. Exposed so eval/probe_routing can show WHY a turn routed."""
+    text = str(message or "")
+    scores: dict[str, int] = {}
+    for domain, weight, pat in _DOMAIN_TERMS:
+        hits = len(set(m.group(0).lower() for m in pat.finditer(text)))
+        if hits:
+            scores[domain] = scores.get(domain, 0) + weight * hits
+    return scores
 
 
 def classify_domain(message: str, context: Any = None) -> str:
-    """Return the dominant domain. Health is checked first (safety-sensitive); finance before the others
-    because money terms co-occur widely. Falls back to context.domain_priorities, then 'general'."""
-    text = str(message or "")
-    for dom, pat in _DOMAIN_PATTERNS:
-        if pat.search(text):
-            return dom
+    """The dominant domain by weighted score. Ties fall back to `_DOMAIN_ORDER` (health first).
+
+    Falls through to context.domain_priorities, then 'general' — never to finance. A finance default
+    is what previously mis-routed health and family questions into money advice.
+    """
+    scores = domain_scores(message)
+    if scores:
+        best = max(scores.values())
+        winners = [d for d in _DOMAIN_ORDER if scores.get(d) == best]
+        if winners:
+            return winners[0]
     pri = getattr(context, "domain_priorities", None) or []
     if pri:
         d = str(pri[0]).lower()
-        return d if d in ("health", "finance", "career", "education", "family") else "general"
+        return d if d in _DOMAIN_ORDER else "general"
     return "general"
 
 

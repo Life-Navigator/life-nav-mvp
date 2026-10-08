@@ -1,53 +1,16 @@
 {
-  "failures": [
-    {
-      "actual": "finance/medium",
-      "case_id": "route.education-framed-as-loans",
-      "expected": "education/*",
-      "known_divergence": "Routes to FINANCE today: `loan` and `debt` are finance patterns and finance is scanned before education, so the degree decision is reframed as a debt decision and the advisor grounds on the wrong domain. This is the 'education misframe' in this repo's remediation notes. Fixing it needs either pattern reordering (which would pull genuine finance turns into education) or a classifier with confidence \u2014 it is not a one-line change, which is why it is annotated rather than patched here.",
-      "mismatches": ["domain finance\u2260education"],
-      "tags": ["education", "misroute", "pattern_order"],
-      "why": "The decision is about the degree; loans are how it is paid for. The user is asking an education question."
-    },
-    {
-      "actual": "health/high",
-      "case_id": "route.life-insurance-for-dependents",
-      "expected": "family/*",
-      "known_divergence": "Routes to HEALTH today: `insurance` is in BOTH the health and finance patterns and health is scanned first, so any mention of insurance becomes a health turn. This is the 'health misroute' class. The collision is in the pattern vocabulary itself, not in the ordering alone.",
-      "mismatches": ["domain health\u2260family"],
-      "tags": ["family", "misroute", "pattern_collision", "insurance"],
-      "why": "A dependant-protection decision \u2014 family/estate territory."
-    },
-    {
-      "actual": "health/medium",
-      "case_id": "route.401k-premium-wording",
-      "expected": "finance/*",
-      "known_divergence": "Routes to HEALTH today: `premium` is a health pattern and health is scanned first, so a fund-fee question is handled by the health agent with health grounding.",
-      "mismatches": ["domain health\u2260finance"],
-      "tags": ["finance", "misroute", "pattern_collision", "premium"],
-      "why": "A fee question about a retirement account. Unambiguously finance by meaning."
-    },
-    {
-      "actual": "general/low",
-      "case_id": "route.finance-vocabulary-gap-bare-cash",
-      "expected": "finance/*",
-      "known_divergence": "Routes to GENERAL today. The finance pattern matches the phrase 'cash flow' but not bare 'cash', and has no entry for 'position', 'allocate', 'rebalance' or 'move money'. So a real finance turn gets no finance grounding and no finance playbook. Found by this probe; adding vocabulary is easy but risks pulling neighbouring domains into finance, which is exactly the collision class the insurance/premium cases document \u2014 so it is measured, not patched under an eval commit.",
-      "mismatches": ["domain general\u2260finance"],
-      "tags": ["finance", "vocabulary_gap", "misroute"],
-      "why": "An unmistakably financial question by meaning: idle cash, moving it into a position."
-    }
-  ],
-  "fixture_version": "3",
-  "known_divergences": 4,
+  "failures": [],
+  "fixture_version": "4",
+  "known_divergences": 0,
   "must_block_passed": 0,
   "must_block_total": 7,
-  "must_pass_blocked": 4,
+  "must_pass_blocked": 0,
   "must_pass_total": 16,
   "notes": [
     "16 routing / 7 safety-net cases",
     "classifiers are regex with no confidence score; ambiguity resolves by pattern ORDER (health \u2192 finance \u2192 career \u2192 education \u2192 family)"
   ],
-  "over_block_rate_pct": 25.0,
+  "over_block_rate_pct": 0.0,
   "probe": "routing",
   "refused_unscoreable": 0,
   "status": "MEASURED",
