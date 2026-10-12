@@ -121,3 +121,51 @@ def test_acct_source_labels_honestly():
     # synthetic is NOT labeled plaid and plaid is NOT labeled synthetic
     assert _acct_source([{"metadata": {"source": "synthetic_beta"}}]) != PLAID
     assert _acct_source([{"plaid_account_id": "x"}]) != SYNTHETIC
+
+
+@_pytest.mark.asyncio
+async def test_debt_apr_is_balance_weighted_not_the_first_row_found():
+    """THE DEFECT THIS FIXES. `debt_apr` was `next(... for a in debt_accts ...)` — the rate of
+    whichever debt row came back first. A 22% card plus a 4% mortgage gave one or the other
+    depending on row ORDER, and `debt.payoff_months` then ran on it: pick the mortgage and the
+    payoff looks years too fast; pick the card and it looks far too slow.
+
+    Balance-weighted is the only aggregate that means anything when one blended rate must stand in
+    for several debts. Here: (10,000x20 + 390,000x4) / 400,000 = 4.4%.
+    """
+    sb = FakeSupabase({"financial_accounts": [
+        {"id": "a", "user_id": CTX.user_id, "account_name": "card", "account_type": "credit_card",
+         "current_balance": 10000, "interest_rate": 20.0},
+        {"id": "b", "user_id": CTX.user_id, "account_name": "home", "account_type": "mortgage",
+         "current_balance": 390000, "interest_rate": 4.0},
+    ]})
+    r = await FinancialInputResolver(sb).resolve(CTX)
+    apr = r["inputs"]["debt_apr"]["value"]
+    assert apr == _pytest.approx((10000 * 20.0 + 390000 * 4.0) / 400000, abs=1e-6)
+    assert apr == _pytest.approx(4.4, abs=0.01)
+    # Not simply the first row's 20%, which is what it used to return.
+    assert apr != _pytest.approx(20.0, abs=0.1)
+
+
+@_pytest.mark.asyncio
+async def test_debt_list_carries_each_debt_separately_for_the_payoff_order():
+    sb = FakeSupabase({"financial_accounts": [
+        {"id": "a", "user_id": CTX.user_id, "account_name": "Visa", "account_type": "credit_card",
+         "current_balance": 8000, "interest_rate": 22.0},
+        {"id": "b", "user_id": CTX.user_id, "account_name": "Auto", "account_type": "loan",
+         "current_balance": 22000, "interest_rate": 4.9},
+        # Zero balance: a paid-off account is not a debt to order.
+        {"id": "c", "user_id": CTX.user_id, "account_name": "Old", "account_type": "credit_card",
+         "current_balance": 0, "interest_rate": 18.0},
+    ]})
+    r = await FinancialInputResolver(sb).resolve(CTX)
+    debts = r["inputs"]["debt_list"]["value"]
+    assert [d["label"] for d in debts] == ["Visa", "Auto"]
+    assert {d["apr"] for d in debts} == {22.0, 4.9}
+
+
+@_pytest.mark.asyncio
+async def test_no_debts_leaves_debt_list_absent_rather_than_an_empty_plan():
+    sb = FakeSupabase({})
+    r = await FinancialInputResolver(sb).resolve(CTX)
+    assert r["inputs"]["debt_list"]["present"] is False

@@ -41,6 +41,7 @@ def _resolver(**overrides):
         "filing_status": _field(None, False, "How do you file?"),
         "dependents": _field(None, False, "How many dependents do you claim?"),
         "tax_state": _field(None, False, "Which state do you file in?"),
+        "debt_list": _field(None, False, "Add your individual debts."),
     }
     for k, v in overrides.items():
         inputs[k] = _field(v, v is not None)
@@ -475,7 +476,9 @@ async def test_every_calculator_marked_wired_actually_appears_for_a_complete_pro
         _resolver(income=120000, cash_balance=20000, investment_balance=150000,
                   retirement_balance=250000, debt_total=30000, debt_apr=0.07,
                   retirement_contribution_rate=3, employer_match_rate=6,
-                  time_horizon=10)
+                  time_horizon=10,
+                  debt_list=[{"label": "card", "balance": 8000, "apr": 22.0},
+                             {"label": "auto", "balance": 22000, "apr": 4.9}])
     ).compute(_Ctx(), monthly_expenses=4000, monthly_income=10000,
               monthly_debt_payment=800, home_price_goal=500000,
               current_age=40, target_retirement_age=65,
@@ -490,3 +493,50 @@ async def test_every_calculator_marked_wired_actually_appears_for_a_complete_pro
     assert not unaccounted, (
         f"marked wired in advisor_calc_coverage but neither fired nor gapped: "
         f"{sorted(unaccounted)}")
+
+
+# ── Debt payoff ORDER (structural gap #2) ────────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_payoff_order_comes_from_per_debt_rows():
+    """"Which debt first" is the question that changes behaviour; `debt.payoff_months` only answers
+    "how long" on an aggregate. The 22% card must be targeted ahead of the 4.9% auto loan."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(debt_list=[{"label": "auto", "balance": 22000, "apr": 4.9},
+                             {"label": "card", "balance": 8000, "apr": 22.0}])
+    ).compute(_Ctx())
+    r = _by_id(p, "debt.avalanche_order")
+    assert r is not None
+    assert r["detail"]["order"] == ["card", "auto"]
+    assert r["detail"]["target"] == "card"
+
+
+@pytest.mark.asyncio
+async def test_a_single_debt_says_there_is_no_order_to_optimize():
+    """Honest refusal rather than a one-item "plan" presented as optimization."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(debt_list=[{"label": "card", "balance": 8000, "apr": 22.0}])
+    ).compute(_Ctx())
+    g = _gap_for(p, "debt.avalanche_order")
+    assert g is not None and "no payoff order to optimize" in g["refused"]
+
+
+@pytest.mark.asyncio
+async def test_debts_with_no_rates_become_a_gap_asking_for_the_apr():
+    p = await AdvisorCalculationPlanner(
+        _resolver(debt_list=[{"label": "card", "balance": 8000, "apr": None},
+                             {"label": "auto", "balance": 22000, "apr": None}])
+    ).compute(_Ctx())
+    g = _gap_for(p, "debt.avalanche_order")
+    assert g is not None and "debt_apr" in g["needs"]
+
+
+@pytest.mark.asyncio
+async def test_percent_aprs_from_the_database_are_normalized_for_the_order():
+    """`interest_rate` is stored as a percent (22.0) in some rows and a decimal elsewhere — the same
+    two-convention problem `_as_decimal_rate` exists for. An unnormalized 22.0 would be rejected by
+    require_rate as an unconverted percent and the order would silently not run."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(debt_list=[{"label": "a", "balance": 1000, "apr": 22.0},
+                             {"label": "b", "balance": 1000, "apr": 0.049}])
+    ).compute(_Ctx())
+    assert _by_id(p, "debt.avalanche_order") is not None

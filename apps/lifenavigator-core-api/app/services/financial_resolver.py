@@ -122,7 +122,31 @@ class FinancialInputResolver:
                   + sum(_num(p.get("current_savings")) or 0 for p in plans))
         debt_accts = [a for a in accounts if a.get("account_type") in ("credit_card", "loan", "mortgage")]
         debt_total = sum(_num(a.get("current_balance")) or 0 for a in debt_accts)
-        apr = next((_num(a.get("interest_rate")) for a in debt_accts if _num(a.get("interest_rate"))), None)
+
+        # Per-debt rows, so a payoff ORDER can be computed instead of only an aggregate. The
+        # calculators need (label, balance, apr); `minimum_payment` is NOT a column on
+        # finance.financial_accounts, which is why `debt.payoff_plan` and the DTI `monthly_debts`
+        # input remain blocked — see advisor_calc_coverage.
+        debt_list = [
+            {"label": a.get("account_name") or a.get("account_type") or "debt",
+             "balance": _num(a.get("current_balance")) or 0.0,
+             "apr": _num(a.get("interest_rate")),
+             "account_type": a.get("account_type")}
+            for a in debt_accts
+            if (_num(a.get("current_balance")) or 0.0) > 0
+        ]
+
+        # BALANCE-WEIGHTED average APR, not the first one found.
+        #
+        # This was `next((_num(a.get("interest_rate")) for a in debt_accts if ...), None)` — the
+        # APR of whichever debt account happened to come back first. A user with a 22% credit card
+        # and a 4% mortgage got one or the other depending on row order, and `debt.payoff_months`
+        # then ran on it: pick the mortgage and the payoff looks years too fast, pick the card and
+        # it looks far too slow. Weighting by balance is the only aggregate that means anything
+        # when a single blended rate must stand in for several debts.
+        _rated = [(d["balance"], d["apr"]) for d in debt_list if d["apr"] is not None]
+        _rated_total = sum(b for b, _ in _rated)
+        apr = (sum(b * r for b, r in _rated) / _rated_total) if _rated_total else None
 
         income = None
         if self._comp is not None:
@@ -157,8 +181,14 @@ class FinancialInputResolver:
                                          prompt="No retirement balances on file — connect a profile or add them.", unlocks=["retirement projection", "readiness"]),
             "debt_total": _field(debt_total, acct_source if debt_accts else MISSING, origin="finance.financial_accounts", confidence=0.9,
                                  prompt="Add your debts to optimize payoff.", unlocks=["debt payoff optimizer"]),
-            "debt_apr": _field(apr, acct_source if apr else MISSING, origin="finance.financial_accounts.interest_rate", confidence=0.8,
+            "debt_apr": _field(apr, acct_source if apr else MISSING,
+                               origin="finance.financial_accounts.interest_rate (balance-weighted)",
+                               confidence=0.8,
                                prompt="What APR are you paying on your debt?"),
+            "debt_list": _field(debt_list or None, acct_source if debt_list else MISSING,
+                                origin="finance.financial_accounts (per-debt)", confidence=0.9,
+                                prompt="Add your individual debts so we can work out which to attack first.",
+                                unlocks=["payoff order (avalanche)", "interest saved by reordering"]),
             "retirement_contribution_rate": _field(rate, DOC if rate is not None else MISSING, origin="documents:401k_statement", confidence=0.85,
                                                    prompt="Enter your 401(k) contribution rate to unlock retirement projections, 401(k) match optimization, and scenario planning.",
                                                    unlocks=["retirement projection", "401(k) match optimization", "scenario planning"]),

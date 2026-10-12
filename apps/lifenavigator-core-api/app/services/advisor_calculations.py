@@ -217,6 +217,29 @@ class AdvisorCalculationPlanner:
                     label="estimated monthly mortgage payment",
                 )
 
+        # ── Debt payoff ORDER ────────────────────────────────────────────────────────────────────
+        # Which debt to attack first, from per-debt rows. Distinct from `debt.payoff_months`, which
+        # answers "how long" on the aggregate: this answers "in what order", which is the question
+        # that actually changes behaviour and saves interest.
+        #
+        # `debt.payoff_plan` (months + total interest for a whole set) stays unreachable because it
+        # needs each debt's MINIMUM PAYMENT, and finance.financial_accounts has no such column.
+        # That is a migration, not a wiring gap — recorded in advisor_calc_coverage.
+        debt_list = _present(inputs, "debt_list")
+        if debt_list:
+            rated = [d for d in debt_list if d.get("apr") is not None]
+            if len(rated) >= 2:
+                run(debt.avalanche_order,
+                    debts=[{"label": d["label"], "balance": d["balance"],
+                            "apr": _as_decimal_rate(d["apr"])} for d in rated])
+            elif rated:
+                # One debt has no ordering decision to make; saying so beats a one-item "plan".
+                gaps.append({"calculator": "debt.avalanche_order",
+                             "refused": "only one debt carries a rate, so there is no payoff order "
+                                        "to optimize"})
+            else:
+                gaps.append(_gap(inputs, "debt.avalanche_order", ["debt_apr"]))
+
         # ── Employer match: free money, from three inputs already on file ───────────────────────
         # The cheapest high-value wiring in the whole planner. All three inputs are canonical, and
         # the output is the one figure a user acts on immediately — employer money they are leaving

@@ -37,6 +37,8 @@ CANONICAL_INPUTS = frozenset({
     # Added 2026-10-11 from finance.tax_profiles. `filing_status` was the single highest-impact
     # addition in the whole inventory — it unblocks seven tax calculators at once.
     "filing_status", "dependents", "tax_state",
+    # Per-debt rows, so a payoff ORDER is computable rather than only an aggregate.
+    "debt_list",
 })
 
 # Values the ADVISOR TURN supplies (parsed from the message or passed by the caller), not resolved
@@ -115,13 +117,16 @@ REACHABLE: dict[str, Reach] = {r.calc_id: r for r in (
 
     # BLOCKED ON INPUTS — the resolver cannot supply these yet.
     _r("cash.savings_rate", ("income", "annual_savings")),
+    # `monthly_debts` is the DTI input, and it needs actual monthly PAYMENTS — blocked on the same
+    # missing minimum_payment column as debt.payoff_plan.
     _r("housing.max_monthly_payment", ("income", "monthly_debts")),
     _r("housing.max_home_price", ("income", "monthly_debts", "down_payment")),
     _r("housing.rent_vs_buy", ("home_price_goal", "monthly_rent")),
-    _r("debt.payoff_plan", ("debt_list",),
-       note="canonical data holds an AGGREGATE debt_total/debt_apr; a payoff ORDER needs per-debt "
-            "balance, apr and minimum. This is a resolver shape change, not a missing field"),
-    _r("debt.avalanche_order", ("debt_list",)),
+    _r("debt.payoff_plan", ("debt_list", "debt_minimum_payments"),
+       note="BLOCKED ON A MIGRATION, not on wiring: finance.financial_accounts has no "
+            "minimum_payment column, and months-to-debt-free plus total interest cannot be "
+            "simulated without one. debt_list alone is enough for the ORDER, which is wired"),
+    _r("debt.avalanche_order", ("debt_list",), wired=True),
     _r("career.offer_total_comp", ("offers",)),
     _r("education.degree_total_cost", ("tuition_total", "years_in_school", "salary_before")),
     _r("education.degree_payback_years", ("tuition_total", "years_in_school", "salary_before",

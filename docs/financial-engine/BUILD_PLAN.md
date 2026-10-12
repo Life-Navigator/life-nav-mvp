@@ -538,6 +538,25 @@ AMT/QBI detail, business/self-employment (QBI, SE tax, entity choice).
 | K         | 4                          | —                          |
 | **Total** | **~98 + 5 composites**     |                            |
 
+## 3b. Known gaps, deferred by decision
+
+### User-facing web calculators — DEFERRED 2026-10-11
+
+`/dashboard/calculators` ships **seven user-facing calculators** (retirement, mortgage, loan,
+debt-payoff, compound-interest, rent-vs-buy, cash-vs-financing) plus a directory page and a nav
+entry at `DashboardClient.tsx:237`. `components/financial/tax/TaxEstimator.tsx` separately accepts
+typed income, deductions and credits.
+
+This sits against the owner decision that **calculators are model-only** (the API surface was closed
+in `cb26f241`), and each page carries its **own inline `Math.pow`** — a third implementation of
+compound growth and amortization, with no registry assumptions, no strict/scenario tiering and no
+provenance. So it is simultaneously a user calculator surface, instance #3 of the TS/Python fork,
+and unprovenanced math.
+
+**Owner decision: leave in place for now.** Options when revisited: remove entirely (+ redirects);
+keep but repoint at the real engine through a narrow server route carrying tiering and citations;
+or remove only the ones that mirror the engine and the tax layer.
+
 ## 4. Open questions for the owner
 
 1. **State tax scope.** All 50 + DC is a large data-maintenance commitment. Recommend the top ~12 by
