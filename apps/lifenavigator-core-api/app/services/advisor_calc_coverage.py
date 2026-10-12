@@ -142,6 +142,10 @@ REACHABLE: dict[str, Reach] = {r.calc_id: r for r in (
        note="THE highest-value tax figure for the advisor — every Roth, pre-tax and raise question "
             "turns on it, and it needs only income + filing status"),
     _r("tax.tax_credits", ("income", "filing_status", "dependents")),
+    _r("tax.bracket_headroom", ("income", "filing_status"), wired=True,
+       note="how much more ordinary income fits before the next rate. Answers 'how big a bonus "
+            "before it costs 32%', 'how much can I convert to Roth this year', 'how much gain can "
+            "I realise' — and it is what the Phase F conversion ladder is built from"),
 )}
 
 

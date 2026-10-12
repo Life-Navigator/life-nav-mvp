@@ -37,7 +37,7 @@ from typing import Any, Optional, Sequence
 from ..calculators import versioned_data as V
 from ..calculators import tax as tax_calc
 from ..calculators.base import from_registry
-from .household import TAXABLE, TAX_DEFERRED, Account, Household, PlanningError
+from .household import ROTH, TAXABLE, TAX_DEFERRED, Account, Household, PlanningError
 
 log = logging.getLogger("core.planning.ledger")
 
@@ -73,6 +73,7 @@ class LedgerYear:
     withdrawals: dict[str, float] = field(default_factory=dict)
     contributions: float = 0.0
     rmd: float = 0.0
+    roth_conversion: float = 0.0
     filing_status: str = ""
     end_balances: dict[str, float] = field(default_factory=dict)
     total_assets: float = 0.0
@@ -106,6 +107,7 @@ class LedgerYear:
             "state_tax": round(self.state_tax, 2), "total_tax": round(self.total_tax, 2),
             "withdrawals": {k: round(v, 2) for k, v in self.withdrawals.items()},
             "contributions": round(self.contributions, 2), "rmd": round(self.rmd, 2),
+            "roth_conversion": round(self.roth_conversion, 2),
             "filing_status": self.filing_status,
             "end_balances": {k: round(v, 2) for k, v in self.end_balances.items()},
             "total_assets": round(self.total_assets, 2),
@@ -186,7 +188,8 @@ def _rate(explicit: Optional[float], key: str, cited: list[dict[str, Any]]) -> f
 def project(household: Household, *, tax_year: Optional[int] = None,
             horizon_years: Optional[int] = None,
             inflation: Optional[float] = None,
-            return_path: Optional[Sequence[float]] = None) -> PlanResult:
+            return_path: Optional[Sequence[float]] = None,
+            conversions: Optional[dict[int, float]] = None) -> PlanResult:
     """Project the household year by year, computing tax annually from the Phase B engine.
 
     `return_path` supplies a return for EACH plan year instead of one rate for all of them, which is
@@ -194,6 +197,12 @@ def project(household: Household, *, tax_year: Optional[int] = None,
     because SEQUENCE matters: the same set of annual returns in a different order produces a very
     different outcome for a household that is drawing down, since a bad early year is realised
     against a full balance and never recovers. Averaging that away would measure nothing.
+
+    `conversions` maps a plan year to a Roth conversion amount. A conversion moves money from a
+    tax-deferred bucket to a Roth one and is ORDINARY INCOME in the year it happens — which is the
+    entire trade: pay tax now at a known rate to remove the balance from future RMDs and from the
+    survivor's narrower brackets. Modelled as a strategy overlay rather than a household fact,
+    because it is something the plan DOES, not something the household HAS.
 
     Raises `PlanningError` BEFORE the loop when the tax tables for `tax_year` are unverified — a
     projection that discovered this in plan year 30 would already have produced thirty years of
@@ -296,6 +305,27 @@ def project(household: Household, *, tax_year: Optional[int] = None,
                 amount *= e.retirement_factor
             row.expenses += amount
 
+        # 3b. Roth conversion — BEFORE the RMD, deliberately.
+        #
+        # ORDER MATTERS HERE. A conversion shrinks the tax-deferred balance, and the RMD is a
+        # fraction of that balance, so converting first reduces this year's RMD too. Running it
+        # after would overstate the forced distribution and understate the strategy's benefit —
+        # which is most of the reason the strategy exists. (In practice an RMD must be satisfied
+        # before a conversion in the same year; the ordering here models the balance effect, and
+        # `roth_conversion_ladder` deliberately targets pre-RMD years where the question does not
+        # arise.)
+        want_convert = float((conversions or {}).get(t, 0.0) or 0.0)
+        if want_convert > 0:
+            source = next((a for a in accounts
+                           if a.tax_treatment == TAX_DEFERRED and a.balance > 0), None)
+            target = next((a for a in accounts if a.tax_treatment == ROTH), None)
+            if source is not None and target is not None:
+                moved = min(source.balance, want_convert)
+                source.balance -= moved
+                target.balance += moved
+                row.roth_conversion = moved
+                row.events.append(f"Roth conversion of ${moved:,.0f} (taxable this year)")
+
         # 4. RMDs — forced out of tax-deferred whether the household needs the money or not. This
         #    is the thing a plan must surface early, because it can push a retiree into a higher
         #    bracket than they were ever in while working.
@@ -331,7 +361,9 @@ def project(household: Household, *, tax_year: Optional[int] = None,
                     st = 0.0
             return fed, pay, st
 
-        ordinary_income = row.wage_income + row.taxable_other_income + row.rmd
+        # The conversion is ordinary income in the conversion year — the whole cost of the trade.
+        ordinary_income = (row.wage_income + row.taxable_other_income + row.rmd
+                           + row.roth_conversion)
         fed, fica_amt, state_amt = tax_for(ordinary_income, row.wage_income)
 
         # 6. Goals due this year, funded in priority order.
@@ -367,18 +399,44 @@ def project(household: Household, *, tax_year: Optional[int] = None,
             drawn = 0.0
 
             # Fixed-point iteration. Withdrawing from a tax-deferred account IS income, so it
-            # raises the tax, which widens the gap, which needs a larger withdrawal. Converges in
-            # 3-4 passes; a ledger that skipped this would underfund every year and compound the
-            # error, making the plan look better than it is.
+            # raises the tax, which widens the gap, which needs a larger withdrawal. A ledger that
+            # skipped this would underfund every year and compound the error, making the plan look
+            # better than it is.
+            #
+            # TWO THINGS HERE ARE LOAD-BEARING, and the first was a real bug:
+            #
+            # 1. THE LOOP MUST NEVER EXIT IN AN UNDONE STATE. The original version ended each
+            #    non-converging pass with `_undo()`, so if it exhausted its iterations the
+            #    withdrawals had been REVERSED while `drawn` still held the stale amount. The year's
+            #    tax was then treated as funded from money that had been put back — assets ROSE and
+            #    the shortfall read zero. It silently created money, and it only showed up as a
+            #    non-monotonic strategy ranking: converting MORE paid more tax and somehow ended
+            #    with $1.69M more assets. A final re-draw after the loop guarantees the balances
+            #    match the figures.
+            #
+            # 2. DAMPING. Jumping straight to each new estimate oscillates when the withdrawal is
+            #    large enough to cross a bracket — the exact case a big Roth conversion creates.
+            #    Averaging the old and new estimates converges instead of flip-flopping.
+            converged = False
             for _ in range(_MAX_GROSS_UP_ITERATIONS):
                 f2, p2, s2 = tax_for(ordinary_income + extra_ordinary, row.wage_income)
                 target = need + ((f2 + p2 + s2) - base_tax)
                 drawn, drawn_ordinary = _draw(accounts, household.withdrawal_order, target, row)
                 if abs(drawn_ordinary - extra_ordinary) < _GROSS_UP_TOLERANCE:
                     extra_ordinary = drawn_ordinary
+                    converged = True
                     break
                 _undo(row)                         # reverse and retry with a better estimate
-                extra_ordinary = drawn_ordinary
+                extra_ordinary = (extra_ordinary + drawn_ordinary) / 2.0
+
+            if not converged:
+                # Settle on the damped estimate and actually take the money. Slightly imprecise is
+                # fine; an unfunded year is not.
+                f2, p2, s2 = tax_for(ordinary_income + extra_ordinary, row.wage_income)
+                target = need + ((f2 + p2 + s2) - base_tax)
+                drawn, _ = _draw(accounts, household.withdrawal_order, target, row)
+                row.events.append(
+                    "withdrawal gross-up did not fully converge; funded to the closest estimate")
 
             fed, fica_amt, state_amt = tax_for(ordinary_income + extra_ordinary, row.wage_income)
             required = need + ((fed + fica_amt + state_amt) - base_tax)

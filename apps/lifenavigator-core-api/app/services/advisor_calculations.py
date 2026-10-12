@@ -313,6 +313,10 @@ class AdvisorCalculationPlanner:
             # been standing in for it.
             run_tax(tax_calc.effective_marginal_rate, gross_income=annual_income,
                     filing_status=filing_status, tax_year=tax_year)
+            # Room left in the current bracket. The actionable companion to the marginal rate: the
+            # rate says what the next dollar costs, this says how many more dollars cost that much.
+            run_tax(tax_calc.bracket_headroom, ordinary_income=annual_income,
+                    filing_status=filing_status, tax_year=tax_year)
             tax_state = _present(inputs, "tax_state")
             if tax_state:
                 run_tax(tax_calc.state_income_tax, taxable_income=annual_income,

@@ -53,6 +53,7 @@ from .base import (
     CalculatorError,
     register,
     require_money,
+    require_rate,
 )
 
 FILING_STATUSES = ("single", "married_jointly", "married_separately", "head_of_household")
@@ -370,6 +371,57 @@ def effective_marginal_rate(*, gross_income: float, filing_status: str,
                 # point of measuring: it is what a lookup table cannot tell you.
                 "exceeds_statutory_by": round(rate - now["statutory_marginal"], 4),
                 "current_total_tax": round(now["total"], 2),
+                "table_provenance": t.provenance},
+    )
+
+
+@register("tax.bracket_headroom")
+def bracket_headroom(*, ordinary_income: float, filing_status: str,
+                     ceiling_rate: float = 0.24,
+                     above_the_line_deductions: float = 0.0,
+                     tax_year: Optional[int] = None) -> CalcResult:
+    """How much MORE ordinary income fits before the marginal rate exceeds `ceiling_rate`.
+
+    This is the number a Roth conversion ladder is built from: "fill the 24% bracket" is only
+    actionable if you know how much room is left in it this year. It is also what answers "how big
+    a bonus can I take before it costs 32%?" and "how much can I realise as a gain this year?".
+
+    Returns ZERO when income already exceeds the ceiling — not a negative number, which would read
+    as room. `detail.exceeded_by` carries how far over, because that is the useful follow-up.
+    """
+    status = _status(filing_status)
+    income = require_money("ordinary_income", ordinary_income)
+    ceiling = require_rate("ceiling_rate", ceiling_rate)
+    atl = require_money("above_the_line_deductions", above_the_line_deductions)
+    t = _table(tax_year)
+
+    standard = float(t.data["standard_deduction"][status])
+    taxable = max(0.0, income - atl - standard)
+    brackets = t.data["ordinary_brackets"][status]
+
+    # Top of the last bracket at or below the ceiling rate.
+    top: Optional[float] = None
+    for b in brackets:
+        if float(b["rate"]) <= ceiling and b["upto"] is not None:
+            top = float(b["upto"])
+    if top is None:
+        raise CalculatorError(
+            f"no bracket at or below {ceiling:.0%} for {status}; the lowest rate is "
+            f"{float(brackets[0]['rate']):.0%}")
+
+    room = max(0.0, top - taxable)
+    carried = _carry_forward_note(t)
+    return CalcResult(
+        calculator="tax.bracket_headroom",
+        label=f"room remaining in the {ceiling:.0%} bracket",
+        value=round(room, 2), unit="usd", tier=SCENARIO if carried else STRICT,
+        inputs_used={"ordinary_income": income, "filing_status": status,
+                     "ceiling_rate": ceiling, "tax_year": t.year_used},
+        assumptions=carried,
+        detail={"taxable_income": round(taxable, 2), "bracket_top": top,
+                "standard_deduction": standard,
+                "exceeded_by": round(max(0.0, taxable - top), 2),
+                "already_above_ceiling": taxable > top,
                 "table_provenance": t.provenance},
     )
 
