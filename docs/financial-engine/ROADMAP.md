@@ -75,9 +75,9 @@ S/M/L — because estimates I invent are worth less than the ordering.
 
 ### Milestone 2 — "What should I do about it?" (ledger readouts)
 
-> **Status 2026-10-12: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3-ages and 2.5-RMD are DONE.** Remaining:
-> 2.4 (three leaf calculators), 2.5's pension lump sum and withdrawal guardrails, and
-> **spousal + survivor Social Security**.
+> **Status 2026-10-12: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3-ages, 2.4 and 2.5-RMD are DONE.** Remaining:
+> 2.5's **pension lump sum vs annuity** and **withdrawal guardrails**, plus **spousal + survivor
+> Social Security**.
 >
 > The two fixes mattered more than the deferred items: **taxable withdrawals were untaxed** (a
 > $100k draw against a 90% embedded gain paid $0), which biased `withdrawal_sequencing` — the one

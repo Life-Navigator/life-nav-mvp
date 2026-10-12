@@ -163,8 +163,17 @@ class AdvisorCalculationPlanner:
             # The projection needs AGES, which are never measured from finance.* — user-entered
             # only. Absent, this is a gap, not a 40-year-old guess.
             if current_age and target_retirement_age:
+                before_proj = len(results)
                 run(retirement.projected_balance, current_balance=retirement_balance,
                     current_age=current_age, target_age=target_retirement_age)
+                # Restate it in today's dollars. A user who hears "$2.1 million" anchors on a number
+                # that will not buy what they think — roughly half of a 30-year projection is
+                # inflation rather than growth, and reporting only the nominal total withholds that.
+                if len(results) > before_proj:
+                    projected = results[-1].value
+                    horizon_months = max(1, int((target_retirement_age - current_age) * 12))
+                    run(money.purchasing_power, future_amount=projected,
+                        months=horizon_months)
             else:
                 gaps.append({
                     "calculator": "retirement.projected_balance",

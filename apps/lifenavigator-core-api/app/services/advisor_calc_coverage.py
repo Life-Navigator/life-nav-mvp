@@ -112,6 +112,18 @@ REACHABLE: dict[str, Reach] = {r.calc_id: r for r in (
     _r("cash.emergency_fund_gap", ("cash_balance", "monthly_expenses"), wired=True),
     _r("money.future_value", ("investment_balance", "time_horizon"),
        optional=("monthly_income",)),
+    # Restates any projected balance in today's dollars. Not independently reachable — it is a
+    # TRANSFORM on another calculator's output — so it is wired onto the retirement projection,
+    # which is the figure users most often anchor on nominally.
+    _r("money.purchasing_power", ("retirement_balance", "current_age",
+                                   "target_retirement_age"), wired=True,
+       note="the honest reframe of every projection: $2.1M in 30 years is ~$1.0M of today's "
+            "purchasing power, and 52% of the headline is inflation rather than growth"),
+    _r("money.expense_ratio_drag", ("investment_balance", "time_horizon", "expense_ratio"),
+       note="the single most actionable number in a portfolio review — a 0.95% ratio on $500k over "
+            "30 years costs 24% of the terminal balance. BLOCKED on the user's actual fund fees; a "
+            "typical ratio would be an invented assumption about their portfolio"),
+    _r("money.lump_sum_vs_dca", ("lump_sum_amount", "spread_months")),
     _r("debt.total_interest", ("home_price_goal",),
        note="same registry-sourced scenario path as amortized_payment"),
 
