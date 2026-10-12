@@ -124,6 +124,11 @@ REACHABLE: dict[str, Reach] = {r.calc_id: r for r in (
             "30 years costs 24% of the terminal balance. BLOCKED on the user's actual fund fees; a "
             "typical ratio would be an invented assumption about their portfolio"),
     _r("money.lump_sum_vs_dca", ("lump_sum_amount", "spread_months")),
+    _r("retirement.pension_lump_sum_vs_annuity",
+       ("pension_lump_sum", "pension_annual_annuity", "current_age"),
+       note="an irreversible, high-stakes election. Needs the two figures from the pension's own "
+            "offer letter, which no canonical source holds — but it is a strong candidate for "
+            "Document Intelligence extraction rather than a chat question"),
     _r("debt.total_interest", ("home_price_goal",),
        note="same registry-sourced scenario path as amortized_payment"),
 
