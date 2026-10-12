@@ -37,7 +37,7 @@ from typing import Any, Optional, Sequence
 from ..calculators import versioned_data as V
 from ..calculators import tax as tax_calc
 from ..calculators.base import from_registry
-from .household import ROTH, TAXABLE, TAX_DEFERRED, Account, Household, PlanningError
+from .household import HSA, ROTH, TAXABLE, TAX_DEFERRED, Account, Household, PlanningError
 
 log = logging.getLogger("core.planning.ledger")
 
@@ -77,6 +77,12 @@ class LedgerYear:
     state_tax: float = 0.0
     withdrawals: dict[str, float] = field(default_factory=dict)
     contributions: float = 0.0
+    # Split deliberately: money the household DECIDED to save, versus what happened to be left
+    # over after spending and tax. "I save $30,000 a year" and "there was $16,000 spare" are
+    # different facts about a household, and conflating them made `contributions` unusable for
+    # either question.
+    planned_contributions: float = 0.0
+    surplus_saved: float = 0.0
     rmd: float = 0.0
     roth_conversion: float = 0.0
     capital_gain_realized: float = 0.0
@@ -118,7 +124,10 @@ class LedgerYear:
             "federal_tax": round(self.federal_tax, 2), "fica": round(self.fica, 2),
             "state_tax": round(self.state_tax, 2), "total_tax": round(self.total_tax, 2),
             "withdrawals": {k: round(v, 2) for k, v in self.withdrawals.items()},
-            "contributions": round(self.contributions, 2), "rmd": round(self.rmd, 2),
+            "contributions": round(self.contributions, 2),
+            "planned_contributions": round(self.planned_contributions, 2),
+            "surplus_saved": round(self.surplus_saved, 2),
+            "rmd": round(self.rmd, 2),
             "roth_conversion": round(self.roth_conversion, 2),
             "capital_gain_realized": round(self.capital_gain_realized, 2),
             "filing_status": self.filing_status,
@@ -325,6 +334,32 @@ def project(household: Household, *, tax_year: Optional[int] = None,
                 amount *= e.retirement_factor
             row.expenses += amount
 
+        # 3a. Planned contributions, while the household is still earning.
+        #
+        # THE BUG THIS FIXES: `Account.annual_contribution` was accepted, documented and copied
+        # between runs — and never applied. An input that looks modelled and is not, which is the
+        # same class as the untaxed capital gains. It made `whatif.save_more` a no-op: "save
+        # $25,000/yr more" returned EXACTLY the baseline, to the cent.
+        #
+        # Gated on wages, because you cannot defer what you do not earn. Pre-tax buckets
+        # (tax-deferred, HSA) reduce ordinary income; a Roth or taxable contribution does not.
+        planned_contrib = 0.0
+        pretax_contrib = 0.0
+        if row.wage_income > 0:
+            for a in accounts:
+                amount = float(a.annual_contribution or 0.0)
+                if amount <= 0:
+                    continue
+                a.balance += amount
+                if a.tax_treatment == TAXABLE:
+                    a.basis = float(a.basis or 0.0) + amount
+                planned_contrib += amount
+                if a.tax_treatment in (TAX_DEFERRED, HSA):
+                    pretax_contrib += amount
+            if planned_contrib:
+                row.planned_contributions = planned_contrib
+                row.contributions += planned_contrib
+
         # 3b. Roth conversion — BEFORE the RMD, deliberately.
         #
         # ORDER MATTERS HERE. A conversion shrinks the tax-deferred balance, and the RMD is a
@@ -398,15 +433,17 @@ def project(household: Household, *, tax_year: Optional[int] = None,
             return fed, pay, st
 
         # The conversion is ordinary income in the conversion year — the whole cost of the trade.
-        ordinary_income = (row.wage_income + row.taxable_other_income + row.rmd
-                           + row.roth_conversion)
+        # Pre-tax contributions come out before tax — that is the whole point of them.
+        ordinary_income = max(0.0, row.wage_income + row.taxable_other_income + row.rmd
+                              + row.roth_conversion - pretax_contrib)
         fed, fica_amt, state_amt = tax_for(ordinary_income, row.wage_income)
 
         # 6. Goals due this year, funded in priority order.
         due = sorted(goals_by_year.get(t, []), key=lambda g: (g.rank, -g.amount))
 
+        # Contributions are already in the accounts, so they must come out of this year's cash.
         available = (row.wage_income + row.other_income + row.rmd
-                     - row.expenses - (fed + fica_amt + state_amt))
+                     - row.expenses - planned_contrib - (fed + fica_amt + state_amt))
 
         def liquid() -> float:
             return sum(a.balance for a in accounts)
@@ -515,6 +552,7 @@ def project(household: Household, *, tax_year: Optional[int] = None,
                 target.balance += available
                 if target.tax_treatment == TAXABLE:
                     target.basis = float(target.basis or 0.0) + available
+                row.surplus_saved = available
                 row.contributions += available
 
         row.federal_tax, row.fica, row.state_tax = fed, fica_amt, state_amt

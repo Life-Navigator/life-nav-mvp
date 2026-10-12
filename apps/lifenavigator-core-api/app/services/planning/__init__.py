@@ -20,6 +20,23 @@ from .household import (  # noqa: F401
 )
 from .ledger import LedgerYear, PlanResult, project  # noqa: F401
 from .monte_carlo import MonteCarloResult, simulate  # noqa: F401
+from .whatif import (  # noqa: F401
+    Solution,
+    WhatIf,
+    assume_inflation,
+    assume_return,
+    compare,
+    custom,
+    delay_social_security,
+    move_to_state,
+    retire_later,
+    save_more,
+    solve_all,
+    solve_for_retirement_age,
+    solve_for_spending,
+    spend_change,
+    suggest,
+)
 from .stress import (  # noqa: F401
     StressResult,
     crash_at_retirement,
