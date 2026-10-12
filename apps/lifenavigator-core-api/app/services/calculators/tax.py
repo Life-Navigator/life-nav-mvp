@@ -279,6 +279,8 @@ def effective_marginal_rate(*, gross_income: float, filing_status: str,
                             wages: Optional[float] = None,
                             above_the_line_deductions: float = 0.0,
                             increment: float = 1000.0,
+                            qualifying_children: int = 0, other_dependents: int = 0,
+                            include_credits: bool = False,
                             tax_year: Optional[int] = None) -> CalcResult:
     """The TRUE cost of the next dollar: federal + FICA, measured rather than read off a table.
 
@@ -291,6 +293,14 @@ def effective_marginal_rate(*, gross_income: float, filing_status: str,
 
     `increment` defaults to $1,000 rather than $1 because the result is used for decisions at that
     scale, and a $1 probe straddling a threshold reports a rate that applies to almost nothing.
+
+    CREDIT PHASE-OUTS (`include_credits=True`) are where the measured approach earns its keep. A
+    phase-out is an implicit marginal tax: the child credit sheds $50 per $1,000 above the
+    threshold, a 5% implicit surtax inside the band — applied to the AGGREGATE credit, so more
+    children lengthen the band rather than steepening the rate. Overlapping phase-outs (child plus
+    AOTC) do compound, and a filer sitting inside two of them can face a true marginal rate above
+    the top statutory bracket while every bracket table still says 24%. Default OFF because it
+    needs verified credit parameters, which the table does not yet have.
     """
     status = _status(filing_status)
     gross = require_money("gross_income", gross_income, allow_zero=False)
@@ -302,7 +312,15 @@ def effective_marginal_rate(*, gross_income: float, filing_status: str,
                                  above_the_line_deductions=above_the_line_deductions,
                                  tax_year=tax_year)
         pay = fica(wages=wg, filing_status=status, tax_year=tax_year)
-        return {"federal": fed.value, "fica": pay.value, "total": fed.value + pay.value,
+        credits = 0.0
+        if include_credits and (qualifying_children or other_dependents):
+            credits = tax_credits(
+                agi=fed.detail["agi"], filing_status=status,
+                tax_before_credits=fed.value, qualifying_children=qualifying_children,
+                other_dependents=other_dependents, tax_year=tax_year).value
+        # Credits REDUCE tax, so losing them to a phase-out INCREASES the marginal rate.
+        return {"federal": fed.value, "fica": pay.value, "credits": credits,
+                "total": fed.value + pay.value - credits,
                 "statutory_marginal": fed.detail["marginal_rate"]}
 
     now = total_at(gross, w)
@@ -321,6 +339,9 @@ def effective_marginal_rate(*, gross_income: float, filing_status: str,
         detail={"statutory_bracket_rate": now["statutory_marginal"],
                 "federal_component": round((nxt["federal"] - now["federal"]) / step, 4),
                 "fica_component": round((nxt["fica"] - now["fica"]) / step, 4),
+                # Positive when a phase-out is clawing credits back — an invisible surtax.
+                "credit_phase_out_component": round((now["credits"] - nxt["credits"]) / step, 4),
+                "credits_included": include_credits,
                 # The gap between the statutory bracket and the real marginal rate is the whole
                 # point of measuring: it is what a lookup table cannot tell you.
                 "exceeds_statutory_by": round(rate - now["statutory_marginal"], 4),
@@ -600,4 +621,217 @@ def state_income_tax(*, taxable_income: float, state: str, filing_status: str = 
         f"{code} is not modelled for {t.year_used}. Modelled: {', '.join(modelled)}. "
         f"Report the federal figure and say the state portion is not included — do NOT treat "
         f"{code} as having no income tax."
+    )
+
+
+# ── Credits ───────────────────────────────────────────────────────────────────────────────────────
+# WHY CREDITS BELONG IN THE *MARGINAL RATE*, NOT JUST THE TAX TOTAL
+# -----------------------------------------------------------------
+# A credit phase-out is an implicit marginal tax. The child credit sheds $50 per $1,000 of income
+# above the threshold — a 5% implicit surtax inside the band. Note that the statutory reduction
+# applies to the AGGREGATE credit, not per child, so a third child does NOT make the phase-out
+# steeper; it makes it LONGER. Two children at $2,000 each exhaust over an $80,000 band, three over
+# $120,000. The rate is 5% either way, and getting that backwards overstates the surtax for large
+# families by a multiple.
+#
+# The AOTC phases out ratably over its own $10,000 band, which can stack on top. Add a 24% bracket
+# plus 7.65% FICA and the true cost of the next dollar runs well above what any bracket table shows.
+#
+# That is the whole reason `effective_marginal_rate` MEASURES by re-running the return instead of
+# reading a bracket. Credits are the largest source of the gap between the two, and they are also
+# where the gap is least intuitive: the band is invisible, it moves with family size, and crossing
+# it can make a raise worth less than nothing.
+#
+# The saver's credit is worse still — a CLIFF, not a phase-out. One dollar of AGI over a tier
+# ceiling drops the rate from 50% to 20%, so a $1 raise can cost $600 of credit. That is a marginal
+# rate of 60,000%, and it is real.
+
+_CREDIT_SECTION = "credits"
+
+
+def _credits_cfg(t: V.LoadedData) -> dict[str, Any]:
+    cfg = t.data.get(_CREDIT_SECTION)
+    if not cfg:
+        raise CalculatorError(
+            f"the {t.year_used} tax table has no `credits` section — credits cannot be computed"
+        )
+    if not cfg.get("verified"):
+        raise V.UnverifiedDataError(
+            f"the {t.year_used} credit parameters are NOT verified — "
+            f"{cfg.get('verify_against') or 'check against the IRS publications'}. "
+            f"Unlike the ordinary brackets, credits have no independent cross-check in this repo, "
+            f"so nothing here may produce a user-facing figure yet."
+        )
+    return cfg
+
+
+def _staircase_phase_out(amount: float, agi: float, start: float, per_1000: float) -> float:
+    """CTC-style reduction: `per_1000` lost per $1,000 OR FRACTION above `start`.
+
+    The fraction rounding is statutory, and it makes the reduction a STAIRCASE rather than a ramp —
+    $1 over a $1,000 boundary costs the full $50. Treating it as linear understates the credit lost
+    at every point inside a step, and hides the small cliffs entirely.
+    """
+    if agi <= start:
+        return amount
+    import math
+    steps = math.ceil((agi - start) / 1000.0)
+    return max(0.0, amount - steps * per_1000)
+
+
+def _ratable_phase_out(amount: float, agi: float, lo: float, hi: float) -> float:
+    """AOTC/LLC-style: reduced linearly across [lo, hi], zero at or above `hi`.
+
+    `hi <= lo` means the credit is unavailable for this filing status (MFS cannot claim AOTC), which
+    is expressed in the table as a [0, 0] range rather than a special case here.
+    """
+    if hi <= lo:
+        return 0.0
+    if agi <= lo:
+        return amount
+    if agi >= hi:
+        return 0.0
+    return amount * (1.0 - (agi - lo) / (hi - lo))
+
+
+@register("tax.tax_credits")
+def tax_credits(*, agi: float, filing_status: str, tax_before_credits: float = 0.0,
+                qualifying_children: int = 0, other_dependents: int = 0,
+                aotc_students: int = 0, aotc_expenses_per_student: float = 0.0,
+                llc_expenses: float = 0.0, retirement_contributions: float = 0.0,
+                tax_year: Optional[int] = None) -> CalcResult:
+    """Federal credits: child, other-dependent, AOTC, LLC, saver's.
+
+    REFUNDABLE VS NONREFUNDABLE ORDERING MATTERS. Nonrefundable credits can only reduce liability to
+    zero; refundable ones pay out beyond it. `tax.ts` set `totalCredits = 0`, so a family with two
+    children was shown $4,000 more tax than they owe — the single largest error in that engine for
+    anyone with dependents.
+
+    EITC is deliberately NOT included: its phase-in/phase-out parameters are the least reliable
+    figures in the table, it is fully refundable, and it targets filers least able to absorb an
+    error. It is gated behind `credits.earned_income_credit.enabled` and stays off until sourced.
+    """
+    status = _status(filing_status)
+    income = require_money("agi", agi)
+    liability = require_money("tax_before_credits", tax_before_credits)
+    t = _table(tax_year)
+    cfg = _credits_cfg(t)
+
+    children = int(qualifying_children)
+    others = int(other_dependents)
+    students = int(aotc_students)
+    if min(children, others, students) < 0:
+        raise CalculatorError("dependent and student counts must not be negative")
+
+    rows: list[dict[str, Any]] = []
+    nonrefundable = 0.0
+    refundable = 0.0
+
+    # ── Child + other-dependent credit (shared phase-out) ──
+    ctc_cfg = cfg["child_tax_credit"]
+    odc_cfg = cfg["other_dependent_credit"]
+    start = float(ctc_cfg["phase_out_start"][status])
+    per_1000 = float(ctc_cfg["phase_out_per_1000"])
+    gross_family = children * float(ctc_cfg["per_child"]) + others * float(odc_cfg["per_dependent"])
+    if gross_family > 0:
+        after = _staircase_phase_out(gross_family, income, start, per_1000)
+        # The refundable ceiling applies per child, and only to the child portion.
+        refundable_cap = children * float(ctc_cfg["refundable_per_child"])
+        ref = min(after, refundable_cap)
+        nonref = after - ref
+        nonrefundable += nonref
+        refundable += ref
+        rows.append({"credit": "child_and_dependent", "gross": round(gross_family, 2),
+                     "after_phase_out": round(after, 2),
+                     "lost_to_phase_out": round(gross_family - after, 2),
+                     "refundable": round(ref, 2), "nonrefundable": round(nonref, 2),
+                     "in_phase_out_band": start < income and after > 0,
+                     "phase_out_start": start})
+
+    # ── AOTC (per student) ──
+    if students > 0:
+        a = cfg["american_opportunity_credit"]
+        lo, hi = (float(x) for x in a["phase_out"][status])
+        exp = require_money("aotc_expenses_per_student", aotc_expenses_per_student)
+        per = min(
+            float(a["max_per_student"]),
+            min(exp, float(a["first_tier_expenses"])) * float(a["first_tier_rate"])
+            + max(0.0, min(exp - float(a["first_tier_expenses"]),
+                           float(a["second_tier_expenses"]))) * float(a["second_tier_rate"]),
+        )
+        gross = per * students
+        after = _ratable_phase_out(gross, income, lo, hi)
+        ref = after * float(a["refundable_share"])
+        nonrefundable += after - ref
+        refundable += ref
+        rows.append({"credit": "american_opportunity", "gross": round(gross, 2),
+                     "after_phase_out": round(after, 2),
+                     "lost_to_phase_out": round(gross - after, 2),
+                     "refundable": round(ref, 2), "nonrefundable": round(after - ref, 2),
+                     "in_phase_out_band": lo < income < hi, "phase_out_range": [lo, hi],
+                     "unavailable_for_status": hi <= lo})
+
+    # ── LLC (per return) ──
+    if llc_expenses:
+        l_cfg = cfg["lifetime_learning_credit"]
+        lo, hi = (float(x) for x in l_cfg["phase_out"][status])
+        exp = require_money("llc_expenses", llc_expenses)
+        gross = min(float(l_cfg["max_per_return"]),
+                    min(exp, float(l_cfg["qualified_expense_cap"])) * float(l_cfg["rate"]))
+        after = _ratable_phase_out(gross, income, lo, hi)
+        nonrefundable += after
+        rows.append({"credit": "lifetime_learning", "gross": round(gross, 2),
+                     "after_phase_out": round(after, 2),
+                     "lost_to_phase_out": round(gross - after, 2),
+                     "refundable": 0.0, "nonrefundable": round(after, 2),
+                     "in_phase_out_band": lo < income < hi, "phase_out_range": [lo, hi],
+                     "unavailable_for_status": hi <= lo})
+
+    # ── Saver's credit (a CLIFF) ──
+    if retirement_contributions:
+        s_cfg = cfg["savers_credit"]
+        contrib = min(require_money("retirement_contributions", retirement_contributions),
+                      float(s_cfg["contribution_cap"]))
+        rate = 0.0
+        next_ceiling: Optional[float] = None
+        for ceiling, tier_rate in s_cfg["tiers"][status]:
+            if income <= float(ceiling):
+                rate = float(tier_rate)
+                break
+            next_ceiling = float(ceiling)
+        amount = contrib * rate
+        nonrefundable += amount
+        rows.append({"credit": "savers", "gross": round(amount, 2),
+                     "after_phase_out": round(amount, 2), "lost_to_phase_out": 0.0,
+                     "refundable": 0.0, "nonrefundable": round(amount, 2),
+                     "rate": rate, "is_cliff": True,
+                     "last_ceiling_passed": next_ceiling,
+                     "note": "a cliff, not a phase-out — one dollar of AGI can cost the whole credit"})
+
+    # Nonrefundable credits cannot take liability below zero.
+    nonref_applied = min(nonrefundable, liability)
+    total = nonref_applied + refundable
+    carried = _carry_forward_note(t)
+    return CalcResult(
+        calculator="tax.tax_credits", label="federal tax credits",
+        value=round(total, 2), unit="usd", tier=SCENARIO if carried else STRICT,
+        inputs_used={"agi": income, "filing_status": status,
+                     "tax_before_credits": liability,
+                     "qualifying_children": children, "other_dependents": others,
+                     "aotc_students": students, "llc_expenses": llc_expenses,
+                     "retirement_contributions": retirement_contributions,
+                     "tax_year": t.year_used},
+        assumptions=carried,
+        detail={"credits": rows,
+                "nonrefundable_earned": round(nonrefundable, 2),
+                "nonrefundable_applied": round(nonref_applied, 2),
+                # The part users are never told: a nonrefundable credit they "qualified" for and
+                # could not use, because their liability ran out first.
+                "nonrefundable_wasted": round(nonrefundable - nonref_applied, 2),
+                "refundable": round(refundable, 2),
+                "total_lost_to_phase_outs": round(sum(r["lost_to_phase_out"] for r in rows), 2),
+                "in_any_phase_out_band": any(r.get("in_phase_out_band") for r in rows),
+                "eitc_excluded": "EITC is gated off — its parameters are unverified and it is fully "
+                                 "refundable, so an error lands on the filers least able to absorb it",
+                "table_provenance": t.provenance},
     )

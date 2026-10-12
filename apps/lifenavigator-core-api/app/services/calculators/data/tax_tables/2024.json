@@ -11,40 +11,124 @@
   },
   "ordinary_brackets": {
     "single": [
-      { "rate": 0.1, "upto": 11600 },
-      { "rate": 0.12, "upto": 47150 },
-      { "rate": 0.22, "upto": 100525 },
-      { "rate": 0.24, "upto": 191950 },
-      { "rate": 0.32, "upto": 243725 },
-      { "rate": 0.35, "upto": 609350 },
-      { "rate": 0.37, "upto": null }
+      {
+        "rate": 0.1,
+        "upto": 11600
+      },
+      {
+        "rate": 0.12,
+        "upto": 47150
+      },
+      {
+        "rate": 0.22,
+        "upto": 100525
+      },
+      {
+        "rate": 0.24,
+        "upto": 191950
+      },
+      {
+        "rate": 0.32,
+        "upto": 243725
+      },
+      {
+        "rate": 0.35,
+        "upto": 609350
+      },
+      {
+        "rate": 0.37,
+        "upto": null
+      }
     ],
     "married_jointly": [
-      { "rate": 0.1, "upto": 23200 },
-      { "rate": 0.12, "upto": 94300 },
-      { "rate": 0.22, "upto": 201050 },
-      { "rate": 0.24, "upto": 383900 },
-      { "rate": 0.32, "upto": 487450 },
-      { "rate": 0.35, "upto": 731200 },
-      { "rate": 0.37, "upto": null }
+      {
+        "rate": 0.1,
+        "upto": 23200
+      },
+      {
+        "rate": 0.12,
+        "upto": 94300
+      },
+      {
+        "rate": 0.22,
+        "upto": 201050
+      },
+      {
+        "rate": 0.24,
+        "upto": 383900
+      },
+      {
+        "rate": 0.32,
+        "upto": 487450
+      },
+      {
+        "rate": 0.35,
+        "upto": 731200
+      },
+      {
+        "rate": 0.37,
+        "upto": null
+      }
     ],
     "married_separately": [
-      { "rate": 0.1, "upto": 11600 },
-      { "rate": 0.12, "upto": 47150 },
-      { "rate": 0.22, "upto": 100525 },
-      { "rate": 0.24, "upto": 191950 },
-      { "rate": 0.32, "upto": 243725 },
-      { "rate": 0.35, "upto": 365600 },
-      { "rate": 0.37, "upto": null }
+      {
+        "rate": 0.1,
+        "upto": 11600
+      },
+      {
+        "rate": 0.12,
+        "upto": 47150
+      },
+      {
+        "rate": 0.22,
+        "upto": 100525
+      },
+      {
+        "rate": 0.24,
+        "upto": 191950
+      },
+      {
+        "rate": 0.32,
+        "upto": 243725
+      },
+      {
+        "rate": 0.35,
+        "upto": 365600
+      },
+      {
+        "rate": 0.37,
+        "upto": null
+      }
     ],
     "head_of_household": [
-      { "rate": 0.1, "upto": 16550 },
-      { "rate": 0.12, "upto": 63100 },
-      { "rate": 0.22, "upto": 100500 },
-      { "rate": 0.24, "upto": 191950 },
-      { "rate": 0.32, "upto": 243700 },
-      { "rate": 0.35, "upto": 609350 },
-      { "rate": 0.37, "upto": null }
+      {
+        "rate": 0.1,
+        "upto": 16550
+      },
+      {
+        "rate": 0.12,
+        "upto": 63100
+      },
+      {
+        "rate": 0.22,
+        "upto": 100500
+      },
+      {
+        "rate": 0.24,
+        "upto": 191950
+      },
+      {
+        "rate": 0.32,
+        "upto": 243700
+      },
+      {
+        "rate": 0.35,
+        "upto": 609350
+      },
+      {
+        "rate": 0.37,
+        "upto": null
+      }
     ]
   },
   "standard_deduction": {
@@ -67,24 +151,60 @@
   },
   "long_term_capital_gains": {
     "single": [
-      { "rate": 0.0, "upto": 47025 },
-      { "rate": 0.15, "upto": 518900 },
-      { "rate": 0.2, "upto": null }
+      {
+        "rate": 0.0,
+        "upto": 47025
+      },
+      {
+        "rate": 0.15,
+        "upto": 518900
+      },
+      {
+        "rate": 0.2,
+        "upto": null
+      }
     ],
     "married_jointly": [
-      { "rate": 0.0, "upto": 94050 },
-      { "rate": 0.15, "upto": 583750 },
-      { "rate": 0.2, "upto": null }
+      {
+        "rate": 0.0,
+        "upto": 94050
+      },
+      {
+        "rate": 0.15,
+        "upto": 583750
+      },
+      {
+        "rate": 0.2,
+        "upto": null
+      }
     ],
     "married_separately": [
-      { "rate": 0.0, "upto": 47025 },
-      { "rate": 0.15, "upto": 291850 },
-      { "rate": 0.2, "upto": null }
+      {
+        "rate": 0.0,
+        "upto": 47025
+      },
+      {
+        "rate": 0.15,
+        "upto": 291850
+      },
+      {
+        "rate": 0.2,
+        "upto": null
+      }
     ],
     "head_of_household": [
-      { "rate": 0.0, "upto": 63000 },
-      { "rate": 0.15, "upto": 551350 },
-      { "rate": 0.2, "upto": null }
+      {
+        "rate": 0.0,
+        "upto": 63000
+      },
+      {
+        "rate": 0.15,
+        "upto": 551350
+      },
+      {
+        "rate": 0.2,
+        "upto": null
+      }
     ]
   },
   "niit": {
@@ -95,6 +215,121 @@
       "married_separately": 125000,
       "head_of_household": 200000
     },
-    "note": "Net Investment Income Tax thresholds are NOT inflation-indexed — they are fixed in statute at these amounts and have been since 2013."
+    "note": "Net Investment Income Tax thresholds are NOT inflation-indexed \u2014 they are fixed in statute at these amounts and have been since 2013."
+  },
+  "credits": {
+    "verified": false,
+    "note": "Credit parameters were populated from model knowledge. Unlike the ordinary brackets \u2014 which were cross-checked against the figures tax.ts shipped to production \u2014 there is NO independent cross-check available for credits in this repo, so this section is unverified in BOTH years. Engine correctness is proven against synthetic verified fixtures instead.",
+    "verify_against": "IRS Pub 972 / Schedule 8812 (CTC/ACTC/ODC), Pub 970 (AOTC/LLC), Form 8880 (saver's credit), Pub 596 (EITC) for tax year 2024",
+    "child_tax_credit": {
+      "per_child": 2000,
+      "refundable_per_child": 1700,
+      "qualifying_age_under": 17,
+      "phase_out_start": {
+        "single": 200000,
+        "married_jointly": 400000,
+        "married_separately": 200000,
+        "head_of_household": 200000
+      },
+      "phase_out_per_1000": 50,
+      "note": "Reduced by $50 for each $1,000 (OR FRACTION THEREOF) of MAGI above the threshold \u2014 the fraction rounding is statutory and makes the phase-out a staircase, not a ramp."
+    },
+    "other_dependent_credit": {
+      "per_dependent": 500,
+      "refundable_per_dependent": 0,
+      "shares_phase_out_with": "child_tax_credit"
+    },
+    "american_opportunity_credit": {
+      "max_per_student": 2500,
+      "first_tier_expenses": 2000,
+      "first_tier_rate": 1.0,
+      "second_tier_expenses": 2000,
+      "second_tier_rate": 0.25,
+      "refundable_share": 0.4,
+      "phase_out": {
+        "single": [80000, 90000],
+        "married_jointly": [160000, 180000],
+        "married_separately": [0, 0],
+        "head_of_household": [80000, 90000]
+      },
+      "note": "MFS cannot claim it at all, hence the [0, 0] range. Phase-out is a linear ratable range, not a staircase."
+    },
+    "lifetime_learning_credit": {
+      "max_per_return": 2000,
+      "qualified_expense_cap": 10000,
+      "rate": 0.2,
+      "refundable_share": 0.0,
+      "phase_out": {
+        "single": [80000, 90000],
+        "married_jointly": [160000, 180000],
+        "married_separately": [0, 0],
+        "head_of_household": [80000, 90000]
+      },
+      "note": "PER RETURN, not per student \u2014 unlike AOTC. Mutually exclusive with AOTC for the same student's expenses."
+    },
+    "savers_credit": {
+      "contribution_cap": 2000,
+      "tiers": {
+        "single": [
+          [23000, 0.5],
+          [25000, 0.2],
+          [38250, 0.1]
+        ],
+        "married_jointly": [
+          [46000, 0.5],
+          [50000, 0.2],
+          [76500, 0.1]
+        ],
+        "married_separately": [
+          [23000, 0.5],
+          [25000, 0.2],
+          [38250, 0.1]
+        ],
+        "head_of_household": [
+          [34500, 0.5],
+          [37500, 0.2],
+          [57375, 0.1]
+        ]
+      },
+      "refundable_share": 0.0,
+      "note": "AGI at or below each tier's ceiling gets that rate; above the last ceiling the credit is zero. A CLIFF, not a phase-out \u2014 one dollar of AGI can cost the entire credit."
+    },
+    "earned_income_credit": {
+      "max_credit": {
+        "0": 632,
+        "1": 4213,
+        "2": 6960,
+        "3": 7830
+      },
+      "phase_in_rate": {
+        "0": 0.0765,
+        "1": 0.34,
+        "2": 0.4,
+        "3": 0.45
+      },
+      "phase_out_rate": {
+        "0": 0.0765,
+        "1": 0.1598,
+        "2": 0.2106,
+        "3": 0.2106
+      },
+      "phase_out_start": {
+        "single": {
+          "0": 9800,
+          "1": 21560,
+          "2": 21560,
+          "3": 21560
+        },
+        "married_jointly": {
+          "0": 16370,
+          "1": 28120,
+          "2": 28120,
+          "3": 28120
+        }
+      },
+      "refundable_share": 1.0,
+      "confidence": "LOW \u2014 the phase-in/phase-out parameters are the least reliable figures in this file. EITC is fully refundable and targets low-income filers, so an error here is both large in relative terms and lands on the people least able to absorb it. Verify against Pub 596 before enabling.",
+      "enabled": false
+    }
   }
 }

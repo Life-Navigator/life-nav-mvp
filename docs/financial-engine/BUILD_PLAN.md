@@ -107,8 +107,9 @@ _No new user capability; everything after this depends on it._
 
 _Blocks retirement, equity comp, 529, HSA, and both composites._
 
-**Shipped (7 calculators):** `federal_income_tax`, `fica`, `capital_gains_tax`,
-`effective_marginal_rate`, `standard_vs_itemized`, `state_income_tax`, plus `validate_state_table`.
+**Shipped (8 calculators):** `federal_income_tax`, `fica`, `capital_gains_tax`,
+`effective_marginal_rate`, `standard_vs_itemized`, `state_income_tax`, `tax_credits`, plus
+`validate_state_table`.
 
 **Why the marginal rate is MEASURED, not looked up.** The statutory bracket is not what the next
 dollar costs. At $150k single it is 24% but the true combined rate is 31.65%; at $400k the bracket is
@@ -170,15 +171,47 @@ disabled, so anything _new_ fails immediately while each known gap is recorded w
 
 **1,578 tests pass.** Commit `33460715` + state tables.
 
-#### Still open in Phase B
+#### Credits, and why they belong in the marginal rate
+
+`tax_credits` covers the child credit, other-dependent credit, AOTC, LLC and the saver's credit,
+with the refundable/nonrefundable split handled properly. `tax.ts` set `totalCredits = 0`, so a
+family with two children was shown **$4,000 more tax than they owe** — its largest error for anyone
+with dependents.
+
+Three mechanics that need code rather than a rate:
+
+- **The child phase-out is a STAIRCASE.** $50 per $1,000 _or fraction_ above the threshold is
+  statutory, so $1 over a boundary costs the full $50. Modelling it as a linear ramp understates the
+  loss at every point inside a step.
+- **The reduction applies to the AGGREGATE credit, not per child.** More children lengthen the band
+  (2 children exhaust over $80k, 4 over $160k) but do not steepen it — the implicit surtax is 5%
+  either way. Reading it as 5% per child overstates a large family's marginal rate by a multiple.
+  _(This corrected an error in the first draft of the code comments and the test.)_
+- **The saver's credit is a CLIFF.** One dollar of AGI over a tier ceiling drops the rate from 50%
+  to 20% — a $600 loss on a $1 raise. The result flags `is_cliff` explicitly.
+
+`effective_marginal_rate` now takes `include_credits` (default **off**, pending verified
+parameters), so the measured rate captures the phase-out as the implicit surtax it is. This is the
+payoff for measuring rather than reading a bracket.
+
+**EITC is deliberately excluded and gated off.** Its phase-in/phase-out parameters are the
+least reliable figures in the table, it is fully refundable, and it targets the filers least able to
+absorb an error. `credits.earned_income_credit.enabled: false` until sourced from Pub 596.
+
+**1,605 tests pass.** Commits `33460715`, `b8d83736`, + credits.
+
+#### Still open in Phase B — all owner tasks or decisions
 
 1. **Verify `tax_tables/2026.json`** against the IRS Rev. Proc. for TY2026 + the SSA wage base. This
-   gates every 2026 figure. **Owner task.**
+   gates every 2026 figure.
 2. **Verify the 20 rate-bearing states**, and replace NJ's and MD's copied joint schedules.
-   **Owner task.** `validate_state_table` will catch transcription errors.
-3. `tax_credits` — CTC, EITC, AOTC/LLC, saver's credit. Not built; phase-out ranges are where
-   model knowledge is least reliable, so this needs sourced data before code.
-4. **Port `tax.ts` onto this tier.** Not mechanical — the web tier would call core-api over HTTP,
+   `validate_state_table` will catch transcription errors.
+3. **Verify the credit parameters** (Schedule 8812, Pub 970, Form 8880) in both years. Unlike the
+   ordinary brackets, credits had **no independent cross-check** available in this repo, so the
+   section is unverified in 2024 as well as 2026 and the engine is proven against synthetic
+   fixtures.
+4. **Source EITC** from Pub 596, then enable it.
+5. **Port `tax.ts` onto this tier.** Not mechanical — the web tier would call core-api over HTTP,
    making the browser-side tax page server-dependent. An architecture decision, not a move.
 
 ### Phase C — Cash flow & paycheck
