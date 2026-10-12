@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import get_settings
-from .routers import benefits, career_domain, chat, decision, documents, education_domain, family_domain, finance, health, health_domain, analytics, life as life_discovery_router, life_graph, life_profile, military, plaid, platform_router, readiness, recommendations, reports, share, tools, version
+from .routers import benefits, career_domain, chat, decision, documents, education_domain, family_domain, finance, health, health_domain, analytics, life as life_discovery_router, life_graph, life_profile, military, plaid, platform_router, readiness, recommendations, reports, share, version
 
 
 def _configure_logging(level: str) -> None:
@@ -69,7 +69,29 @@ def create_app() -> FastAPI:
     app.include_router(military.router)
     app.include_router(platform_router.router)
     app.include_router(recommendations.router)
-    app.include_router(tools.router)
+    # NO CALCULATOR ROUTER, DELIBERATELY (owner decision 2026-10-11).
+    #
+    # `/v1/tools` used to expose a catalog of every deterministic calculator plus
+    # `POST /v1/tools/{name}/run`, which accepted ARBITRARY user-supplied inputs. Both are gone,
+    # along with the `apps/web/src/app/api/tools/run` proxy that fronted them (dead — no UI called
+    # it, but the door was open).
+    #
+    # Three reasons the surface had to close, beyond the owner's instruction:
+    #   1. The engine IS the moat. A public calculator catalog hands away the deterministic layer
+    #      and lets anyone extract the value without the advisor that frames it.
+    #   2. Direct invocation bypasses every guardrail. The number gate, the strict/scenario tiering,
+    #      the disclosure tier and the gap-vs-guess discipline all live in the advisor path; a raw
+    #      `/run` call returns an unhedged, undisclosed figure computed from inputs the user typed
+    #      rather than from their canonical data.
+    #   3. User-supplied inputs are unprovenanced. The whole point of `FinancialInputResolver` is
+    #      that a cited number traces to real data. A hand-typed input produces a confident figure
+    #      about nothing.
+    #
+    # Calculators remain reachable ONLY through the advisor (`advisor_calculations.py`) and through
+    # domain endpoints that compute from CANONICAL data rather than from request bodies — e.g.
+    # `/v1/finance/retirement-projection`, which reads the user's own resolved inputs and returns a
+    # named missing state instead of accepting substitutes. `test_no_route_exposes_arbitrary_
+    # calculator_invocation` keeps it that way.
     app.include_router(life_discovery_router.router)
     app.include_router(life_graph.router)
     app.include_router(finance.router)
