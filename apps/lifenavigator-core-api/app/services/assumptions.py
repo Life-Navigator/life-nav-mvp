@@ -39,6 +39,8 @@ _REGISTRY: dict[str, Assumption] = {a.key: a for a in [
     # working horizon, a 7-year rent-vs-buy horizon, and the 28/36 DTI rule). Each was an invented
     # assumption in exactly the sense this module's docstring forbids — unlabelled, uncitable, and
     # invisible to the user it was applied to.
+    Assumption("emergency_fund_months", 6, "months", "Emergency fund target", "Three to six months of expenses is the standard guidance; six is used as the target because it covers a median job search.", "finance"),
+    Assumption("degree_salary_growth", 0.03, "annual %", "Post-degree salary growth", "Applied to the earnings uplift a degree produces; your own offers override it.", "education"),
     Assumption("default_contribution_rate_pct", 6.0, "% of income", "Assumed retirement contribution rate", "6% is the most common default-enrolment rate and the typical employer-match threshold; your stated rate overrides it.", "retirement"),
     Assumption("retirement_age", 65, "age", "Planning retirement age", "Near full Social Security retirement age for current workers; your stated target overrides this.", "retirement"),
     Assumption("working_years_horizon", 25, "years", "Working-years horizon", "A ~25-year remaining career is the conventional horizon for degree and training payback; your age and stated plans override it.", "career"),

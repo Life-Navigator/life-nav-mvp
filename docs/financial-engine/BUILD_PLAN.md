@@ -20,8 +20,8 @@
 `emergency_fund`, `savings_rate`, `net_worth`, `debt_payoff`, `retirement_projection`, `k401_match`,
 `home_affordability`, `rent_vs_buy`, `offer_comparison`, `degree_roi`
 
-**Assumption registry — `app/services/assumptions.py` (15 entries):** categories `markets`,
-`economy`, `education`, `housing`, `retirement`, `career`, `tax`.
+**Assumption registry — `app/services/assumptions.py` (20 entries after Phase A):** categories
+`markets`, `economy`, `education`, `housing`, `retirement`, `career`, `tax`, `finance`.
 
 ### Three defects to fix before adding anything
 
@@ -65,16 +65,43 @@
 
 Dependency-ordered. Each phase is shippable and independently testable.
 
-### Phase A — Foundations & consolidation
+### Phase A — Foundations & consolidation ✅ **DONE (2026-10-11)**
 
 _No new user capability; everything after this depends on it._
 
-- Shared primitives: `npv`, `irr`, `payback_period`, `real_from_nominal`, `annualize`,
-  `present_value`, `growing_annuity`.
-- Fold `tools.py` into `calculators/` with tiers; delete the duplicates; keep the 10-tool
-  HTTP surface as a thin adapter so nothing breaks.
-- `_f()` → `require_*`.
-- Versioned-data loader + the five drift gates above.
+**Shipped:**
+
+- `calculators/primitives.py` — `npv`, `irr`, `payback_period`, `discounted_payback_period`,
+  `present_value`, `growing_annuity_pv`, `real_from_nominal`, `annualize_monthly`, + registered
+  `CalcResult` wrappers. Three bugs found by independent verification: IRR missed roots strictly
+  inside the search bounds; IRR's rate tolerance left NPV residuals near 1e-5; `require_rate`
+  rejected the negative rates that IRR legitimately produces (added `require_discount_rate`).
+- `calculators/versioned_data.py` — 9 declared families, `STRICT` vs `CARRY_FORWARD` policies, so
+  January degrades loudly instead of breaking, and a prior-year figure is never unlabelled.
+- **`tools.py` is now an adapter.** All arithmetic moved into `calculators/`; the 10 tools compose
+  it and recompose the legacy response shape. HTTP contract, `tools.tool_runs` rows and all five
+  callers unchanged. New modules: `cash`, `housing`, `career`, `education`, plus `debt.payoff_plan`.
+  One tool → several calculators, because per-figure tiering is the point:
+  `cash.months_covered` is STRICT while `cash.emergency_fund_target` is SCENARIO.
+- **Silent zeros gone.** `_f(v, default=0.0)` → `_req`/`_opt`/`_parse`; router returns 422, not the
+  404 it gave for a valid request missing one field.
+- **Eight inline assumptions moved to the registry** (20 entries now): `retirement_age`,
+  `working_years_horizon`, `rent_vs_buy_horizon`, `dti_front_pct`, `dti_back_pct`,
+  `default_contribution_rate_pct`, `emergency_fund_months`, `degree_salary_growth`.
+- **5 drift gates**, incl. an AST gate asserting `tools.py` contains no exponentiation at all.
+
+**Defects found and fixed along the way:**
+
+| Where                                | Defect                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `scenario_compare._financial_inputs` | fabricated 5 inputs into user-visible comparisons: `current_age: 40` hardcoded for every user, so every retirement comparison ran on a stranger's horizon; `tuition_total: 0` + `salary_after: income * 1.4` made the MBA variant pay back instantly on a free degree and an invented 40% raise; `monthly_debts: 0` inflated affordability |
+| `tools.debt_payoff`                  | `total_interest` accumulated after payment, then discarded — the figure that makes the case for paying extra; ran to a 600-month ceiling and reported it as a payoff date for balances that GROW; `method="highest_apr"` silently ran snowball                                                                                             |
+| `tools.degree_roi`                   | `annual_gain * 25 - cost`, undiscounted — overstated a representative degree by **$610,000**                                                                                                                                                                                                                                               |
+| `tools.retirement_projection`        | required income, so a balance-only projection was refused; now the target returns `None` rather than a `$0` nest egg reading as "fully funded"                                                                                                                                                                                             |
+| `financial_resolver`                 | inline `6.0` contribution rate and `65` retirement age                                                                                                                                                                                                                                                                                     |
+| `test_calculators.py`                | `len(C.available()) == 10` — order-dependent, would break on every phase                                                                                                                                                                                                                                                                   |
+
+**1,483 tests pass** (was 1,361 at Phase A start). Commits `f716500a`, `2d422f4e`.
 
 ### Phase B — Tax engine ← **the critical path**
 

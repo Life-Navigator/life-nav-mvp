@@ -162,3 +162,105 @@ def avalanche_order(*, debts: Iterable[dict[str, Any]]) -> CalcResult:
             "total_balance": round(sum(r["balance"] for r in ordered), 2),
         },
     )
+
+
+@register("debt.payoff_plan")
+def payoff_plan(*, debts: Iterable[dict[str, Any]], extra_payment: float = 0.0,
+                method: str = "avalanche") -> CalcResult:
+    """Months to clear a whole set of debts, simulated month by month. STRICT.
+
+    REPLACES `tools.py:debt_payoff`, which had three defects beyond the silent-zero inputs:
+
+    1. **`total_interest` was accumulated and never returned.** It was also accumulated AFTER each
+       month's payment rather than on the opening balance, so even had it been returned it would
+       have been wrong. Total interest is the single most persuasive number in a payoff plan — it is
+       what makes the case for paying extra — and it was computed, mangled, and discarded.
+    2. **No check that the plan converges.** The loop ran to a 600-month ceiling and then reported
+       whatever month it stopped at as "months_to_debt_free", so a set of debts whose minimums do
+       not cover interest returned a confident 600 (50 years) instead of saying the balances grow.
+    3. **Snowball was mislabelled.** `method != "avalanche"` sorted by balance ascending, which IS
+       snowball, but the method string was echoed back unvalidated, so `method="highest_apr"` would
+       silently run snowball.
+
+    Interest accrues on the OPENING balance each month, which is how lenders actually bill, and the
+    simulation is the authority here rather than a closed form — minimum payments plus a rolling
+    extra have no clean closed form.
+    """
+    rows = []
+    for idx, d in enumerate(debts or []):
+        rows.append({
+            "label": str(d.get("label") or d.get("name") or f"debt {idx + 1}"),
+            "balance": require_money(f"debts[{idx}].balance", d.get("balance"), allow_zero=False),
+            "apr": require_rate(f"debts[{idx}].apr", d.get("apr")),
+            "min_payment": require_money(f"debts[{idx}].min_payment", d.get("min_payment")),
+        })
+    if not rows:
+        raise CalculatorError("payoff_plan needs at least one debt")
+    if method not in ("avalanche", "snowball"):
+        raise CalculatorError(f"method must be 'avalanche' or 'snowball', got {method!r}")
+    extra = require_money("extra_payment", extra_payment)
+
+    # avalanche = highest APR first (cheapest total interest); snowball = smallest balance first
+    # (fastest first win). Ties keep input order so the advice does not reshuffle between turns.
+    order = sorted(range(len(rows)),
+                   key=lambda k: (-rows[k]["apr"], k) if method == "avalanche"
+                   else (rows[k]["balance"], k))
+
+    balances = [r["balance"] for r in rows]
+    total_interest_paid = 0.0
+    cleared: dict[str, int] = {}
+    month = 0
+    MAX_MONTHS = 600
+
+    while any(b > 0.005 for b in balances) and month < MAX_MONTHS:
+        month += 1
+        opening = sum(balances)
+        # 1. Accrue on the opening balance, then pay minimums.
+        pool = extra
+        for k, r in enumerate(rows):
+            if balances[k] <= 0:
+                continue
+            interest = balances[k] * nominal_monthly_rate(r["apr"])
+            total_interest_paid += interest
+            balances[k] += interest
+            pay = min(balances[k], r["min_payment"])
+            balances[k] -= pay
+        # 2. Roll the extra — plus freed-up minimums — onto the priority debt.
+        freed = sum(rows[k]["min_payment"] for k in range(len(rows)) if balances[k] <= 0)
+        pool += freed
+        for k in order:
+            if pool <= 0:
+                break
+            if balances[k] > 0:
+                pay = min(balances[k], pool)
+                balances[k] -= pay
+                pool -= pay
+        for k in range(len(rows)):
+            if balances[k] <= 0.005 and rows[k]["label"] not in cleared:
+                cleared[rows[k]["label"]] = month
+        # Convergence check: if a full month of payments did not reduce the total, it never will.
+        if sum(balances) >= opening - 0.005:
+            raise CalculatorError(
+                f"these payments do not reduce the balance — after one month the total went from "
+                f"${opening:,.2f} to ${sum(balances):,.2f}. The minimums do not cover the interest, "
+                f"so the debt grows; say that rather than quoting a payoff date"
+            )
+
+    if any(b > 0.005 for b in balances):
+        raise CalculatorError(
+            f"these debts do not clear within {MAX_MONTHS} months at the given payments"
+        )
+
+    return CalcResult(
+        calculator="debt.payoff_plan", label="months until debt-free",
+        value=float(month), unit="months", tier=STRICT,
+        inputs_used={"debt_count": len(rows), "extra_payment": extra, "method": method,
+                     "total_balance": round(sum(r["balance"] for r in rows), 2)},
+        detail={"method": method, "order": [rows[k]["label"] for k in order],
+                "target": rows[order[0]]["label"],
+                "years_to_debt_free": round(month / 12.0, 1),
+                # The number the old tool computed and threw away.
+                "total_interest_paid": round(total_interest_paid, 2),
+                "cleared_month": cleared,
+                "total_paid": round(sum(r["balance"] for r in rows) + total_interest_paid, 2)},
+    )

@@ -49,37 +49,78 @@ def test_every_declared_family_resolves_or_is_honestly_unshipped():
             assert isinstance(loaded.data, dict) and loaded.data, name
 
 
-# ── Gate 2: no duplicate calculators ──────────────────────────────────────────────────────────────
-# The two registries overlap today: `tools.debt_payoff` vs `calculators.debt.payoff_months`, and
-# `tools.retirement_projection` vs `calculators.retirement.projected_balance`. Phase A records the
-# overlap explicitly rather than pretending it is gone — an undeclared duplicate is what diverges.
-KNOWN_OVERLAPS: dict[str, str] = {
-    "debt_payoff": "debt.payoff_months / debt.avalanche_order",
-    "retirement_projection": "retirement.projected_balance / retirement.balance_needed",
-    "home_affordability": "debt.amortized_payment (inverted)",
-    "degree_roi": "primitives.payback_period (superseded by Phase H/J college_comparison)",
-    "offer_comparison": "superseded by Phase I/J offer_impact",
+# ── Gate 2: tools.py must stay an adapter ─────────────────────────────────────────────────────────
+# Phase A moved every tool's arithmetic into `calculators/` and left `tools.py` as a thin
+# composition layer. These gates keep it that way: the failure mode being prevented is a second
+# engine growing back inside the adapter, which is how two implementations of compound growth come
+# to disagree about the same user's retirement balance.
+
+# Every tool, and the calculators it must delegate to. A tool missing from here is a new tool that
+# nobody decided the delegation for.
+TOOL_DELEGATION: dict[str, set[str]] = {
+    "emergency_fund": {"cash.months_covered", "cash.emergency_fund_gap"},
+    "savings_rate": {"cash.savings_rate"},
+    "net_worth": {"cash.net_worth"},
+    "debt_payoff": {"debt.payoff_plan"},
+    "retirement_projection": {"retirement.projected_balance", "retirement.balance_needed"},
+    "k401_match": {"career.uncaptured_match"},
+    "home_affordability": {"housing.max_home_price"},
+    "rent_vs_buy": {"housing.rent_vs_buy"},
+    "offer_comparison": {"career.offer_total_comp"},
+    "degree_roi": {"education.degree_total_cost", "education.degree_lifetime_value",
+                   "education.degree_payback_years"},
 }
 
 
-def test_calculator_ids_are_unique_within_the_registry():
+def test_every_tool_has_a_declared_delegation():
+    assert set(T.REGISTRY) == set(TOOL_DELEGATION), (
+        f"tools.py and TOOL_DELEGATION disagree: "
+        f"only in tools {sorted(set(T.REGISTRY) - set(TOOL_DELEGATION))}, "
+        f"only declared {sorted(set(TOOL_DELEGATION) - set(T.REGISTRY))}"
+    )
+
+
+def test_every_declared_delegate_exists_in_the_calculator_registry():
+    registered = set(base.available())
+    for tool_name, delegates in TOOL_DELEGATION.items():
+        missing = delegates - registered
+        assert not missing, f"{tool_name} delegates to unregistered {sorted(missing)}"
+
+
+def test_each_tool_actually_calls_its_declared_calculators():
+    """Reads the source, so a tool that silently reimplements the math fails even if its numbers
+    happen to match today."""
+    src = open(T.__file__).read()
+    tree = ast.parse(src)
+    bodies = {n.name: ast.get_source_segment(src, n) or ""
+              for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)}
+    for tool_name, delegates in TOOL_DELEGATION.items():
+        body = bodies.get(tool_name, "")
+        assert body, f"{tool_name} not found in {T.__file__}"
+        for delegate in delegates:
+            module, fn = delegate.split(".", 1)
+            assert f"{module}.{fn}(" in body, f"{tool_name} does not call {delegate}"
+
+
+def test_tools_py_does_no_compound_or_amortization_arithmetic_of_its_own():
+    """The specific shapes that belong in `calculators/`: exponentiation of a rate, and the
+    amortization denominator. Both were present in `tools.py` before Phase A — in
+    `retirement_projection` and `home_affordability` respectively — alongside the calculators that
+    already did the same thing."""
+    tree = ast.parse(open(T.__file__).read())
+    powers = [n for n in ast.walk(tree) if isinstance(n, ast.BinOp) and isinstance(n.op, ast.Pow)]
+    assert not powers, (
+        f"tools.py contains {len(powers)} exponentiation(s) at line(s) "
+        f"{[n.lineno for n in powers]} — compound growth and amortization belong in calculators/"
+    )
+
+
+def test_calculator_ids_are_unique_and_well_formed():
     """`base.register` raises on a duplicate id, so this asserts the registry agrees with itself."""
     ids = base.available()
     assert len(ids) == len(set(ids))
     for cid in ids:
         assert base.get(cid) is not None and cid.count(".") == 1, cid
-
-
-def test_every_tools_py_overlap_is_declared():
-    """FAILS when a NEW tool is added to `tools.py` that duplicates a calculator without being
-    recorded here. Consolidation is Phase A's debt; adding to it silently is the thing to catch."""
-    undeclared = set(T.REGISTRY) - set(KNOWN_OVERLAPS) - {
-        "emergency_fund", "savings_rate", "net_worth", "k401_match", "rent_vs_buy",
-    }
-    assert not undeclared, (
-        f"new tools.py entries not declared in KNOWN_OVERLAPS: {sorted(undeclared)} — either "
-        f"register them in calculators/ or record the overlap"
-    )
 
 
 # ── Gate 3: no inline assumptions ─────────────────────────────────────────────────────────────────

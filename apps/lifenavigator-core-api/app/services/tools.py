@@ -1,12 +1,31 @@
-"""Deterministic Tool Platform (Elite Sprint 38).
+"""Deterministic Tool Platform — now an ADAPTER over `calculators/` (Phase A consolidation).
 
 Every important number comes from a tool here, never an LLM. Each tool is a PURE function: same
 inputs → same outputs, with its assumptions (cited from the registry), a confidence, and stated
 limitations. The ToolRunner persists each run as a first-class, auditable entity. These power
 recommendations, scenarios, the Decision Brain, and reports.
 
-This is a strong REPRESENTATIVE set (finance/home/debt/career/education), not the full 40-tool
-catalog — the architecture + schema make adding the rest mechanical.
+WHAT CHANGED, AND WHY
+---------------------
+This module used to carry its own arithmetic, which meant two engines computed the same quantities
+by different code: `debt_payoff` vs `calculators.debt.payoff_months`, `retirement_projection` vs
+`calculators.retirement.projected_balance`, `home_affordability`'s inverted amortization vs
+`calculators.debt.amortized_payment`. Two implementations of compound growth eventually disagree,
+and the user sees whichever path answered first.
+
+So the math moved into `calculators/`, where it is tiered, registry-sourced and parity-tested, and
+each tool here is a thin composition that recomposes the legacy response shape. The HTTP contract
+(`/v1/tools/{name}/run`), the persisted `tools.tool_runs` rows and every existing caller
+(`financial_resolver`, `scenario_compare`, `report_engine`, two routers) are unchanged.
+
+ONE TOOL → SEVERAL CALCULATORS
+------------------------------
+A tool returns many outputs; a `CalcResult` carries ONE figure and ONE tier. That is not a mismatch
+to paper over — the outputs genuinely differ in kind. In `emergency_fund`, `months_covered` is the
+user's cash over their own expenses (STRICT) while `target` rests on an assumed six months
+(SCENARIO). One tier per tool cannot express that, so the strict figures were hedged as estimates
+and the assumed ones were not hedged at all. Per-figure tiering is what lets
+`advisor_validator` treat each correctly.
 """
 from __future__ import annotations
 
@@ -16,6 +35,7 @@ from typing import Any, Callable, Optional
 
 from ..models.common import UserContext
 from . import assumptions as A
+from .calculators import cash, career, debt, education, housing, retirement
 from .calculators.base import CalculatorError
 
 TOOLS_SCHEMA = "tools"
@@ -89,6 +109,31 @@ def _result(outputs: dict, *, assumptions: list, confidence: float, limitations:
             "limitations": limitations, "calculation": calculation, "deterministic": True}
 
 
+def _cited(*results: Any, extra: Optional[list] = None) -> list[dict[str, Any]]:
+    """Registry assumptions from the composed CalcResults, deduped, in the legacy `A.cite()` shape.
+
+    Deduped by key because a composition touches the same assumption more than once —
+    `rent_vs_buy` pulls `mortgage_rate` through both the payment and the remaining-balance paths —
+    and the same citation listed twice reads as two separate assumptions to anyone auditing it.
+    """
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for res in results:
+        for a in getattr(res, "assumptions", ()):
+            if a.source == "registry" and a.key not in seen:
+                seen.add(a.key)
+                out.append(A.cite(a.key))
+    for item in (extra or []):
+        out.append(item)
+    return out
+
+
+def _tiers(*results: Any) -> dict[str, str]:
+    """Per-figure tier map, carried into `outputs` so a consumer can tell which numbers are the
+    user's own and which are estimates. The legacy shape had no room for this at all."""
+    return {r.calculator.split(".", 1)[1]: r.tier for r in results}
+
+
 REGISTRY: dict[str, dict[str, Any]] = {}
 
 
@@ -102,205 +147,207 @@ def tool(name: str, label: str, suite: str, inputs: list[str]) -> Callable:
 # ── Finance ──────────────────────────────────────────────────────────────────
 @tool("emergency_fund", "Emergency Fund Calculator", "finance", ["monthly_expenses", "current_cash", "target_months"])
 def emergency_fund(i: dict) -> dict:
-    exp = _req("monthly_expenses", i.get("monthly_expenses"), allow_zero=False)
-    cash = _req("current_cash", i.get("current_cash"))
-    months = _opt("target_months", i.get("target_months"), 6)
-    target = round(exp * months, 2)
-    covered = round(cash / exp, 1)
-    status = "green" if covered >= months else "yellow" if covered >= 3 else "red"
-    return _result({"target": target, "current": cash, "gap": round(max(0.0, target - cash), 2),
-                    "months_covered": covered, "status": status},
-                   assumptions=[{"label": "Target months of expenses", "value": months}],
-                   confidence=0.9, limitations=["Uses stated monthly expenses; irregular costs not modeled."],
-                   calculation=f"target = monthly expenses ${exp:,.0f} × {months:.0f} months = ${target:,.0f}")
+    covered = cash.months_covered(
+        monthly_expenses=_req("monthly_expenses", i.get("monthly_expenses"), allow_zero=False),
+        current_cash=_req("current_cash", i.get("current_cash")))
+    gap = cash.emergency_fund_gap(
+        monthly_expenses=covered.inputs_used["monthly_expenses"],
+        current_cash=covered.inputs_used["current_cash"],
+        target_months=_parse("target_months", i.get("target_months")))
+    months = gap.inputs_used["target_months"]
+    status = "green" if covered.value >= months else "yellow" if covered.value >= 3 else "red"
+    return _result({"target": gap.detail["target"], "current": covered.inputs_used["current_cash"],
+                    "gap": gap.value, "months_covered": covered.value, "status": status,
+                    "funded": gap.detail["funded"], "surplus": gap.detail["surplus"],
+                    "tiers": _tiers(covered, gap)},
+                   assumptions=_cited(gap), confidence=0.9,
+                   limitations=["Uses stated monthly expenses; irregular costs not modeled."],
+                   calculation=f"target = monthly expenses ${covered.inputs_used['monthly_expenses']:,.0f} × {months:.0f} months = ${gap.detail['target']:,.0f}")
 
 
 @tool("savings_rate", "Savings Rate Engine", "finance", ["annual_income", "annual_savings"])
 def savings_rate(i: dict) -> dict:
-    inc = _req("annual_income", i.get("annual_income"), allow_zero=False)
-    sav = _req("annual_savings", i.get("annual_savings"))
-    rate = round(sav / inc * 100, 1)
-    status = "green" if rate >= 20 else "yellow" if rate >= 10 else "red"
-    return _result({"savings_rate_pct": rate, "status": status, "target_pct": 20},
-                   assumptions=[{"label": "Healthy savings-rate target", "value": "15-20%"}],
+    r = cash.savings_rate(annual_income=_req("annual_income", i.get("annual_income"), allow_zero=False),
+                          annual_savings=_req("annual_savings", i.get("annual_savings")))
+    pct = r.detail["pct"]
+    status = "green" if pct >= 20 else "yellow" if pct >= 10 else "red"
+    return _result({"savings_rate_pct": pct, "status": status,
+                    "target_pct": r.detail["common_target_pct"], "tiers": _tiers(r)},
+                   assumptions=_cited(r, extra=[{"label": "Healthy savings-rate target", "value": "15-20%"}]),
                    confidence=0.9, limitations=["Pre-tax vs post-tax income not distinguished."],
-                   calculation=f"rate = ${sav:,.0f} ÷ ${inc:,.0f} = {rate}%")
+                   calculation=f"rate = ${r.inputs_used['annual_savings']:,.0f} ÷ ${r.inputs_used['annual_income']:,.0f} = {pct}%")
 
 
 @tool("net_worth", "Net Worth Engine", "finance", ["assets", "liabilities"])
 def net_worth(i: dict) -> dict:
-    a = _req("assets", i.get("assets"))
-    li = _req("liabilities", i.get("liabilities"))
-    return _result({"net_worth": round(a - li, 2), "assets": a, "liabilities": li},
-                   assumptions=[], confidence=0.95,
+    r = cash.net_worth(assets=_req("assets", i.get("assets")),
+                       liabilities=_req("liabilities", i.get("liabilities")))
+    return _result({"net_worth": r.value, "assets": r.inputs_used["assets"],
+                    "liabilities": r.inputs_used["liabilities"],
+                    "negative": r.detail["negative"], "tiers": _tiers(r)},
+                   assumptions=_cited(r), confidence=0.95,
                    limitations=["Only the assets/liabilities you provide are counted."],
-                   calculation=f"net worth = ${a:,.0f} − ${li:,.0f} = ${a - li:,.0f}")
+                   calculation=f"net worth = ${r.inputs_used['assets']:,.0f} − ${r.inputs_used['liabilities']:,.0f} = ${r.value:,.0f}")
 
 
 @tool("debt_payoff", "Debt Payoff Optimizer", "debt", ["debts", "extra_payment", "method"])
 def debt_payoff(i: dict) -> dict:
-    debts = [{"name": d.get("name", "debt"),
-               "balance": _req(f"debts[{k}].balance", d.get("balance"), allow_zero=False),
-               "apr": _req(f"debts[{k}].apr", d.get("apr")),
-               "min_payment": _req(f"debts[{k}].min_payment", d.get("min_payment"))}
-             for k, d in enumerate(i.get("debts") or [])]
-    extra = _opt("extra_payment", i.get("extra_payment"), 0.0)
-    method = i.get("method", "avalanche")
-    if not debts:
+    rows = i.get("debts") or []
+    if not rows:
+        # A real answer about a real (empty) portfolio, not a missing input.
         return _result({"available": False}, assumptions=[], confidence=0.3,
                        limitations=["No debts provided."], calculation="n/a")
-    order = sorted(range(len(debts)), key=lambda k: (-debts[k]["apr"]) if method == "avalanche" else debts[k]["balance"])
-    bal = [d["balance"] for d in debts]
-    total_interest, month = 0.0, 0
-    while sum(bal) > 0.01 and month < 600:
-        month += 1
-        pool = extra
-        for k in range(len(debts)):  # accrue + pay minimums
-            if bal[k] <= 0:
-                continue
-            bal[k] += bal[k] * debts[k]["apr"] / 100 / 12
-            pay = min(bal[k], debts[k]["min_payment"])
-            bal[k] -= pay
-        for k in order:  # apply the extra to the priority debt
-            if bal[k] > 0 and pool > 0:
-                pay = min(bal[k], pool)
-                bal[k] -= pay
-                pool -= pay
-        total_interest += sum(b * debts[k]["apr"] / 100 / 12 for k, b in enumerate(bal) if b > 0)
-    return _result({"method": method, "order": [debts[k]["name"] for k in order], "months_to_debt_free": month,
-                    "years_to_debt_free": round(month / 12, 1)},
-                   assumptions=[{"label": "Method", "value": method}, {"label": "Extra monthly payment", "value": extra}],
+    method = i.get("method") or "avalanche"
+    try:
+        plan = debt.payoff_plan(
+            debts=[{"label": d.get("name") or d.get("label"),
+                    "balance": d.get("balance"),
+                    # The legacy input convention is APR AS A PERCENT (22 for 22%), which the
+                    # calculator rejects under R5. Converted here, in the adapter, so the boundary
+                    # owns the conversion rather than either engine guessing.
+                    "apr": (_req(f"debts[{k}].apr", d.get("apr")) / 100.0),
+                    "min_payment": d.get("min_payment")} for k, d in enumerate(rows)],
+            extra_payment=_opt("extra_payment", i.get("extra_payment"), 0.0),
+            method=method)
+    except CalculatorError as exc:
+        # "Your minimums do not cover the interest" is the single most important thing the advisor
+        # could say here, and the old tool reported a confident 600-month payoff instead.
+        raise ToolInputError(str(exc)) from exc
+    return _result({"method": plan.detail["method"], "order": plan.detail["order"],
+                    "months_to_debt_free": int(plan.value),
+                    "years_to_debt_free": plan.detail["years_to_debt_free"],
+                    "total_interest_paid": plan.detail["total_interest_paid"],
+                    "total_paid": plan.detail["total_paid"],
+                    "cleared_month": plan.detail["cleared_month"],
+                    "target": plan.detail["target"], "tiers": _tiers(plan)},
+                   assumptions=_cited(plan, extra=[{"label": "Method", "value": plan.detail["method"]},
+                                                   {"label": "Extra monthly payment", "value": plan.inputs_used["extra_payment"]}]),
                    confidence=0.85, limitations=["Assumes fixed APRs + payments; promo rates not modeled."],
-                   calculation=f"{method}: order {[debts[k]['name'] for k in order]}, debt-free in {month} months")
+                   calculation=f"{plan.detail['method']}: order {plan.detail['order']}, debt-free in {int(plan.value)} months, ${plan.detail['total_interest_paid']:,.0f} interest")
 
 
 @tool("retirement_projection", "Retirement Projection Engine", "finance", ["current_age", "retirement_age", "current_assets", "annual_contribution", "income"])
 def retirement_projection(i: dict) -> dict:
-    # `current_age` is the user's own data — there is no defensible default for it, so it is
-    # required rather than assumed to be 40.
-    age = _req("current_age", i.get("current_age"), allow_zero=False)
-    retire = _opt("retirement_age", i.get("retirement_age"), A.value("retirement_age"))
+    age = int(_req("current_age", i.get("current_age"), allow_zero=False))
+    retire = int(_opt("retirement_age", i.get("retirement_age"), A.value("retirement_age")))
     assets = _req("current_assets", i.get("current_assets"))
     contrib = _req("annual_contribution", i.get("annual_contribution"))
-    # OPTIONAL, deliberately. This tool answers two different questions: "what will my balance be?"
-    # (needs assets, contributions, horizon) and "how much do I need?" (needs income, to apply the
-    # replacement ratio). The resolver legitimately passes income=None when it has not been
-    # captured. Requiring it would refuse a projection the user CAN have; defaulting it to 0 would
-    # report a $0 nest-egg target and a 'fully funded' readiness ratio. So: project the balance, and
-    # return the target as None with a limitation saying which input would unlock it.
+    # OPTIONAL. This tool answers two questions — "what will my balance be?" and "how much do I
+    # need?" — and only the second needs income. The resolver legitimately has no income; requiring
+    # it would refuse a projection the user CAN have, and defaulting it to 0 reported a $0 nest-egg
+    # target with a 'fully funded' readiness ratio.
     income = _parse("income", i.get("income"))
-    r = A.value("investment_return")
-    repl = A.value("retirement_replacement")
-    wd = A.value("withdrawal_rate")
-    years = max(0, int(retire - age))
-    grown = assets * (1 + r) ** years
-    contrib_fv = contrib * (((1 + r) ** years - 1) / r) if r else contrib * years
-    projected = round(grown + contrib_fv, 0)
-    target = round(income * repl / wd, 0) if income else None
-    gap = round(max(0.0, target - projected), 0) if target else None
-    ratio = round(projected / target, 2) if target else None
+
+    projected = retirement.projected_balance(
+        current_balance=assets, current_age=age, target_age=retire,
+        monthly_contribution=contrib / 12.0)
+
+    needed = None
+    extra_cites: list[dict[str, Any]] = []
+    if not i.get("retirement_age"):
+        extra_cites.append(A.cite("retirement_age"))
+    if income:
+        # The replacement ratio is applied HERE, in the adapter, so it must be cited here — the
+        # composed `balance_needed` only sees the resulting dollar figure and cites the withdrawal
+        # rate. An assumption applied at the boundary is still an assumption (R2).
+        repl = A.value("retirement_replacement")
+        extra_cites.append(A.cite("retirement_replacement"))
+        needed = retirement.balance_needed(desired_annual_income=income * repl)
+
+    target = needed.value if needed else None
+    gap = round(max(0.0, target - projected.value), 0) if target else None
+    ratio = round(projected.value / target, 2) if target else None
     limitations = ["Deterministic compound projection (not a full Monte Carlo); taxes + Social Security excluded here."]
     if target is None:
         limitations.append("Annual income was not provided, so the nest-egg target, funding gap and "
                            "readiness ratio are not computed — ask for income to unlock them.")
-    return _result({"projected_assets": projected, "target_nest_egg": target, "funding_gap": gap,
-                    "readiness_ratio": ratio,
+    results = (projected,) + ((needed,) if needed else ())
+    return _result({"projected_assets": round(projected.value, 0), "target_nest_egg": target,
+                    "funding_gap": gap, "readiness_ratio": ratio,
                     "on_track": (ratio >= 0.9) if ratio is not None else None,
-                    "years_to_retirement": years},
-                   assumptions=[A.cite("investment_return"), A.cite("retirement_replacement"),
-                                A.cite("withdrawal_rate"), A.cite("retirement_age")],
-                   confidence=0.7 if income else 0.55,
-                   limitations=limitations,
-                   calculation=(f"projected = ${assets:,.0f}×(1+{r:.0%})^{years} + contributions FV = ${projected:,.0f}"
-                                + (f"; target = income×{repl:.0%}÷{wd:.0%}" if income else "")))
+                    "years_to_retirement": projected.inputs_used.get("years_to_target", retire - age),
+                    "tiers": _tiers(*results)},
+                   assumptions=_cited(*results, extra=extra_cites),
+                   confidence=0.7 if income else 0.55, limitations=limitations,
+                   calculation=(f"projected = ${assets:,.0f} + contributions, compounded to age {retire} = ${projected.value:,.0f}"
+                                + (f"; target = income × {A.value('retirement_replacement'):.0%} ÷ {A.value('withdrawal_rate'):.0%}" if income else "")))
 
 
 @tool("k401_match", "401(k) Match Calculator", "finance", ["income", "current_rate", "employer_match_rate"])
 def k401_match(i: dict) -> dict:
-    # OPTIONAL, deliberately. This tool answers two different questions: "what will my balance be?"
-    # (needs assets, contributions, horizon) and "how much do I need?" (needs income, to apply the
-    # replacement ratio). The resolver legitimately passes income=None when it has not been
-    # captured. Requiring it would refuse a projection the user CAN have; defaulting it to 0 would
-    # report a $0 nest-egg target and a 'fully funded' readiness ratio. So: project the balance, and
-    # return the target as None with a limitation saying which input would unlock it.
-    income = _parse("income", i.get("income"))
-    cur = _req("current_rate", i.get("current_rate"))
-    match = _req("employer_match_rate", i.get("employer_match_rate"))
-    uncaptured = round(income * max(0.0, match - cur) / 100, 2)
-    return _result({"uncaptured_match_annual": uncaptured, "recommended_rate_pct": max(cur, match),
-                    "full_match_annual": round(income * match / 100, 2), "capturing_full_match": cur >= match},
-                   assumptions=[], confidence=0.9,
-                   limitations=["Assumes a simple % match up to the stated cap."],
-                   calculation=f"uncaptured = ${income:,.0f} × ({match:.0f}% − {cur:.0f}%) = ${uncaptured:,.0f}/yr")
+    r = career.uncaptured_match(
+        income=_req("income", i.get("income"), allow_zero=False),
+        current_rate=_req("current_rate", i.get("current_rate")),
+        employer_match_rate=_req("employer_match_rate", i.get("employer_match_rate")))
+    return _result({"uncaptured_match_annual": r.value,
+                    "recommended_rate_pct": r.detail["recommended_rate_pct"],
+                    "full_match_annual": r.detail["full_match_annual"],
+                    "capturing_full_match": r.detail["capturing_full_match"],
+                    "tiers": _tiers(r)},
+                   assumptions=_cited(r), confidence=0.9,
+                   limitations=["Assumes a simple % match up to the stated cap.",
+                                "Tiered match formulas, vesting and true-up are Phase I."],
+                   calculation=f"uncaptured = ${r.inputs_used['income']:,.0f} × ({r.inputs_used['employer_match_rate_pct']:.0f}% − {r.inputs_used['current_rate_pct']:.0f}%) = ${r.value:,.0f}/yr")
 
 
 # ── Home ─────────────────────────────────────────────────────────────────────
 @tool("home_affordability", "Home Affordability Engine", "home", ["annual_income", "monthly_debts", "down_payment", "rate", "term_years"])
 def home_affordability(i: dict) -> dict:
-    income = _req("annual_income", i.get("annual_income"), allow_zero=False)
-    debts = _req("monthly_debts", i.get("monthly_debts"))
-    down = _req("down_payment", i.get("down_payment"))
-    rate = _opt("rate", i.get("rate"), A.value("mortgage_rate") * 100) / 100
-    term = _opt("term_years", i.get("term_years"), A.value("mortgage_term_months") / 12)
-    monthly = income / 12
-    front = monthly * A.value("dti_front_pct")          # housing ≤ front-end DTI
-    back = monthly * A.value("dti_back_pct") - debts    # total debt ≤ back-end DTI
-    max_payment = max(0.0, min(front, back))
-    n = term * 12
-    mr = rate / 12
-    loan = (max_payment * (1 - (1 + mr) ** -n) / mr) if mr else max_payment * n
-    price = round(loan + down, 0)
-    return _result({"max_home_price": price, "max_loan": round(loan, 0), "max_monthly_payment": round(max_payment, 0),
-                    "down_payment": down},
-                   assumptions=[A.cite("mortgage_rate"), A.cite("mortgage_term_months"),
-                                A.cite("dti_front_pct"), A.cite("dti_back_pct")],
-                   confidence=0.8,
-                   limitations=["Excludes property tax, insurance, HOA, PMI — payment is principal+interest only."],
-                   calculation=f"max P&I = min(28% gross, 36%−debts) = ${max_payment:,.0f}/mo → loan ${loan:,.0f} + down ${down:,.0f}")
+    rate = _parse("rate", i.get("rate"))
+    term_years = _parse("term_years", i.get("term_years"))
+    r = housing.max_home_price(
+        annual_income=_req("annual_income", i.get("annual_income"), allow_zero=False),
+        monthly_debts=_req("monthly_debts", i.get("monthly_debts")),
+        down_payment=_req("down_payment", i.get("down_payment")),
+        # Legacy input convention: `rate` is a PERCENT here. Converted at the boundary.
+        apr=(rate / 100.0) if rate is not None else None,
+        term_months=int(term_years * 12) if term_years is not None else None)
+    return _result({"max_home_price": round(r.value, 0), "max_loan": round(r.detail["max_loan"], 0),
+                    "max_monthly_payment": round(r.detail["max_monthly_payment"], 0),
+                    "down_payment": r.inputs_used["down_payment"],
+                    "binding_constraint": r.detail["binding_constraint"],
+                    "tiers": _tiers(r)},
+                   assumptions=_cited(r), confidence=0.8,
+                   limitations=["Excludes property tax, insurance, HOA, PMI — payment is principal+interest only.",
+                                f"The ceiling is set by your {r.detail['binding_constraint'].replace('_', ' ')}."],
+                   calculation=f"max P&I = min(front-end, back-end DTI) = ${r.detail['max_monthly_payment']:,.0f}/mo → loan ${r.detail['max_loan']:,.0f} + down ${r.inputs_used['down_payment']:,.0f}")
 
 
 @tool("rent_vs_buy", "Rent vs Buy Comparison", "home", ["home_price", "monthly_rent", "down_payment", "rate", "years"])
 def rent_vs_buy(i: dict) -> dict:
-    price = _req("home_price", i.get("home_price"), allow_zero=False)
-    rent = _req("monthly_rent", i.get("monthly_rent"), allow_zero=False)
-    down = _opt("down_payment", i.get("down_payment"), price * A.value("down_payment_pct"))
-    rate = _opt("rate", i.get("rate"), A.value("mortgage_rate") * 100) / 100
-    years = int(_opt("years", i.get("years"), A.value("rent_vs_buy_horizon")))
-    appr = A.value("home_appreciation")
-    rent_growth = A.value("inflation")
-    n, mr = 30 * 12, rate / 12
-    loan = price - down
-    pmt = (loan * mr / (1 - (1 + mr) ** -n)) if mr else loan / n
-    buy_cost = down + pmt * 12 * years              # simplified: down + payments over horizon
-    equity = price * (1 + appr) ** years - (loan)   # rough home value gain minus original loan
-    net_buy = round(buy_cost - max(0.0, equity - down), 0)
-    rent_cost = round(sum(rent * 12 * (1 + rent_growth) ** y for y in range(years)), 0)
-    return _result({"net_buy_cost": net_buy, "total_rent_cost": rent_cost,
-                    "favors": "buy" if net_buy < rent_cost else "rent", "horizon_years": years},
-                   assumptions=[A.cite("mortgage_rate"), A.cite("home_appreciation"),
-                                A.cite("down_payment_pct"), A.cite("rent_vs_buy_horizon"),
-                                A.cite("inflation")],
-                   confidence=0.65,
+    rate = _parse("rate", i.get("rate"))
+    down = _parse("down_payment", i.get("down_payment"))
+    years = _parse("years", i.get("years"))
+    r = housing.rent_vs_buy(
+        home_price=_req("home_price", i.get("home_price"), allow_zero=False),
+        monthly_rent=_req("monthly_rent", i.get("monthly_rent"), allow_zero=False),
+        years=int(years) if years is not None else None,
+        down_payment=down,
+        apr=(rate / 100.0) if rate is not None else None)
+    return _result({"net_buy_cost": round(r.detail["net_buy_cost"], 0),
+                    "total_rent_cost": round(r.detail["total_rent_cost"], 0),
+                    "favors": r.detail["favors"], "horizon_years": r.inputs_used["years"],
+                    "difference": round(r.value, 0),
+                    "equity_recovered": round(r.detail["equity_recovered"], 0),
+                    "monthly_payment": round(r.detail["monthly_payment"], 0),
+                    "tiers": _tiers(r)},
+                   assumptions=_cited(r), confidence=0.65,
                    limitations=["Simplified: excludes tax deductions, maintenance, closing costs, opportunity cost of the down payment."],
-                   calculation=f"buy (net of equity) ${net_buy:,.0f} vs rent ${rent_cost:,.0f} over {years}y")
+                   calculation=f"buy (net of equity) ${r.detail['net_buy_cost']:,.0f} vs rent ${r.detail['total_rent_cost']:,.0f} over {r.inputs_used['years']}y")
 
 
 # ── Career ───────────────────────────────────────────────────────────────────
 @tool("offer_comparison", "Job Offer Comparison Tool", "career", ["offers"])
 def offer_comparison(i: dict) -> dict:
     offers = i.get("offers") or []
-    rows = []
-    for o in offers:
-        base = _req("offers[].base", o.get("base"), allow_zero=False)
-        bonus = _opt("offers[].bonus", o.get("bonus"), 0.0)
-        equity = _opt("offers[].equity_per_year", o.get("equity_per_year"), 0.0)
-        benefits = _opt("offers[].benefits_value", o.get("benefits_value"), 0.0)
-        total = round(base + bonus + equity + benefits, 0)
-        rows.append({"name": o.get("name", "offer"), "base": base, "total_comp": total})
-    rows.sort(key=lambda r: r["total_comp"], reverse=True)
-    return _result({"ranked": rows, "best": rows[0]["name"] if rows else None},
-                   assumptions=[{"label": "Equity valued at stated annual amount", "value": "as provided"}],
-                   confidence=0.85 if rows else 0.3,
+    if not offers:
+        return _result({"ranked": [], "best": None}, assumptions=[], confidence=0.3,
+                       limitations=["No offers provided."], calculation="n/a")
+    r = career.offer_total_comp(offers=offers)
+    return _result({"ranked": r.detail["ranked"], "best": r.detail["best"],
+                    "spread": r.value, "tiers": _tiers(r)},
+                   assumptions=_cited(r, extra=[{"label": "Equity valued at stated annual amount", "value": "as provided"}]),
+                   confidence=0.85,
                    limitations=["Equity valuation + COL differences are as provided; not risk-adjusted.",
                                 "Compares gross comp only — no tax, COL or benefit modelling. "
                                 "Phase I/J `offer_impact` supersedes this."],
@@ -314,19 +361,34 @@ def degree_roi(i: dict) -> dict:
     yrs = _req("years_in_school", i.get("years_in_school"), allow_zero=False)
     before = _req("salary_before", i.get("salary_before"))
     after = _req("salary_after", i.get("salary_after"), allow_zero=False)
-    lost_wages = before * yrs
-    cost = round(tuition + lost_wages, 0)
-    annual_gain = after - before
-    payback = round(cost / annual_gain, 1) if annual_gain > 0 else None
-    horizon = int(A.value("working_years_horizon"))
-    lifetime = round(annual_gain * horizon - cost, 0)
-    return _result({"total_cost": cost, "lost_wages": round(lost_wages, 0), "annual_salary_gain": round(annual_gain, 0),
-                    "payback_years": payback, "lifetime_net_gain": lifetime, "horizon_years": horizon, "worth_it": bool(payback and payback < 10)},
-                   assumptions=[A.cite("tuition_inflation"), A.cite("working_years_horizon")],
-                   confidence=0.7,
-                   limitations=["Salary gain is the stated estimate; not discounted to present value "
-                                "— Phase H/J `college_comparison` replaces this with NPV and IRR."],
-                   calculation=f"cost = tuition ${tuition:,.0f} + lost wages ${lost_wages:,.0f}; payback = cost ÷ ${annual_gain:,.0f}/yr")
+
+    cost = education.degree_total_cost(tuition_total=tuition, years_in_school=yrs,
+                                       salary_before=before)
+    pv = education.degree_lifetime_value(tuition_total=tuition, years_in_school=yrs,
+                                         salary_before=before, salary_after=after)
+    try:
+        payback = education.degree_payback_years(tuition_total=tuition, years_in_school=yrs,
+                                                 salary_before=before, salary_after=after)
+        payback_years: Optional[float] = payback.value
+        results = (cost, payback, pv)
+    except CalculatorError:
+        # No uplift ⇒ no payback period. None, not a sentinel: the old tool returned None here too,
+        # and callers already treat it as "does not pay back".
+        payback_years, results = None, (cost, pv)
+    return _result({"total_cost": round(cost.value, 0),
+                    "lost_wages": round(cost.detail["foregone_earnings"], 0),
+                    "annual_salary_gain": round(pv.detail["annual_uplift"], 0),
+                    "payback_years": payback_years,
+                    "lifetime_net_gain": round(pv.detail["undiscounted_net_gain"], 0),
+                    "present_value": round(pv.value, 0),
+                    "horizon_years": pv.inputs_used["horizon_years"],
+                    "worth_it": pv.detail["worth_it"], "tiers": _tiers(*results)},
+                   assumptions=_cited(*results), confidence=0.7,
+                   limitations=["`present_value` discounts the uplift stream; `lifetime_net_gain` does not "
+                                "— the gap between them is the cost of discounting.",
+                                "Salary gain is the stated estimate. Phase H/J `college_comparison` adds "
+                                "aid, 529 drawdown, loan burden and completion risk."],
+                   calculation=f"cost = tuition ${tuition:,.0f} + lost wages ${cost.detail['foregone_earnings']:,.0f}; PV of uplift over {pv.inputs_used['horizon_years']}y = ${pv.value:,.0f}")
 
 
 class ToolRunner:
