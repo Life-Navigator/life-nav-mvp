@@ -356,6 +356,136 @@ def standard_vs_itemized(*, filing_status: str, itemized_deductions: float,
     )
 
 
+
+
+# ── State table structural validation ─────────────────────────────────────────────────────────────
+# WHY THIS EXISTS, WHEN THE DATA IS UNVERIFIED ANYWAY
+# ---------------------------------------------------
+# Verification answers "is 4.95% the right rate for Illinois?" — a question only a primary source
+# can settle. Validation answers "is this schedule even well-formed?" — and that question is
+# answerable here, exhaustively, and it is where the errors actually happen. Transcribing 29 states
+# x 4 filing statuses x up to 9 brackets by hand is thousands of numbers; a threshold typed out of
+# order, a rate entered as 4.95 instead of 0.0495, a missing top bracket or a filing status left out
+# are all silent in a rate table and loud here.
+#
+# A malformed schedule does not merely error — it quietly computes the WRONG tax. A descending
+# threshold truncates the bracket walk early and undercharges; a rate entered as a percent charges
+# 100x. So `state_income_tax` validates the specific state it is about to use on every call, and a
+# drift gate validates all of them.
+
+_MAX_PLAUSIBLE_STATE_RATE = 0.20   # no US state income tax rate approaches this
+
+
+def _validate_schedule(where: str, brackets: Any) -> list[str]:
+    problems: list[str] = []
+    if not isinstance(brackets, list) or not brackets:
+        return [f"{where}: schedule must be a non-empty list"]
+
+    prev_top: Optional[float] = None
+    prev_rate: Optional[float] = None
+    for idx, b in enumerate(brackets):
+        if not isinstance(b, dict) or "rate" not in b or "upto" not in b:
+            problems.append(f"{where}[{idx}]: each bracket needs 'rate' and 'upto'")
+            continue
+        try:
+            rate = float(b["rate"])
+        except (TypeError, ValueError):
+            problems.append(f"{where}[{idx}]: rate {b['rate']!r} is not a number")
+            continue
+
+        if rate < 0:
+            problems.append(f"{where}[{idx}]: negative rate {rate}")
+        elif rate > _MAX_PLAUSIBLE_STATE_RATE:
+            # The classic transcription error: 4.95 meaning 4.95%, which would charge 495%.
+            problems.append(
+                f"{where}[{idx}]: rate {rate} exceeds {_MAX_PLAUSIBLE_STATE_RATE} — looks like a "
+                f"percent, not a decimal fraction (pass {rate / 100:g} for {rate:g}%)")
+        if prev_rate is not None and rate < prev_rate:
+            # A progressive schedule never steps down. This one is worth catching because the
+            # bracket walk would still "work" and simply charge the wrong amount.
+            problems.append(
+                f"{where}[{idx}]: rate {rate} is BELOW the previous bracket's {prev_rate} — a "
+                f"progressive schedule never steps down")
+        prev_rate = rate
+
+        upto = b["upto"]
+        is_last = idx == len(brackets) - 1
+        if upto is None:
+            if not is_last:
+                problems.append(f"{where}[{idx}]: only the LAST bracket may have upto: null")
+        else:
+            try:
+                top = float(upto)
+            except (TypeError, ValueError):
+                problems.append(f"{where}[{idx}]: upto {upto!r} is not a number")
+                continue
+            if top <= 0:
+                problems.append(f"{where}[{idx}]: upto must be positive, got {top}")
+            if prev_top is not None and top <= prev_top:
+                # Descending or duplicate thresholds truncate the walk early and UNDERCHARGE.
+                problems.append(
+                    f"{where}[{idx}]: upto {top} is not above the previous {prev_top} — "
+                    f"thresholds must strictly ascend or the bracket walk stops early")
+            prev_top = top
+            if is_last:
+                problems.append(
+                    f"{where}[{idx}]: the last bracket must have upto: null (an open top bracket), "
+                    f"got {top} — income above it would be untaxed")
+    return problems
+
+
+def validate_state_table(data: dict[str, Any], *, state: Optional[str] = None) -> list[str]:
+    """Structural problems in a state tax table. Empty list means well-formed.
+
+    `state` limits the check to one state, which is what the calculator uses per call.
+    """
+    problems: list[str] = []
+    no_tax = set((data.get("no_income_tax") or {}).get("states") or [])
+    flat = data.get("flat") or {}
+    bracketed = data.get("bracketed") or {}
+
+    # A state in two sections is a contradiction, and which one wins would be arbitrary.
+    for a_name, a, b_name, b in (("no_income_tax", no_tax, "flat", set(flat)),
+                                 ("no_income_tax", no_tax, "bracketed", set(bracketed)),
+                                 ("flat", set(flat), "bracketed", set(bracketed))):
+        both = a & b
+        if both and (state is None or state in both):
+            problems.append(
+                f"{sorted(both)} appear in BOTH {a_name} and {b_name} — a state cannot be two "
+                f"regimes at once")
+
+    for code, entry in sorted(flat.items()):
+        if state is not None and code != state:
+            continue
+        if "verified" not in entry:
+            problems.append(f"flat.{code}: missing a 'verified' flag")
+        try:
+            rate = float(entry.get("rate"))
+        except (TypeError, ValueError):
+            problems.append(f"flat.{code}: rate {entry.get('rate')!r} is not a number")
+            continue
+        if rate < 0 or rate > _MAX_PLAUSIBLE_STATE_RATE:
+            problems.append(
+                f"flat.{code}: rate {rate} is outside 0-{_MAX_PLAUSIBLE_STATE_RATE} — likely a "
+                f"percent rather than a decimal fraction")
+
+    for code, entry in sorted(bracketed.items()):
+        if state is not None and code != state:
+            continue
+        if "verified" not in entry:
+            problems.append(f"bracketed.{code}: missing a 'verified' flag")
+        schedules = entry.get("brackets") or {}
+        missing = [s for s in FILING_STATUSES if s not in schedules]
+        if missing:
+            problems.append(
+                f"bracketed.{code}: missing schedules for {missing} — a filer with that status "
+                f"would get a KeyError mid-request")
+        for status in FILING_STATUSES:
+            if status in schedules:
+                problems.extend(_validate_schedule(f"bracketed.{code}.{status}", schedules[status]))
+    return problems
+
+
 # ── State income tax ──────────────────────────────────────────────────────────────────────────────
 class UnmodelledStateError(CalculatorError):
     """This state's tax law is not in the table.
@@ -391,6 +521,15 @@ def state_income_tax(*, taxable_income: float, state: str, filing_status: str = 
     t = V.load("state_tax", tax_year, require_verified=True)
     data = t.data
     carried = _carry_forward_note(t)
+
+    # Validate the ONE state about to be used, on every call. A malformed schedule does not error
+    # on its own — it quietly computes the wrong tax — so this must gate the figure, not just CI.
+    structural = validate_state_table(data, state=code)
+    if structural:
+        raise CalculatorError(
+            f"{code}'s {t.year_used} schedule is malformed and would compute the wrong tax: "
+            + "; ".join(structural[:4])
+        )
 
     no_tax = data.get("no_income_tax") or {}
     if code in (no_tax.get("states") or []):

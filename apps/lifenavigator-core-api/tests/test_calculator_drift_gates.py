@@ -324,3 +324,22 @@ def test_unverified_tables_cannot_produce_a_user_facing_figure():
     for family in PENDING_VERIFICATION:
         with pytest.raises(V.UnverifiedDataError):
             V.load(family, require_verified=True)
+
+
+# ── Gate 7: state tax schedules must be structurally sound ────────────────────────────────────────
+def test_every_shipped_state_tax_schedule_is_well_formed():
+    """FAILS on a malformed state schedule, which is the error class that actually occurs.
+
+    Verification ("is 4.95% right for Illinois?") needs a primary source. Validation ("is this
+    schedule even well-formed?") is answerable here, and it is where hand-transcription goes wrong:
+    29 states x 4 filing statuses x up to 9 brackets is thousands of numbers.
+
+    This gate matters most at the moment the data becomes TRUSTED. A descending threshold truncates
+    the bracket walk and silently undercharges; a rate typed as `4.95` charges 495%; a closed top
+    bracket leaves high income untaxed. None of those error on their own — they just compute the
+    wrong tax.
+    """
+    from app.services.calculators import tax as _tax
+    for year in V.available_years("state_tax"):
+        problems = _tax.validate_state_table(V.load("state_tax", year).data)
+        assert problems == [], f"state_tax/{year}.json:\n" + "\n".join(problems)

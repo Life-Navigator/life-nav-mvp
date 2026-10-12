@@ -385,20 +385,34 @@ def test_an_unverified_state_rate_is_refused_not_quoted():
 
 
 def test_an_unmodelled_state_raises_and_never_returns_zero():
-    """THE REQUIREMENT. Treating California as zero would understate a Californian's total tax by
-    five figures while looking like a complete answer."""
-    for code in ("CA", "NY", "NJ", "MA", "OR", "MN"):
+    """THE REQUIREMENT. Treating a state as zero would understate its residents' total tax by
+    five figures while looking like a complete answer.
+
+    These codes are states still outside the modelled set. The 10 bracketed states added later
+    (CA, NY, NJ, MA, VA, MD, OH, WI, MN, OR) now raise UnverifiedDataError instead — a different
+    and more advanced failure: the schedule is present but nobody has checked it.
+    """
+    for code in ("NM", "ID", "IA", "SC", "AL", "MS", "AR", "CT", "RI", "DE"):
         with pytest.raises(T.UnmodelledStateError, match="is not modelled"):
             T.state_income_tax(taxable_income=135400, state=code, tax_year=Y)
 
 
+def test_a_modelled_but_unverified_state_raises_a_different_error_than_an_unmodelled_one():
+    """The distinction is what the advisor should SAY. 'I don't model New Mexico' and 'California's
+    schedule is loaded but unverified' are different sentences and different remedies."""
+    with pytest.raises(V.UnverifiedDataError):
+        T.state_income_tax(taxable_income=135400, state="CA", tax_year=Y)
+    with pytest.raises(T.UnmodelledStateError):
+        T.state_income_tax(taxable_income=135400, state="NM", tax_year=Y)
+
+
 def test_the_unmodelled_error_tells_the_advisor_what_to_say():
     try:
-        T.state_income_tax(taxable_income=135400, state="CA", tax_year=Y)
+        T.state_income_tax(taxable_income=135400, state="NM", tax_year=Y)
     except T.UnmodelledStateError as exc:
         msg = str(exc)
         assert "Report the federal figure" in msg
-        assert "do NOT treat CA as having no income tax" in msg
+        assert "do NOT treat NM as having no income tax" in msg
         assert "TX" in msg          # lists what IS modelled
     else:
         pytest.fail("expected UnmodelledStateError")

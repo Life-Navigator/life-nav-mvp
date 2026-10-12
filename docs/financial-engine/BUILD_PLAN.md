@@ -103,22 +103,83 @@ _No new user capability; everything after this depends on it._
 
 **1,483 tests pass** (was 1,361 at Phase A start). Commits `f716500a`, `2d422f4e`.
 
-### Phase B — Tax engine ← **the critical path**
+### Phase B — Tax engine ← **the critical path** · **ENGINE DONE (2026-10-11), DATA PENDING VERIFICATION**
 
 _Blocks retirement, equity comp, 529, HSA, and both composites._
 
-- `tax_tables/2026.json`: federal brackets × filing status, standard deduction, FICA wage bases,
-  capital-gains thresholds, NIIT, AMT exemption, QBI thresholds.
-- `federal_income_tax` — marginal + effective from brackets.
-- `fica` — Social Security (with wage base) + Medicare + additional Medicare.
-- `state_income_tax` — table-driven; flat, bracketed, and no-tax states. Start with the top ~12
-  states by user count, fail loudly on an unmodelled state rather than assuming zero.
-- `capital_gains_tax` — short vs long term, 0/15/20 + NIIT.
-- `standard_vs_itemized`.
-- `effective_marginal_rate` — the one retirement/Roth/equity decisions actually need (includes
-  phase-outs, not just the bracket).
-- `tax_credits` — CTC, EITC, AOTC/LLC, saver's credit.
-- Port `tax.ts` to call this tier, so there is one engine and the web no longer owns tax math.
+**Shipped (7 calculators):** `federal_income_tax`, `fica`, `capital_gains_tax`,
+`effective_marginal_rate`, `standard_vs_itemized`, `state_income_tax`, plus `validate_state_table`.
+
+**Why the marginal rate is MEASURED, not looked up.** The statutory bracket is not what the next
+dollar costs. At $150k single it is 24% but the true combined rate is 31.65%; at $400k the bracket is
+_higher_ (35%) while the FICA component has fallen from 7.65% to 2.35% because Social Security
+stopped. `effective_marginal_rate` re-runs the whole return with a $1,000 increment and divides.
+This is the figure `assumptions.py:marginal_tax_rate` has been standing in for.
+
+**FICA is regressive, and that is the point.** $400k single, 2024: `168,600 × 6.2%` capped +
+`400,000 × 1.45%` + `200,000 × 0.9%` = $18,053.20 — a 4.51% effective rate against 7.65% at $150k.
+The flat-7.65% shortcut charges $30,600, overstating by $12,547.
+
+**Capital gains stack.** LT gains are measured against ordinary taxable income PLUS the gain, so an
+identical $50k gain attracts ~0% or 23.8% depending on the rest of the return. Computing it against
+the gain alone errs in the user's favour — the worse direction.
+
+#### The data is gated; the engine is not
+
+2026 figures could not be verified (they post-date the OBBBA changes of July 2025), so
+`tax_tables/2026.json` ships `_meta.verified: false` listing which fields are high- and
+low-confidence. **Every calculator loads with `require_verified=True`**, so an unverified table
+cannot produce a user-facing figure. Engine correctness is proven against **2024** — historically
+fixed and cross-checked against what `tax.ts` shipped — so a data gap can never look like an engine
+bug, nor the reverse.
+
+#### State coverage: 29 states, per-state verification
+
+| Regime        | Count | States                        | Status                        |
+| ------------- | ----- | ----------------------------- | ----------------------------- |
+| No income tax | 9     | AK FL NV NH SD TN TX WA WY    | **verified, usable**          |
+| Flat          | 10    | AZ CO GA IL IN KY MI NC PA UT | unverified → refuses to quote |
+| Bracketed     | 10    | CA NY NJ MA VA MD OH WI MN OR | unverified → refuses to quote |
+| Absent        | rest  | NM ID IA SC AL MS CT RI DE …  | `UnmodelledStateError`        |
+
+Per-state flags because the confidence genuinely differs: "Texas has no income tax" is statutory and
+stable; "Illinois is 4.95%" is a number a legislature changes.
+
+Documented in-table rather than silently omitted: **NYC's ~3.1–3.9% local tax**, **every Maryland
+county's 2.25–3.20%**, Ohio municipal taxes, CA's 1% Mental Health Services surtax above $1M, and
+MA's 4% millionaire surtax (which IS modelled, as 5% → 9%). **NJ and MD publish separate joint
+schedules rather than doubling the single one** — their `married_jointly` entries are copies and are
+flagged `WRONG, replace before verifying`, because assuming every state doubles is a real and common
+error.
+
+#### `validate_state_table` — structure, which is a different question from correctness
+
+Verification asks "is 4.95% right for Illinois?" — only a primary source settles that. Validation
+asks "is this schedule well-formed?" — answerable exhaustively, and it is where hand-transcription
+actually fails: 29 states × 4 statuses × up to 9 brackets is thousands of numbers. Catches a rate
+typed as `4.95` instead of `0.0495` (would charge 495%), descending or duplicate thresholds (truncate
+the bracket walk and **silently undercharge**), a regressive rate step, a closed top bracket (leaves
+high income untaxed), an `upto: null` that is not last, a missing filing status, a state declared in
+two regimes, and a missing `verified` flag. None of these error on their own — they just compute the
+wrong tax, so `state_income_tax` validates the state it is about to use **on every call**, not only
+in CI.
+
+**Gates:** Gate 6 (verified, not merely present) and Gate 7 (state schedules well-formed). Both data
+gates assert an exact match against a declared `PENDING` list — a gate that fails permanently gets
+disabled, so anything _new_ fails immediately while each known gap is recorded with what it needs.
+
+**1,578 tests pass.** Commit `33460715` + state tables.
+
+#### Still open in Phase B
+
+1. **Verify `tax_tables/2026.json`** against the IRS Rev. Proc. for TY2026 + the SSA wage base. This
+   gates every 2026 figure. **Owner task.**
+2. **Verify the 20 rate-bearing states**, and replace NJ's and MD's copied joint schedules.
+   **Owner task.** `validate_state_table` will catch transcription errors.
+3. `tax_credits` — CTC, EITC, AOTC/LLC, saver's credit. Not built; phase-out ranges are where
+   model knowledge is least reliable, so this needs sourced data before code.
+4. **Port `tax.ts` onto this tier.** Not mechanical — the web tier would call core-api over HTTP,
+   making the browser-side tax page server-dependent. An architecture decision, not a move.
 
 ### Phase C — Cash flow & paycheck
 

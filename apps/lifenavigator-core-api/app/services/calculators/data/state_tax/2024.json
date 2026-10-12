@@ -2,11 +2,12 @@
   "_meta": {
     "tax_year": 2024,
     "verified": true,
-    "verified_by": "Only the no_income_tax list is verified here — it is statutory, not inflation-indexed, and stable across years. Rate data for individual states carries its OWN per-state `verified` flag and is unverified until an owner checks it.",
+    "verified_by": "Only the no_income_tax list is verified here \u2014 it is statutory, not inflation-indexed, and stable across years. Rate data for individual states carries its OWN per-state `verified` flag and is unverified until an owner checks it.",
     "verified_on": "2026-10-11",
     "source": "no_income_tax list: state constitutions/statutes. Per-state rates: UNVERIFIED, see each state's `verified` field.",
     "purpose": "PER-STATE verification, because the confidence genuinely differs. 'Texas has no income tax' is a fact that does not move; 'Illinois is 4.95%' is a number that changes by legislature. A single file-level flag would force both to the lower confidence and make the engine useless, or both to the higher and make it dishonest.",
-    "policy": "A state absent from every section raises UNMODELLED_STATE. It is NEVER treated as zero — a silent zero would understate a Californian's total tax by five figures and look like a complete answer."
+    "policy": "A state absent from every section raises UNMODELLED_STATE. It is NEVER treated as zero \u2014 a silent zero would understate a Californian's total tax by five figures and look like a complete answer.",
+    "bracketed_added": "2026-10-11: 10 bracketed states + GA/AZ as flat. ALL unverified."
   },
   "no_income_tax": {
     "verified": true,
@@ -18,23 +19,1069 @@
     }
   },
   "flat": {
-    "IL": { "rate": 0.0495, "verified": false, "note": "verify against IL DOR for the tax year" },
-    "IN": { "rate": 0.0305, "verified": false, "note": "verify; county add-ons are NOT modelled" },
+    "IL": {
+      "rate": 0.0495,
+      "verified": false,
+      "note": "verify against IL DOR for the tax year"
+    },
+    "IN": {
+      "rate": 0.0305,
+      "verified": false,
+      "note": "verify; county add-ons are NOT modelled"
+    },
     "MI": {
       "rate": 0.0425,
       "verified": false,
       "note": "verify; city taxes (e.g. Detroit) NOT modelled"
     },
-    "NC": { "rate": 0.045, "verified": false, "note": "verify against NC DOR for the tax year" },
-    "PA": { "rate": 0.0307, "verified": false, "note": "verify; local EIT is NOT modelled" },
-    "CO": { "rate": 0.044, "verified": false, "note": "verify against CO DOR for the tax year" },
-    "UT": { "rate": 0.0465, "verified": false, "note": "verify against UT STC for the tax year" },
+    "NC": {
+      "rate": 0.045,
+      "verified": false,
+      "note": "verify against NC DOR for the tax year"
+    },
+    "PA": {
+      "rate": 0.0307,
+      "verified": false,
+      "note": "verify; local EIT is NOT modelled"
+    },
+    "CO": {
+      "rate": 0.044,
+      "verified": false,
+      "note": "verify against CO DOR for the tax year"
+    },
+    "UT": {
+      "rate": 0.0465,
+      "verified": false,
+      "note": "verify against UT STC for the tax year"
+    },
     "KY": {
       "rate": 0.04,
       "verified": false,
       "note": "verify; rate is on a statutory reduction schedule"
+    },
+    "GA": {
+      "rate": 0.0549,
+      "verified": false,
+      "note": "GA moved to a flat rate; verify the exact rate for the tax year"
+    },
+    "AZ": {
+      "rate": 0.025,
+      "verified": false,
+      "note": "verify against AZ DOR for the tax year"
     }
   },
-  "bracketed": {},
-  "not_modelled_note": "CA, NY, NJ, MA, VA, MD, GA, OH, AZ, WI, MN, OR and the rest are deliberately absent rather than guessed. The build plan commits to the top ~12 states by user count; they go in `bracketed` with per-status schedules, each individually verified."
+  "bracketed": {
+    "CA": {
+      "verified": false,
+      "note": "Thresholds populated from model knowledge; verify against the state revenue department for the tax year.",
+      "brackets": {
+        "single": [
+          {
+            "rate": 0.01,
+            "upto": 10412
+          },
+          {
+            "rate": 0.02,
+            "upto": 24684
+          },
+          {
+            "rate": 0.04,
+            "upto": 38959
+          },
+          {
+            "rate": 0.06,
+            "upto": 54081
+          },
+          {
+            "rate": 0.08,
+            "upto": 68350
+          },
+          {
+            "rate": 0.093,
+            "upto": 349137
+          },
+          {
+            "rate": 0.103,
+            "upto": 418961
+          },
+          {
+            "rate": 0.113,
+            "upto": 698271
+          },
+          {
+            "rate": 0.123,
+            "upto": null
+          }
+        ],
+        "married_jointly": [
+          {
+            "rate": 0.01,
+            "upto": 20824
+          },
+          {
+            "rate": 0.02,
+            "upto": 49368
+          },
+          {
+            "rate": 0.04,
+            "upto": 77918
+          },
+          {
+            "rate": 0.06,
+            "upto": 108162
+          },
+          {
+            "rate": 0.08,
+            "upto": 136700
+          },
+          {
+            "rate": 0.093,
+            "upto": 698274
+          },
+          {
+            "rate": 0.103,
+            "upto": 837922
+          },
+          {
+            "rate": 0.113,
+            "upto": 1396542
+          },
+          {
+            "rate": 0.123,
+            "upto": null
+          }
+        ],
+        "married_separately": [
+          {
+            "rate": 0.01,
+            "upto": 10412
+          },
+          {
+            "rate": 0.02,
+            "upto": 24684
+          },
+          {
+            "rate": 0.04,
+            "upto": 38959
+          },
+          {
+            "rate": 0.06,
+            "upto": 54081
+          },
+          {
+            "rate": 0.08,
+            "upto": 68350
+          },
+          {
+            "rate": 0.093,
+            "upto": 349137
+          },
+          {
+            "rate": 0.103,
+            "upto": 418961
+          },
+          {
+            "rate": 0.113,
+            "upto": 698271
+          },
+          {
+            "rate": 0.123,
+            "upto": null
+          }
+        ],
+        "head_of_household": [
+          {
+            "rate": 0.01,
+            "upto": 20824
+          },
+          {
+            "rate": 0.02,
+            "upto": 49368
+          },
+          {
+            "rate": 0.04,
+            "upto": 77918
+          },
+          {
+            "rate": 0.06,
+            "upto": 108162
+          },
+          {
+            "rate": 0.08,
+            "upto": 136700
+          },
+          {
+            "rate": 0.093,
+            "upto": 698274
+          },
+          {
+            "rate": 0.103,
+            "upto": 837922
+          },
+          {
+            "rate": 0.113,
+            "upto": 1396542
+          },
+          {
+            "rate": 0.123,
+            "upto": null
+          }
+        ]
+      },
+      "surtax_note": "An additional 1% Mental Health Services tax applies above $1,000,000, making the top effective rate 13.3%. Included as a separate bracket only if you add it \u2014 NOT in the schedule below."
+    },
+    "NY": {
+      "verified": false,
+      "note": "Thresholds populated from model knowledge; verify against the state revenue department for the tax year.",
+      "brackets": {
+        "single": [
+          {
+            "rate": 0.04,
+            "upto": 8500
+          },
+          {
+            "rate": 0.045,
+            "upto": 11700
+          },
+          {
+            "rate": 0.0525,
+            "upto": 13900
+          },
+          {
+            "rate": 0.055,
+            "upto": 80650
+          },
+          {
+            "rate": 0.06,
+            "upto": 215400
+          },
+          {
+            "rate": 0.0685,
+            "upto": 1077550
+          },
+          {
+            "rate": 0.0965,
+            "upto": 5000000
+          },
+          {
+            "rate": 0.103,
+            "upto": 25000000
+          },
+          {
+            "rate": 0.109,
+            "upto": null
+          }
+        ],
+        "married_jointly": [
+          {
+            "rate": 0.04,
+            "upto": 17000
+          },
+          {
+            "rate": 0.045,
+            "upto": 23400
+          },
+          {
+            "rate": 0.0525,
+            "upto": 27800
+          },
+          {
+            "rate": 0.055,
+            "upto": 161300
+          },
+          {
+            "rate": 0.06,
+            "upto": 430800
+          },
+          {
+            "rate": 0.0685,
+            "upto": 2155100
+          },
+          {
+            "rate": 0.0965,
+            "upto": 10000000
+          },
+          {
+            "rate": 0.103,
+            "upto": 50000000
+          },
+          {
+            "rate": 0.109,
+            "upto": null
+          }
+        ],
+        "married_separately": [
+          {
+            "rate": 0.04,
+            "upto": 8500
+          },
+          {
+            "rate": 0.045,
+            "upto": 11700
+          },
+          {
+            "rate": 0.0525,
+            "upto": 13900
+          },
+          {
+            "rate": 0.055,
+            "upto": 80650
+          },
+          {
+            "rate": 0.06,
+            "upto": 215400
+          },
+          {
+            "rate": 0.0685,
+            "upto": 1077550
+          },
+          {
+            "rate": 0.0965,
+            "upto": 5000000
+          },
+          {
+            "rate": 0.103,
+            "upto": 25000000
+          },
+          {
+            "rate": 0.109,
+            "upto": null
+          }
+        ],
+        "head_of_household": [
+          {
+            "rate": 0.04,
+            "upto": 8500
+          },
+          {
+            "rate": 0.045,
+            "upto": 11700
+          },
+          {
+            "rate": 0.0525,
+            "upto": 13900
+          },
+          {
+            "rate": 0.055,
+            "upto": 80650
+          },
+          {
+            "rate": 0.06,
+            "upto": 215400
+          },
+          {
+            "rate": 0.0685,
+            "upto": 1077550
+          },
+          {
+            "rate": 0.0965,
+            "upto": 5000000
+          },
+          {
+            "rate": 0.103,
+            "upto": 25000000
+          },
+          {
+            "rate": 0.109,
+            "upto": null
+          }
+        ]
+      },
+      "local_tax_not_modelled": "New York City levies its own income tax (~3.078%-3.876%) and Yonkers a surcharge. NOT modelled \u2014 a NYC resident's state+local burden is materially higher than this figure."
+    },
+    "NJ": {
+      "verified": false,
+      "note": "Thresholds populated from model knowledge; verify against the state revenue department for the tax year.",
+      "brackets": {
+        "single": [
+          {
+            "rate": 0.014,
+            "upto": 20000
+          },
+          {
+            "rate": 0.0175,
+            "upto": 35000
+          },
+          {
+            "rate": 0.035,
+            "upto": 40000
+          },
+          {
+            "rate": 0.05525,
+            "upto": 75000
+          },
+          {
+            "rate": 0.0637,
+            "upto": 500000
+          },
+          {
+            "rate": 0.0897,
+            "upto": 1000000
+          },
+          {
+            "rate": 0.1075,
+            "upto": null
+          }
+        ],
+        "married_jointly": [
+          {
+            "rate": 0.014,
+            "upto": 20000
+          },
+          {
+            "rate": 0.0175,
+            "upto": 35000
+          },
+          {
+            "rate": 0.035,
+            "upto": 40000
+          },
+          {
+            "rate": 0.05525,
+            "upto": 75000
+          },
+          {
+            "rate": 0.0637,
+            "upto": 500000
+          },
+          {
+            "rate": 0.0897,
+            "upto": 1000000
+          },
+          {
+            "rate": 0.1075,
+            "upto": null
+          }
+        ],
+        "married_separately": [
+          {
+            "rate": 0.014,
+            "upto": 20000
+          },
+          {
+            "rate": 0.0175,
+            "upto": 35000
+          },
+          {
+            "rate": 0.035,
+            "upto": 40000
+          },
+          {
+            "rate": 0.05525,
+            "upto": 75000
+          },
+          {
+            "rate": 0.0637,
+            "upto": 500000
+          },
+          {
+            "rate": 0.0897,
+            "upto": 1000000
+          },
+          {
+            "rate": 0.1075,
+            "upto": null
+          }
+        ],
+        "head_of_household": [
+          {
+            "rate": 0.014,
+            "upto": 20000
+          },
+          {
+            "rate": 0.0175,
+            "upto": 35000
+          },
+          {
+            "rate": 0.035,
+            "upto": 40000
+          },
+          {
+            "rate": 0.05525,
+            "upto": 75000
+          },
+          {
+            "rate": 0.0637,
+            "upto": 500000
+          },
+          {
+            "rate": 0.0897,
+            "upto": 1000000
+          },
+          {
+            "rate": 0.1075,
+            "upto": null
+          }
+        ]
+      },
+      "married_jointly_warning": "NJ publishes a SEPARATE joint schedule rather than doubling the single one. The married_jointly brackets below are a COPY of single and are WRONG \u2014 replace them with the published joint schedule before verifying."
+    },
+    "MA": {
+      "verified": false,
+      "note": "Thresholds populated from model knowledge; verify against the state revenue department for the tax year.",
+      "brackets": {
+        "single": [
+          {
+            "rate": 0.05,
+            "upto": 1000000
+          },
+          {
+            "rate": 0.09,
+            "upto": null
+          }
+        ],
+        "married_jointly": [
+          {
+            "rate": 0.05,
+            "upto": 1000000
+          },
+          {
+            "rate": 0.09,
+            "upto": null
+          }
+        ],
+        "married_separately": [
+          {
+            "rate": 0.05,
+            "upto": 1000000
+          },
+          {
+            "rate": 0.09,
+            "upto": null
+          }
+        ],
+        "head_of_household": [
+          {
+            "rate": 0.05,
+            "upto": 1000000
+          },
+          {
+            "rate": 0.09,
+            "upto": null
+          }
+        ]
+      },
+      "surtax_note": "The 4% surtax above $1,000,000 IS modelled, as the second bracket (5% -> 9%)."
+    },
+    "VA": {
+      "verified": false,
+      "note": "Thresholds populated from model knowledge; verify against the state revenue department for the tax year.",
+      "brackets": {
+        "single": [
+          {
+            "rate": 0.02,
+            "upto": 3000
+          },
+          {
+            "rate": 0.03,
+            "upto": 5000
+          },
+          {
+            "rate": 0.05,
+            "upto": 17000
+          },
+          {
+            "rate": 0.0575,
+            "upto": null
+          }
+        ],
+        "married_jointly": [
+          {
+            "rate": 0.02,
+            "upto": 3000
+          },
+          {
+            "rate": 0.03,
+            "upto": 5000
+          },
+          {
+            "rate": 0.05,
+            "upto": 17000
+          },
+          {
+            "rate": 0.0575,
+            "upto": null
+          }
+        ],
+        "married_separately": [
+          {
+            "rate": 0.02,
+            "upto": 3000
+          },
+          {
+            "rate": 0.03,
+            "upto": 5000
+          },
+          {
+            "rate": 0.05,
+            "upto": 17000
+          },
+          {
+            "rate": 0.0575,
+            "upto": null
+          }
+        ],
+        "head_of_household": [
+          {
+            "rate": 0.02,
+            "upto": 3000
+          },
+          {
+            "rate": 0.03,
+            "upto": 5000
+          },
+          {
+            "rate": 0.05,
+            "upto": 17000
+          },
+          {
+            "rate": 0.0575,
+            "upto": null
+          }
+        ]
+      }
+    },
+    "MD": {
+      "verified": false,
+      "note": "Thresholds populated from model knowledge; verify against the state revenue department for the tax year.",
+      "brackets": {
+        "single": [
+          {
+            "rate": 0.02,
+            "upto": 1000
+          },
+          {
+            "rate": 0.03,
+            "upto": 2000
+          },
+          {
+            "rate": 0.04,
+            "upto": 3000
+          },
+          {
+            "rate": 0.0475,
+            "upto": 100000
+          },
+          {
+            "rate": 0.05,
+            "upto": 125000
+          },
+          {
+            "rate": 0.0525,
+            "upto": 150000
+          },
+          {
+            "rate": 0.055,
+            "upto": 250000
+          },
+          {
+            "rate": 0.0575,
+            "upto": null
+          }
+        ],
+        "married_jointly": [
+          {
+            "rate": 0.02,
+            "upto": 1000
+          },
+          {
+            "rate": 0.03,
+            "upto": 2000
+          },
+          {
+            "rate": 0.04,
+            "upto": 3000
+          },
+          {
+            "rate": 0.0475,
+            "upto": 100000
+          },
+          {
+            "rate": 0.05,
+            "upto": 125000
+          },
+          {
+            "rate": 0.0525,
+            "upto": 150000
+          },
+          {
+            "rate": 0.055,
+            "upto": 250000
+          },
+          {
+            "rate": 0.0575,
+            "upto": null
+          }
+        ],
+        "married_separately": [
+          {
+            "rate": 0.02,
+            "upto": 1000
+          },
+          {
+            "rate": 0.03,
+            "upto": 2000
+          },
+          {
+            "rate": 0.04,
+            "upto": 3000
+          },
+          {
+            "rate": 0.0475,
+            "upto": 100000
+          },
+          {
+            "rate": 0.05,
+            "upto": 125000
+          },
+          {
+            "rate": 0.0525,
+            "upto": 150000
+          },
+          {
+            "rate": 0.055,
+            "upto": 250000
+          },
+          {
+            "rate": 0.0575,
+            "upto": null
+          }
+        ],
+        "head_of_household": [
+          {
+            "rate": 0.02,
+            "upto": 1000
+          },
+          {
+            "rate": 0.03,
+            "upto": 2000
+          },
+          {
+            "rate": 0.04,
+            "upto": 3000
+          },
+          {
+            "rate": 0.0475,
+            "upto": 100000
+          },
+          {
+            "rate": 0.05,
+            "upto": 125000
+          },
+          {
+            "rate": 0.0525,
+            "upto": 150000
+          },
+          {
+            "rate": 0.055,
+            "upto": 250000
+          },
+          {
+            "rate": 0.0575,
+            "upto": null
+          }
+        ]
+      },
+      "married_jointly_warning": "MD publishes a SEPARATE joint schedule rather than doubling the single one. The married_jointly brackets below are a COPY of single and are WRONG \u2014 replace them with the published joint schedule before verifying.",
+      "local_tax_not_modelled": "Every Maryland county levies an income tax (roughly 2.25%-3.20%). NOT modelled \u2014 this understates a Maryland resident's total by that margin."
+    },
+    "OH": {
+      "verified": false,
+      "note": "Thresholds populated from model knowledge; verify against the state revenue department for the tax year.",
+      "brackets": {
+        "single": [
+          {
+            "rate": 0.0,
+            "upto": 26050
+          },
+          {
+            "rate": 0.0275,
+            "upto": 100000
+          },
+          {
+            "rate": 0.035,
+            "upto": null
+          }
+        ],
+        "married_jointly": [
+          {
+            "rate": 0.0,
+            "upto": 26050
+          },
+          {
+            "rate": 0.0275,
+            "upto": 100000
+          },
+          {
+            "rate": 0.035,
+            "upto": null
+          }
+        ],
+        "married_separately": [
+          {
+            "rate": 0.0,
+            "upto": 26050
+          },
+          {
+            "rate": 0.0275,
+            "upto": 100000
+          },
+          {
+            "rate": 0.035,
+            "upto": null
+          }
+        ],
+        "head_of_household": [
+          {
+            "rate": 0.0,
+            "upto": 26050
+          },
+          {
+            "rate": 0.0275,
+            "upto": 100000
+          },
+          {
+            "rate": 0.035,
+            "upto": null
+          }
+        ]
+      },
+      "local_tax_not_modelled": "Many Ohio municipalities levy an income tax (~1%-3%). NOT modelled."
+    },
+    "WI": {
+      "verified": false,
+      "note": "Thresholds populated from model knowledge; verify against the state revenue department for the tax year.",
+      "brackets": {
+        "single": [
+          {
+            "rate": 0.035,
+            "upto": 14320
+          },
+          {
+            "rate": 0.044,
+            "upto": 28640
+          },
+          {
+            "rate": 0.053,
+            "upto": 315310
+          },
+          {
+            "rate": 0.0765,
+            "upto": null
+          }
+        ],
+        "married_jointly": [
+          {
+            "rate": 0.035,
+            "upto": 14320
+          },
+          {
+            "rate": 0.044,
+            "upto": 28640
+          },
+          {
+            "rate": 0.053,
+            "upto": 315310
+          },
+          {
+            "rate": 0.0765,
+            "upto": null
+          }
+        ],
+        "married_separately": [
+          {
+            "rate": 0.035,
+            "upto": 14320
+          },
+          {
+            "rate": 0.044,
+            "upto": 28640
+          },
+          {
+            "rate": 0.053,
+            "upto": 315310
+          },
+          {
+            "rate": 0.0765,
+            "upto": null
+          }
+        ],
+        "head_of_household": [
+          {
+            "rate": 0.035,
+            "upto": 14320
+          },
+          {
+            "rate": 0.044,
+            "upto": 28640
+          },
+          {
+            "rate": 0.053,
+            "upto": 315310
+          },
+          {
+            "rate": 0.0765,
+            "upto": null
+          }
+        ]
+      }
+    },
+    "MN": {
+      "verified": false,
+      "note": "Thresholds populated from model knowledge; verify against the state revenue department for the tax year.",
+      "brackets": {
+        "single": [
+          {
+            "rate": 0.0535,
+            "upto": 31690
+          },
+          {
+            "rate": 0.068,
+            "upto": 104090
+          },
+          {
+            "rate": 0.0785,
+            "upto": 193240
+          },
+          {
+            "rate": 0.0985,
+            "upto": null
+          }
+        ],
+        "married_jointly": [
+          {
+            "rate": 0.0535,
+            "upto": 63380
+          },
+          {
+            "rate": 0.068,
+            "upto": 208180
+          },
+          {
+            "rate": 0.0785,
+            "upto": 386480
+          },
+          {
+            "rate": 0.0985,
+            "upto": null
+          }
+        ],
+        "married_separately": [
+          {
+            "rate": 0.0535,
+            "upto": 31690
+          },
+          {
+            "rate": 0.068,
+            "upto": 104090
+          },
+          {
+            "rate": 0.0785,
+            "upto": 193240
+          },
+          {
+            "rate": 0.0985,
+            "upto": null
+          }
+        ],
+        "head_of_household": [
+          {
+            "rate": 0.0535,
+            "upto": 31690
+          },
+          {
+            "rate": 0.068,
+            "upto": 104090
+          },
+          {
+            "rate": 0.0785,
+            "upto": 193240
+          },
+          {
+            "rate": 0.0985,
+            "upto": null
+          }
+        ]
+      }
+    },
+    "OR": {
+      "verified": false,
+      "note": "Thresholds populated from model knowledge; verify against the state revenue department for the tax year.",
+      "brackets": {
+        "single": [
+          {
+            "rate": 0.0475,
+            "upto": 4300
+          },
+          {
+            "rate": 0.0675,
+            "upto": 10750
+          },
+          {
+            "rate": 0.0875,
+            "upto": 125000
+          },
+          {
+            "rate": 0.099,
+            "upto": null
+          }
+        ],
+        "married_jointly": [
+          {
+            "rate": 0.0475,
+            "upto": 8600
+          },
+          {
+            "rate": 0.0675,
+            "upto": 21500
+          },
+          {
+            "rate": 0.0875,
+            "upto": 250000
+          },
+          {
+            "rate": 0.099,
+            "upto": null
+          }
+        ],
+        "married_separately": [
+          {
+            "rate": 0.0475,
+            "upto": 4300
+          },
+          {
+            "rate": 0.0675,
+            "upto": 10750
+          },
+          {
+            "rate": 0.0875,
+            "upto": 125000
+          },
+          {
+            "rate": 0.099,
+            "upto": null
+          }
+        ],
+        "head_of_household": [
+          {
+            "rate": 0.0475,
+            "upto": 8600
+          },
+          {
+            "rate": 0.0675,
+            "upto": 21500
+          },
+          {
+            "rate": 0.0875,
+            "upto": 250000
+          },
+          {
+            "rate": 0.099,
+            "upto": null
+          }
+        ]
+      }
+    }
+  },
+  "not_modelled_note": "Modelled set now covers the top states by likely user count. Any state still absent raises UNMODELLED_STATE rather than being treated as zero."
 }
