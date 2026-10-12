@@ -453,3 +453,40 @@ def test_every_year_of_reference_data_is_kept_not_replaced():
         data = V.load("tax_tables", y).data
         assert data.get("ordinary_brackets"), f"{y}: brackets missing"
         assert data.get("standard_deduction"), f"{y}: standard deduction missing"
+
+
+# ── Gate 10: the registry must be complete after importing the package alone ──────────────────────
+def test_importing_the_package_alone_registers_every_calculator_and_rule():
+    """FAILS when a module that registers calculators is missing from `calculators/__init__.py`.
+
+    THE BUG THIS CAUGHT: only debt/money/retirement were imported there — the Phase 2 three.
+    Phases A, B and B2 added eight more modules and none were added, so `base.available()` returned
+    11 calculators instead of 34, and `treatment.available_rules()` returned ZERO, unless the caller
+    happened to import those modules itself.
+
+    Gate 8 did not catch it, because the test file imports everything — so the gate was passing
+    against a registry that production callers would never see. This asserts the package's own
+    stated contract: "a caller must never have to know which module holds which calculator."
+
+    Run in a SUBPROCESS, because by the time this test file runs the other test modules have already
+    imported everything and the registry looks complete whatever `__init__` does.
+    """
+    import subprocess
+    import sys
+
+    code = (
+        "import app.services.calculators as C;"
+        "from app.services.calculators import treatment as T;"
+        "print(len(C.available()), len(T.available_rules()))"
+    )
+    app_root = os.path.abspath(os.path.join(_SERVICES_DIR, "..", ".."))
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                         cwd=app_root)
+    assert out.returncode == 0, out.stderr
+    calcs, rules = (int(x) for x in out.stdout.split())
+    assert calcs >= 34, (
+        f"importing the package alone registered only {calcs} calculators — a module that calls "
+        f"@register is missing from calculators/__init__.py")
+    assert rules >= 11, (
+        f"importing the package alone registered only {rules} treatment rules — a module that "
+        f"calls @rule is missing from calculators/__init__.py")

@@ -8,7 +8,31 @@ calculator in order for it to exist.
 See `base.py` for the contract, the strict/scenario tiering, and why the two monthly-rate
 conventions are deliberately kept apart.
 """
-from . import debt, money, retirement  # noqa: F401  (imported to populate the registry)
+# Imported for their REGISTRATION side effect. Every module that calls @register or @rule MUST be
+# listed, or the registry is silently partial.
+#
+# THE BUG THIS FIXES: only debt/money/retirement were here — the Phase 2 three. Phases A, B and B2
+# added eight more modules and none were added, so `base.available()` returned 11 calculators
+# instead of 34 and `treatment.available_rules()` returned ZERO unless the caller happened to have
+# imported those modules itself. Gate 8 (every calculator declared reachable) passed only because
+# the TEST file imports them all; a production caller asking the registry what exists got a
+# confident, partial answer. The module docstring above already promised otherwise.
+from . import (  # noqa: F401
+    career,
+    cash,
+    debt,
+    education,
+    effective,
+    housing,
+    money,
+    primitives,
+    retirement,
+    tax,
+    tax_debt_interest,
+    tax_wrappers,
+    treatment,
+    versioned_data,
+)
 from .base import (  # noqa: F401
     SCENARIO,
     STRICT,
@@ -25,5 +49,6 @@ from .base import (  # noqa: F401
 __all__ = [
     "SCENARIO", "STRICT", "Assumption", "CalcResult", "CalculatorError",
     "REGISTRY", "available", "get", "effective_monthly_rate", "nominal_monthly_rate",
-    "debt", "money", "retirement",
+    "career", "cash", "debt", "education", "effective", "housing", "money", "primitives",
+    "retirement", "tax", "tax_debt_interest", "tax_wrappers", "treatment", "versioned_data",
 ]
