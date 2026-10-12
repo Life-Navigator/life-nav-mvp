@@ -29,7 +29,8 @@ import re
 
 import pytest
 
-from app.services.advisor_llm import ADVISOR_SYSTEM, _system_for, domain_playbook_block
+from app.services.advisor_llm import (ADVISOR_SYSTEM, _claude_system_blocks, _system_for,
+                                      domain_playbook_block)
 
 
 class _Ctx:
@@ -183,3 +184,75 @@ async def test_turn_log_line_carries_the_caching_and_cost_fields(caplog):
     assert entry["provider_calls"] == 1
     assert entry["cost_usd_micros"] > 0
     assert entry["cost_known"] is True
+
+
+# ── Where the Anthropic cache breakpoint goes ─────────────────────────────────────────────────────
+# Gemini caches implicitly and finds the common prefix on its own, so the tests above were enough
+# for that path. Anthropic matches an EXPLICIT breakpoint by exact bytes, which means the block
+# LAYOUT — not just the prompt ordering — decides whether the discount lands.
+
+DOMAIN_CASES = [None, ("financial",), ("family",), ("career",), ("health",), ("education",)]
+PLAYBOOK_DOMAINS = [("career",), ("health",), ("education",)]
+NO_PLAYBOOK_DOMAINS = [None, ("financial",), ("family",)]
+
+
+@pytest.fixture
+def cache_on(monkeypatch):
+    monkeypatch.setenv("CLAUDE_PROMPT_CACHE", "true")
+
+
+def test_caching_off_returns_a_plain_string(monkeypatch):
+    monkeypatch.delenv("CLAUDE_PROMPT_CACHE", raising=False)
+    assert isinstance(_claude_system_blocks(_system_for(_Ctx(("career",)))), str)
+
+
+@pytest.mark.parametrize("domains", DOMAIN_CASES)
+def test_the_cached_block_is_byte_identical_in_every_domain(cache_on, domains):
+    """THE POINT. One shared cache entry, not one per routed domain.
+
+    A single block over `ADVISOR_SYSTEM + playbook` produced four distinct entries, each paying a
+    1.25x cache WRITE on its first turn. Ephemeral entries expire in minutes, so a low-traffic
+    domain paid the write repeatedly and collected the read almost never — worse than no caching.
+    """
+    blocks = _claude_system_blocks(_system_for(_Ctx(domains)))
+    cached = [b for b in blocks if "cache_control" in b]
+    assert len(cached) == 1, "exactly one breakpoint"
+    assert cached[0]["text"] == ADVISOR_SYSTEM
+
+
+def test_every_domain_shares_one_cache_entry(cache_on):
+    prefixes = {_claude_system_blocks(_system_for(_Ctx(d)))[0]["text"] for d in DOMAIN_CASES}
+    assert len(prefixes) == 1
+
+
+@pytest.mark.parametrize("domains", PLAYBOOK_DOMAINS)
+def test_the_volatile_playbook_is_a_separate_unmarked_block(cache_on, domains):
+    """Separate so it cannot invalidate the prefix; unmarked because at ~250 tokens it is below the
+    minimum cacheable size, so a breakpoint there could not be honoured anyway."""
+    blocks = _claude_system_blocks(_system_for(_Ctx(domains)))
+    assert len(blocks) == 2
+    assert "cache_control" not in blocks[1]
+    assert blocks[1]["text"] == domain_playbook_block(domains)
+    assert blocks[1]["text"]
+
+
+@pytest.mark.parametrize("domains", NO_PLAYBOOK_DOMAINS)
+def test_domains_with_no_playbook_send_a_single_block(cache_on, domains):
+    blocks = _claude_system_blocks(_system_for(_Ctx(domains)))
+    assert len(blocks) == 1 and blocks[0]["text"] == ADVISOR_SYSTEM
+
+
+@pytest.mark.parametrize("domains", DOMAIN_CASES)
+def test_the_blocks_reassemble_into_exactly_the_original_system_text(cache_on, domains):
+    """The split must be lossless — a dropped or reordered block changes the advisor's instructions,
+    which is a far worse outcome than a cache miss."""
+    system_text = _system_for(_Ctx(domains))
+    blocks = _claude_system_blocks(system_text)
+    assert "".join(b["text"] for b in blocks) == system_text
+
+
+def test_cached_block_still_clears_the_minimum_cacheable_size(cache_on):
+    """Splitting must not drop the cached unit below the threshold, or the breakpoint is ignored and
+    every turn silently pays full input price."""
+    cached = _claude_system_blocks(_system_for(_Ctx(("health",))))[0]["text"]
+    assert len(cached) // 4 > 2048, "cached prefix must clear the 2,048-token minimum"

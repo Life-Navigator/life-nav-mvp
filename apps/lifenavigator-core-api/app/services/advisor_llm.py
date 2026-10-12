@@ -518,6 +518,27 @@ def _claude_system_blocks(system_text: str) -> Any:
     comfortably clears the minimum cacheable size (see tests/test_prompt_cache_prefix.py). All that
     was missing is the breakpoint.
 
+    WHERE THE BREAKPOINT GOES — AND WHY IT IS *TWO* BLOCKS
+    ------------------------------------------------------
+    `_system_for(context)` returns `ADVISOR_SYSTEM + domain_playbook_block(...)`, and the playbook is
+    ~237-311 tokens of per-domain guidance that is EMPTY for finance, family and general turns. A
+    single block over the combined text makes the cached unit vary by routed domain, which produces
+    four distinct cache entries instead of one shared prefix:
+
+        finance / family / general → ADVISOR_SYSTEM                     (5,165 tok)
+        career                     → ADVISOR_SYSTEM + career playbook   (5,402 tok)
+        health                     → ADVISOR_SYSTEM + health playbook   (5,416 tok)
+        education                  → ADVISOR_SYSTEM + education playbook(5,476 tok)
+
+    Each entry's first turn pays a cache WRITE at 1.25x input, and ephemeral entries expire in
+    minutes. For a low-traffic domain that means paying the write almost every time and collecting
+    the read almost never — strictly worse than not caching at all. Anthropic matches a cached
+    prefix by exact bytes up to the breakpoint, so splitting the blocks and marking only the stable
+    one gives every turn in every domain the same 5,165-token hit.
+
+    The playbook block is deliberately left UNMARKED rather than given a second breakpoint: at ~250
+    tokens it is below the minimum cacheable size, so a breakpoint there could not be honoured.
+
     DEFAULT OFF (CLAUDE_PROMPT_CACHE). Prompt caching for Claude on Vertex is preview and documented
     as not behaving identically to the first-party API, and an unsupported field would 400 the turn
     into a Gemini fallback — a silent quality loss. Flip it on and read
@@ -526,6 +547,13 @@ def _claude_system_blocks(system_text: str) -> Any:
     """
     if not _env_flag("CLAUDE_PROMPT_CACHE"):
         return system_text
+    # Split at the stable/volatile seam rather than caching the concatenation.
+    if system_text.startswith(ADVISOR_SYSTEM) and len(system_text) > len(ADVISOR_SYSTEM):
+        volatile = system_text[len(ADVISOR_SYSTEM):]
+        return [
+            {"type": "text", "text": ADVISOR_SYSTEM, "cache_control": {"type": "ephemeral"}},
+            {"type": "text", "text": volatile},
+        ]
     return [{"type": "text", "text": system_text, "cache_control": {"type": "ephemeral"}}]
 
 
