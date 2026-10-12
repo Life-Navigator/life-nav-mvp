@@ -214,6 +214,37 @@ absorb an error. `credits.earned_income_credit.enabled: false` until sourced fro
 5. **Port `tax.ts` onto this tier.** Not mechanical — the web tier would call core-api over HTTP,
    making the browser-side tax page server-dependent. An architecture decision, not a move.
 
+### Phase B2 — Tax TREATMENT layer (rules, not rates) ← **designed 2026-10-11, not built**
+
+Owner ask: HSA, 401(k), HDHP, 7(a), securities-based lending, HELOC, short-term rentals, and the
+rest. **Full design in [TAX_TREATMENT_LAYER.md](TAX_TREATMENT_LAYER.md).**
+
+Phase B answers "how much?" from a rate schedule. B2 answers "what is the treatment?" — deductible,
+excludable, what character, which limit binds, what trap bites later. That is a rules engine with
+its own output contract (`TreatmentResult`: determination + the tests that decided it + authority +
+traps), not another table.
+
+**Key insight that makes it tractable:** rules are statutory and stable; parameters are annual.
+§163(d), the HELOC tracing rule and the 7-day STR rule can be encoded now with high confidence,
+over a `tax_parameters/<year>.json` that carries the dollar thresholds under the same verification
+gate as the rate tables. A determination can be right about the rule and explicit that the limit is
+unverified.
+
+**~35-45 rules in three groups:** account wrappers (HSA/HDHP/FSA/401k/IRA/529/solo-k),
+debt-interest tracing (mortgage/HELOC/SBL-margin/7(a)/504/student), activity character
+(STR 7-day rule/LTR passive/SE+QBI/equity comp), plus cross-cutting (SALT, charitable, wash sale,
+§1031, §121, step-up).
+
+**SEQUENCING CHANGE:** B2-a (wrappers) and B2-b (debt interest) must land **before F and L**, not
+after. `offer_impact` cannot value "HSA with HDHP and limited FSA" without the eligibility test and
+the payroll-FICA exclusion; `financing_optimizer` cannot rank HELOC vs margin vs 7(a) without
+after-tax cost of capital. A HELOC at 8% deductible beats a margin loan at 7% non-deductible, and
+nothing in the plan could see that until B2.
+
+**Found while designing:** `comp_benefits.py:23-25` hardcodes `FSA_CAP = 3300`,
+`HSA_CAP_INDIVIDUAL = 4300`, `HSA_CAP_FAMILY = 8550` — annual limits in source, in the web-facing
+benefits service, invisible to the tax engine. Same defect class as `BRACKETS_2024`.
+
 ### Phase C — Cash flow & paycheck
 
 - `paycheck_net` — gross → net: pretax deductions, FICA, federal/state withholding. _Removes the
