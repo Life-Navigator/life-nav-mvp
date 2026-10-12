@@ -100,8 +100,21 @@ S/M/L — because estimates I invent are worth less than the ordering.
 
 ### Milestone 2 — "What should I do about it?" (ledger readouts)
 
-> **Status 2026-10-12: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3-ages, 2.4, 2.5-RMD and 2.5-pension are DONE.**
-> Remaining: **withdrawal guardrails** and **spousal + survivor Social Security**.
+> **Status 2026-10-12: all of Milestone 1 and all of Milestone 2 are DONE except spousal +
+> survivor Social Security.** 1.1 Monte Carlo, 1.2 stress tests, 1.3 what-ifs + solve-for, 2.1
+> sequencing, 2.2 Roth ladder, 2.3 claiming ages, 2.4 the three leaf calculators, 2.5 RMD table,
+> pension lump sum and spending guardrails.
+>
+> Along the way the ledger gained **composable planned spending** (owner request): a goal can be
+> built from line items — flights, hotel, venue, caterer — with `optional` lines the household
+> would drop first, a `month` for calendar ordering inside a year, and PARTIAL FUNDING, so an
+> outlay that does not fit in full is answered "it fits at $12,710 without the upgrade" rather than
+> "no". An unfundable goal names the largest line, because that is the lever.
+>
+> Five ledger correctness bugs were found and fixed by building these, each one an input that
+> looked modelled and was not: untaxed capital gains, the approximated RMD, the gross-up creating
+> money, `annual_contribution` never applied, and `contributions` conflating planned saving with
+> leftover surplus.
 >
 > The two fixes mattered more than the deferred items: **taxable withdrawals were untaxed** (a
 > $100k draw against a 90% embedded gain paid $0), which biased `withdrawal_sequencing` — the one

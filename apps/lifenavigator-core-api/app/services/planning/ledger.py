@@ -37,7 +37,16 @@ from typing import Any, Optional, Sequence
 from ..calculators import versioned_data as V
 from ..calculators import tax as tax_calc
 from ..calculators.base import from_registry
-from .household import HSA, ROTH, TAXABLE, TAX_DEFERRED, Account, Household, PlanningError
+from .household import (
+    HSA,
+    ROTH,
+    TAXABLE,
+    TAX_DEFERRED,
+    Account,
+    Guardrail,
+    Household,
+    PlanningError,
+)
 
 log = logging.getLogger("core.planning.ledger")
 
@@ -72,6 +81,7 @@ class LedgerYear:
     expenses: float = 0.0
     goal_outflows: float = 0.0
     unfunded_goals: list[dict[str, Any]] = field(default_factory=list)
+    partially_funded_goals: list[dict[str, Any]] = field(default_factory=list)
     federal_tax: float = 0.0
     fica: float = 0.0
     state_tax: float = 0.0
@@ -86,6 +96,8 @@ class LedgerYear:
     rmd: float = 0.0
     roth_conversion: float = 0.0
     capital_gain_realized: float = 0.0
+    spending_factor: float = 1.0
+    withdrawal_rate_before_adjustment: Optional[float] = None
     filing_status: str = ""
     end_balances: dict[str, float] = field(default_factory=dict)
     total_assets: float = 0.0
@@ -121,6 +133,7 @@ class LedgerYear:
             "expenses": round(self.expenses, 2),
             "goal_outflows": round(self.goal_outflows, 2),
             "unfunded_goals": list(self.unfunded_goals),
+            "partially_funded_goals": list(self.partially_funded_goals),
             "federal_tax": round(self.federal_tax, 2), "fica": round(self.fica, 2),
             "state_tax": round(self.state_tax, 2), "total_tax": round(self.total_tax, 2),
             "withdrawals": {k: round(v, 2) for k, v in self.withdrawals.items()},
@@ -130,6 +143,8 @@ class LedgerYear:
             "rmd": round(self.rmd, 2),
             "roth_conversion": round(self.roth_conversion, 2),
             "capital_gain_realized": round(self.capital_gain_realized, 2),
+            "spending_factor": round(self.spending_factor, 4),
+            "withdrawal_rate_before_adjustment": self.withdrawal_rate_before_adjustment,
             "filing_status": self.filing_status,
             "end_balances": {k: round(v, 2) for k, v in self.end_balances.items()},
             "total_assets": round(self.total_assets, 2),
@@ -169,6 +184,10 @@ class PlanResult:
         return [g for y in self.years for g in y.unfunded_goals]
 
     @property
+    def partially_funded_goals(self) -> list[dict[str, Any]]:
+        return [g for y in self.years for g in y.partially_funded_goals]
+
+    @property
     def lifetime_tax(self) -> float:
         return sum(y.total_tax for y in self.years)
 
@@ -181,6 +200,7 @@ class PlanResult:
             "succeeds": self.succeeds,
             "depleted_year": self.depleted_year,
             "unfunded_goals": self.unfunded_goals,
+            "partially_funded_goals": self.partially_funded_goals,
             "lifetime_tax": round(self.lifetime_tax, 2),
             "terminal_assets": round(self.terminal_assets, 2),
             "horizon_years": len(self.years),
@@ -211,7 +231,8 @@ def project(household: Household, *, tax_year: Optional[int] = None,
             horizon_years: Optional[int] = None,
             inflation: Optional[float] = None,
             return_path: Optional[Sequence[float]] = None,
-            conversions: Optional[dict[int, float]] = None) -> PlanResult:
+            conversions: Optional[dict[int, float]] = None,
+            guardrail: Optional[Guardrail] = None) -> PlanResult:
     """Project the household year by year, computing tax annually from the Phase B engine.
 
     `return_path` supplies a return for EACH plan year instead of one rate for all of them, which is
@@ -219,6 +240,12 @@ def project(household: Household, *, tax_year: Optional[int] = None,
     because SEQUENCE matters: the same set of annual returns in a different order produces a very
     different outcome for a household that is drawing down, since a bad early year is realised
     against a full balance and never recovers. Averaging that away would measure nothing.
+
+    `guardrail` lets spending RESPOND to the portfolio instead of staying fixed through a crash.
+    Without it, a projection assumes the household keeps spending the same amount through a 2008 —
+    which nobody does, so a fixed-spending model understates the plan by reporting failures the
+    household would have avoided by doing the obvious thing. It changes no behaviour: the app is
+    read-only, and the output is a rule the user chooses to follow.
 
     `conversions` maps a plan year to a Roth conversion amount. A conversion moves money from a
     tax-deferred bucket to a Roth one and is ORDINARY INCOME in the year it happens — which is the
@@ -280,6 +307,7 @@ def project(household: Household, *, tax_year: Optional[int] = None,
         goals_by_year.setdefault(g.year, []).append(g)
 
     years: list[LedgerYear] = []
+    spend_factor = 1.0          # guardrail state, carried across years
 
     for t in range(horizon):
         infl_factor = (1.0 + infl) ** t
@@ -333,6 +361,21 @@ def project(household: Household, *, tax_year: Optional[int] = None,
             if everyone_retired:
                 amount *= e.retirement_factor
             row.expenses += amount
+
+        # 3a-bis. The guardrail. Evaluated on the rate THIS year's planned spending implies against
+        # the CURRENT portfolio, before any of it is drawn — which is the decision the household
+        # would actually be making at the start of the year.
+        if guardrail is not None and everyone_retired:
+            portfolio = sum(a.balance for a in accounts)
+            rate_now = (row.expenses / portfolio) if portfolio > 0 else float("inf")
+            spend_factor, why = guardrail.factor_for(rate_now, spend_factor)
+            row.spending_factor = spend_factor
+            row.withdrawal_rate_before_adjustment = round(rate_now, 4)
+            if why:
+                row.events.append(
+                    f"spending adjusted to {spend_factor:.0%} of plan — {why} "
+                    f"(rate was {rate_now:.1%})")
+            row.expenses *= spend_factor
 
         # 3a. Planned contributions, while the household is still earning.
         #
@@ -439,7 +482,12 @@ def project(household: Household, *, tax_year: Optional[int] = None,
         fed, fica_amt, state_amt = tax_for(ordinary_income, row.wage_income)
 
         # 6. Goals due this year, funded in priority order.
-        due = sorted(goals_by_year.get(t, []), key=lambda g: (g.rank, -g.amount))
+        # Priority first, then CALENDAR ORDER inside the year, then size. The month matters here
+        # even though the ledger steps annually: a January wedding is paid for before a November
+        # trip, which is how the money would actually leave the account. Goals with no month sort
+        # last within their priority, since an undated outlay is the flexible one.
+        due = sorted(goals_by_year.get(t, []),
+                     key=lambda g: (g.rank, g.month if g.month is not None else 13, -g.amount))
 
         # Contributions are already in the accounts, so they must come out of this year's cash.
         available = (row.wage_income + row.other_income + row.rmd
@@ -449,20 +497,51 @@ def project(household: Household, *, tax_year: Optional[int] = None,
             return sum(a.balance for a in accounts)
 
         for g in due:
-            amount = g.amount * (infl_factor if g.inflation_adjusted else 1.0)
-            if available + liquid() >= amount - _GROSS_UP_TOLERANCE:
+            scale = infl_factor if g.inflation_adjusted else 1.0
+            amount = g.amount * scale
+            essential = g.essential_amount * scale
+            can_fund = available + liquid()
+
+            if can_fund >= amount - _GROSS_UP_TOLERANCE:
                 row.goal_outflows += amount
                 available -= amount
+            elif g.items and can_fund >= essential - _GROSS_UP_TOLERANCE and essential < amount:
+                # PARTIAL FUNDING. The optional lines are exactly what a household drops first, so
+                # answering "it fits without the upgrade" beats answering "no" — same computation,
+                # and it is the difference between a plan that refuses and a plan that advises.
+                row.goal_outflows += essential
+                available -= essential
+                dropped = [i.label for i in g.items if i.optional]
+                row.partially_funded_goals.append({
+                    "label": g.label, "priority": g.priority, "year": t,
+                    "month": g.month, "wanted": round(amount, 2),
+                    "funded": round(essential, 2),
+                    "dropped": dropped, "dropped_amount": round(amount - essential, 2),
+                })
+                row.events.append(
+                    f"{g.label} fits at ${essential:,.0f} without {', '.join(dropped)} "
+                    f"(${amount - essential:,.0f} less than planned)")
             else:
                 # Reported, never absorbed. A ledger that silently runs a balance negative leaves
                 # the plan looking complete while the goal is unaffordable.
+                shortfall = amount - max(0.0, can_fund)
                 row.unfunded_goals.append({
                     "label": g.label, "priority": g.priority, "year": t,
+                    "month": g.month,
                     "needed": round(amount, 2),
-                    "available": round(max(0.0, available + liquid()), 2),
+                    "essential_only": round(essential, 2) if g.items else None,
+                    "available": round(max(0.0, can_fund), 2),
+                    "short_by": round(shortfall, 2),
+                    # The line to question first, so the gap has an obvious lever.
+                    "largest_item": (g.largest_item.label if g.largest_item else None),
+                    "largest_item_amount": (round(g.largest_item.amount * scale, 2)
+                                            if g.largest_item else None),
                 })
                 row.events.append(
-                    f"{g.label} ({g.priority}) is unfunded: needs ${amount:,.0f}")
+                    f"{g.label} ({g.priority}) is unfunded: needs ${amount:,.0f}, short by "
+                    f"${shortfall:,.0f}"
+                    + (f" — {g.largest_item.label} is the biggest piece at "
+                       f"${g.largest_item.amount * scale:,.0f}" if g.largest_item else ""))
 
         # 7. Cover any remaining deficit by withdrawing, grossed up for the tax it creates.
         if available < -_GROSS_UP_TOLERANCE:

@@ -166,33 +166,167 @@ class Expense:
 
 
 @dataclass(frozen=True)
+class SpendItem:
+    """One line inside a planned outlay — flights, the hotel, the venue, the caterer.
+
+    WHY A GOAL IS DECOMPOSED RATHER THAN A SINGLE NUMBER. When a plan cannot fund something, "your
+    $45,000 wedding is unfunded" is a dead end. "The venue is $22,000 of it" is a decision the
+    household can act on, and it is the same computation — the breakdown is already how people hold
+    the number in their heads, so throwing it away at the door makes the advice worse for no gain.
+
+    `optional` marks a line the household would drop first. It lets the ledger answer "what fits"
+    rather than only "does it fit", which is the difference between a plan that says no and a plan
+    that says what to change.
+    """
+
+    label: str
+    amount: float
+    optional: bool = False
+
+    def __post_init__(self) -> None:
+        if not self.label.strip():
+            raise PlanningError("every spend item needs a label — the breakdown is the point")
+        if self.amount <= 0:
+            raise PlanningError(f"{self.label}: amount must be greater than zero")
+
+
+@dataclass(frozen=True)
 class Goal:
-    """A funded objective — a house, a wedding, tuition, a sabbatical.
+    """A planned outlay — a house, a wedding, tuition, a sabbatical, a trip in March.
 
     PRIORITY IS LOAD-BEARING. When a plan cannot fund everything, it must fail in a stated order:
     needs before wants before wishes. A ledger that silently absorbs an unfundable goal into a
     negative balance is the single most misleading thing a planning engine can do, because the plan
     still looks complete.
+
+    TIMING. `year` is a plan-year offset and `month` (1-12) is optional. The ledger steps ANNUALLY
+    because tax is annual, so a month does NOT buy sub-year cash-flow precision — what it does is
+    order competing outlays inside the same year (a January wedding is funded before a November
+    trip, which is how the money would actually be spent) and carry the date through to the user.
+    Pretending an annual ledger resolves months would be worse than being clear that it does not.
+
+    COMPOSITION. Either give an `amount`, or give `items` and let it sum. Both must agree if both
+    are supplied — a mismatch means the breakdown shown to the user does not add up to the figure
+    the plan was built on, which is exactly the kind of quiet inconsistency that destroys trust in a
+    plan document.
     """
 
     label: str
-    amount: float
-    year: int
+    amount: float = 0.0
+    year: int = 0
     priority: str = WANT
     inflation_adjusted: bool = True
+    month: Optional[int] = None
+    items: tuple[SpendItem, ...] = ()
+    note: str = ""
 
     def __post_init__(self) -> None:
         if self.priority not in PRIORITIES:
             raise PlanningError(
                 f"{self.label}: priority must be one of {PRIORITIES}, got {self.priority!r}")
-        if self.amount <= 0:
-            raise PlanningError(f"{self.label}: amount must be greater than zero")
         if self.year < 0:
             raise PlanningError(f"{self.label}: year must be a non-negative plan-year offset")
+        if self.month is not None and not 1 <= self.month <= 12:
+            raise PlanningError(f"{self.label}: month must be 1-12, got {self.month}")
+
+        if self.items:
+            total = round(sum(i.amount for i in self.items), 2)
+            if self.amount and round(self.amount, 2) != total:
+                raise PlanningError(
+                    f"{self.label}: amount ${self.amount:,.2f} does not match its items "
+                    f"(${total:,.2f}). A breakdown that does not add up to the figure the plan was "
+                    f"built on is the kind of inconsistency that destroys trust in a plan.")
+            object.__setattr__(self, "amount", total)
+
+        if self.amount <= 0:
+            raise PlanningError(
+                f"{self.label}: amount must be greater than zero (give `amount` or `items`)")
 
     @property
     def rank(self) -> int:
         return _PRIORITY_RANK[self.priority]
+
+    @property
+    def essential_amount(self) -> float:
+        """The outlay with every `optional` line dropped.
+
+        What "cut it back" costs — so an unfundable goal can be answered with "the trip fits at
+        $6,200 without the business-class upgrade" instead of simply "no".
+        """
+        if not self.items:
+            return self.amount
+        return round(sum(i.amount for i in self.items if not i.optional), 2)
+
+    @property
+    def optional_amount(self) -> float:
+        return round(self.amount - self.essential_amount, 2)
+
+    @property
+    def largest_item(self) -> Optional[SpendItem]:
+        """The line to question first."""
+        return max(self.items, key=lambda i: i.amount) if self.items else None
+
+    @property
+    def when(self) -> str:
+        return f"year {self.year}" + (f", month {self.month}" if self.month else "")
+
+
+@dataclass(frozen=True)
+class Guardrail:
+    """A spending RULE, not an instruction — the app never moves money (see the roadmap's
+    read-only constraint).
+
+    WHAT IT MODELS AND WHY IT MATTERS. A fixed-withdrawal projection assumes the household keeps
+    spending the same amount through a 2008. Nobody does that. The realistic response to a bad
+    market is to spend less for a couple of years, and a model that cannot express that
+    SYSTEMATICALLY UNDERSTATES the plan — it reports a failure the household would have avoided by
+    doing the obvious thing.
+
+    Expressed as withdrawal-RATE triggers rather than portfolio-value triggers, deliberately. A
+    dollar threshold goes stale the moment spending inflates or the horizon shortens; the rate
+    (this year's spending over the current portfolio) stays comparable across the whole plan, which
+    is why the Guyton-Klinger and Kitces formulations both use it.
+
+    The OUTPUT is the pair of dollar thresholds for the user to recognise — "if the portfolio falls
+    below $1.1M, cut spending about 8%" — which is advice they act on themselves.
+    """
+
+    upper_rate: float = 0.055      # withdrawal rate above which spending is cut
+    lower_rate: float = 0.035      # rate below which spending may rise
+    adjustment: float = 0.10       # proportional change applied when a rail is hit
+    max_cut: float = 0.30          # never model a cut deeper than this
+    max_raise: float = 0.20        # nor a rise larger
+
+    def __post_init__(self) -> None:
+        if not 0 < self.lower_rate < self.upper_rate:
+            raise PlanningError(
+                f"guardrail rates must satisfy 0 < lower ({self.lower_rate}) < upper "
+                f"({self.upper_rate})")
+        if not 0 < self.adjustment < 1:
+            raise PlanningError(f"adjustment must be between 0 and 1, got {self.adjustment}")
+        if not 0 <= self.max_cut < 1 or not 0 <= self.max_raise < 1:
+            raise PlanningError("max_cut and max_raise must be between 0 and 1")
+
+    def factor_for(self, withdrawal_rate: float, current_factor: float) -> tuple[float, str]:
+        """The new spending factor, and why it changed.
+
+        Clamped by `max_cut`/`max_raise` because an unbounded rule will happily model a household
+        cutting spending 60% for a decade, which is not flexibility — it is a different life, and
+        presenting it as a plan that "works" would be dishonest.
+        """
+        if withdrawal_rate > self.upper_rate:
+            proposed = current_factor * (1 - self.adjustment)
+            floor = 1 - self.max_cut
+            if proposed < floor:
+                return floor, "at the spending floor"
+            return proposed, "cut: withdrawal rate above the upper rail"
+        if withdrawal_rate < self.lower_rate:
+            proposed = current_factor * (1 + self.adjustment)
+            ceiling = 1 + self.max_raise
+            if proposed > ceiling:
+                return ceiling, "at the spending ceiling"
+            return proposed, "raise: withdrawal rate below the lower rail"
+        return current_factor, ""
 
 
 @dataclass

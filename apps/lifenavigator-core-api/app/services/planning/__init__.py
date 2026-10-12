@@ -7,12 +7,15 @@ stress tests and side-by-side what-ifs are all READOUTS of a ledger, not separat
 See docs/financial-engine/PLANNING_ENGINE_GAP.md for why this had to move ahead of Phase K.
 """
 from .household import (  # noqa: F401
+    PlanningError,
     Account,
     Expense,
     Goal,
+    Guardrail,
     Household,
     IncomeSource,
     Person,
+    SpendItem,
     TAXABLE,
     TAX_DEFERRED,
     ROTH,
@@ -48,9 +51,11 @@ from .stress import (  # noqa: F401
     run_all,
 )
 from .strategies import (  # noqa: F401
+    GuardrailResult,
     StrategyResult,
     claiming_factor,
     roth_conversion_ladder,
     social_security_claiming,
+    spending_guardrails,
     withdrawal_sequencing,
 )

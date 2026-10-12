@@ -415,3 +415,138 @@ def social_security_claiming(household: Household, *, owner: str, primary_insura
                "Not modelled: spousal and survivor benefits, the earnings test before FRA, and "
                "IRMAA surcharges.",),
     )
+
+
+# ── 2.5 Spending guardrails ───────────────────────────────────────────────────────────────────────
+@dataclass
+class GuardrailResult:
+    """What flexibility is worth, and what it costs."""
+
+    fixed_success: float
+    flexible_success: float
+    paths: int
+    lower_threshold: float
+    upper_threshold: float
+    planned_spending: float
+    worst_cut_modelled: float
+    years_below_plan_p50: int
+    years_below_plan_worst: int
+    rule: dict[str, Any]
+    tax_year: int
+    assumptions: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def improvement(self) -> float:
+        return self.flexible_success - self.fixed_success
+
+    @property
+    def summary(self) -> str:
+        return (
+            f"A fixed-spending plan succeeds {self.fixed_success:.0%} of the time. Being willing to "
+            f"adjust takes that to {self.flexible_success:.0%}. "
+            f"The rule: if the portfolio falls below about ${self.lower_threshold:,.0f}, cut "
+            f"spending roughly {self.rule['adjustment']:.0%}; above about "
+            f"${self.upper_threshold:,.0f} you could raise it."
+        )
+
+    @property
+    def honest_cost(self) -> str:
+        """WHAT THE SUCCESS NUMBER HIDES.
+
+        Reporting "flexibility takes you from 68% to 91%" without saying what the flexible paths
+        actually felt like would oversell it badly. In the worst paths the rule demands living on a
+        materially smaller budget for years, and a household entitled to the upside number is
+        entitled to that one too.
+        """
+        if self.worst_cut_modelled <= 0.001:
+            return "No path required a cut — the flexibility was never called on."
+        return (
+            f"That improvement is not free. In the worst simulated paths the rule asks for a "
+            f"{self.worst_cut_modelled:.0%} cut, and spending sits below plan for "
+            f"{self.years_below_plan_worst} years (median {self.years_below_plan_p50}). "
+            f"Flexibility is only worth modelling if the household would actually accept that."
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"fixed_success": round(self.fixed_success, 4),
+                "flexible_success": round(self.flexible_success, 4),
+                "improvement": round(self.improvement, 4), "paths": self.paths,
+                "lower_threshold": round(self.lower_threshold, 2),
+                "upper_threshold": round(self.upper_threshold, 2),
+                "planned_spending": round(self.planned_spending, 2),
+                "worst_cut_modelled": round(self.worst_cut_modelled, 4),
+                "years_below_plan_p50": self.years_below_plan_p50,
+                "years_below_plan_worst": self.years_below_plan_worst,
+                "rule": self.rule, "summary": self.summary, "honest_cost": self.honest_cost,
+                "tax_year": self.tax_year, "assumptions": self.assumptions}
+
+
+def spending_guardrails(household: Household, *, tax_year: Optional[int] = None,
+                        guardrail: Optional[Any] = None,
+                        paths: int = 300, seed: int = 20261012) -> GuardrailResult:
+    """How much is a willingness to adjust spending worth?
+
+    MEASURED UNDER MONTE CARLO, because that is the only place flexibility shows up. On a single
+    deterministic path a guardrail either fires or it does not, and the answer is an artefact of one
+    return sequence. The value of flexibility IS its effect on the distribution — it converts some
+    of the failing paths into surviving ones — so the comparison has to be a probability.
+
+    Reports the rule in DOLLARS as well as rates, because "cut spending when the withdrawal rate
+    exceeds 5.5%" is not something a household can act on, while "if the portfolio drops below
+    $1.1M, cut about 10%" is. The app never moves money; this is a rule the user chooses to follow.
+    """
+    import math
+    import random
+
+    from ..calculators.base import from_registry
+    from .household import Guardrail
+    from .monte_carlo import _lognormal_params
+
+    rail = guardrail or Guardrail()
+    planned = sum(e.annual_amount for e in household.expenses)
+    if planned <= 0:
+        raise PlanningError("spending_guardrails needs at least one expense to adjust")
+
+    mean, mean_cited = from_registry("investment_return")
+    vol, vol_cited = from_registry("return_volatility")
+    mu, sigma = _lognormal_params(mean, vol)
+    horizon = household.horizon_years
+    rng = random.Random(seed)
+
+    fixed_ok = flex_ok = 0
+    worst_cut = 0.0
+    years_below: list[int] = []
+
+    for _ in range(paths):
+        draws = [math.exp(rng.gauss(mu, sigma)) - 1.0 for _ in range(horizon)]
+        if project(_with_order(household, household.withdrawal_order),
+                   tax_year=tax_year, return_path=draws).succeeds:
+            fixed_ok += 1
+        flexible = project(_with_order(household, household.withdrawal_order),
+                           tax_year=tax_year, return_path=draws, guardrail=rail)
+        if flexible.succeeds:
+            flex_ok += 1
+        factors = [y.spending_factor for y in flexible.years]
+        if factors:
+            worst_cut = max(worst_cut, 1 - min(factors))
+            years_below.append(sum(1 for f in factors if f < 0.999))
+
+    years_below.sort()
+    median = years_below[len(years_below) // 2] if years_below else 0
+
+    return GuardrailResult(
+        fixed_success=fixed_ok / paths, flexible_success=flex_ok / paths, paths=paths,
+        # Thresholds restated in today's dollars against the planned spend — the actionable form.
+        lower_threshold=planned / rail.upper_rate,
+        upper_threshold=planned / rail.lower_rate,
+        planned_spending=planned,
+        worst_cut_modelled=worst_cut,
+        years_below_plan_p50=median,
+        years_below_plan_worst=max(years_below) if years_below else 0,
+        rule={"upper_rate": rail.upper_rate, "lower_rate": rail.lower_rate,
+              "adjustment": rail.adjustment, "max_cut": rail.max_cut,
+              "max_raise": rail.max_raise},
+        tax_year=project(_with_order(household, household.withdrawal_order),
+                         tax_year=tax_year).tax_year,
+        assumptions=[mean_cited.as_dict(), vol_cited.as_dict()],
+    )
