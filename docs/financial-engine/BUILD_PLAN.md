@@ -575,3 +575,48 @@ or remove only the ones that mirror the engine and the tax layer.
 
 _Grounded in the code as of 2026-10-11. Figures for existing coverage were read from source, not
 estimated._
+
+## 5. Maintaining the engine over time
+
+Three kinds of change, three mechanisms. Conflating them is how a tax engine goes stale without
+failing — which is the single most dangerous failure mode here, because nothing errors and the
+figure still looks like an answer.
+
+| What changes                                            | Mechanism                                                     | Effort to update                                                                           |
+| ------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| **An amount** (bracket threshold, HSA limit, wage base) | `data/<family>/<year>.json`                                   | Drop in a file. No code. A drift gate fails until the current year exists.                 |
+| **A rule's value** (RMD age 73 → 75 in 2033)            | same — it is a parameter                                      | same                                                                                       |
+| **A provision STARTS or ENDS**                          | `calculators/effective.py`                                    | One `Provision` entry with its authority.                                                  |
+| **A rule's MECHANICS change**                           | a NEW function; the old one stays, `superseded_by` links them | Deliberately not a branch inside one function — that is how an engine becomes unauditable. |
+
+### Adding a new year
+
+Proven end to end: TY2026 landed as a single commit with no code change — two JSON files with
+per-field source citations. The gates then do the work:
+
+- **Gate 1** fails when a family has data but nothing for the current year.
+- **Gate 6** fails when a current-year table exists but is unverified.
+- **Gate 7** validates every state schedule structurally (ascending thresholds, open top bracket,
+  no rate typed as a percent, all four filing statuses).
+- **`PENDING_DATA` / `PENDING_VERIFICATION`** are declared lists the gates assert an EXACT match
+  against — so anything new fails immediately, and removing an entry tightens the gate automatically.
+
+### Prior years are kept, not replaced
+
+Every year accumulates on disk. `tax_year` reaches every calculator, the ledger and the advisor
+planner, so "what did I pay in 2024?" is answerable and returns **STRICT** tier (verified law, the
+user's own numbers), while a current-year question returns **SCENARIO** (carried-forward law,
+labelled). `advisor_context.parse_tax_year` extracts a named year from the message, requiring a tax
+cue so "we bought the house in 2019" is not mistaken for a tax year, and rejecting money so
+`$2024 in fees` is not either.
+
+**Gate 9** asserts tables accumulate rather than get replaced — a migration that overwrote a year
+would silently destroy prior-year answers and nothing else would notice.
+
+### Sunsets
+
+The one tax change that arrives on a known date and still surprises people. `expiring_within()`
+surfaces them two years ahead, and **Gate 9** fails when a provision is past its sunset with no
+declared successor. An expired provision is not automatically wrong to keep — a 2026 question must
+still reach the 2026 rule — but it must be marked `superseded_by` so the engine knows what governs
+today.

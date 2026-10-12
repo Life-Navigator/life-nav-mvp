@@ -612,3 +612,44 @@ class AdvisorContextBuilder:
             finance_scenarios=finance_scenarios,
             calculations=calculations,
         )
+
+
+# ── Prior-year tax questions ──────────────────────────────────────────────────────────────────────
+# "What did I pay in 2024?" / "what would this have cost under 2024 rules?" are answerable, because
+# every tax table is KEPT rather than replaced. The year has to be extracted from the message to
+# reach the calculators, though — otherwise the advisor answers on the current year and the figure
+# looks like an answer to what was asked.
+# A plausible tax year, bounded so a dollar amount, a street number or an age can never be mistaken
+# for one. The upper bound is deliberately the NEXT year: people ask forward-looking questions
+# ("what will I owe in 2027?"), and that is a legitimate request the carry-forward policy answers
+# with a labelled estimate.
+# The lookbehind rejects a year that is actually MONEY. `\b` matches after `$` because `$` is a
+# non-word character, so a bare `\b(20[12][0-9])\b` read "$2024 in fees" as tax year 2024 — and
+# then recomputed the user's tax against the wrong law off a fee amount. The trailing guard
+# rejects "2024.50" and "2,0241" for the same reason.
+_TAX_YEAR_RE = re.compile(r"(?<![$\d,.])(20[12][0-9])(?![\d,.])")
+_TAX_YEAR_CUES = ("tax", "owe", "owed", "paid", "pay", "return", "filed", "filing", "refund",
+                  "bracket", "deduction", "withheld", "withholding", "liability")
+
+
+def parse_tax_year(message: str, *, current_year: int, earliest: int = 2018) -> Optional[int]:
+    """A tax year the user named, or None.
+
+    Requires a TAX cue in the message as well as a year, because a bare year is far more often
+    something else — "we bought the house in 2019", "I started there in 2021". Pulling a tax year
+    out of those would silently recompute their tax against the wrong law.
+
+    Returns None for the current year too: that is the default path, and flagging it would make
+    every ordinary question look like a prior-year request.
+    """
+    if not message:
+        return None
+    low = message.lower()
+    if not any(cue in low for cue in _TAX_YEAR_CUES):
+        return None
+    candidates = [int(m) for m in _TAX_YEAR_RE.findall(message)]
+    valid = [y for y in candidates if earliest <= y <= current_year + 1 and y != current_year]
+    if not valid:
+        return None
+    # The most recent named year, so "between 2022 and 2024" resolves to 2024.
+    return max(valid)

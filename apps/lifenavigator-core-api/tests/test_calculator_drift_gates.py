@@ -407,3 +407,49 @@ def test_wired_calculators_only_need_inputs_that_actually_exist():
             assert reach.inputs_available, (
                 f"{calc_id} is marked wired but needs unavailable inputs "
                 f"{reach.missing_inputs}")
+
+
+# ── Gate 9: sunsetting provisions must be noticed before they expire ──────────────────────────────
+def test_no_provision_has_silently_expired():
+    """FAILS when a dated provision is past its sunset and still declared with no successor.
+
+    A sunset is the one kind of tax change that arrives on a KNOWN DATE and still surprises people,
+    because nothing fails when it happens — the rule simply keeps applying expired law and the
+    figure still looks like an answer. This gate makes the date arrive loudly.
+
+    An expired provision is not automatically wrong to keep: a prior-year question about 2026 must
+    still reach the 2026 rule. What is required is that it be marked `superseded_by`, so the engine
+    knows which rule governs today.
+    """
+    from app.services.calculators import effective as E
+    orphaned = [p for p in E.expired() if p.superseded_by is None]
+    assert not orphaned, (
+        "these provisions are past their sunset with no declared successor: "
+        + "; ".join(f"{p.name} (ended {p.last_year}, {p.authority})" for p in orphaned)
+        + ". Either set superseded_by, or remove it if nothing replaced it."
+    )
+
+
+def test_provisions_expiring_soon_are_visible():
+    """Informational rather than a failure — it reports what needs attention within two years so a
+    sunset is planned for rather than discovered. A tax engine that only learns about an expiry
+    after it happens has already issued wrong advice."""
+    from app.services.calculators import effective as E
+    soon = E.expiring_within(2)
+    for p in soon:
+        assert p.authority and p.note, f"{p.name} expires soon and must explain itself"
+
+
+def test_every_year_of_reference_data_is_kept_not_replaced():
+    """Prior-year questions are only answerable because tables ACCUMULATE. A migration that
+    replaced a year's file instead of adding one would silently destroy the ability to answer
+    "what did I pay in 2024?" — and nothing else would notice.
+    """
+    years = V.available_years("tax_tables")
+    assert len(years) >= 2, f"expected multiple tax years on disk, found {years}"
+    assert 2024 in years, "2024 is the verified baseline the engine's tests depend on"
+    # Each kept year must still load and be structurally whole.
+    for y in years:
+        data = V.load("tax_tables", y).data
+        assert data.get("ordinary_brackets"), f"{y}: brackets missing"
+        assert data.get("standard_deduction"), f"{y}: standard deduction missing"

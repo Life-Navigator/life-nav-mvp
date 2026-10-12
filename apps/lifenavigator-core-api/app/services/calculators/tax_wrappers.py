@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from . import effective
 from . import versioned_data as V
 from .base import CalculatorError, require_money
 from .treatment import (
@@ -304,7 +305,10 @@ def k401_deferral(*, employee_deferral: float, age: int, compensation: float,
     elective = float(cfg["elective_deferral_limit"])
     catch_up = 0.0
     catch_up_kind = None
-    if 60 <= yrs <= 63 and p.year_used >= int(cfg["super_catch_up_first_year"]):
+    # Effective-dated rather than compared against a first-year NUMBER in the parameters file.
+    # The number worked for a provision that starts; it cannot express one that ends, and nothing
+    # would flag a rule still applying expired law. See calculators/effective.py.
+    if 60 <= yrs <= 63 and effective.in_effect("retirement.super_catch_up_60_63", p.year_used):
         catch_up = float(cfg["super_catch_up_60_63"])
         catch_up_kind = "super catch-up (ages 60-63)"
     elif yrs >= 50:

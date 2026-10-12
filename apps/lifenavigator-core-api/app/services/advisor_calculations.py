@@ -110,6 +110,7 @@ class AdvisorCalculationPlanner:
         savings_goal_months: Optional[int] = None,
         current_age: Optional[int] = None,
         target_retirement_age: Optional[int] = None,
+        tax_year: Optional[int] = None,
     ) -> dict[str, Any]:
         """Run every calculator this user's real data supports. Never raises into the turn."""
         try:
@@ -299,18 +300,23 @@ class AdvisorCalculationPlanner:
                 except Exception as exc:  # noqa: BLE001
                     log.warning("tax calculator %s failed: %s", getattr(fn, "calc_id", fn), exc)
 
+            # PRIOR-YEAR QUESTIONS. "What did I pay in 2024?" is answerable because every table is
+            # kept, not replaced — but only if the year reaches the calculators. Without this the
+            # advisor silently answered every tax question on the current year, which is wrong in a
+            # way the user cannot see: the figure looks like an answer to what they asked.
             run_tax(tax_calc.federal_income_tax, gross_income=annual_income,
-                    filing_status=filing_status)
-            run_tax(tax_calc.fica, wages=annual_income, filing_status=filing_status)
+                    filing_status=filing_status, tax_year=tax_year)
+            run_tax(tax_calc.fica, wages=annual_income, filing_status=filing_status,
+                    tax_year=tax_year)
             # The highest-value tax figure for an advisor: every Roth, pre-tax-contribution and
             # raise question turns on the marginal rate, and `assumptions.marginal_tax_rate` has
             # been standing in for it.
             run_tax(tax_calc.effective_marginal_rate, gross_income=annual_income,
-                    filing_status=filing_status)
+                    filing_status=filing_status, tax_year=tax_year)
             tax_state = _present(inputs, "tax_state")
             if tax_state:
                 run_tax(tax_calc.state_income_tax, taxable_income=annual_income,
-                        state=str(tax_state), filing_status=filing_status)
+                        state=str(tax_state), filing_status=filing_status, tax_year=tax_year)
         elif annual_income:
             gaps.append(_gap(inputs, "tax.effective_marginal_rate", ["filing_status"]))
 
@@ -334,12 +340,15 @@ class AdvisorCalculationPlanner:
             # everything into Tier 1 would let a 25-year projection be asserted as a present fact.
             "scenario_numbers": sorted(_allowed_numbers(scenario)),
             "gaps": gaps,
+            "tax_year_requested": tax_year,
             "source": "Deterministic calculators over canonical finance inputs",
             "constraints": [
                 "Cite these computed figures as given; never recompute or adjust them.",
                 "A result with tier='scenario' MUST be presented as an estimate and its assumptions "
                 "named — never as the user's actual figure.",
                 "A gap is a question to ASK, never a number to assume.",
+                "A tax figure states the year's law it was computed on. Never present a figure "
+                "from one tax year as though it answered a question about another.",
             ],
         }
 
