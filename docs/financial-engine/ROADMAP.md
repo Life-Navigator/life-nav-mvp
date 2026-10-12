@@ -100,10 +100,30 @@ S/M/L — because estimates I invent are worth less than the ordering.
 
 ### Milestone 2 — "What should I do about it?" (ledger readouts)
 
-> **Status 2026-10-12: all of Milestone 1 and all of Milestone 2 are DONE except spousal +
-> survivor Social Security.** 1.1 Monte Carlo, 1.2 stress tests, 1.3 what-ifs + solve-for, 2.1
-> sequencing, 2.2 Roth ladder, 2.3 claiming ages, 2.4 the three leaf calculators, 2.5 RMD table,
-> pension lump sum and spending guardrails.
+> **Status 2026-10-12: Milestone 1 and Milestone 2 are COMPLETE.** 1.1 Monte Carlo, 1.2 stress
+> tests, 1.3 what-ifs + solve-for, 2.1 sequencing, 2.2 Roth ladder, 2.3 claiming ages **including
+> spousal and survivor**, 2.4 the three leaf calculators, 2.5 RMD table, pension lump sum and
+> spending guardrails.
+>
+> `household_claiming` closed 2.3 by comparing claiming-age **pairs**, because the two claims
+> interact three ways that optimising them separately gets wrong: the lower earner may be on a
+> spousal top-up off the higher earner's record; the survivor steps up to the larger benefit for
+> life, **inheriting the deceased's delayed credits**; and the survivor then files single, so the
+> ledger's widow's penalty applies. Every statutory factor was checked against SSA rather than
+> recalled - spousal 32.5% at 62 with **no** delayed credits, survivor 71.5% at 60 with a maximum
+> 28.5% reduction.
+>
+> Four bugs surfaced here, and the third is the instructive one. The survivor rebuild set the
+> lower earner's start age to `min(age_lo, age_hi)`, which moved their benefit **earlier** than
+> they claimed it - paying a 67-year-old's benefit from 62 whenever the higher earner claimed at
+> 62, worth about $105,000 - and that made **claiming early win at every funding level**, the exact
+> opposite of the advice the function exists to give. It was caught by checking the ranking against
+> an independent present-value calculation of the benefit stream ($726,557 / $766,255 / $785,367 at
+> 62 / 67 / 70), not by reading the code: the margins were small enough to look like a close call.
+> Also fixed: an off-by-one that paid the deceased's benefit and the survivor step-up in the same
+> year; `first_to_go` chosen by life **expectancy** instead of years remaining (wrong whenever the
+> spouses are different ages - an 80-year-old expected to reach 85 dies before a 62-year-old
+> expected to reach 84); and a spousal top-up paid before the worker had filed.
 >
 > Along the way the ledger gained **composable planned spending** (owner request): a goal can be
 > built from line items — flights, hotel, venue, caterer — with `optional` lines the household
@@ -129,7 +149,7 @@ All of Phase F, and all of it is a readout rather than a formula.
 | --- | ----------------------------------------------------------------------------------------------------------------------------------- | ---- |
 | 2.1 | `withdrawal_sequencing` — compare ledgers under different orders; the machinery exists                                              | M    |
 | 2.2 | `roth_conversion_ladder` — fill brackets to the top each year against the ledger's own tax                                          | M    |
-| 2.3 | Social Security claiming (62 / FRA / 70, spousal + survivor)                                                                        | M    |
+| 2.3 | Social Security claiming (62 / FRA / 70, spousal + survivor) - `household_claiming` compares PAIRS                                  | M    |
 | 2.4 | `expense_ratio_drag`, real-vs-nominal toggle, `lump_sum_vs_dca`                                                                     | S    |
 | 2.5 | RMD refinement (real uniform-lifetime table; the ledger currently approximates), pension lump sum vs annuity, withdrawal guardrails | M    |
 

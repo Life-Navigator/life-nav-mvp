@@ -55,7 +55,11 @@ from .strategies import (  # noqa: F401
     StrategyResult,
     claiming_factor,
     roth_conversion_ladder,
+    effective_spouse_benefit,
+    household_claiming,
     social_security_claiming,
     spending_guardrails,
+    spousal_factor,
+    survivor_factor,
     withdrawal_sequencing,
 )

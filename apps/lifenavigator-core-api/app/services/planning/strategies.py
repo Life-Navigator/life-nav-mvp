@@ -550,3 +550,241 @@ def spending_guardrails(household: Household, *, tax_year: Optional[int] = None,
                          tax_year=tax_year).tax_year,
         assumptions=[mean_cited.as_dict(), vol_cited.as_dict()],
     )
+
+
+# ── 2.3 Spousal and survivor Social Security ──────────────────────────────────────────────────────
+# Statutory, verified against SSA sources 2026-10-12:
+#
+#   OWN benefit      early: 5/9 of 1%/month for 36 months, then 5/12 of 1%/month
+#                    late:  2/3 of 1%/month to 70 (delayed retirement credits)
+#   SPOUSAL benefit  up to 50% of the worker's PIA at the SPOUSE's FRA
+#                    early: 25/36 of 1%/month for 36 months, then 5/12 of 1%/month
+#                    -> 32.5% of PIA at 62 against an FRA of 67 (a 35% reduction from the 50%)
+#                    NO delayed retirement credits — waiting past FRA adds nothing
+#   SURVIVOR benefit up to 100% of what the deceased was receiving (or their PIA, plus any DRCs
+#                    they earned), claimable from 60, maximum reduction 28.5%
+#                    -> 71.5% at 60 against an FRA of 67
+#
+# THE ASYMMETRY IS THE WHOLE PLANNING POINT. A spousal benefit earns NO credit for waiting, but a
+# survivor benefit INHERITS the credits the deceased earned. So the higher earner delaying to 70 is
+# not just a bet on their own longevity — it permanently raises the income of whichever spouse lives
+# longer. That is survivor insurance, and it compounds with the widow's penalty the ledger already
+# models: the survivor files single, on narrower brackets, for every remaining year.
+
+SPOUSAL_MAX_SHARE = 0.50
+SURVIVOR_MAX_REDUCTION = 0.285
+SURVIVOR_EARLIEST_AGE = 60
+
+
+def spousal_factor(claim_age: float, *, fra: int = FULL_RETIREMENT_AGE) -> float:
+    """Share of the WORKER's PIA payable as a spousal benefit at `claim_age`.
+
+    Caps at 50% — the one place where "wait longer" is simply wrong advice, because unlike an own
+    benefit a spousal benefit earns no delayed retirement credits. A tool that applied the own-
+    benefit uplift here would tell a spouse to wait past their FRA for nothing.
+    """
+    if claim_age < EARLIEST_CLAIM_AGE:
+        raise PlanningError(f"a spousal benefit cannot start before {EARLIEST_CLAIM_AGE}")
+    months_early = max(0, round((fra - claim_age) * 12))
+    if months_early == 0:
+        return SPOUSAL_MAX_SHARE
+    first = min(months_early, 36)
+    beyond = max(0, months_early - 36)
+    reduction = (first * (25.0 / 36.0) + beyond * (5.0 / 12.0)) / 100.0
+    return SPOUSAL_MAX_SHARE * (1.0 - reduction)
+
+
+def survivor_factor(claim_age: float, *, fra: int = FULL_RETIREMENT_AGE) -> float:
+    """Share of the DECEASED's benefit payable to a surviving spouse at `claim_age`.
+
+    The maximum reduction is fixed at 28.5% regardless of the FRA, so the per-month rate is derived
+    from the window rather than hardcoded — that is how the statute keeps the 28.5% constant as the
+    FRA moves.
+    """
+    if claim_age < SURVIVOR_EARLIEST_AGE:
+        raise PlanningError(
+            f"a survivor benefit cannot start before {SURVIVOR_EARLIEST_AGE}")
+    if claim_age >= fra:
+        return 1.0
+    window_months = (fra - SURVIVOR_EARLIEST_AGE) * 12
+    months_early = round((fra - claim_age) * 12)
+    return 1.0 - SURVIVOR_MAX_REDUCTION * (months_early / window_months)
+
+
+def effective_spouse_benefit(*, own_pia: float, worker_pia: float, claim_age: float,
+                             fra: int = FULL_RETIREMENT_AGE) -> dict[str, Any]:
+    """What the lower earner actually receives: the GREATER of their own benefit or the spousal one.
+
+    NOT the sum. Social Security pays the higher of the two, which people routinely misunderstand as
+    stacking — and the misunderstanding inflates a household's expected income by thousands a year.
+    """
+    own = own_pia * claiming_factor(claim_age, fra=fra)
+    spousal = worker_pia * spousal_factor(claim_age, fra=fra)
+    return {
+        "own_benefit": round(own, 2),
+        "spousal_benefit": round(spousal, 2),
+        "received": round(max(own, spousal), 2),
+        "basis": "own record" if own >= spousal else "spousal top-up",
+        "top_up": round(max(0.0, spousal - own), 2),
+        "note": ("Social Security pays the HIGHER of the two, not the sum — a spousal benefit tops "
+                 "an own benefit up to the spousal amount, it does not add to it."),
+    }
+
+
+def household_claiming(household: Household, *, pias: dict[str, float],
+                       tax_year: Optional[int] = None,
+                       claim_ages: tuple[int, ...] = (62, 67, 70)) -> StrategyResult:
+    """Compare claiming-age PAIRS for a couple, with the spousal top-up and the survivor step-up.
+
+    WHY PAIRS AND NOT TWO SEPARATE DECISIONS. The two claims interact three ways, and optimising
+    them independently gets all three wrong:
+
+      * the lower earner's benefit may be a spousal top-up off the HIGHER earner's PIA;
+      * whoever survives steps up to the larger of the two benefits for life, INHERITING any delayed
+        credits the deceased earned; and
+      * when one dies the survivor files single, so the same income is taxed on narrower brackets —
+        which the ledger already models as the widow's penalty.
+
+    The practical consequence, and the thing this function exists to show: **delaying the HIGHER
+    earner's claim is survivor insurance.** It raises the floor under whichever spouse lives longer,
+    and it is usually worth more than optimising the lower earner's date.
+
+    `pias` maps each person's name to their primary insurance amount — the benefit at their own FRA,
+    which is what an SSA statement reports. Required, never estimated: a household's claiming answer
+    turns entirely on the relative size of the two records.
+    """
+    if len(household.people) != 2:
+        raise PlanningError(
+            "household_claiming compares a COUPLE's two claims; use social_security_claiming for "
+            "one person")
+    names = [p.name for p in household.people]
+    missing = [n for n in names if n not in pias or pias[n] < 0]
+    if missing:
+        raise PlanningError(
+            f"a primary insurance amount is required for {missing} — the answer turns entirely on "
+            f"the relative size of the two records, so it cannot be estimated")
+
+    higher = max(names, key=lambda n: pias[n])
+    lower = next(n for n in names if n != higher)
+
+    candidates: list[Candidate] = []
+    for age_hi in claim_ages:
+        for age_lo in claim_ages:
+            h = _with_order(household, household.withdrawal_order)
+            h.income_sources = [s for s in h.income_sources
+                                if "social security" not in s.label.lower()]
+
+            hi_benefit = pias[higher] * claiming_factor(age_hi)
+            lo = effective_spouse_benefit(own_pia=pias[lower], worker_pia=pias[higher],
+                                          claim_age=age_lo)
+            h.income_sources.append(IncomeSource(
+                label="Social Security", annual_amount=hi_benefit, owner=higher,
+                start_age=age_hi, taxable_share=0.85))
+            # A SPOUSAL TOP-UP CANNOT BE PAID BEFORE THE WORKER FILES. The lower earner may claim
+            # their own record at 62, but the top-up to half the worker's PIA only begins once the
+            # higher earner has actually claimed. Modelling the top-up from the lower earner's own
+            # claim date pays it years early and makes "she claims early, he delays" look free.
+            lower_person = next(p for p in household.people if p.name == lower)
+            higher_person = next(p for p in household.people if p.name == higher)
+            lower_age_at_hi_claim = lower_person.current_age + (age_hi - higher_person.current_age)
+            top_up_from = max(age_lo, lower_age_at_hi_claim)
+            lo_own = pias[lower] * claiming_factor(age_lo) if pias[lower] > 0 else 0.0
+
+            if lo["top_up"] > 0 and top_up_from > age_lo:
+                # Own record first, then the topped-up amount once the worker has filed.
+                if lo_own > 0:
+                    h.income_sources.append(IncomeSource(
+                        label="Social Security", annual_amount=lo_own, owner=lower,
+                        start_age=age_lo, end_age=top_up_from - 1, taxable_share=0.85))
+                h.income_sources.append(IncomeSource(
+                    label="Social Security", annual_amount=lo["received"], owner=lower,
+                    start_age=top_up_from, taxable_share=0.85))
+            else:
+                h.income_sources.append(IncomeSource(
+                    label="Social Security", annual_amount=lo["received"], owner=lower,
+                    start_age=age_lo, taxable_share=0.85))
+
+            # SURVIVOR STEP-UP. Whoever outlives the other keeps the LARGER benefit, including the
+            # deceased's delayed credits. Modelled as the survivor's own stream ending and a
+            # stepped-up one beginning at the first death.
+            # WHO GOES FIRST IS A DATE, NOT AN AGE. Picking the lower life EXPECTANCY is wrong
+            # whenever the two spouses are different ages: an 80-year-old expected to reach 85 dies
+            # five years out, long before a 62-year-old expected to reach 84. Rank by years
+            # remaining.
+            first_to_go = min(household.people,
+                              key=lambda p: p.life_expectancy - p.current_age)
+            survivor = next(p for p in household.people if p.name != first_to_go.name)
+            survivor_stream = 0.0
+            if (survivor.life_expectancy - survivor.current_age
+                    > first_to_go.life_expectancy - first_to_go.current_age):
+                deceased_benefit = (hi_benefit if first_to_go.name == higher
+                                    else lo["received"])
+                survivor_own = (lo["received"] if first_to_go.name == higher else hi_benefit)
+                # OFF-BY-ONE THAT DOUBLE-PAID. `Person.is_alive_in` keeps someone alive while
+                # age <= life_expectancy, so the deceased is still collecting IN the year they
+                # reach that age — the first year they are gone is one later. Starting the survivor
+                # stream at `life_expectancy - current_age` paid the deceased's benefit AND the
+                # survivor's step-up in the same year, inflating household income by a full
+                # benefit for twelve months.
+                first_gone_offset = (first_to_go.life_expectancy
+                                     - first_to_go.current_age) + 1
+                survivor_age_at_death = survivor.current_age + first_gone_offset
+                stepped = max(survivor_own,
+                              deceased_benefit * survivor_factor(
+                                  max(SURVIVOR_EARLIEST_AGE, survivor_age_at_death)))
+                if stepped > survivor_own and survivor_age_at_death < survivor.life_expectancy:
+                    survivor_stream = round(stepped, 2)
+                    # End the survivor's own stream at the first death and replace it.
+                    # THE SURVIVOR'S OWN STREAM KEEPS ITS OWN START DATE. This read
+                    # `min(age_lo, age_hi)`, which moved the lower earner's benefit EARLIER than
+                    # they claimed it — paying a 67-year-old's benefit from 62 whenever the higher
+                    # earner claimed at 62, and making early claiming win at every funding level.
+                    kept = [s for s in h.income_sources
+                            if s.owner == survivor.name and s.start_age is not None]
+                    own_start = min(s.start_age for s in kept) if kept else (
+                        age_lo if survivor.name == lower else age_hi)
+                    # If the survivor's own claim date falls AT OR AFTER the first death, there is
+                    # no "own benefit first" segment to model — they go straight onto the survivor
+                    # benefit. Emitting the segment anyway built an IncomeSource whose end_age
+                    # preceded its start_age.
+                    own_segment = ([IncomeSource(
+                        label="Social Security", annual_amount=survivor_own,
+                        owner=survivor.name, start_age=own_start,
+                        end_age=survivor_age_at_death - 1, taxable_share=0.85)]
+                        if own_start < survivor_age_at_death else [])
+                    h.income_sources = [
+                        s for s in h.income_sources if s.owner != survivor.name
+                    ] + own_segment + [
+                        IncomeSource(label="Social Security (survivor)", annual_amount=stepped,
+                                     owner=survivor.name, start_age=survivor_age_at_death,
+                                     taxable_share=0.85),
+                    ]
+
+            r = project(h, tax_year=tax_year)
+            candidates.append(_candidate(
+                f"{higher} at {age_hi}, {lower} at {age_lo}", r,
+                higher_earner=higher, higher_benefit=round(hi_benefit, 2),
+                lower_benefit=lo["received"], lower_basis=lo["basis"],
+                spousal_top_up=lo["top_up"], survivor_benefit=survivor_stream,
+                survivor_name=survivor.name if survivor_stream else None))
+
+    first = project(_with_order(household, household.withdrawal_order), tax_year=tax_year)
+    return StrategyResult(
+        strategy="household_claiming",
+        question=f"When should {names[0]} and {names[1]} each claim Social Security?",
+        candidates=candidates,
+        baseline_label=f"{higher} at {FULL_RETIREMENT_AGE}, {lower} at {FULL_RETIREMENT_AGE}",
+        tax_year=first.tax_year,
+        tax_basis_is_current_year=first.tax_basis_is_current_year,
+        assumptions=first.assumptions,
+        notes=(f"{higher} is the higher earner (PIA ${pias[higher]:,.0f} vs "
+               f"${pias[lower]:,.0f}).",
+               "A spousal benefit caps at 50% of the worker's PIA at the spouse's FRA and earns NO "
+               "delayed credits — waiting past FRA for a spousal benefit adds nothing.",
+               "A SURVIVOR benefit inherits the deceased's delayed credits, so delaying the higher "
+               f"earner's claim permanently raises the income of whichever spouse lives longer. "
+               f"That is usually worth more than optimising {lower}'s date.",
+               "Social Security pays the HIGHER of an own and a spousal benefit, never the sum.",
+               "Not modelled: the RIB-LIM cap when the deceased claimed early, the earnings test "
+               "before FRA, divorced-spouse and child benefits, the family maximum, and WEP/GPO."),
+    )
