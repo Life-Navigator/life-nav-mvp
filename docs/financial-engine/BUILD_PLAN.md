@@ -214,7 +214,7 @@ absorb an error. `credits.earned_income_credit.enabled: false` until sourced fro
 5. **Port `tax.ts` onto this tier.** Not mechanical — the web tier would call core-api over HTTP,
    making the browser-side tax page server-dependent. An architecture decision, not a move.
 
-### Phase B2 — Tax TREATMENT layer (rules, not rates) ← **designed 2026-10-11, not built**
+### Phase B2 — Tax TREATMENT layer (rules, not rates) · **B2-a + B2-b DONE (2026-10-11)**
 
 Owner ask: HSA, 401(k), HDHP, 7(a), securities-based lending, HELOC, short-term rentals, and the
 rest. **Full design in [TAX_TREATMENT_LAYER.md](TAX_TREATMENT_LAYER.md).**
@@ -230,10 +230,19 @@ over a `tax_parameters/<year>.json` that carries the dollar thresholds under the
 gate as the rate tables. A determination can be right about the rule and explicit that the limit is
 unverified.
 
-**~35-45 rules in three groups:** account wrappers (HSA/HDHP/FSA/401k/IRA/529/solo-k),
-debt-interest tracing (mortgage/HELOC/SBL-margin/7(a)/504/student), activity character
-(STR 7-day rule/LTR passive/SE+QBI/equity comp), plus cross-cutting (SALT, charitable, wash sale,
-§1031, §121, step-up).
+**Shipped — B2-a account wrappers (5):** `hdhp_qualifies`, `hsa_contribution`,
+`fsa_hsa_compatibility`, `k401_deferral`, `ira_deduction`.
+
+**Shipped — B2-b debt interest (6):** `mortgage`, `heloc`, `investment` (§163(d) margin/SBL),
+`business` (§163(j) 7(a)/504), `student_loan`, and `after_tax_cost` — the bridge into Phase L.
+
+**The headline result:** at a 32% marginal rate an **8% deductible HELOC costs 5.44% after tax while
+a 7% non-deductible margin loan costs 7.00%**. The cheaper-looking loan is the more expensive one,
+and no rate comparison reveals it. `financing_optimizer` was going to be wrong without this.
+
+**Still to build:** B2-a's 529 / solo-401(k) / early-withdrawal rules, all of B2-c (activity
+character — the STR 7-day rule, LTR passive losses, SE+QBI, equity comp), and the cross-cutting set
+(SALT, charitable, wash sale, §1031, §121, step-up).
 
 **SEQUENCING CHANGE:** B2-a (wrappers) and B2-b (debt interest) must land **before F and L**, not
 after. `offer_impact` cannot value "HSA with HDHP and limited FSA" without the eligibility test and
@@ -243,7 +252,12 @@ nothing in the plan could see that until B2.
 
 **Found while designing:** `comp_benefits.py:23-25` hardcodes `FSA_CAP = 3300`,
 `HSA_CAP_INDIVIDUAL = 4300`, `HSA_CAP_FAMILY = 8550` — annual limits in source, in the web-facing
-benefits service, invisible to the tax engine. Same defect class as `BRACKETS_2024`.
+benefits service, invisible to the tax engine. Same defect class as `BRACKETS_2024`. Those values
+also look like **2025** figures, not 2024, which is the kind of year-mismatch a dated file makes
+visible and a module constant never does. `comp_benefits` should be repointed at
+`tax_parameters/<year>.json`; not done yet.
+
+**1,660 tests pass.** Commit after `af1a3991`.
 
 ### Phase C — Cash flow & paycheck
 

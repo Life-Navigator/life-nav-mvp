@@ -96,6 +96,12 @@ FAMILIES: dict[str, DatasetFamily] = {
         DatasetFamily("state_tax", "State income tax tables", CARRY_FORWARD, phase="B"),
         # Phase F. Published in the autumn for the following year; a gap here is a process miss.
         DatasetFamily("contribution_limits", "401k/IRA/HSA/FSA limits", STRICT, phase="F"),
+        # Phase B2. The dollar thresholds that statutory RULES test against, kept apart from the
+        # rate schedules in `tax_tables` because the split is load-bearing: the rules are stable
+        # across years and encodable now, these amounts are not. CARRY_FORWARD because a rule
+        # applied with last year's labelled threshold is far more useful than no determination at
+        # all — and the label says which year it came from.
+        DatasetFamily("tax_parameters", "Statutory thresholds for tax rules", CARRY_FORWARD, phase="B2"),
         # Phase I. Annual index refresh; carrying forward a year barely moves a COL ratio.
         DatasetFamily("col_index", "Cost-of-living index by metro", CARRY_FORWARD, phase="I"),
         # Phase L. Rates move constantly, so a stale table is a materially wrong quote. Strict.

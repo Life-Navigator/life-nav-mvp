@@ -32,15 +32,26 @@ _SERVICES_DIR = os.path.dirname(A.__file__)
 # carries its own reason.
 
 PENDING_DATA: dict[str, str] = {
-    "state_tax": "only 2024 exists. Needs the current year, plus the top ~12 states by user count "
-                 "in `bracketed` with per-status schedules (CA/NY/NJ/MA/VA/MD/GA/OH/AZ/WI/MN/OR).",
+    "state_tax": "only 2024 exists. Needs the current year; the top ~12 states by user count are "
+                 "now modelled but their rates are unverified (see PENDING_VERIFICATION).",
+    "tax_parameters": "only 2024 exists. Needs the current year's HSA/HDHP/FSA limits (Pub 969), "
+                      "retirement limits (annual IRS notice), and debt-interest thresholds "
+                      "(Pub 936/550/970). The RULES that consume them do not need re-verification.",
 }
 
 PENDING_VERIFICATION: dict[str, str] = {
     "tax_tables": "2026.json was populated from model knowledge, not a primary source. Every "
                   "bracket threshold, standard deduction, SS wage base and LTCG threshold must be "
                   "checked against the IRS Rev. Proc. for TY2026 and the SSA wage-base "
-                  "announcement, then set _meta.verified: true.",
+                  "announcement, then set _meta.verified: true. The `credits` section is "
+                  "separately unverified in BOTH years — unlike the brackets it had no "
+                  "independent cross-check available in this repo.",
+    "tax_parameters": "Phase B2 thresholds (HSA/HDHP/FSA, retirement limits, mortgage and "
+                      "investment-interest caps, passive-activity figures) came from model "
+                      "knowledge. Verify against Pub 969, the annual retirement-limits notice, "
+                      "Pub 936, Pub 550, Pub 970 and Pub 925. NOTE: the RULES in tax_wrappers.py "
+                      "and tax_debt_interest.py are statutory structure and are NOT pending — "
+                      "only these amounts are.",
 }
 
 

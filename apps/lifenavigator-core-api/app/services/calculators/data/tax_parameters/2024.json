@@ -1,0 +1,82 @@
+{
+  "_meta": {
+    "tax_year": 2024,
+    "verified": false,
+    "verification_required": "Every dollar amount below must be checked against its IRS publication or revenue procedure. The RULES that consume them (tax_wrappers.py, tax_debt_interest.py) are statutory structure and do not need annual re-verification; these amounts do.",
+    "why_split_from_tax_tables": "Deliberate separation. tax_tables holds rate SCHEDULES; this holds the thresholds that statutory RULES test against. The rules are stable across years and encodable with high confidence; these numbers are not. Keeping them apart lets a determination be correct about the rule while explicit that the limit is unverified.",
+    "source": "UNVERIFIED — populate from Pub 969 (HSA/HDHP/FSA), Notice 2023-75 (retirement limits), Pub 936 (mortgage interest), Pub 550 (investment interest), Pub 970 (student loan interest), Pub 925 (passive activity)",
+    "note": "comp_benefits.py:23-25 currently hardcodes FSA_CAP=3300, HSA_CAP_INDIVIDUAL=4300, HSA_CAP_FAMILY=8550. Those look like 2025 figures, not 2024 — which is exactly the kind of year-mismatch a dated file makes visible and a module constant does not."
+  },
+  "hsa": {
+    "contribution_limit": { "self_only": 4150, "family": 8300 },
+    "catch_up_amount": 1000,
+    "catch_up_age": 55,
+    "medicare_age_blocks_contributions": 65,
+    "non_qualified_withdrawal_penalty": 0.2,
+    "penalty_waived_age": 65,
+    "testing_period_months": 13
+  },
+  "hdhp": {
+    "min_annual_deductible": { "self_only": 1600, "family": 3200 },
+    "max_out_of_pocket": { "self_only": 8050, "family": 16100 }
+  },
+  "fsa": {
+    "health_fsa_limit": 3200,
+    "health_fsa_carryover": 640,
+    "dependent_care_limit": {
+      "married_jointly": 5000,
+      "married_separately": 2500,
+      "single": 5000,
+      "head_of_household": 5000
+    }
+  },
+  "retirement": {
+    "elective_deferral_limit": 23000,
+    "catch_up_50": 7500,
+    "super_catch_up_60_63": 11250,
+    "super_catch_up_first_year": 2025,
+    "total_415c_limit": 69000,
+    "compensation_limit": 345000,
+    "ira_contribution_limit": 7000,
+    "ira_catch_up_50": 1000,
+    "ira_deduction_phase_out_covered": {
+      "single": [77000, 87000],
+      "married_jointly": [123000, 143000],
+      "married_separately": [0, 10000],
+      "head_of_household": [77000, 87000]
+    },
+    "roth_contribution_phase_out": {
+      "single": [146000, 161000],
+      "married_jointly": [230000, 240000],
+      "married_separately": [0, 10000],
+      "head_of_household": [146000, 161000]
+    },
+    "early_withdrawal_penalty": 0.1,
+    "early_withdrawal_age": 59.5,
+    "rule_of_55_age": 55,
+    "rmd_age": 73
+  },
+  "debt_interest": {
+    "mortgage_acquisition_cap": 750000,
+    "mortgage_acquisition_cap_grandfathered": 1000000,
+    "grandfather_cutoff_date": "2017-12-15",
+    "student_loan_interest_cap": 2500,
+    "student_loan_phase_out": {
+      "single": [80000, 95000],
+      "married_jointly": [165000, 195000],
+      "head_of_household": [80000, 95000]
+    },
+    "business_interest_163j_pct_of_ati": 0.3,
+    "business_interest_small_business_gross_receipts": 30000000
+  },
+  "passive_activity": {
+    "rental_loss_allowance": 25000,
+    "rental_loss_phase_out": [100000, 150000],
+    "short_term_rental_average_stay_days": 7,
+    "material_participation_hours": 500,
+    "real_estate_professional_hours": 750,
+    "augusta_rule_days": 14,
+    "residential_depreciation_years": 27.5,
+    "section_1250_recapture_rate": 0.25
+  }
+}
