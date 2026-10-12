@@ -35,6 +35,16 @@ _REGISTRY: dict[str, Assumption] = {a.key: a for a in [
     Assumption("ss_replacement", 0.30, "% of income", "Social Security replacement (estimate)", "Used ONLY when no SSA statement is uploaded; SS replaces ~30-40% for median earners.", "retirement"),
     Assumption("salary_growth", 0.03, "annual %", "Salary growth", "Typical merit + inflation raise; your offers/history override this.", "career"),
     Assumption("equity_vest_years", 4, "years", "Equity vesting period", "Standard 4-year vest; your grant terms override this.", "career"),
+    # Phase A: five values `tools.py` previously hardcoded inline (retirement age 65, a 25-year
+    # working horizon, a 7-year rent-vs-buy horizon, and the 28/36 DTI rule). Each was an invented
+    # assumption in exactly the sense this module's docstring forbids — unlabelled, uncitable, and
+    # invisible to the user it was applied to.
+    Assumption("default_contribution_rate_pct", 6.0, "% of income", "Assumed retirement contribution rate", "6% is the most common default-enrolment rate and the typical employer-match threshold; your stated rate overrides it.", "retirement"),
+    Assumption("retirement_age", 65, "age", "Planning retirement age", "Near full Social Security retirement age for current workers; your stated target overrides this.", "retirement"),
+    Assumption("working_years_horizon", 25, "years", "Working-years horizon", "A ~25-year remaining career is the conventional horizon for degree and training payback; your age and stated plans override it.", "career"),
+    Assumption("rent_vs_buy_horizon", 7, "years", "Rent-vs-buy horizon", "Median US homeowner tenure is roughly 7-8 years; shorter holds favour renting because closing costs are not yet recovered.", "housing"),
+    Assumption("dti_front_pct", 0.28, "% of gross income", "Housing payment limit (front-end DTI)", "The conventional 28% front-end ratio lenders apply to housing cost vs gross income.", "housing"),
+    Assumption("dti_back_pct", 0.36, "% of gross income", "Total debt limit (back-end DTI)", "The conventional 36% back-end ratio lenders apply to all debt payments vs gross income.", "housing"),
     Assumption("marginal_tax_rate", 0.24, "%", "Marginal tax rate (fallback)", "Used only when income is unknown; otherwise computed from your income bracket.", "tax"),
 ]}
 

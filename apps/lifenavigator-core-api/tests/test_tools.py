@@ -4,7 +4,9 @@ from __future__ import annotations
 import pytest
 
 from app.models.common import UserContext
-from app.services.tools import REGISTRY, ToolRunner, emergency_fund, debt_payoff, home_affordability, retirement_projection, k401_match, degree_roi
+from app.services.tools import (REGISTRY, ToolInputError, ToolRunner, debt_payoff, degree_roi,
+                                emergency_fund, home_affordability, k401_match,
+                                retirement_projection)
 from .conftest import FakeSupabase
 
 CTX = UserContext(user_id="11111111-1111-1111-1111-111111111111")
@@ -52,8 +54,62 @@ def test_retirement_projection_deterministic_and_cited():
 
 
 def test_edge_cases_no_fabrication():
-    assert emergency_fund({})["confidence"] < 0.5  # no inputs -> low confidence, not a fake number
+    """Phase A strengthened this: no inputs now RAISES rather than returning a low-confidence zero.
+
+    The original assertion (`confidence < 0.5`) encoded the weaker guarantee. A $0 emergency-fund
+    target with "0.0 months covered" is a fabricated finding about the user whatever confidence is
+    attached to it, and a low number in a `confidence` field is not something a reader of the figure
+    ever sees. Refusing to answer, and naming the input needed, is the honest version.
+    """
+    with pytest.raises(ToolInputError, match="monthly_expenses is required"):
+        emergency_fund({})
+    # A present-but-unparseable value is also a question, never a zero.
+    with pytest.raises(ToolInputError, match="is not a number"):
+        emergency_fund({"monthly_expenses": "around 4k", "current_cash": 0})
+    # An explicit empty debt list is a real answer, not a missing input — that distinction stands.
     assert debt_payoff({"debts": []})["outputs"]["available"] is False
+
+
+def test_zero_is_accepted_where_it_is_a_real_answer_and_refused_where_it_is_not():
+    """`allow_zero` draws the line: $0 of cash is a fact; $0 of monthly expenses is a divisor."""
+    ok = emergency_fund({"monthly_expenses": 3000, "current_cash": 0})
+    assert ok["outputs"]["months_covered"] == 0.0 and ok["outputs"]["gap"] == 18000.0
+    with pytest.raises(ToolInputError, match="must be greater than zero"):
+        emergency_fund({"monthly_expenses": 0, "current_cash": 5000})
+
+
+def test_ui_decorated_values_still_parse():
+    """"$4,000" and "6%" are real inputs from a form, not errors."""
+    out = emergency_fund({"monthly_expenses": "$4,000", "current_cash": "12,000"})
+    assert out["outputs"]["target"] == 24000.0
+
+
+def test_formerly_inline_assumptions_are_now_cited():
+    """R2: five values were hardcoded in this module. Each must now appear in the lineage."""
+    ha = home_affordability({"annual_income": 150000, "monthly_debts": 500, "down_payment": 60000})
+    keys = {a.get("key") for a in ha["assumptions"] if isinstance(a, dict)}
+    assert {"dti_front_pct", "dti_back_pct", "mortgage_term_months"} <= keys
+
+    rp = retirement_projection({"current_age": 40, "current_assets": 100000,
+                                "annual_contribution": 12000, "income": 150000})
+    assert "retirement_age" in {a.get("key") for a in rp["assumptions"] if isinstance(a, dict)}
+
+    dr = degree_roi({"tuition_total": 80000, "years_in_school": 2,
+                     "salary_before": 90000, "salary_after": 140000})
+    assert "working_years_horizon" in {a.get("key") for a in dr["assumptions"] if isinstance(a, dict)}
+    assert dr["outputs"]["horizon_years"] == 25
+
+
+def test_retirement_projection_omits_the_target_when_income_is_unknown():
+    """Two questions, one tool. Without income the balance still projects; the TARGET must be None
+    rather than $0, which would read as 'fully funded'."""
+    out = retirement_projection({"current_age": 40, "current_assets": 100000,
+                                 "annual_contribution": 12000})["outputs"]
+    assert out["projected_assets"] > 100000
+    assert out["target_nest_egg"] is None
+    assert out["funding_gap"] is None
+    assert out["readiness_ratio"] is None
+    assert out["on_track"] is None
 
 
 @pytest.mark.asyncio

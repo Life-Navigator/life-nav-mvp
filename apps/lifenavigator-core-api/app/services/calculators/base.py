@@ -190,6 +190,34 @@ def require_rate(name: str, v: Any) -> float:
     return f
 
 
+def require_discount_rate(name: str, v: Any) -> float:
+    """A rate used for DISCOUNTING, which may legitimately be negative.
+
+    Distinct from `require_rate` on purpose. `require_rate` guards *growth* inputs — a return, an
+    inflation rate, an APR — where a negative value is almost always a sign error, so rejecting it
+    catches bugs. Discounting is different in two ways that matter:
+
+      * A negative discount rate is meaningful (deflation), and
+      * IRR is frequently negative. A loss-making purchase has a real, negative internal rate of
+        return, and `npv(irr(flows), flows) == 0` must hold for it. With `require_rate` on `npv`,
+        verifying a negative IRR raised instead of returning zero — the defining property of IRR
+        became unprovable for exactly the cases a user most needs told about.
+
+    Still rejects values above 1.0 (the unconverted-percent guard from R5) and anything at or below
+    -1.0, where `(1 + r)` reaches zero and every discount factor divides by it.
+    """
+    f = _finite(name, v)
+    if f <= -1.0:
+        raise CalculatorError(
+            f"{name}={f} is at or below -100%; the discount factor (1+{name}) would be zero or negative"
+        )
+    if f > _MAX_PLAUSIBLE_ANNUAL_RATE:
+        raise CalculatorError(
+            f"{name}={f} looks like a percent, not a decimal fraction — pass {f / 100:g} for {f:g}%"
+        )
+    return f
+
+
 def require_months(name: str, v: Any, *, maximum: int = 1200) -> int:
     """A whole number of months, at least 1. `maximum` defaults to 100 years."""
     try:

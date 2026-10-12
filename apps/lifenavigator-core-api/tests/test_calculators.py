@@ -385,10 +385,27 @@ def test_withdrawal_rate_of_zero_is_refused():
 
 # ── Contract-wide invariants ─────────────────────────────────────────────────────────────────────
 def test_every_registered_calculator_is_addressable_by_its_reported_id():
-    """A cited figure must be traceable to the function that produced it."""
-    assert len(C.available()) == 10
-    for calc_id in C.available():
-        assert C.get(calc_id) is not None
+    """A cited figure must be traceable to the function that produced it.
+
+    Asserts the CONTRACT, not a count. This was `len(C.available()) == 10`, which made the test
+    order-dependent — it passed alone and failed in the full suite as soon as Phase A registered the
+    three shared primitives, because the registry is module-global and only populated for modules
+    that happen to have been imported. Every subsequent phase would have broken it again.
+    """
+    ids = C.available()
+    assert ids, "the calculator registry is empty"
+    assert len(ids) == len(set(ids)), "duplicate calculator ids"
+    for calc_id in ids:
+        assert C.get(calc_id) is not None, calc_id
+        assert calc_id.count(".") == 1, f"{calc_id} should be '<module>.<name>'"
+
+    # The Phase 2 set must remain present and addressable; later phases only ADD.
+    phase2 = {
+        "debt.amortized_payment", "debt.total_interest", "debt.payoff_months", "debt.avalanche_order",
+        "money.future_value", "money.monthly_contribution_for_target", "money.monthly_surplus",
+        "retirement.projected_balance", "retirement.sustainable_income", "retirement.balance_needed",
+    }
+    assert phase2 <= set(ids), f"missing Phase 2 calculators: {sorted(phase2 - set(ids))}"
 
 
 def test_a_result_that_made_assumptions_cannot_claim_strict_tier():

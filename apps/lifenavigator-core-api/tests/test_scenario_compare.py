@@ -102,13 +102,18 @@ async def test_retirement_scenarios_carry_tool_calculations():
     c = await _engine_with_tools(sb).compare(CTX, "retirement_timing")
     r55 = next(s for s in c["scenarios"] if s["scenario_id"] == "retire_55")
     r65 = next(s for s in c["scenarios"] if s["scenario_id"] == "retire_65")
-    # each scenario carries a deterministic retirement_projection tool run
+    assert r65["tool_calculations"][0]["skipped"] is True
+    # Each scenario still reaches for retirement_projection...
     assert r55["tool_calculations"] and r55["tool_calculations"][0]["tool"] == "retirement_projection"
-    assert "tool_run_id" in r55["tool_calculations"][0] and r55["tool_calculations"][0]["calculation"]
-    # retiring at 65 projects more assets than at 55 (deterministic, tool-derived difference)
-    a55 = r55["tool_calculations"][0]["outputs"]["projected_assets"]
-    a65 = r65["tool_calculations"][0]["outputs"]["projected_assets"]
-    assert a65 > a55
+    # ...but this fixture has no current_age, so the run is SKIPPED and says which input it needs.
+    # Phase A: it previously "succeeded" against a hardcoded age of 40 — a stranger's retirement
+    # horizon presented as this user's. An honest ask beats a confident wrong number.
+    skipped = r55["tool_calculations"][0]
+    assert skipped["skipped"] is True
+    assert skipped["needs_input"] == "current_age is required"
+    assert skipped["tool_run_id"] is None and skipped["calculation"] is None
+    # No numbers at all, for either variant — so nothing can be compared, and nothing is invented.
+    assert all(t["outputs"] == {} for s_ in c["scenarios"] for t in s_["tool_calculations"])
 
 
 @pytest.mark.asyncio
@@ -118,3 +123,48 @@ async def test_housing_scenario_runs_home_affordability_tool():
     c = await _engine_with_tools(sb).compare(CTX, "housing")
     buy = next(s for s in c["scenarios"] if s["scenario_id"] == "buy_now")
     assert any(t["tool"] == "home_affordability" for t in buy["tool_calculations"])
+
+
+@pytest.mark.asyncio
+async def test_retirement_scenarios_compute_real_numbers_once_age_is_known():
+    """The positive half of the Phase A change: with the user's real age present, the deterministic
+    run happens for real — a persisted tool_run_id and a stated calculation, no assumed horizon."""
+    class _Comp:
+        async def analyze(self, _ctx):
+            return {"total_compensation": {"base": 120000}}
+
+    sb = FakeSupabase({
+        "documents": [{"id": "k", "user_id": CTX.user_id, "doc_type": "401k_statement",
+                       "extracted_json": {"total_balance": "80000"}}],
+        "life_vision": [{"user_id": CTX.user_id, "prompts": {"current_age": 38}}],
+    })
+    await LifeDiscoveryService(sb).discover_goal(CTX, surface_goal="retire early",
+                                                 why_chain=[{"a": "freedom and independence"}])
+    from app.services.tools import ToolRunner
+    engine = ScenarioComparisonEngine(readiness=None, life=LifeDiscoveryService(sb), supabase=sb,
+                                      tools=ToolRunner(sb), comp=_Comp())
+    c = await engine.compare(CTX, "retirement_timing")
+    r55 = next(s for s in c["scenarios"] if s["scenario_id"] == "retire_55")
+    run = r55["tool_calculations"][0]
+    assert run.get("skipped") is not True
+    assert run["tool"] == "retirement_projection" and run["tool_run_id"] and run["calculation"]
+    assert run["outputs"]["projected_assets"] > 80000           # grew from the real balance
+    assert run["outputs"]["years_to_retirement"] == 55 - 38     # the USER's horizon, not an assumed one
+
+    # Retiring later projects more assets — the deterministic, tool-derived difference the old test
+    # checked, now verified on real runs instead of on a hardcoded age.
+    r65 = next(s_ for s_ in c["scenarios"] if s_["scenario_id"] == "retire_65")
+    assert r65["tool_calculations"][0]["outputs"]["projected_assets"] > run["outputs"]["projected_assets"]
+
+
+@pytest.mark.asyncio
+async def test_no_income_means_no_fabricated_degree_roi():
+    """`salary_after = income * 1.4` used to invent a 40% raise and `tuition_total = 0` a free
+    degree, so the MBA variant always 'paid back'. Both are now absent, so the tool asks."""
+    sb = FakeSupabase({})
+    await LifeDiscoveryService(sb).discover_goal(CTX, surface_goal="get an MBA",
+                                                 why_chain=[{"a": "advance my career"}])
+    engine = _engine_with_tools(sb)
+    base = await engine._financial_inputs(CTX)  # noqa: SLF001
+    for fabricated in ("tuition_total", "salary_after", "current_age", "monthly_debts"):
+        assert fabricated not in base, fabricated

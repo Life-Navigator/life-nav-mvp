@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from ..models.common import UserContext
+from . import assumptions as A
 
 PLAID = "Plaid sandbox persona"
 DOC = "Uploaded document"
@@ -281,9 +282,13 @@ class FinancialInputResolver:
                     "message": "Add the missing input(s) to run a real, deterministic retirement projection."}
 
         income = i["income"]["value"] if i["income"]["present"] else None
-        rate = i["retirement_contribution_rate"]["value"] if i["retirement_contribution_rate"]["present"] else 6.0
+        # Phase A (R2): was an inline `6.0`. A contribution rate the user never stated is an
+        # assumption, and an assumption must be citable and visible.
+        rate = (i["retirement_contribution_rate"]["value"] if i["retirement_contribution_rate"]["present"]
+                else A.value("default_contribution_rate_pct"))
         contribution = round((income or 0) * (float(rate) / 100), 2) if income else 0.0
-        tool_inputs = {"current_age": int(age), "retirement_age": int(retire_age) if retire_age else 65,  # type: ignore[arg-type]
+        tool_inputs = {"current_age": int(age),
+                       "retirement_age": int(retire_age) if retire_age else int(A.value("retirement_age")),  # type: ignore[arg-type]
                        "current_assets": i["retirement_balance"]["value"], "income": income, "annual_contribution": contribution}
         run = await runner.run(ctx, "retirement_projection", tool_inputs)
         return {"available": True, "source": "Deterministic tool run", "tool_run_id": run["tool_run_id"],

@@ -10,10 +10,21 @@ number. Where a real input is missing, the scenario says so and lowers its confi
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 from ..models.common import UserContext
 from . import assumptions as A
+from .tools import REGISTRY as TOOL_REGISTRY, ToolInputError
+
+
+def _num(v: Any) -> Optional[float]:
+    """A number, or None when absent/unparseable. None — never 0.0, which would read as a real age."""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    try:
+        return float(str(v).replace(",", "").replace("$", "").strip())
+    except (TypeError, ValueError):
+        return None
 
 # Competing-future sets. Each variant carries: objective influences (root -> signed magnitude),
 # tradeoffs, the registry assumptions that drive it, and the inputs it needs (missing -> lower conf).
@@ -140,21 +151,54 @@ class ScenarioComparisonEngine:
                 assets = assets or float(nw[0].get("net_worth") or 0)
         except Exception:  # noqa: BLE001
             pass
-        return {"income": income, "annual_income": income, "current_assets": assets,
-                "annual_contribution": round(income * 0.06, 2) if income else 0.0,
-                "current_age": 40, "monthly_debts": 0.0, "debts": debts,
-                "tuition_total": 0.0, "salary_before": income, "salary_after": round(income * 1.4, 2) if income else 0.0}
+        # current_age is the user's own data, read from where the resolver canonically stores it.
+        age: Optional[float] = None
+        try:
+            vis = await self._sb.select("life_vision", filters={"user_id": f"eq.{ctx.user_id}"}, limit=1, schema="life")
+            if vis:
+                age = _num((vis[0].get("prompts") or {}).get("current_age"))
+        except Exception:  # noqa: BLE001
+            pass
+
+        # OMIT WHAT WE DO NOT KNOW (Phase A, R4). This dict previously fabricated five inputs and
+        # handed them to user-visible scenario comparisons:
+        #   current_age: 40          — a hardcoded age, applied to every user regardless of theirs,
+        #                              so every retirement comparison ran on a stranger's horizon.
+        #   annual_contribution      — an inline 6% of income (now a registry assumption).
+        #   tuition_total: 0.0       — a free degree, which made `degree_roi` for the MBA variant
+        #   salary_after: income*1.4 — pay back instantly on a fabricated 40% raise.
+        #   monthly_debts: 0.0       — no debts, which inflates home affordability.
+        # Absent keys now stay absent, the tool raises, and the variant records WHICH input it
+        # needs. An honest "tell me your tuition" beats a confident ROI on numbers nobody supplied.
+        out: dict[str, Any] = {"debts": debts}
+        if income:
+            out["income"] = out["annual_income"] = out["salary_before"] = income
+            out["annual_contribution"] = round(income * A.value("default_contribution_rate_pct") / 100, 2)
+        if assets:
+            out["current_assets"] = assets
+        if age:
+            out["current_age"] = int(age)
+        return out
 
     async def _variant_tool_runs(self, ctx: UserContext, set_key: str, variant_id: str, base: dict) -> list[dict[str, Any]]:
         if self._tools is None:
             return []
-        runs = []
+        runs: list[dict[str, Any]] = []
         for tool_name, override in VARIANT_TOOLS.get(variant_id, []):
             try:
                 r = await self._tools.run(ctx, tool_name, {**base, **override}, scenario_id=f"{set_key}:{variant_id}")
                 runs.append({"tool": r["tool"], "label": r["label"], "outputs": r["outputs"],
-                             "confidence": r["confidence"], "calculation": r["calculation"], "tool_run_id": r["tool_run_id"]})
-            except Exception:  # noqa: BLE001
+                             "confidence": r["confidence"], "calculation": r["calculation"],
+                             "tool_run_id": r["tool_run_id"]})
+            # A MISSING INPUT IS NOT AN ERROR — it is a question for the user, so it is reported
+            # rather than swallowed. `except Exception: continue` used to be dead code (nothing
+            # raised when every input defaulted to zero); left as-is it would now return a scenario
+            # with no numbers and no explanation of why, which is worse than either outcome.
+            except ToolInputError as exc:
+                runs.append({"tool": tool_name, "label": TOOL_REGISTRY.get(tool_name, {}).get("label", tool_name),
+                             "skipped": True, "needs_input": str(exc), "outputs": {}, "confidence": 0.0,
+                             "calculation": None, "tool_run_id": None})
+            except Exception:  # noqa: BLE001 — an unexpected failure must not break the comparison
                 continue
         return runs
 
@@ -198,8 +242,9 @@ class ScenarioComparisonEngine:
             tool_runs = await self._variant_tool_runs(ctx, set_key, v["id"], base_inputs)
             # blend the deterministic tool confidence into the scenario confidence
             base_conf = max(0.4, 0.85 - 0.15 * len(missing))
-            if tool_runs:
-                tconf = sum(t["confidence"] for t in tool_runs) / len(tool_runs)
+            computed = [t for t in tool_runs if not t.get("skipped")]
+            if computed:
+                tconf = sum(t["confidence"] for t in computed) / len(computed)
                 confidence = round((base_conf + tconf) / 2, 2)
             else:
                 confidence = round(base_conf, 2)
