@@ -42,6 +42,38 @@ def _num(v: Any) -> Optional[float]:
         return None
 
 
+# The DB stores `married_filing_jointly`; the calculators and the web page both use
+# `married_jointly`. `tax.ts` already carries a dbToPageFilingStatus converter for the same reason,
+# so this is the THIRD vocabulary for one concept. Normalized here, at the resolver boundary, so
+# every consumer downstream sees one spelling — an unnormalized value would be rejected by
+# `tax._status()` deep inside a calculator, which reads as a bug rather than a data-shape mismatch.
+_FILING_STATUS_ALIASES = {
+    "single": "single",
+    "married_filing_jointly": "married_jointly",
+    "married_jointly": "married_jointly",
+    "mfj": "married_jointly",
+    "married_filing_separately": "married_separately",
+    "married_separately": "married_separately",
+    "mfs": "married_separately",
+    "head_of_household": "head_of_household",
+    "hoh": "head_of_household",
+    "qualifying_widow": "married_jointly",
+    "qualifying_surviving_spouse": "married_jointly",
+}
+
+
+def _filing_status(raw: Any) -> Optional[str]:
+    """Canonical filing status, or None. Never guesses `single`.
+
+    Defaulting to single would be the worst available choice: it halves every bracket threshold and
+    the standard deduction, so it OVERSTATES tax for a married filer by thousands — a confident
+    wrong number rather than a question.
+    """
+    if raw is None:
+        return None
+    return _FILING_STATUS_ALIASES.get(str(raw).strip().lower().replace("-", "_").replace(" ", "_"))
+
+
 def _band(c: float) -> str:
     return "High" if c >= 0.8 else "Medium" if c >= 0.5 else "Low"
 
@@ -105,6 +137,14 @@ class FinancialInputResolver:
         match = _num(k.get("employer_match"))
         th = (vis[0].get("prompts") or {}).get("time_horizon") if vis else None
 
+        # finance.tax_profiles — the single highest-impact canonical addition: `filing_status`
+        # alone unblocks seven tax calculators (see advisor_calc_coverage.coverage_report()).
+        tax_rows = await self._rows("tax_profiles", "finance", uid=ctx.user_id)
+        tax_row = max(tax_rows, key=lambda r: _num(r.get("tax_year")) or 0) if tax_rows else {}
+        filing_status = _filing_status(tax_row.get("filing_status"))
+        dependents = _num(tax_row.get("dependents"))
+        tax_state = (str(tax_row.get("state")).strip().upper() or None) if tax_row.get("state") else None
+
         last_updated = next((a.get("last_synced_at") for a in accounts if a.get("last_synced_at")), None)
         inputs = {
             "income": _field(income, income_src, origin="documents:offer_letter / compensation", confidence=0.85,
@@ -130,6 +170,18 @@ class FinancialInputResolver:
                                    prompt="When do you hope to reach your goal?", unlocks=["strategy selection"]),
             "housing_target": _field(None, MISSING, origin="user-entered", prompt="What home price are you considering?",
                                      unlocks=["home affordability", "rent-vs-buy"]),  # only ever user-entered
+            "filing_status": _field(filing_status, DOC if filing_status else MISSING,
+                                    origin="finance.tax_profiles.filing_status", confidence=0.95,
+                                    prompt="How do you file — single, married filing jointly, married filing separately, or head of household?",
+                                    unlocks=["federal tax", "FICA", "marginal rate", "capital gains",
+                                             "state tax", "credits", "standard vs itemized"]),
+            "dependents": _field(dependents, DOC if dependents is not None else MISSING,
+                                 origin="finance.tax_profiles.dependents", confidence=0.9,
+                                 prompt="How many dependents do you claim?",
+                                 unlocks=["child tax credit", "credit phase-outs"]),
+            "tax_state": _field(tax_state, DOC if tax_state else MISSING,
+                                origin="finance.tax_profiles.state", confidence=0.95,
+                                prompt="Which state do you file in?", unlocks=["state income tax"]),
         }
         missing = [{"input": k2, "prompt": v["prompt"], "unlocks": v["unlocks"]} for k2, v in inputs.items() if not v["present"]]
         return {"inputs": inputs, "present_count": sum(1 for v in inputs.values() if v["present"]),

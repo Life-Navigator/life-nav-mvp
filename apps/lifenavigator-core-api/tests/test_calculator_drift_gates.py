@@ -354,3 +354,56 @@ def test_every_shipped_state_tax_schedule_is_well_formed():
     for year in V.available_years("state_tax"):
         problems = _tax.validate_state_table(V.load("state_tax", year).data)
         assert problems == [], f"state_tax/{year}.json:\n" + "\n".join(problems)
+
+
+# ── Gate 8: no calculator may be registered-but-unreachable without saying so ─────────────────────
+def test_every_calculator_is_declared_reachable_or_not_advisor_facing():
+    """FAILS when a registered calculator is not declared in `advisor_calc_coverage`.
+
+    THE TRIGGER: Phase 3 wired ten calculators into the advisor with a hand-written dispatch block
+    each. Phases A, B and B2 added twenty-plus more, and `advisor_calculations.py` does not know any
+    of them exist — every one tested, registered, and completely unreachable. Nothing failed,
+    because "registered but unreachable" has no symptom.
+
+    This gate gives it one. A new calculator must be declared REACHABLE (with the inputs it
+    consumes) or NOT_ADVISOR_FACING (with a reason), so the gap cannot silently re-open.
+    """
+    from app.services import advisor_calc_coverage as COV
+
+    declared = set(COV.REACHABLE) | set(COV.NOT_ADVISOR_FACING)
+    registered = set(base.available())
+
+    undeclared = registered - declared
+    assert not undeclared, (
+        "these calculators are registered but not declared in advisor_calc_coverage — the advisor "
+        f"cannot reach them and nothing says so: {sorted(undeclared)}"
+    )
+    phantom = declared - registered
+    assert not phantom, (
+        f"declared in advisor_calc_coverage but not registered: {sorted(phantom)}"
+    )
+
+
+def test_every_not_advisor_facing_entry_gives_a_reason():
+    """"Not wired" without a reason is how a calculator goes missing."""
+    from app.services import advisor_calc_coverage as COV
+    for calc_id, reason in COV.NOT_ADVISOR_FACING.items():
+        assert len(reason) > 30, f"{calc_id}: needs a real reason, not a placeholder"
+
+
+def test_every_treatment_rule_declares_the_inputs_it_needs():
+    from app.services import advisor_calc_coverage as COV
+    from app.services.calculators import treatment as TR
+    undeclared = set(TR.available_rules()) - set(COV.TREATMENT_REACH)
+    assert not undeclared, f"treatment rules with no declared inputs: {sorted(undeclared)}"
+
+
+def test_wired_calculators_only_need_inputs_that_actually_exist():
+    """A calculator marked `wired=True` whose inputs are not available is a lie in the inventory —
+    it would mean the dispatch runs and silently never fires."""
+    from app.services import advisor_calc_coverage as COV
+    for calc_id, reach in COV.REACHABLE.items():
+        if reach.wired:
+            assert reach.inputs_available, (
+                f"{calc_id} is marked wired but needs unavailable inputs "
+                f"{reach.missing_inputs}")

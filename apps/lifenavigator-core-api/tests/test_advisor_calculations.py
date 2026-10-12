@@ -38,6 +38,9 @@ def _resolver(**overrides):
         "risk_profile": _field(None, False, "How do you handle uncertainty?"),
         "time_horizon": _field(None, False, "When do you hope to reach your goal?"),
         "housing_target": _field(None, False, "What home price are you considering?"),
+        "filing_status": _field(None, False, "How do you file?"),
+        "dependents": _field(None, False, "How many dependents do you claim?"),
+        "tax_state": _field(None, False, "Which state do you file in?"),
     }
     for k, v in overrides.items():
         inputs[k] = _field(v, v is not None)
@@ -364,3 +367,126 @@ async def test_an_explicit_monthly_income_still_wins_over_the_derived_one():
     p = AdvisorCalculationPlanner(_resolver(income=146_400))
     out = await p.compute(_Ctx(), monthly_income=9_000, monthly_expenses=5_400)
     assert _by_id(out, "money.monthly_surplus")["value"] == 3_600.0
+
+
+# ── Structural gap #1: the newly reachable calculators ───────────────────────────────────────────
+# Phases A/B/B2 added 27 calculators that `advisor_calculations` did not know existed — tested,
+# registered, and completely unreachable. These assert the ones now wired actually fire, and that
+# the inventory in `advisor_calc_coverage` matches reality.
+
+@pytest.mark.asyncio
+async def test_uncaptured_match_fires_from_three_canonical_inputs():
+    """The cheapest high-value wiring on the list: all three inputs were already canonical, and the
+    output is employer money the user is leaving behind. $120k at 3% against a 6% match is $3,600."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=120000, retirement_contribution_rate=3, employer_match_rate=6)
+    ).compute(_Ctx())
+    r = _by_id(p, "career.uncaptured_match")
+    assert r is not None and r["value"] == 3600.0
+    assert r["tier"] == "strict", "the user's own income and rates — no assumption involved"
+    assert "3600" in p["allowed_numbers"] or "3,600" in p["allowed_numbers"]
+
+
+@pytest.mark.asyncio
+async def test_uncaptured_match_without_the_rates_is_a_gap_naming_them():
+    p = await AdvisorCalculationPlanner(_resolver(income=120000)).compute(_Ctx())
+    g = _gap_for(p, "career.uncaptured_match")
+    assert g is not None
+    assert set(g["needs"]) == {"retirement_contribution_rate", "employer_match_rate"}
+
+
+@pytest.mark.asyncio
+async def test_net_worth_sums_the_three_balances_against_debt():
+    p = await AdvisorCalculationPlanner(
+        _resolver(cash_balance=20000, investment_balance=150000,
+                  retirement_balance=250000, debt_total=180000)
+    ).compute(_Ctx())
+    r = _by_id(p, "cash.net_worth")
+    assert r is not None and r["value"] == 240000.0
+    assert r["tier"] == "strict"
+
+
+@pytest.mark.asyncio
+async def test_emergency_fund_produces_a_strict_and_a_scenario_figure():
+    """Per-figure tiering, which is why one tool became several calculators in Phase A.
+    `months_covered` is the user's own arithmetic; the gap rests on an assumed target."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(cash_balance=12000)
+    ).compute(_Ctx(), monthly_expenses=4000)
+    covered = _by_id(p, "cash.months_covered")
+    gap = _by_id(p, "cash.emergency_fund_gap")
+    assert covered["value"] == 3.0 and covered["tier"] == "strict"
+    assert gap["tier"] == "scenario", "rests on the assumed emergency_fund_months"
+    assert any(a["key"] == "emergency_fund_months" for a in gap["assumptions"])
+
+
+@pytest.mark.asyncio
+async def test_without_cash_the_target_still_computes_and_the_coverage_is_a_gap():
+    p = await AdvisorCalculationPlanner(_resolver()).compute(_Ctx(), monthly_expenses=4000)
+    assert _by_id(p, "cash.emergency_fund_target") is not None
+    assert _gap_for(p, "cash.months_covered") is not None
+
+
+# ── Tax: unblocked by filing_status, and gated by the unverified table ───────────────────────────
+@pytest.mark.asyncio
+async def test_without_filing_status_the_marginal_rate_is_a_gap():
+    """`filing_status` was the single highest-impact canonical addition — it unblocks seven
+    calculators. Absent, the advisor must ASK rather than assume single, which would halve every
+    bracket threshold and overstate a married filer's tax by thousands."""
+    p = await AdvisorCalculationPlanner(_resolver(income=150000)).compute(_Ctx())
+    g = _gap_for(p, "tax.effective_marginal_rate")
+    assert g is not None and "filing_status" in g["needs"]
+
+
+@pytest.mark.asyncio
+async def test_an_unverified_tax_table_becomes_a_SPOKEN_gap_not_an_exception():
+    """The shipped 2026 table is unverified, so every tax calculator refuses. That must surface as
+    something the advisor can say — "I can't quote a figure until the tables are verified" — rather
+    than an exception inside the turn or, far worse, a number nobody checked."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=150000, filing_status="single")
+    ).compute(_Ctx())
+    refusals = [g for g in p["gaps"] if "reference data unavailable" in str(g.get("refused", ""))]
+    assert refusals, "an unverified tax table must produce a spoken refusal"
+    assert any(g["calculator"].startswith("tax.") for g in refusals)
+    # And nothing unverified leaked into either tier.
+    assert not any(r["calculator"].startswith("tax.") for r in p["results"])
+
+
+@pytest.mark.asyncio
+async def test_a_tax_refusal_never_breaks_the_rest_of_the_turn():
+    """The other calculators must still run. A tax-data gap is not a turn failure."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=120000, filing_status="single",
+                  retirement_contribution_rate=3, employer_match_rate=6)
+    ).compute(_Ctx())
+    assert _by_id(p, "career.uncaptured_match") is not None
+    assert p["available"] is True
+
+
+# ── The inventory must match reality ─────────────────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_every_calculator_marked_wired_actually_appears_for_a_complete_profile():
+    """Guards the inventory against drifting from the code. A calculator marked `wired=True` that
+    never fires would make `coverage_report()` a comforting fiction."""
+    from app.services import advisor_calc_coverage as COV
+
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=120000, cash_balance=20000, investment_balance=150000,
+                  retirement_balance=250000, debt_total=30000, debt_apr=0.07,
+                  retirement_contribution_rate=3, employer_match_rate=6,
+                  time_horizon=10)
+    ).compute(_Ctx(), monthly_expenses=4000, monthly_income=10000,
+              monthly_debt_payment=800, home_price_goal=500000,
+              current_age=40, target_retirement_age=65,
+              savings_goal_amount=50000, savings_goal_months=24)
+
+    fired = {r["calculator"] for r in p["results"]}
+    gapped = {g.get("calculator") for g in p["gaps"]}
+    # Tax is excluded: its table is unverified by design, so it is expected to gap.
+    claimed = {cid for cid, reach in COV.REACHABLE.items()
+               if reach.wired and not cid.startswith("tax.")}
+    unaccounted = claimed - fired - gapped
+    assert not unaccounted, (
+        f"marked wired in advisor_calc_coverage but neither fired nor gapped: "
+        f"{sorted(unaccounted)}")

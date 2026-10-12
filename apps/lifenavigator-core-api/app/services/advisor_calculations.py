@@ -49,7 +49,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from .calculators import CalcResult, CalculatorError, debt, money, retirement
+from .calculators import CalcResult, CalculatorError, cash, career, debt, money, retirement
+from .calculators import tax as tax_calc
+from .calculators import versioned_data as _vd
 
 log = logging.getLogger("core.advisor.calculations")
 
@@ -214,6 +216,80 @@ class AdvisorCalculationPlanner:
                     extra_inputs={"home_price_goal": home_price_goal, "down_payment_pct": dp_pct},
                     label="estimated monthly mortgage payment",
                 )
+
+        # ── Employer match: free money, from three inputs already on file ───────────────────────
+        # The cheapest high-value wiring in the whole planner. All three inputs are canonical, and
+        # the output is the one figure a user acts on immediately — employer money they are leaving
+        # behind. It was unreachable only because nothing dispatched it.
+        match_rate = _present(inputs, "employer_match_rate")
+        contrib_rate = _present(inputs, "retirement_contribution_rate")
+        if annual_income and match_rate is not None and contrib_rate is not None:
+            run(career.uncaptured_match, income=annual_income,
+                current_rate=float(contrib_rate), employer_match_rate=float(match_rate))
+        elif annual_income:
+            gaps.append(_gap(inputs, "career.uncaptured_match",
+                             [k for k, v in (("retirement_contribution_rate", contrib_rate),
+                                             ("employer_match_rate", match_rate)) if v is None]))
+
+        # ── Balance sheet ────────────────────────────────────────────────────────────────────────
+        cash_bal = _present(inputs, "cash_balance")
+        invest_bal = _present(inputs, "investment_balance")
+        debt_total = _present(inputs, "debt_total")
+        assets = sum(float(v) for v in (cash_bal, invest_bal, retirement_balance) if v)
+        if assets or debt_total:
+            run(cash.net_worth, assets=assets, liabilities=float(debt_total or 0.0))
+
+        # ── Emergency fund ───────────────────────────────────────────────────────────────────────
+        # Two figures, two tiers, deliberately: months_covered is the user's own cash over their own
+        # expenses (STRICT), while the target rests on an assumed number of months (SCENARIO). The
+        # per-figure tiering from the Phase A consolidation is what makes that expressible.
+        if monthly_expenses:
+            # The target runs unconditionally: "how big should my emergency fund be?" is asked
+            # directly and often, and it needs only the user's expenses. It was originally only in
+            # the no-cash branch, which the coverage test caught — the inventory claimed it was
+            # wired while a complete profile never fired it.
+            run(cash.emergency_fund_target, monthly_expenses=monthly_expenses)
+            if cash_bal is not None:
+                run(cash.months_covered, monthly_expenses=monthly_expenses,
+                    current_cash=float(cash_bal))
+                run(cash.emergency_fund_gap, monthly_expenses=monthly_expenses,
+                    current_cash=float(cash_bal))
+            else:
+                gaps.append(_gap(inputs, "cash.months_covered", ["cash_balance"]))
+
+        # ── Tax ──────────────────────────────────────────────────────────────────────────────────
+        # `filing_status` was the single highest-impact canonical addition: it unblocks seven
+        # calculators at once. Every one is wrapped so that an UNVERIFIED tax table degrades to a
+        # gap the advisor can speak ("I can't quote a 2026 figure until the tables are verified")
+        # rather than an exception inside the turn.
+        filing_status = _present(inputs, "filing_status")
+        if annual_income and filing_status:
+            def run_tax(fn: Any, **kwargs: Any) -> None:
+                try:
+                    results.append(fn(**kwargs))
+                except _vd.VersionedDataError as exc:
+                    gaps.append({"calculator": getattr(fn, "calc_id", "tax"),
+                                 "refused": f"tax reference data unavailable: {exc}"})
+                except CalculatorError as exc:
+                    gaps.append({"calculator": getattr(fn, "calc_id", "tax"),
+                                 "refused": str(exc)})
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("tax calculator %s failed: %s", getattr(fn, "calc_id", fn), exc)
+
+            run_tax(tax_calc.federal_income_tax, gross_income=annual_income,
+                    filing_status=filing_status)
+            run_tax(tax_calc.fica, wages=annual_income, filing_status=filing_status)
+            # The highest-value tax figure for an advisor: every Roth, pre-tax-contribution and
+            # raise question turns on the marginal rate, and `assumptions.marginal_tax_rate` has
+            # been standing in for it.
+            run_tax(tax_calc.effective_marginal_rate, gross_income=annual_income,
+                    filing_status=filing_status)
+            tax_state = _present(inputs, "tax_state")
+            if tax_state:
+                run_tax(tax_calc.state_income_tax, taxable_income=annual_income,
+                        state=str(tax_state), filing_status=filing_status)
+        elif annual_income:
+            gaps.append(_gap(inputs, "tax.effective_marginal_rate", ["filing_status"]))
 
         # ── A savings goal the user named ────────────────────────────────────────────────────────
         if savings_goal_amount and savings_goal_months:
