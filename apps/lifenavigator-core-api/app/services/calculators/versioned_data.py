@@ -168,18 +168,39 @@ def _family(name: str) -> DatasetFamily:
     return fam
 
 
-def available_years(family: str, *, root: Optional[str] = None) -> list[int]:
-    """Years present on disk for `family`, ascending. Empty when the phase has not shipped."""
-    _family(family)
-    d = os.path.join(_root(root), family)
+@lru_cache(maxsize=64)
+def _available_years_cached(family: str) -> tuple[int, ...]:
+    """Years for the PACKAGE data directory, cached.
+
+    WHY THIS IS CACHED: profiling a 100-path Monte Carlo showed **39,480 `os.listdir` calls** —
+    36% of total runtime — because every tax calculation re-scanned the data directory to answer a
+    question whose answer cannot change while the process runs. The files ship inside the package.
+    It also hit every advisor turn, which makes four tax calls.
+
+    Only the package directory is cached. A test-supplied `root` is read fresh every time, or one
+    test's fixture would leak into the next and a newly written year would be invisible.
+    """
+    return _scan_years(_DATA_ROOT, family)
+
+
+def _scan_years(root: str, family: str) -> tuple[int, ...]:
+    d = os.path.join(root, family)
     if not os.path.isdir(d):
-        return []
+        return ()
     years: list[int] = []
     for entry in os.listdir(d):
         stem, ext = os.path.splitext(entry)
         if ext == ".json" and stem.isdigit():
             years.append(int(stem))
-    return sorted(years)
+    return tuple(sorted(years))
+
+
+def available_years(family: str, *, root: Optional[str] = None) -> list[int]:
+    """Years present on disk for `family`, ascending. Empty when the phase has not shipped."""
+    _family(family)
+    if root is None:
+        return list(_available_years_cached(family))
+    return list(_scan_years(root, family))
 
 
 def load(family: str, year: Optional[int] = None, *, root: Optional[str] = None,

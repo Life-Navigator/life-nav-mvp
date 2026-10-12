@@ -32,7 +32,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
 from ..calculators import versioned_data as V
 from ..calculators import tax as tax_calc
@@ -185,8 +185,15 @@ def _rate(explicit: Optional[float], key: str, cited: list[dict[str, Any]]) -> f
 
 def project(household: Household, *, tax_year: Optional[int] = None,
             horizon_years: Optional[int] = None,
-            inflation: Optional[float] = None) -> PlanResult:
+            inflation: Optional[float] = None,
+            return_path: Optional[Sequence[float]] = None) -> PlanResult:
     """Project the household year by year, computing tax annually from the Phase B engine.
+
+    `return_path` supplies a return for EACH plan year instead of one rate for all of them, which is
+    what Monte Carlo and the stress tests need. It must be a per-year sequence rather than an average
+    because SEQUENCE matters: the same set of annual returns in a different order produces a very
+    different outcome for a household that is drawing down, since a bad early year is realised
+    against a full balance and never recovers. Averaging that away would measure nothing.
 
     Raises `PlanningError` BEFORE the loop when the tax tables for `tax_year` are unverified — a
     projection that discovered this in plan year 30 would already have produced thirty years of
@@ -221,6 +228,12 @@ def project(household: Household, *, tax_year: Optional[int] = None,
                         annual_contribution=a.annual_contribution)
                 for a in household.accounts]
     returns = {a.label: _rate(a.annual_return, "investment_return", cited) for a in accounts}
+    if return_path is not None:
+        path = [float(r) for r in return_path]
+        if len(path) < horizon:
+            raise PlanningError(
+                f"return_path has {len(path)} years but the horizon is {horizon}; a short path "
+                f"would silently apply a flat default to the remaining years")
     growth = {p.name: _rate(p.income_growth, "salary_growth", cited) for p in household.people}
     rmd_age = int(V.load("tax_parameters", tax_year).data["retirement"]["rmd_age"])
 
@@ -390,7 +403,11 @@ def project(household: Household, *, tax_year: Optional[int] = None,
         # 9. Growth, applied after the year's flows.
         for a in accounts:
             if a.balance > 0:
-                a.balance *= (1.0 + returns[a.label])
+                # A sampled path overrides the per-account rate. Applied to every account alike:
+                # modelling per-account correlation is a refinement, and pretending accounts move
+                # independently would understate risk far more than this simplification does.
+                rate_t = path[t] if return_path is not None else returns[a.label]
+                a.balance *= (1.0 + rate_t)
 
         row.end_balances = {a.label: a.balance for a in accounts}
         row.total_assets = sum(a.balance for a in accounts)
