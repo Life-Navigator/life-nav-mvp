@@ -67,7 +67,7 @@ def test_carry_forward_serves_the_prior_year_and_marks_it(tmp_path):
     got = V.load("tax_tables", 2026, root=str(tmp_path))
     assert got.year_used == 2025 and got.year_requested == 2026
     assert got.is_carried_forward is True
-    assert "not yet loaded" in got.provenance and "2025" in got.provenance
+    assert "computed on 2025 law" in got.provenance and "not yet verified" in got.provenance
 
 
 def test_carry_forward_picks_the_most_recent_prior_year(tmp_path):
@@ -152,3 +152,40 @@ def test_test_supplied_roots_are_not_cached_across_calls(tmp_path):
     assert V.load("tax_tables", 2026, root=str(tmp_path)).data["v"] == 1
     _write(str(tmp_path), "tax_tables", 2026, {"v": 2})
     assert V.load("tax_tables", 2026, root=str(tmp_path)).data["v"] == 2
+
+
+# ── load_latest_verified: Option B's primitive ───────────────────────────────────────────────────
+def test_latest_verified_walks_back_past_an_unverified_year(tmp_path):
+    """THE WHOLE POINT. An unverified table must never be served — it is model knowledge, not law.
+    The loader walks BACK to the most recent year a human checked rather than sideways to a guess.
+    """
+    _write(str(tmp_path), "tax_tables", 2024, {"_meta": {"verified": True}, "year": 2024})
+    _write(str(tmp_path), "tax_tables", 2026, {"_meta": {"verified": False}, "year": 2026})
+
+    got = V.load_latest_verified("tax_tables", 2026, root=str(tmp_path))
+    assert got.year_used == 2024 and got.is_verified is True
+    assert got.data["year"] == 2024, "never the unverified file's contents"
+    assert got.is_carried_forward is True
+
+
+def test_latest_verified_prefers_the_exact_year_when_it_is_verified(tmp_path):
+    _write(str(tmp_path), "tax_tables", 2024, {"_meta": {"verified": True}, "year": 2024})
+    _write(str(tmp_path), "tax_tables", 2026, {"_meta": {"verified": True}, "year": 2026})
+    got = V.load_latest_verified("tax_tables", 2026, root=str(tmp_path))
+    assert got.year_used == 2026 and got.is_carried_forward is False
+
+
+def test_latest_verified_raises_when_nothing_has_ever_been_verified(tmp_path):
+    """No silent fallback to a guess: if nobody has checked anything, there is no basis to compute
+    on and saying so is the only honest option."""
+    _write(str(tmp_path), "tax_tables", 2024, {"_meta": {"verified": False}})
+    with pytest.raises(V.UnverifiedDataError, match="no VERIFIED table"):
+        V.load_latest_verified("tax_tables", 2026, root=str(tmp_path))
+
+
+def test_latest_verified_never_reaches_forward(tmp_path):
+    """A later verified year must not be applied to an earlier one — next year's brackets on this
+    year's income is wrong in a way that looks right."""
+    _write(str(tmp_path), "tax_tables", 2027, {"_meta": {"verified": True}})
+    with pytest.raises(V.UnverifiedDataError):
+        V.load_latest_verified("tax_tables", 2026, root=str(tmp_path))

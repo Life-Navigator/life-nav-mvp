@@ -148,8 +148,8 @@ class LoadedData:
         unlabelled prior-year figure is the defect this module exists to prevent."""
         fam = FAMILIES[self.family].label
         if self.is_carried_forward:
-            base = (f"{fam}, {self.year_used} tables (the {self.year_requested} tables are not yet "
-                    f"loaded, so this uses {self.year_used})")
+            base = (f"{fam}, computed on {self.year_used} law (the {self.year_requested} tables are "
+                    f"not yet verified against the primary source)")
         else:
             base = f"{fam}, {self.year_used} tables"
         return base if self.is_verified else base + " — NOT YET VERIFIED against the primary source"
@@ -261,6 +261,43 @@ def _read_uncached(path: str) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise VersionedDataError(f"{path}: expected a JSON object at the top level")
     return data
+
+
+def load_latest_verified(family: str, year: Optional[int] = None, *,
+                         root: Optional[str] = None) -> LoadedData:
+    """The newest VERIFIED table at or before `year`. Raises when no verified year exists.
+
+    WHY THIS IS NOT "load the unverified one anyway"
+    ------------------------------------------------
+    The distinction is the whole point. `tax_tables/2026.json` was populated from model knowledge,
+    not a primary source — roughly fifty inflation-indexed figures that are plausible and
+    unconfirmed. Serving those would be exactly the fabrication the engine exists to prevent.
+
+    This instead walks BACK to the most recent year a human actually checked (2024), and the result
+    reports `is_carried_forward`, so every figure derived from it can be labelled. The data is real
+    law; it is simply last year's law, and that is a statement we can stand behind.
+
+    The direction of the error matters and is in our favour: bracket thresholds and the standard
+    deduction rise with inflation, so applying an earlier year's narrower brackets to today's income
+    OVERSTATES tax. A plan built on it is conservative rather than flattering, which is the right
+    way to be wrong.
+    """
+    fam = _family(family)
+    want = int(year) if year is not None else date.today().year
+    years = available_years(family, root=root)
+    if not years:
+        raise VersionedDataError(
+            f"{family}: no data files found — phase {fam.phase or '?'} has not shipped this dataset")
+
+    for candidate in sorted((y for y in years if y <= want), reverse=True):
+        loaded = LoadedData(family, want, candidate, _read(family, candidate, root=root))
+        if loaded.is_verified:
+            return loaded
+
+    raise UnverifiedDataError(
+        f"{family}: no VERIFIED table at or before {want} (have {years}). Verify one of them "
+        f"against its primary source and set _meta.verified: true."
+    )
 
 
 # ── Drift gate support ────────────────────────────────────────────────────────────────────────────

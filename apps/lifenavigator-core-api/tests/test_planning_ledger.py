@@ -72,9 +72,35 @@ def test_an_income_source_must_belong_to_someone_in_the_household():
         _single(income_sources=[IncomeSource("SS", 30000, "Nobody", 67)])
 
 
-def test_an_unverified_tax_basis_fails_before_the_loop_runs():
-    """A projection that discovered this in plan year 30 would already have produced thirty years of
-    figures nobody can stand behind."""
+def test_an_unverified_year_projects_on_the_last_verified_law_and_labels_it():
+    """Option B. The 2026 tables are unverified model knowledge, so the plan is computed on the most
+    recent year a human checked and says so — rather than refusing outright (no planning at all) or
+    quoting ~50 unconfirmed figures (the fabrication this engine exists to prevent).
+
+    Brackets widen with inflation, so earlier law OVERSTATES tax: the plan is conservative.
+    """
+    r = project(_single(expenses=[Expense("Living", 50000)]), tax_year=2026)
+    assert r.tax_year == 2024 and r.tax_basis_verified is True
+    assert r.tax_basis_is_current_year is False
+    assert "computed on 2024 law" in r.tax_basis_label
+    assert "OVERSTATED" in r.tax_basis_label
+
+
+def test_the_label_is_unmissable_because_every_figure_rests_on_it(monkeypatch):
+    r = project(_single(expenses=[Expense("Living", 50000)]), tax_year=2026)
+    d = r.as_dict()
+    assert d["tax_basis_label"] and d["tax_basis_is_current_year"] is False
+    # And when the basis IS the requested year, no caveat is attached.
+    clean = project(_single(expenses=[Expense("Living", 50000)]), tax_year=Y).as_dict()
+    assert clean["tax_basis_is_current_year"] is True
+    assert "OVERSTATED" not in clean["tax_basis_label"]
+
+
+def test_verified_only_policy_still_refuses_before_the_loop(monkeypatch):
+    """What to switch to after the CPA signs off: a fallback would then mean something is wrong
+    rather than pending. And it must fail BEFORE the loop — a projection that discovered this in
+    plan year 30 would already have produced thirty years of figures nobody can stand behind."""
+    monkeypatch.setenv("TAX_BASIS_POLICY", "verified_only")
     with pytest.raises(PlanningError, match="verified tax basis"):
         project(_single(expenses=[Expense("Living", 50000)]), tax_year=2026)
 

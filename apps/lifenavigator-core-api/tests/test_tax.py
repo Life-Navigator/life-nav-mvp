@@ -274,21 +274,48 @@ def test_itemizing_benefit_is_the_excess_over_the_standard_deduction():
 
 
 # ── Data gating: the engine is open, the data is not ──────────────────────────────────────────────
-def test_calculators_refuse_an_unverified_table():
-    """The 2026 table is populated from model knowledge, not a primary source. An unverified tax
-    table that quotes numbers is exactly the fabrication this engine exists to prevent, so every
-    calculator loads with require_verified=True."""
+def test_an_unverified_year_falls_back_to_the_last_VERIFIED_law_and_labels_it():
+    """The 2026 table was populated from model knowledge, so it must never be quoted. The engine
+    walks BACK to the most recent year a human checked (2024) rather than sideways to a guess, and
+    the result is labelled and downgraded to SCENARIO so the hedge reaches the user.
+
+    Direction of the error matters and is in our favour: brackets widen with inflation, so earlier,
+    narrower brackets OVERSTATE tax. Conservative, not flattering.
+    """
+    r = T.federal_income_tax(gross_income=150000, filing_status="single", tax_year=2026)
+    assert r.inputs_used["tax_year"] == 2024, "never the unverified 2026 figures"
+    assert r.tier == SCENARIO
+    assert [a.key for a in r.assumptions] == ["tax_table_year"]
+    assert "OVERSTATES" in r.assumptions[0].rationale
+    assert "not yet verified" in r.detail["table_provenance"]
+
+
+def test_verified_only_policy_refuses_instead_of_falling_back(monkeypatch):
+    """The posture to switch to once the current year IS verified: a fallback would then mean
+    something has gone wrong rather than something is pending."""
+    monkeypatch.setenv("TAX_BASIS_POLICY", "verified_only")
     with pytest.raises(V.UnverifiedDataError, match="not verified against its primary source"):
         T.federal_income_tax(gross_income=150000, filing_status="single", tax_year=2026)
 
 
-def test_the_unverified_error_says_what_to_do_about_it():
+def test_the_unverified_error_says_what_to_do_about_it(monkeypatch):
+    monkeypatch.setenv("TAX_BASIS_POLICY", "verified_only")
     try:
         T.fica(wages=150000, filing_status="single", tax_year=2026)
     except V.UnverifiedDataError as exc:
         assert "IRS" in str(exc) and "verified" in str(exc)
     else:
         pytest.fail("expected UnverifiedDataError")
+
+
+def test_the_fallback_never_serves_the_unverified_figures():
+    """The load-bearing distinction. 2026's guessed single-filer bracket tops start at 12,400;
+    2024's verified ones at 11,600. A fallback that served the unverified table would be the
+    fabrication this whole engine exists to prevent."""
+    r = T.federal_income_tax(gross_income=150000, filing_status="single", tax_year=2026)
+    # 2024 law on $150k is the hand-derived $25,538.50.
+    assert r.value == pytest.approx(25538.50, abs=0.01)
+    assert r.detail["standard_deduction"] == 14600, "the 2024 figure, not 2026's guessed 16,100"
 
 
 def test_the_2024_table_is_verified_and_its_results_are_strict():
@@ -298,7 +325,7 @@ def test_the_2024_table_is_verified_and_its_results_are_strict():
     assert r.tier == STRICT and r.assumptions == ()
 
 
-def test_a_carried_forward_table_downgrades_the_result_to_scenario(tmp_path):
+def test_a_carried_forward_table_downgrades_the_result_to_scenario(tmp_path, monkeypatch):
     """Last year's law applied to this year's income IS an assumption, and it is cited rather than
     silently absorbed — bracket thresholds move with inflation, so the tax comes out slightly high.
     """
@@ -310,14 +337,17 @@ def test_a_carried_forward_table_downgrades_the_result_to_scenario(tmp_path):
     with open(os.path.join(str(d), "2024.json"), "w") as fh:
         json.dump(src.data, fh)
 
-    loaded = V.load("tax_tables", 2025, root=str(tmp_path), require_verified=True)
+    loaded = V.load_latest_verified("tax_tables", 2025, root=str(tmp_path))
     assert loaded.is_carried_forward and loaded.year_used == 2024
     assert "NOT YET VERIFIED" not in loaded.provenance
-    assert "not yet loaded" in loaded.provenance
+    assert "computed on 2024 law" in loaded.provenance
 
     note = T._carry_forward_note(loaded)
     assert len(note) == 1 and note[0].key == "tax_table_year" and note[0].value == 2024
-    assert "understates the bracket boundaries" in note[0].rationale
+    # The rationale must state the DIRECTION of the error, not just that one exists — a user
+    # deciding on a conservative figure needs to know it is conservative.
+    assert "OVERSTATES" in note[0].rationale
+    assert "conservative, not flattering" in note[0].rationale
 
 
 def test_a_carried_forward_table_makes_the_computed_result_scenario_tier(monkeypatch):

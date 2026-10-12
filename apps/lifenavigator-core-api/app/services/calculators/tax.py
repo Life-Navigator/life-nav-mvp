@@ -41,6 +41,7 @@ Each is listed in the relevant result's `limitations` rather than silently omitt
 """
 from __future__ import annotations
 
+import os
 from typing import Any, Optional
 
 from . import versioned_data as V
@@ -66,9 +67,31 @@ def _status(value: Any) -> str:
     return s
 
 
+# How the tax basis is resolved when the requested year's table is not verified.
+#
+#   "latest_verified" (default) — fall back to the most recent year a human checked, and LABEL every
+#                     figure. `_carry_forward_note` downgrades the result to SCENARIO and cites
+#                     `tax_table_year`, so the hedge reaches the user through the existing
+#                     validator path rather than needing a new mechanism.
+#   "verified_only" — refuse outright. Correct once the current year IS verified, because then a
+#                     fallback would mean something has gone wrong rather than something is pending.
+#
+# Never "use the unverified table": those figures came from model knowledge, and serving them is the
+# fabrication this engine exists to prevent. The fallback walks BACK to real law, not sideways to a
+# guess.
+_BASIS_POLICY_ENV = "TAX_BASIS_POLICY"
+
+
+def _basis_policy() -> str:
+    raw = (os.environ.get(_BASIS_POLICY_ENV) or "latest_verified").strip().lower()
+    return raw if raw in ("latest_verified", "verified_only") else "latest_verified"
+
+
 def _table(tax_year: Optional[int]) -> V.LoadedData:
-    """The statutory table for `tax_year`, refusing anything unverified."""
-    return V.load("tax_tables", tax_year, require_verified=True)
+    """The statutory table for `tax_year`. Never unverified; see `_basis_policy`."""
+    if _basis_policy() == "verified_only":
+        return V.load("tax_tables", tax_year, require_verified=True)
+    return V.load_latest_verified("tax_tables", tax_year)
 
 
 def _carry_forward_note(t: V.LoadedData) -> tuple[Assumption, ...]:
@@ -79,9 +102,10 @@ def _carry_forward_note(t: V.LoadedData) -> tuple[Assumption, ...]:
     return (Assumption(
         key="tax_table_year",
         value=t.year_used,
-        rationale=(f"The {t.year_requested} tables are not loaded, so {t.year_used} figures are "
-                   f"applied. Bracket thresholds move with inflation each year, so this understates "
-                   f"the bracket boundaries and slightly overstates the tax."),
+        rationale=(f"Computed on {t.year_used} tax law, because the {t.year_requested} tables have "
+                   f"not yet been verified against the IRS publication. Bracket thresholds and the "
+                   f"standard deduction rise with inflation, so applying earlier, narrower brackets "
+                   f"OVERSTATES the tax — the figure is conservative, not flattering."),
         source="caller",
     ),)
 

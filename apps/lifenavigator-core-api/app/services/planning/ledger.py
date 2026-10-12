@@ -121,6 +121,8 @@ class PlanResult:
     assumptions: list[dict[str, Any]]
     tax_year: int
     tax_basis_verified: bool
+    tax_basis_label: str = ""
+    tax_basis_is_current_year: bool = True
 
     @property
     def depleted_year(self) -> Optional[int]:
@@ -164,6 +166,9 @@ class PlanResult:
             # Load-bearing: an unverified tax basis means the whole projection is pending, not just
             # one figure in it.
             "tax_basis_verified": self.tax_basis_verified,
+            # Unmissable, because every figure in `years` rests on it.
+            "tax_basis_label": self.tax_basis_label,
+            "tax_basis_is_current_year": self.tax_basis_is_current_year,
             "years": [y.as_dict() for y in self.years],
         }
 
@@ -190,9 +195,16 @@ def project(household: Household, *, tax_year: Optional[int] = None,
     if not isinstance(household, Household):
         raise PlanningError("project() takes a Household")
 
-    # Fail fast on the tax basis.
+    # Fail fast on the tax basis — resolved ONCE, before the loop. A projection that discovered a
+    # problem in plan year 30 would already have produced thirty years of figures nobody can stand
+    # behind.
+    #
+    # `tax._table` resolves to the most recent VERIFIED year rather than serving an unverified one
+    # (see `_basis_policy` there). So a 2026 plan is computed on 2024 law and says so, instead of
+    # either refusing outright or quoting fifty unconfirmed figures. Brackets widen with inflation,
+    # so earlier law OVERSTATES tax — the plan is conservative rather than flattering.
     try:
-        table = V.load("tax_tables", tax_year, require_verified=True)
+        table = tax_calc._table(tax_year)
     except V.VersionedDataError as exc:
         raise PlanningError(
             f"cannot project a plan without a verified tax basis: {exc}"
@@ -384,8 +396,14 @@ def project(household: Household, *, tax_year: Optional[int] = None,
         row.total_assets = sum(a.balance for a in accounts)
         years.append(row)
 
+    label = table.provenance
+    if table.is_carried_forward:
+        label += (" — every figure in this plan is computed on that year's law; tax is therefore "
+                  "slightly OVERSTATED, since bracket thresholds rise with inflation")
     return PlanResult(years=years, household=household.as_dict(), assumptions=cited,
-                      tax_year=table.year_used, tax_basis_verified=table.is_verified)
+                      tax_year=table.year_used, tax_basis_verified=table.is_verified,
+                      tax_basis_label=label,
+                      tax_basis_is_current_year=not table.is_carried_forward)
 
 
 def _draw(accounts: list[Account], order: tuple[str, ...], target: float,

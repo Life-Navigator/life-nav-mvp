@@ -440,17 +440,31 @@ async def test_without_filing_status_the_marginal_rate_is_a_gap():
 
 
 @pytest.mark.asyncio
-async def test_an_unverified_tax_table_becomes_a_SPOKEN_gap_not_an_exception():
-    """The shipped 2026 table is unverified, so every tax calculator refuses. That must surface as
-    something the advisor can say — "I can't quote a figure until the tables are verified" — rather
-    than an exception inside the turn or, far worse, a number nobody checked."""
+async def test_tax_figures_now_reach_the_advisor_on_the_last_verified_law():
+    """Option B. The advisor gets real tax figures, computed on the most recent VERIFIED year and
+    tiered SCENARIO so the hedge reaches the user — rather than nothing at all."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=150000, filing_status="single")
+    ).compute(_Ctx())
+    tax_results = [r for r in p["results"] if r["calculator"].startswith("tax.")]
+    assert tax_results, "tax figures must reach the advisor"
+    for r in tax_results:
+        assert r["tier"] == "scenario", "carried-forward law is an estimate, not the user's fact"
+        assert any(a["key"] == "tax_table_year" for a in r["assumptions"])
+    # Every one is labelled with the year it was computed on.
+    assert all("2024" in r["detail"]["table_provenance"] for r in tax_results)
+
+
+@pytest.mark.asyncio
+async def test_under_the_strict_policy_tax_becomes_a_SPOKEN_gap_not_an_exception(monkeypatch):
+    """The posture after the CPA verifies. A refusal must surface as something the advisor can SAY
+    rather than an exception inside the turn or, far worse, a number nobody checked."""
+    monkeypatch.setenv("TAX_BASIS_POLICY", "verified_only")
     p = await AdvisorCalculationPlanner(
         _resolver(income=150000, filing_status="single")
     ).compute(_Ctx())
     refusals = [g for g in p["gaps"] if "reference data unavailable" in str(g.get("refused", ""))]
     assert refusals, "an unverified tax table must produce a spoken refusal"
-    assert any(g["calculator"].startswith("tax.") for g in refusals)
-    # And nothing unverified leaked into either tier.
     assert not any(r["calculator"].startswith("tax.") for r in p["results"])
 
 
