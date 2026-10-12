@@ -29,6 +29,31 @@ follows a readout rather than new arithmetic.
 
 ---
 
+## 0b. Standing constraint: READ-ONLY, ADVICE-ONLY (owner, 2026-10-12)
+
+**The app never moves money.** Account access is read-only — balances and transactions via Plaid.
+It does not execute withdrawals, transfers, rebalances, contributions, conversions or trades, and
+nothing in this roadmap should be read as implying otherwise.
+
+Everything the engine produces is a RECOMMENDATION the user acts on themselves, or with their own
+advisor/CPA. That is already consistent with what is built: the planning engine is pure computation,
+the calculator HTTP surface is closed (`cb26f241`), and the advisor's action loop writes to
+`life.facts` rather than to accounts.
+
+Where the vocabulary could mislead, the name is the problem rather than the behaviour:
+
+| Reads as an action              | Actually is                                                               |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| "withdrawal **guardrails**"     | a spending RULE — thresholds at which the user would choose to adjust     |
+| "withdrawal **sequencing**"     | a comparison of drawdown ORDERS, for the user to instruct their custodian |
+| "Roth conversion **ladder**"    | how much to convert and when — the user or their CPA executes it          |
+| `financing_optimizer` (Phase L) | ranks structure CLASSES; originates nothing, names no lender              |
+| `offer_impact` (Phase J2)       | values an offer; does not accept one                                      |
+
+**Consequences for later phases:** Phase L must not imply loan origination, and Milestone 7 must not
+imply rebalancing or transfers. If a future feature would require write access, that is a separate
+decision with its own regulatory posture — not an extension of this plan.
+
 ## 1. Gate 0 — three things that block everything (do first)
 
 These are not phases. Nothing below ships until they are resolved.
