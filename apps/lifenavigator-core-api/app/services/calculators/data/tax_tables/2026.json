@@ -2,20 +2,25 @@
   "_meta": {
     "tax_year": 2026,
     "verified": false,
-    "verification_required": "EVERY numeric value below must be checked against the IRS inflation-adjustment revenue procedure for tax year 2026 and the SSA wage-base announcement before this table may serve a user-facing figure.",
-    "why_unverified": "These figures were populated from model knowledge, not from a primary source. The 2026 amounts post-date the OBBBA changes of July 2025 and the author's knowledge of them is NOT reliable to the dollar. Writing an unverified tax table and letting it quote numbers is precisely the fabrication this engine exists to prevent, so the loader refuses an unverified table for user-facing work (see versioned_data.load, require_verified).",
-    "high_confidence": [
-      "ordinary bracket RATES (10/12/22/24/32/35/37) \u2014 made permanent by OBBBA",
-      "social_security_rate_employee 6.2%, medicare_rate_employee 1.45%, additional_medicare_rate 0.9%",
-      "additional_medicare_threshold and niit.threshold \u2014 fixed in statute, never indexed"
-    ],
-    "low_confidence": [
-      "every bracket THRESHOLD",
-      "standard_deduction amounts",
-      "social_security_wage_base",
-      "long_term_capital_gains thresholds"
-    ],
-    "source": "UNVERIFIED \u2014 populate from IRS Rev. Proc. for TY2026 + SSA 2026 wage base, then set verified: true with verified_by and verified_on",
+    "sourced": true,
+    "sourced_on": "2026-10-11",
+    "sources": {
+      "ordinary_brackets": "IRS Rev. Proc. 2025-32 (https://www.irs.gov/pub/irs-drop/rp-25-32.pdf), retrieved 2026-10-11 section 3.01, Tables 1-4",
+      "standard_deduction": "IRS Rev. Proc. 2025-32 (https://www.irs.gov/pub/irs-drop/rp-25-32.pdf), retrieved 2026-10-11 section 3.14",
+      "long_term_capital_gains": "IRS Rev. Proc. 2025-32 (https://www.irs.gov/pub/irs-drop/rp-25-32.pdf), retrieved 2026-10-11 section 3.03",
+      "fica.social_security_wage_base": "SSA Contribution and Benefit Base (https://www.ssa.gov/oact/cola/cbb.html), 2026 = $184,500, retrieved 2026-10-11",
+      "fica.rates": "Statutory: IRC 3101 (6.2% OASDI employee, 1.45% Medicare), IRC 3101(b)(2) (0.9% Additional Medicare). NOT inflation-indexed.",
+      "fica.additional_medicare_threshold": "Statutory, fixed in IRC 3101(b)(2) since 2013. NOT indexed.",
+      "niit": "Statutory, fixed in IRC 1411 since 2013. NOT indexed.",
+      "credits.child_tax_credit": "IRS Rev. Proc. 2025-32 (https://www.irs.gov/pub/irs-drop/rp-25-32.pdf), retrieved 2026-10-11 section 3.05 ($2,200 max; $1,700 refundable)",
+      "credits.earned_income_credit": "IRS Rev. Proc. 2025-32 (https://www.irs.gov/pub/irs-drop/rp-25-32.pdf), retrieved 2026-10-11 section 3.06 table",
+      "credits.american_opportunity_credit": "Statutory, IRC 25A(i) / 25A(d). The AOTC phase-out range is NOT inflation-indexed.",
+      "credits.lifetime_learning_credit": "Statutory, IRC 25A(d) as conformed to the AOTC range by the Taxpayer Certainty and Disaster Tax Relief Act of 2020. NOT indexed.",
+      "amt": "IRS Rev. Proc. 2025-32 (https://www.irs.gov/pub/irs-drop/rp-25-32.pdf), retrieved 2026-10-11 section 3.10",
+      "section_163j_gross_receipts": "IRS Rev. Proc. 2025-32 (https://www.irs.gov/pub/irs-drop/rp-25-32.pdf), retrieved 2026-10-11 section 3.30 (IRC 448(c) test): $32,000,000"
+    },
+    "verification_required": "Sourced from primary documents, NOT yet signed off by the owner's CPA. `verified` stays false until then; see docs/financial-engine/BUILD_PLAN.md.",
+    "note": "Replaces an earlier version of this file populated from model knowledge. Three figures in that version were WRONG: the child tax credit ($2,000 -> $2,200, raised by OBBBA), the student-loan phase-out ($80-95k -> $85-100k), and the 163(j) gross-receipts test ($30M -> $32M). The EITC parameters were 2024 values throughout. That is what 'don't assume' was guarding against.",
     "currency": "USD"
   },
   "ordinary_brackets": {
@@ -124,7 +129,7 @@
       },
       {
         "rate": 0.24,
-        "upto": 201775
+        "upto": 201750
       },
       {
         "rate": 0.32,
@@ -145,6 +150,10 @@
     "married_jointly": 32200,
     "married_separately": 16100,
     "head_of_household": 24150
+  },
+  "additional_standard_deduction_aged_or_blind": {
+    "base": 1650,
+    "unmarried_not_surviving_spouse": 2050
   },
   "fica": {
     "social_security_rate_employee": 0.062,
@@ -226,12 +235,27 @@
     },
     "note": "Fixed in statute since 2013; not inflation-indexed."
   },
+  "amt": {
+    "exemption": {
+      "married_jointly": 140200,
+      "single": 90100,
+      "married_separately": 70100,
+      "head_of_household": 90100
+    },
+    "rate_28_pct_threshold": {
+      "married_separately": 122250,
+      "other": 244500
+    },
+    "exemption_phase_out_start": {
+      "married_jointly": 1000000,
+      "note": "IRC 55(d)(4)(B): the $1,000,000 amount is NOT indexed for years beginning before 2027 (OBBBA s.70107)."
+    }
+  },
   "credits": {
     "verified": false,
-    "note": "Credit parameters were populated from model knowledge. Unlike the ordinary brackets \u2014 which were cross-checked against the figures tax.ts shipped to production \u2014 there is NO independent cross-check available for credits in this repo, so this section is unverified in BOTH years. Engine correctness is proven against synthetic verified fixtures instead.",
-    "verify_against": "IRS Pub 972 / Schedule 8812 (CTC/ACTC/ODC), Pub 970 (AOTC/LLC), Form 8880 (saver's credit), Pub 596 (EITC) for tax year 2026",
+    "sourced": true,
     "child_tax_credit": {
-      "per_child": 2000,
+      "per_child": 2200,
       "refundable_per_child": 1700,
       "qualifying_age_under": 17,
       "phase_out_start": {
@@ -241,12 +265,13 @@
         "head_of_household": 200000
       },
       "phase_out_per_1000": 50,
-      "note": "Reduced by $50 for each $1,000 (OR FRACTION THEREOF) of MAGI above the threshold \u2014 the fraction rounding is statutory and makes the phase-out a staircase, not a ramp."
+      "note": "$2,200 max and $1,700 refundable are the TY2026 figures from Rev. Proc. 2025-32 s.3.05. The $200k/$400k phase-out thresholds are statutory (IRC 24(b)(2)) and NOT indexed. Reduced $50 per $1,000 OR FRACTION above the threshold \u2014 a staircase, not a ramp."
     },
     "other_dependent_credit": {
       "per_dependent": 500,
       "refundable_per_dependent": 0,
-      "shares_phase_out_with": "child_tax_credit"
+      "shares_phase_out_with": "child_tax_credit",
+      "note": "Statutory IRC 24(h)(4); not indexed."
     },
     "american_opportunity_credit": {
       "max_per_student": 2500,
@@ -261,7 +286,7 @@
         "married_separately": [0, 0],
         "head_of_household": [80000, 90000]
       },
-      "note": "MFS cannot claim it at all, hence the [0, 0] range. Phase-out is a linear ratable range, not a staircase."
+      "note": "Statutory IRC 25A(i); the phase-out range is NOT inflation-indexed. MFS cannot claim it, hence [0,0]."
     },
     "lifetime_learning_credit": {
       "max_per_return": 2000,
@@ -274,72 +299,92 @@
         "married_separately": [0, 0],
         "head_of_household": [80000, 90000]
       },
-      "note": "PER RETURN, not per student \u2014 unlike AOTC. Mutually exclusive with AOTC for the same student's expenses."
+      "note": "Conformed to the AOTC range in 2020 and NOT indexed. PER RETURN, unlike AOTC."
     },
     "savers_credit": {
       "contribution_cap": 2000,
       "tiers": {
-        "single": [
-          [23000, 0.5],
-          [25000, 0.2],
-          [38250, 0.1]
-        ],
         "married_jointly": [
-          [46000, 0.5],
-          [50000, 0.2],
-          [76500, 0.1]
-        ],
-        "married_separately": [
-          [23000, 0.5],
-          [25000, 0.2],
-          [38250, 0.1]
+          [48500, 0.5],
+          [52500, 0.2],
+          [80500, 0.1]
         ],
         "head_of_household": [
-          [34500, 0.5],
-          [37500, 0.2],
-          [57375, 0.1]
+          [36375, 0.5],
+          [39375, 0.2],
+          [60375, 0.1]
+        ],
+        "single": [
+          [24250, 0.5],
+          [26250, 0.2],
+          [40250, 0.1]
+        ],
+        "married_separately": [
+          [24250, 0.5],
+          [26250, 0.2],
+          [40250, 0.1]
         ]
       },
       "refundable_share": 0.0,
-      "note": "AGI at or below each tier's ceiling gets that rate; above the last ceiling the credit is zero. A CLIFF, not a phase-out \u2014 one dollar of AGI can cost the entire credit."
+      "source": "IRS Notice 2025-67 (IRC 25B(b)(1)(A)-(D)) for TY2026",
+      "note": "A CLIFF, not a phase-out \u2014 one dollar of AGI over a tier ceiling can cost the whole credit."
     },
     "earned_income_credit": {
       "max_credit": {
-        "0": 632,
-        "1": 4213,
-        "2": 6960,
-        "3": 7830
+        "0": 664,
+        "1": 4427,
+        "2": 7316,
+        "3": 8231
       },
-      "phase_in_rate": {
-        "0": 0.0765,
-        "1": 0.34,
-        "2": 0.4,
-        "3": 0.45
+      "earned_income_amount": {
+        "0": 8680,
+        "1": 13020,
+        "2": 18290,
+        "3": 18290
       },
-      "phase_out_rate": {
-        "0": 0.0765,
-        "1": 0.1598,
-        "2": 0.2106,
-        "3": 0.2106
-      },
-      "phase_out_start": {
-        "single": {
-          "0": 9800,
-          "1": 21560,
-          "2": 21560,
-          "3": 21560
-        },
+      "threshold_phaseout_amount": {
         "married_jointly": {
-          "0": 16370,
-          "1": 28120,
-          "2": 28120,
-          "3": 28120
+          "0": 18140,
+          "1": 31160,
+          "2": 31160,
+          "3": 31160
+        },
+        "other": {
+          "0": 10860,
+          "1": 23890,
+          "2": 23890,
+          "3": 23890
         }
       },
+      "completed_phaseout_amount": {
+        "married_jointly": {
+          "0": 26820,
+          "1": 58863,
+          "2": 65899,
+          "3": 70244
+        },
+        "other": {
+          "0": 19540,
+          "1": 51593,
+          "2": 58629,
+          "3": 62974
+        }
+      },
+      "excessive_investment_income": 12200,
       "refundable_share": 1.0,
-      "confidence": "LOW \u2014 the phase-in/phase-out parameters are the least reliable figures in this file. EITC is fully refundable and targets low-income filers, so an error here is both large in relative terms and lands on the people least able to absorb it. Verify against Pub 596 before enabling.",
-      "enabled": false
+      "source": "IRS Rev. Proc. 2025-32 (https://www.irs.gov/pub/irs-drop/rp-25-32.pdf), retrieved 2026-10-11 section 3.06",
+      "enabled": false,
+      "confidence": "Now SOURCED from the revenue procedure rather than from model knowledge (the previous values were 2024's). Still `enabled: false` pending CPA sign-off, because EITC is fully refundable and lands on the filers least able to absorb an error."
+    }
+  },
+  "debt_interest": {
+    "student_loan_interest_cap": 2500,
+    "student_loan_phase_out": {
+      "single": [85000, 100000],
+      "married_jointly": [175000, 205000],
+      "head_of_household": [85000, 100000]
     },
-    "_2026_note": "Amounts below are the 2024 figures as a PLACEHOLDER SHAPE, not 2026 values. OBBBA changed the child credit; do not assume any number here is current."
+    "section_163j_gross_receipts": 32000000,
+    "source": "IRS Rev. Proc. 2025-32 (https://www.irs.gov/pub/irs-drop/rp-25-32.pdf), retrieved 2026-10-11 sections 3.29 (IRC 221) and 3.30 (IRC 448(c))"
   }
 }

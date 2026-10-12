@@ -34,24 +34,24 @@ _SERVICES_DIR = os.path.dirname(A.__file__)
 PENDING_DATA: dict[str, str] = {
     "state_tax": "only 2024 exists. Needs the current year; the top ~12 states by user count are "
                  "now modelled but their rates are unverified (see PENDING_VERIFICATION).",
-    "tax_parameters": "only 2024 exists. Needs the current year's HSA/HDHP/FSA limits (Pub 969), "
-                      "retirement limits (annual IRS notice), and debt-interest thresholds "
-                      "(Pub 936/550/970). The RULES that consume them do not need re-verification.",
 }
 
 PENDING_VERIFICATION: dict[str, str] = {
-    "tax_tables": "2026.json was populated from model knowledge, not a primary source. Every "
-                  "bracket threshold, standard deduction, SS wage base and LTCG threshold must be "
-                  "checked against the IRS Rev. Proc. for TY2026 and the SSA wage-base "
-                  "announcement, then set _meta.verified: true. The `credits` section is "
-                  "separately unverified in BOTH years — unlike the brackets it had no "
-                  "independent cross-check available in this repo.",
-    "tax_parameters": "Phase B2 thresholds (HSA/HDHP/FSA, retirement limits, mortgage and "
-                      "investment-interest caps, passive-activity figures) came from model "
-                      "knowledge. Verify against Pub 969, the annual retirement-limits notice, "
-                      "Pub 936, Pub 550, Pub 970 and Pub 925. NOTE: the RULES in tax_wrappers.py "
-                      "and tax_debt_interest.py are statutory structure and are NOT pending — "
-                      "only these amounts are.",
+    "tax_tables": "2026.json is now SOURCED from Rev. Proc. 2025-32 (brackets, standard "
+                  "deduction, LTCG breakpoints, AMT, CTC, EITC, student-loan phase-out, 448(c)) "
+                  "and the SSA wage base, with per-field citations in _meta.sources. Pending the "
+                  "owner's CPA sign-off only. Sourcing CORRECTED three figures the earlier "
+                  "model-knowledge version had wrong: the child tax credit ($2,000 -> $2,200), "
+                  "the student-loan phase-out ($80-95k -> $85-100k) and the 448(c) test "
+                  "($30M -> $32M); the EITC parameters were 2024 values throughout. The 2024 "
+                  "`credits` section remains unsourced.",
+    "tax_parameters": "2026 figures are now SOURCED from primary documents (Rev. Proc. 2025-19 "
+                      "for HSA/HDHP, Notice 2025-67 for retirement limits, Rev. Proc. 2025-32 for "
+                      "FSA and student-loan interest) and carry per-field citations. Pending the "
+                      "owner's CPA sign-off only. Two items remain UNSOURCED and are flagged in "
+                      "the file's _meta.unsourced_still: the dependent-care FSA limit and the RMD "
+                      "age. NOTE the RULES in tax_wrappers.py and tax_debt_interest.py are "
+                      "statutory structure and are NOT pending — only these amounts are.",
 }
 
 

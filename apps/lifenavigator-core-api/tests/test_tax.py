@@ -303,7 +303,10 @@ def test_the_unverified_error_says_what_to_do_about_it(monkeypatch):
     try:
         T.fica(wages=150000, filing_status="single", tax_year=2026)
     except V.UnverifiedDataError as exc:
-        assert "IRS" in str(exc) and "verified" in str(exc)
+        # The message must name the remedy, not just the problem. The 2026 figures are now SOURCED
+        # from primary documents with per-field citations; what is outstanding is the CPA sign-off.
+        msg = str(exc)
+        assert "not verified" in msg and "CPA" in msg
     else:
         pytest.fail("expected UnverifiedDataError")
 
