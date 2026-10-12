@@ -43,9 +43,14 @@ log = logging.getLogger("core.planning.ledger")
 
 # Iterations for the withdrawal gross-up. Converges in 3-4 for realistic brackets; the cap exists
 # so a pathological case degrades to a slightly-underfunded year rather than spinning.
-_MAX_GROSS_UP_ITERATIONS = 12
+_MAX_GROSS_UP_ITERATIONS = 24
 _GROSS_UP_TOLERANCE = 1.0   # dollars
 # A shortfall below this is gross-up rounding, not a funding failure.
+#
+# SCALED, because a fixed dollar floor is wrong at both ends. A flat $1 flagged a $2 residual on a
+# $2.1M plan as "the money runs out in year 4" — the same class of false positive as the five-cent
+# bug, just above the old threshold. A shortfall only matters relative to what the year had to fund.
+_MATERIAL_SHORTFALL_SHARE = 0.0001   # one basis point of the year's funding need
 #
 # THE BUG THIS CONSTANT EXISTS TO PREVENT: `depleted_year` originally flagged any shortfall over a
 # cent, while the gross-up converges to within a dollar. A healthy plan with a $900k IRA funding
@@ -74,14 +79,21 @@ class LedgerYear:
     contributions: float = 0.0
     rmd: float = 0.0
     roth_conversion: float = 0.0
+    capital_gain_realized: float = 0.0
     filing_status: str = ""
     end_balances: dict[str, float] = field(default_factory=dict)
     total_assets: float = 0.0
     shortfall: float = 0.0
     events: list[str] = field(default_factory=list)
     # Withdrawals made by the most recent `_draw`, so the gross-up can reverse them and retry
-    # without double-withdrawing. Internal; excluded from as_dict().
-    _drawn_this_pass: list[tuple[Any, float, str]] = field(default_factory=list, repr=False)
+    # without double-withdrawing: (account, amount, treatment, basis_consumed).
+    #
+    # `basis_consumed` is recorded rather than recomputed, because the pro-rata basis reduction
+    # depends on the gain share AT THE MOMENT OF THE DRAW. An earlier version restored the FULL
+    # withdrawal to basis instead, so each undo cycle inflated basis, which shrank the gain share,
+    # which shrank the computed capital gain — a $90,000 gain came out as $6,119 after the
+    # gross-up's twelve passes. Internal; excluded from as_dict().
+    _drawn_this_pass: list[tuple[Any, float, str, float]] = field(default_factory=list, repr=False)
 
     @property
     def total_tax(self) -> float:
@@ -108,6 +120,7 @@ class LedgerYear:
             "withdrawals": {k: round(v, 2) for k, v in self.withdrawals.items()},
             "contributions": round(self.contributions, 2), "rmd": round(self.rmd, 2),
             "roth_conversion": round(self.roth_conversion, 2),
+            "capital_gain_realized": round(self.capital_gain_realized, 2),
             "filing_status": self.filing_status,
             "end_balances": {k: round(v, 2) for k, v in self.end_balances.items()},
             "total_assets": round(self.total_assets, 2),
@@ -244,7 +257,14 @@ def project(household: Household, *, tax_year: Optional[int] = None,
                 f"return_path has {len(path)} years but the horizon is {horizon}; a short path "
                 f"would silently apply a flat default to the remaining years")
     growth = {p.name: _rate(p.income_growth, "salary_growth", cited) for p in household.people}
-    rmd_age = int(V.load("tax_parameters", tax_year).data["retirement"]["rmd_age"])
+    _ret_params = V.load("tax_parameters", tax_year).data["retirement"]
+    rmd_age = int(_ret_params["rmd_age"])
+    rmd_table = {int(k): float(v) for k, v in
+                 (_ret_params.get("uniform_lifetime_table") or {}).items()}
+    if not rmd_table:
+        raise PlanningError(
+            "tax_parameters is missing `retirement.uniform_lifetime_table`; an RMD cannot be "
+            "computed from an approximation — see IRS Pub 590-B Appendix B Table III")
 
     goals_by_year: dict[int, list] = {}
     for g in household.goals:
@@ -335,8 +355,15 @@ def project(household: Household, *, tax_year: Optional[int] = None,
             owner = household.person(a.owner) if a.owner else alive[0]
             if not owner.is_alive_in(t) or owner.age_in(t) < rmd_age:
                 continue
-            # Uniform-lifetime approximation: balance / remaining life expectancy.
-            divisor = max(1.0, float(owner.life_expectancy - owner.age_in(t)))
+            # The real IRS Uniform Lifetime Table, not an approximation.
+            #
+            # THE APPROXIMATION THIS REPLACES: `balance / (life_expectancy - age)`. For an owner
+            # with a life expectancy of 92, that gave a divisor of 19 at 73 against the statutory
+            # 26.5 — a first-year RMD roughly 39% too large — and, worse, it made the RMD depend on
+            # the PLANNING life expectancy, so changing that input silently changed a statutory
+            # forced distribution. It also hit zero at the end of the horizon, which would have
+            # distributed the entire balance in one year.
+            divisor = _rmd_divisor(rmd_table, owner.age_in(t))
             required = a.balance / divisor
             a.balance -= required
             row.rmd += required
@@ -345,10 +372,19 @@ def project(household: Household, *, tax_year: Optional[int] = None,
                 row.events.append(f"{owner.name}'s RMDs begin at {rmd_age}")
 
         # 5. Tax on income as it stands, then the shortfall, then the gross-up.
-        def tax_for(ordinary: float, wages: float) -> tuple[float, float, float]:
-            fed = tax_calc.federal_income_tax(
+        def tax_for(ordinary: float, wages: float,
+                    capital_gain: float = 0.0) -> tuple[float, float, float]:
+            fed_r = tax_calc.federal_income_tax(
                 gross_income=max(0.0, ordinary), filing_status=filing_status,
-                tax_year=tax_year).value
+                tax_year=tax_year)
+            fed = fed_r.value
+            # Long-term gains STACK on ordinary TAXABLE income (after the deduction), not on gross —
+            # so the same gain can be taxed at 0% or 20% depending on the rest of the year.
+            if capital_gain > 0:
+                fed += tax_calc.capital_gains_tax(
+                    gain=capital_gain, filing_status=filing_status,
+                    ordinary_taxable_income=fed_r.detail["taxable_income"],
+                    long_term=True, tax_year=tax_year).value
             pay = tax_calc.fica(wages=max(0.0, wages),
                                 filing_status=filing_status, tax_year=tax_year).value
             st = 0.0
@@ -414,34 +450,60 @@ def project(household: Household, *, tax_year: Optional[int] = None,
             #    with $1.69M more assets. A final re-draw after the loop guarantees the balances
             #    match the figures.
             #
-            # 2. DAMPING. Jumping straight to each new estimate oscillates when the withdrawal is
-            #    large enough to cross a bracket — the exact case a big Roth conversion creates.
-            #    Averaging the old and new estimates converges instead of flip-flopping.
+            # 2. DAMPING, BUT ONLY WHEN IT IS NEEDED. Jumping straight to each new estimate
+            #    oscillates when the withdrawal is large enough to cross a bracket — the case a big
+            #    Roth conversion creates. But damping EVERY step merely halves the error each pass,
+            #    which needs ~log2(error) iterations: a $47,000 capital gain took 16 and the cap was
+            #    12, so the loop silently fell through to the non-converged branch EVERY YEAR, left
+            #    a few dollars unfunded, and that residual then reported as "the money runs out in
+            #    year 4" on a $2.1M plan.
+            #
+            #    So: take the FULL step normally (converges in 2-3), and damp only after detecting
+            #    oscillation — the error changing sign.
+            # Iterates on BOTH the ordinary income a tax-deferred draw creates AND the capital gain
+            # a taxable draw realizes, because the two are taxed differently and either can move
+            # the total.
             converged = False
+            extra_gain = 0.0
+            prev_error = None
             for _ in range(_MAX_GROSS_UP_ITERATIONS):
-                f2, p2, s2 = tax_for(ordinary_income + extra_ordinary, row.wage_income)
+                f2, p2, s2 = tax_for(ordinary_income + extra_ordinary, row.wage_income, extra_gain)
                 target = need + ((f2 + p2 + s2) - base_tax)
-                drawn, drawn_ordinary = _draw(accounts, household.withdrawal_order, target, row)
-                if abs(drawn_ordinary - extra_ordinary) < _GROSS_UP_TOLERANCE:
-                    extra_ordinary = drawn_ordinary
+                drawn, drawn_ordinary, drawn_gain = _draw(
+                    accounts, household.withdrawal_order, target, row)
+                err_ord = drawn_ordinary - extra_ordinary
+                err_gain = drawn_gain - extra_gain
+                if (abs(err_ord) < _GROSS_UP_TOLERANCE
+                        and abs(err_gain) < _GROSS_UP_TOLERANCE):
+                    extra_ordinary, extra_gain = drawn_ordinary, drawn_gain
                     converged = True
                     break
                 _undo(row)                         # reverse and retry with a better estimate
-                extra_ordinary = (extra_ordinary + drawn_ordinary) / 2.0
+                error = err_ord + err_gain
+                oscillating = prev_error is not None and error * prev_error < 0
+                if oscillating:
+                    extra_ordinary = (extra_ordinary + drawn_ordinary) / 2.0
+                    extra_gain = (extra_gain + drawn_gain) / 2.0
+                else:
+                    extra_ordinary, extra_gain = drawn_ordinary, drawn_gain
+                prev_error = error
 
             if not converged:
                 # Settle on the damped estimate and actually take the money. Slightly imprecise is
                 # fine; an unfunded year is not.
-                f2, p2, s2 = tax_for(ordinary_income + extra_ordinary, row.wage_income)
+                f2, p2, s2 = tax_for(ordinary_income + extra_ordinary, row.wage_income, extra_gain)
                 target = need + ((f2 + p2 + s2) - base_tax)
-                drawn, _ = _draw(accounts, household.withdrawal_order, target, row)
+                drawn, _, extra_gain = _draw(accounts, household.withdrawal_order, target, row)
                 row.events.append(
                     "withdrawal gross-up did not fully converge; funded to the closest estimate")
 
-            fed, fica_amt, state_amt = tax_for(ordinary_income + extra_ordinary, row.wage_income)
+            fed, fica_amt, state_amt = tax_for(
+                ordinary_income + extra_ordinary, row.wage_income, extra_gain)
+            row.capital_gain_realized = extra_gain
             required = need + ((fed + fica_amt + state_amt) - base_tax)
             residual = max(0.0, required - drawn)
-            row.shortfall = residual if residual >= _MATERIAL_SHORTFALL else 0.0
+            floor = max(_MATERIAL_SHORTFALL, required * _MATERIAL_SHORTFALL_SHARE)
+            row.shortfall = residual if residual >= floor else 0.0
             if row.shortfall:
                 row.events.append(
                     f"assets exhausted: ${row.shortfall:,.0f} of spending could not be funded")
@@ -481,17 +543,43 @@ def project(household: Household, *, tax_year: Optional[int] = None,
                       tax_basis_is_current_year=not table.is_carried_forward)
 
 
-def _draw(accounts: list[Account], order: tuple[str, ...], target: float,
-          row: LedgerYear) -> tuple[float, float]:
-    """Withdraw `target` across accounts in `order`. Returns (drawn, ordinary-income created).
+def _rmd_divisor(table: dict[int, float], age: int) -> float:
+    """Applicable denominator for `age` from the Uniform Lifetime Table.
 
-    Only TAX_DEFERRED withdrawals are ordinary income. A taxable withdrawal realizes a capital
-    GAIN on the appreciated share, which is taxed at preferential rates — approximated here by
-    excluding it from the ordinary gross-up and noting it, rather than pretending a brokerage
-    drawdown is tax-free (it is not) or that it is ordinary income (it is not either).
+    Below the table's first age there is no RMD, so the caller gates on `rmd_age` and never reaches
+    here. Above the last entry the final value applies — the published table's last row is
+    "120 and over".
+    """
+    if age in table:
+        return table[age]
+    oldest = max(table)
+    if age > oldest:
+        return table[oldest]
+    return table[min(table)]
+
+
+def _draw(accounts: list[Account], order: tuple[str, ...], target: float,
+          row: LedgerYear) -> tuple[float, float, float]:
+    """Withdraw `target` across accounts in `order`.
+
+    Returns (drawn, ordinary income created, long-term capital gain realized).
+
+    THREE BUCKETS, THREE TAX TREATMENTS, and conflating any two of them gets the withdrawal-order
+    answer wrong:
+
+      TAX_DEFERRED  -> ordinary income, taxed at the marginal rate
+      TAXABLE       -> a long-term capital GAIN on the appreciated share, at preferential rates
+                       stacked on ordinary income
+      ROTH / HSA    -> nothing
+
+    THE BUG THIS FIXES: the gain was computed and used to adjust basis, then never taxed. A $100,000
+    withdrawal from an account with a 90% embedded gain paid $0. That made taxable-first look free,
+    which biased the one output this engine exists to produce — `withdrawal_sequencing` compares
+    exactly those orders.
     """
     drawn = 0.0
     ordinary = 0.0
+    gain = 0.0
     row._drawn_this_pass = []
     for treatment in order:
         if drawn >= target - _GROSS_UP_TOLERANCE:
@@ -505,24 +593,29 @@ def _draw(accounts: list[Account], order: tuple[str, ...], target: float,
             gain_share = (a.unrealized_gain / a.balance) if (
                 a.tax_treatment == TAXABLE and a.balance > 0) else 0.0
             a.balance -= take
+            basis_consumed = 0.0
             if a.tax_treatment == TAXABLE:
-                a.basis = max(0.0, float(a.basis or 0.0) - take * (1.0 - gain_share))
+                # Basis comes out pro-rata with the gain; the gain portion is realized and taxable.
+                basis_consumed = min(float(a.basis or 0.0), take * (1.0 - gain_share))
+                a.basis = float(a.basis or 0.0) - basis_consumed
+                gain += take * gain_share
             drawn += take
             if treatment == TAX_DEFERRED:
                 ordinary += take
             row.withdrawals[treatment] = row.withdrawals.get(treatment, 0.0) + take
-            row._drawn_this_pass.append((a, take, treatment))
+            row._drawn_this_pass.append((a, take, treatment, basis_consumed))
             if drawn >= target - _GROSS_UP_TOLERANCE:
                 break
-    return drawn, ordinary
+    return drawn, ordinary, gain
 
 
 def _undo(row: LedgerYear) -> None:
     """Reverse the last `_draw` so the gross-up can retry without double-withdrawing."""
-    for a, take, treatment in row._drawn_this_pass:
+    for a, take, treatment, basis_consumed in row._drawn_this_pass:
         a.balance += take
         if a.tax_treatment == TAXABLE:
-            a.basis = float(a.basis or 0.0) + take
+            # EXACTLY what was consumed, not the full withdrawal — see the field's comment.
+            a.basis = float(a.basis or 0.0) + basis_consumed
         row.withdrawals[treatment] = max(0.0, row.withdrawals.get(treatment, 0.0) - take)
         if row.withdrawals[treatment] <= 0:
             row.withdrawals.pop(treatment, None)

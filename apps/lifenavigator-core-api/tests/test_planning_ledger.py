@@ -387,3 +387,140 @@ def test_expenses_fall_at_retirement_when_a_factor_is_given():
     retired = r.years[26].expenses      # age 66
     # Despite six more years of inflation, the factor makes retired spending lower.
     assert retired < working
+
+
+# ── Capital gains on taxable withdrawals ─────────────────────────────────────────────────────────
+def test_a_taxable_withdrawal_realizes_and_PAYS_capital_gains_tax():
+    """THE BUG THIS FIXES. The gain was computed, used to adjust basis, and never taxed — a $100,000
+    withdrawal from an account with a 90% embedded gain paid $0. That made taxable-first look free
+    and biased `withdrawal_sequencing`, the one output this engine exists to produce."""
+    h = Household(
+        people=[Person("A", 70, None, 72, 0)], filing_status="single",
+        accounts=[Account("Brokerage", 500_000, TAXABLE, basis=50_000, annual_return=0.0)],
+        expenses=[Expense("Living", 100_000)])
+    y = project(h, tax_year=Y, inflation=0.0).years[0]
+    assert y.capital_gain_realized > 0
+    assert y.federal_tax > 0
+    # 90% of the draw is gain; 2024 single has a 0% LTCG bracket to $47,025, then 15%.
+    assert y.capital_gain_realized == pytest.approx(y.total_withdrawn * 0.9, rel=0.01)
+    assert y.federal_tax == pytest.approx(
+        (y.capital_gain_realized - 47_025) * 0.15, abs=5.0)
+
+
+def test_a_small_gain_falls_in_the_zero_percent_bracket():
+    """Long-term gains STACK on ordinary income, so with little other income the gain is free —
+    and a flat-rate approximation would have charged tax that is not owed."""
+    h = Household(
+        people=[Person("A", 70, None, 72, 0)], filing_status="single",
+        accounts=[Account("Brokerage", 500_000, TAXABLE, basis=50_000, annual_return=0.0)],
+        expenses=[Expense("Living", 30_000)])
+    y = project(h, tax_year=Y, inflation=0.0).years[0]
+    assert y.capital_gain_realized > 0 and y.federal_tax == 0.0
+
+
+def test_an_account_with_no_embedded_gain_is_withdrawn_tax_free():
+    h = Household(
+        people=[Person("A", 70, None, 72, 0)], filing_status="single",
+        accounts=[Account("Brokerage", 500_000, TAXABLE, basis=500_000, annual_return=0.0)],
+        expenses=[Expense("Living", 100_000)])
+    y = project(h, tax_year=Y, inflation=0.0).years[0]
+    assert y.capital_gain_realized == 0.0 and y.federal_tax == 0.0
+
+
+def test_the_gross_up_converges_every_year():
+    """THE BUG THIS FIXES. Damping EVERY step merely halves the error per pass, needing ~16
+    iterations for a $47,000 gain against a cap of 12 — so the loop fell through to the
+    non-converged branch in every single year, left a few dollars unfunded, and that residual then
+    reported as "the money runs out in year 4" on a $2.1M plan.
+    """
+    h = Household(
+        people=[Person("Alex", 62, None, 92, 0)], filing_status="single",
+        accounts=[Account("IRA", 1_400_000, TAX_DEFERRED, "Alex"),
+                  Account("Brokerage", 400_000, TAXABLE, basis=250_000),
+                  Account("Roth", 200_000, ROTH, "Alex")],
+        expenses=[Expense("Living", 85_000)])
+    r = project(h, tax_year=Y)
+    failures = [y.year_offset for y in r.years
+                if any("did not fully converge" in e for e in y.events)]
+    assert not failures, f"gross-up failed to converge in years {failures}"
+    assert r.depleted_year is None
+
+
+def test_the_shortfall_floor_scales_with_the_year():
+    """A flat $1 floor flagged a $2 residual on a $2.1M plan as depletion. The floor is now one
+    basis point of the year's funding need, so it means the same thing at every scale."""
+    h = Household(
+        people=[Person("Alex", 62, None, 92, 0)], filing_status="single",
+        accounts=[Account("IRA", 5_000_000, TAX_DEFERRED, "Alex"),
+                  Account("Brokerage", 2_000_000, TAXABLE, basis=500_000)],
+        expenses=[Expense("Living", 200_000)])
+    r = project(h, tax_year=Y)
+    assert r.depleted_year is None
+    assert all(y.shortfall == 0.0 for y in r.years)
+
+
+# ── The real RMD table ───────────────────────────────────────────────────────────────────────────
+@pytest.mark.parametrize("age,divisor", [
+    (73, 26.5), (74, 25.5), (75, 24.6), (80, 20.2), (85, 16.0), (90, 12.2), (95, 8.9),
+])
+def test_rmds_use_the_statutory_uniform_lifetime_table(age, divisor):
+    """IRS Pub 590-B Appendix B Table III, not an approximation.
+
+    THE APPROXIMATION THIS REPLACES: `balance / (life_expectancy - age)`. For an owner with a life
+    expectancy of 92 that gave a divisor of 19 at age 73 against the statutory 26.5 — a first-year
+    RMD about 39% too large — and it made a STATUTORY forced distribution depend on the planning
+    life expectancy, so changing that input silently changed the RMD.
+    """
+    h = Household(
+        people=[Person("Ray", 72, None, 100, 0)], filing_status="single",
+        accounts=[Account("IRA", 1_000_000, TAX_DEFERRED, "Ray", annual_return=0.0)],
+        expenses=[Expense("Living", 20_000, inflation_adjusted=False)])
+    r = project(h, tax_year=Y, inflation=0.0)
+    row = next(y for y in r.years if y.ages["Ray"] == age)
+    opening = (r.years[row.year_offset - 1].end_balances["IRA"]
+               if row.year_offset else 1_000_000.0)
+    assert opening / row.rmd == pytest.approx(divisor, abs=0.05)
+
+
+def test_the_rmd_no_longer_depends_on_the_planning_life_expectancy():
+    """A statutory distribution must not move because the user changed an assumption."""
+    def first_rmd(life):
+        h = Household(
+            people=[Person("Ray", 72, None, life, 0)], filing_status="single",
+            accounts=[Account("IRA", 1_000_000, TAX_DEFERRED, "Ray", annual_return=0.0)],
+            expenses=[Expense("Living", 20_000, inflation_adjusted=False)])
+        r = project(h, tax_year=Y, inflation=0.0)
+        return next(y.rmd for y in r.years if y.rmd > 0)
+
+    assert first_rmd(85) == pytest.approx(first_rmd(100), abs=0.01)
+
+
+def test_the_table_covers_every_age_to_120_and_over():
+    from app.services.calculators import versioned_data as V
+    table = V.load("tax_parameters", Y).data["retirement"]["uniform_lifetime_table"]
+    assert len(table) == 49
+    assert table["72"] == 27.4 and table["73"] == 26.5 and table["120"] == 2.0
+    # Strictly decreasing with age, as a life-expectancy table must be.
+    vals = [table[str(a)] for a in range(72, 121)]
+    assert all(a > b for a, b in zip(vals, vals[1:]))
+
+
+def test_a_missing_rmd_table_refuses_rather_than_approximating(monkeypatch):
+    from app.services.calculators import versioned_data as V
+    real = V.load
+
+    def patched(family, year=None, *, root=None, require_verified=False):
+        loaded = real(family, year, root=root, require_verified=require_verified)
+        if family == "tax_parameters":
+            data = {**loaded.data,
+                    "retirement": {k: v for k, v in loaded.data["retirement"].items()
+                                   if k != "uniform_lifetime_table"}}
+            return V.LoadedData(family, loaded.year_requested, loaded.year_used, data)
+        return loaded
+
+    monkeypatch.setattr(V, "load", patched)
+    h = Household(people=[Person("Ray", 75, None, 92, 0)], filing_status="single",
+                  accounts=[Account("IRA", 500_000, TAX_DEFERRED, "Ray")],
+                  expenses=[Expense("Living", 30_000)])
+    with pytest.raises(PlanningError, match="uniform_lifetime_table"):
+        project(h, tax_year=Y)

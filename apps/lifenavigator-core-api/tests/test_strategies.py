@@ -87,13 +87,13 @@ def test_conversion_benefit_is_single_peaked_not_monotonic():
     """
     h = _retiree()
     totals = {}
-    for annual in (0, 50_000, 120_000, 200_000):
+    for annual in (0, 30_000, 120_000, 200_000):
         conv = {t: float(annual) for t in range(8)} if annual else None
         totals[annual] = project(h, tax_year=Y, conversions=conv).terminal_assets
 
-    assert totals[50_000] > totals[0], "a modest ladder fills cheap brackets and pays off"
+    assert totals[30_000] > totals[0], "a modest ladder fills cheap brackets and pays off"
     # Past the peak, strictly decreasing — more tax paid earlier at higher rates.
-    assert totals[50_000] > totals[120_000] > totals[200_000]
+    assert totals[30_000] > totals[120_000] > totals[200_000]
 
 
 def test_a_conversion_shrinks_the_later_rmd():
@@ -127,13 +127,58 @@ def test_sequencing_compares_every_order_and_names_a_winner():
 
 
 def test_the_conventional_order_is_not_always_best():
-    """THE REASON TO MEASURE. Deferring tax longest is how a large pre-tax balance survives
-    untouched into the RMD years, where it is forced out at a higher rate than the household was
-    ever in while working."""
+    """THE REASON TO MEASURE. Which order wins is not predictable from a rule of thumb — it depends
+    on the balances, the brackets, the RMDs and the growth rate interacting over a lifetime.
+
+    NOTE this conclusion CHANGED when capital gains on taxable withdrawals started being taxed, as
+    it had to: taxable-first was previously drawing from an account whose gains were free. That is
+    exactly why the gap mattered — sequencing is the output most exposed to it.
+    """
     r = withdrawal_sequencing(_retiree(), tax_year=Y)
     assert r.best.label != "taxable first (conventional)"
     assert r.margin > 0
     assert r.material is True
+
+
+def test_more_lifetime_tax_means_fewer_assets_ONLY_without_growth():
+    """A bad invariant, worth recording because I used it as a sanity check and it is false.
+
+    With zero growth, more tax must mean fewer assets — and it does. WITH growth it does not: a
+    strategy can pay more total tax and still end richer, because the tax was paid LATER on a larger
+    base that compounded in the meantime. Any "more tax is always worse" check would report a bug
+    where the finance is simply non-obvious.
+    """
+    flat = Household(
+        people=[Person("A", 62, None, 72, 0)], filing_status="single",
+        accounts=[Account("IRA", 600_000, TAX_DEFERRED, "A", annual_return=0.0),
+                  Account("Brokerage", 300_000, TAXABLE, basis=150_000, annual_return=0.0),
+                  Account("Roth", 200_000, ROTH, "A", annual_return=0.0)],
+        expenses=[Expense("Living", 70_000, inflation_adjusted=False)])
+    r = withdrawal_sequencing(flat, tax_year=Y)
+    ranked = r.ranked
+    for a, b in zip(ranked, ranked[1:]):
+        if abs(a.lifetime_tax - b.lifetime_tax) > 100:
+            assert a.lifetime_tax <= b.lifetime_tax, (
+                "without growth, the better-ranked order must not pay more tax")
+
+
+def test_the_ledger_conserves_across_every_withdrawal_order():
+    """THE CHECK THAT ACTUALLY PROVES CORRECTNESS. Ending assets + lifetime tax + total spending
+    must equal the starting balance when nothing grows. Any order that violates it is creating or
+    destroying money — which both the gross-up bugs did."""
+    def flat():
+        return Household(
+            people=[Person("A", 62, None, 72, 0)], filing_status="single",
+            accounts=[Account("IRA", 600_000, TAX_DEFERRED, "A", annual_return=0.0),
+                      Account("Brokerage", 300_000, TAXABLE, basis=150_000, annual_return=0.0),
+                      Account("Roth", 200_000, ROTH, "A", annual_return=0.0)],
+            expenses=[Expense("Living", 70_000, inflation_adjusted=False)])
+
+    from app.services.planning.strategies import _ORDERS, _with_order
+    for label, order in _ORDERS.items():
+        r = project(_with_order(flat(), order), tax_year=Y, inflation=0.0)
+        total = r.terminal_assets + r.lifetime_tax + sum(y.expenses for y in r.years)
+        assert total == pytest.approx(1_100_000, abs=5.0), f"{label}: ${total:,.2f}"
 
 
 def test_each_candidate_starts_from_the_same_balances():
@@ -161,13 +206,18 @@ def test_the_ladder_window_is_the_years_before_rmds():
     assert filled.detail["window_years"] == 73 - 62
 
 
-def test_a_modest_ladder_beats_no_conversions_and_an_aggressive_one_does_not():
-    """The nuanced answer, and the one a single number cannot give: filling the 12% bracket is cheap
-    enough to pay off, while filling 24% costs more now than the RMD saves later."""
+def test_an_aggressive_ladder_is_worse_than_doing_nothing():
+    """The nuanced answer a single recommendation cannot give. Filling the 24% bracket pays today's
+    higher rate on money that would have been taxed lower later, so it is WORSE than not converting
+    at all — while a modest ladder can pay off (see the sweep test below for the shape).
+
+    The optimum moved once capital gains on taxable withdrawals started being taxed, because the
+    ladder's tax is funded partly from the brokerage. That is the correct sensitivity, not noise.
+    """
     r = roth_conversion_ladder(_retiree(), tax_year=Y)
     by = {c.label: c for c in r.candidates}
-    assert by["fill the 12% bracket"].terminal_assets > by["no conversions"].terminal_assets
     assert by["fill the 24% bracket"].terminal_assets < by["no conversions"].terminal_assets
+    assert by["fill the 22% bracket"].terminal_assets < by["no conversions"].terminal_assets
 
 
 def test_a_higher_ceiling_converts_more():

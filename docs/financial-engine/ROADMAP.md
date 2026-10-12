@@ -75,6 +75,19 @@ S/M/L — because estimates I invent are worth less than the ordering.
 
 ### Milestone 2 — "What should I do about it?" (ledger readouts)
 
+> **Status 2026-10-12: 2.1, 2.2 and 2.3's claiming ages are DONE, plus two ledger correctness fixes
+> that changed their answers.** Deliberately deferred, and logged here rather than left undone:
+> 1.2 stress tests, 1.3 side-by-side what-ifs, 2.4 (expense-ratio drag, real-vs-nominal, lump-sum
+> vs DCA — independent leaf calculators), 2.5's pension lump sum and withdrawal guardrails, and
+> **spousal + survivor Social Security benefits**, which belong with household modelling.
+>
+> The two fixes mattered more than the deferred items: **taxable withdrawals were untaxed** (a
+> $100k draw against a 90% embedded gain paid $0), which biased `withdrawal_sequencing` — the one
+> output most exposed to it. And the **RMD used `balance / (life_expectancy - age)`**, giving a
+> divisor of 19 at age 73 against the statutory 26.5, a first-year RMD ~39% too large, and making a
+> statutory distribution depend on a planning assumption. Both fixed; the real IRS Uniform Lifetime
+> Table (49 ages) is now in `tax_parameters`, sourced from Pub 590-B Appendix B Table III.
+
 All of Phase F, and all of it is a readout rather than a formula.
 
 | #   | Work                                                                                                                                | Size |
