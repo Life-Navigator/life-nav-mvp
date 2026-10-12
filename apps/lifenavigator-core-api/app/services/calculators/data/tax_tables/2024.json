@@ -1,0 +1,100 @@
+{
+  "_meta": {
+    "tax_year": 2024,
+    "verified": true,
+    "verified_by": "cross-checked against apps/web/src/lib/finance/tax.ts BRACKETS_2024 and STANDARD_DEDUCTION_2024, which shipped to production",
+    "verified_on": "2026-10-11",
+    "source": "IRS Rev. Proc. 2023-34 (inflation adjustments for tax year 2024); SSA 2024 wage base",
+    "purpose": "KNOWN-GOOD REFERENCE. 2024 is historically fixed, so it is the fixture the engine's correctness is proven against. Engine tests must use this year, never the current one, so that a data-verification gap can never look like an engine bug.",
+    "currency": "USD",
+    "notes": "Ordinary-income brackets are marginal: `upto: null` means the top bracket."
+  },
+  "ordinary_brackets": {
+    "single": [
+      { "rate": 0.1, "upto": 11600 },
+      { "rate": 0.12, "upto": 47150 },
+      { "rate": 0.22, "upto": 100525 },
+      { "rate": 0.24, "upto": 191950 },
+      { "rate": 0.32, "upto": 243725 },
+      { "rate": 0.35, "upto": 609350 },
+      { "rate": 0.37, "upto": null }
+    ],
+    "married_jointly": [
+      { "rate": 0.1, "upto": 23200 },
+      { "rate": 0.12, "upto": 94300 },
+      { "rate": 0.22, "upto": 201050 },
+      { "rate": 0.24, "upto": 383900 },
+      { "rate": 0.32, "upto": 487450 },
+      { "rate": 0.35, "upto": 731200 },
+      { "rate": 0.37, "upto": null }
+    ],
+    "married_separately": [
+      { "rate": 0.1, "upto": 11600 },
+      { "rate": 0.12, "upto": 47150 },
+      { "rate": 0.22, "upto": 100525 },
+      { "rate": 0.24, "upto": 191950 },
+      { "rate": 0.32, "upto": 243725 },
+      { "rate": 0.35, "upto": 365600 },
+      { "rate": 0.37, "upto": null }
+    ],
+    "head_of_household": [
+      { "rate": 0.1, "upto": 16550 },
+      { "rate": 0.12, "upto": 63100 },
+      { "rate": 0.22, "upto": 100500 },
+      { "rate": 0.24, "upto": 191950 },
+      { "rate": 0.32, "upto": 243700 },
+      { "rate": 0.35, "upto": 609350 },
+      { "rate": 0.37, "upto": null }
+    ]
+  },
+  "standard_deduction": {
+    "single": 14600,
+    "married_jointly": 29200,
+    "married_separately": 14600,
+    "head_of_household": 21900
+  },
+  "fica": {
+    "social_security_rate_employee": 0.062,
+    "social_security_wage_base": 168600,
+    "medicare_rate_employee": 0.0145,
+    "additional_medicare_rate": 0.009,
+    "additional_medicare_threshold": {
+      "single": 200000,
+      "married_jointly": 250000,
+      "married_separately": 125000,
+      "head_of_household": 200000
+    }
+  },
+  "long_term_capital_gains": {
+    "single": [
+      { "rate": 0.0, "upto": 47025 },
+      { "rate": 0.15, "upto": 518900 },
+      { "rate": 0.2, "upto": null }
+    ],
+    "married_jointly": [
+      { "rate": 0.0, "upto": 94050 },
+      { "rate": 0.15, "upto": 583750 },
+      { "rate": 0.2, "upto": null }
+    ],
+    "married_separately": [
+      { "rate": 0.0, "upto": 47025 },
+      { "rate": 0.15, "upto": 291850 },
+      { "rate": 0.2, "upto": null }
+    ],
+    "head_of_household": [
+      { "rate": 0.0, "upto": 63000 },
+      { "rate": 0.15, "upto": 551350 },
+      { "rate": 0.2, "upto": null }
+    ]
+  },
+  "niit": {
+    "rate": 0.038,
+    "threshold": {
+      "single": 200000,
+      "married_jointly": 250000,
+      "married_separately": 125000,
+      "head_of_household": 200000
+    },
+    "note": "Net Investment Income Tax thresholds are NOT inflation-indexed — they are fixed in statute at these amounts and have been since 2013."
+  }
+}

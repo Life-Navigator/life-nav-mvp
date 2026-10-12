@@ -20,7 +20,30 @@ _CALC_DIR = os.path.dirname(base.__file__)
 _SERVICES_DIR = os.path.dirname(A.__file__)
 
 
-# ── Gate 1: reference data must not go stale silently ─────────────────────────────────────────────
+# ── Gates 1 & 6: reference data must be present AND verified ──────────────────────────────────────
+#
+# WHY THERE IS A DECLARED PENDING LIST
+# ------------------------------------
+# A gate that fails permanently gets disabled, and a disabled gate protects nothing. But silently
+# passing unverified data is the whole defect being prevented. So the gates assert an EXACT match
+# against a declared list: anything new fails immediately, and each known gap is recorded here with
+# what it needs. Removing an entry tightens the gate automatically, and the list doubles as the
+# work queue. It cannot be used to hide a problem, because every entry is visible in review and
+# carries its own reason.
+
+PENDING_DATA: dict[str, str] = {
+    "state_tax": "only 2024 exists. Needs the current year, plus the top ~12 states by user count "
+                 "in `bracketed` with per-status schedules (CA/NY/NJ/MA/VA/MD/GA/OH/AZ/WI/MN/OR).",
+}
+
+PENDING_VERIFICATION: dict[str, str] = {
+    "tax_tables": "2026.json was populated from model knowledge, not a primary source. Every "
+                  "bracket threshold, standard deduction, SS wage base and LTCG threshold must be "
+                  "checked against the IRS Rev. Proc. for TY2026 and the SSA wage-base "
+                  "announcement, then set _meta.verified: true.",
+}
+
+
 def test_no_registered_dataset_family_is_stale():
     """FAILS when a dataset family has data on disk but nothing for the current year.
 
@@ -31,11 +54,26 @@ def test_no_registered_dataset_family_is_stale():
     By design this fires every January for families that need a refresh. That is the point; see the
     build plan's open question 5 on ownership.
     """
-    stale = V.stale_families()
-    assert not stale, (
-        f"stale reference data for {date.today().year}: "
-        + "; ".join(f"{s['family']} (have {s['have']}, phase {s['phase']})" for s in stale)
+    stale = {s["family"]: s for s in V.stale_families()}
+    unexpected = set(stale) - set(PENDING_DATA)
+    assert not unexpected, (
+        f"newly stale reference data for {date.today().year}: "
+        + "; ".join(f"{f} (have {stale[f]['have']}, phase {stale[f]['phase']})"
+                    for f in sorted(unexpected))
     )
+    fixed = set(PENDING_DATA) - set(stale)
+    assert not fixed, (
+        f"{sorted(fixed)} now has current-year data — remove it from PENDING_DATA so the gate "
+        f"protects it from regressing"
+    )
+
+
+def test_every_pending_entry_names_a_real_family_and_states_what_it_needs():
+    """Keeps the lists honest: no stale entries for families that no longer exist, no blank
+    reasons that would turn the list into a silent suppression mechanism."""
+    for name, reason in {**PENDING_DATA, **PENDING_VERIFICATION}.items():
+        assert name in V.FAMILIES, f"{name} is not a declared dataset family"
+        assert len(reason) > 40, f"{name}: the reason must say what is actually needed"
 
 
 def test_every_declared_family_resolves_or_is_honestly_unshipped():
@@ -249,3 +287,40 @@ def test_cross_language_parity_fixture_exists_and_is_loaded_by_both_sides():
     assert os.path.exists(ts_test), "the TypeScript half of the parity check is gone"
     with open(ts_test) as fh:
         assert "financial-parity.json" in fh.read(), "TS parity test no longer reads the fixture"
+
+
+# ── Gate 6: reference data must be VERIFIED, not merely present ───────────────────────────────────
+def test_no_dataset_family_serves_an_unverified_table_for_the_current_year():
+    """FAILS until every current-year table has been checked against its primary source.
+
+    Distinct from the staleness gate: that one asks "is the year present?", this asks "has anyone
+    checked it?". A table can pass staleness and still be unfit to quote — which is exactly the
+    state `tax_tables/2026.json` is in right now, populated from model knowledge rather than from
+    the IRS revenue procedure.
+
+    This gate is EXPECTED TO FAIL until an owner verifies the 2026 figures. That is the point: it
+    is the pressure that gets the verification done, and until then every tax calculator refuses to
+    produce a user-facing figure anyway (require_verified=True), so nothing can quietly ship a
+    number nobody checked.
+    """
+    unverified = {u["family"]: u for u in V.unverified_families()}
+    unexpected = set(unverified) - set(PENDING_VERIFICATION)
+    assert not unexpected, (
+        f"newly unverified reference data for {date.today().year}: "
+        + "; ".join(f"{f}/{unverified[f]['year']} — {unverified[f]['needs']}"
+                    for f in sorted(unexpected))
+    )
+    now_verified = set(PENDING_VERIFICATION) - set(unverified)
+    assert not now_verified, (
+        f"{sorted(now_verified)} is now verified — remove it from PENDING_VERIFICATION so the gate "
+        f"protects it from regressing"
+    )
+
+
+def test_unverified_tables_cannot_produce_a_user_facing_figure():
+    """The belt to the gate's braces. Even while a table sits in PENDING_VERIFICATION, every
+    calculator that would quote it must refuse — so a declared gap can never become a shipped
+    number, whatever CI says."""
+    for family in PENDING_VERIFICATION:
+        with pytest.raises(V.UnverifiedDataError):
+            V.load(family, require_verified=True)

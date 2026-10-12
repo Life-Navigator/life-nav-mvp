@@ -1,0 +1,109 @@
+{
+  "_meta": {
+    "tax_year": 2026,
+    "verified": false,
+    "verification_required": "EVERY numeric value below must be checked against the IRS inflation-adjustment revenue procedure for tax year 2026 and the SSA wage-base announcement before this table may serve a user-facing figure.",
+    "why_unverified": "These figures were populated from model knowledge, not from a primary source. The 2026 amounts post-date the OBBBA changes of July 2025 and the author's knowledge of them is NOT reliable to the dollar. Writing an unverified tax table and letting it quote numbers is precisely the fabrication this engine exists to prevent, so the loader refuses an unverified table for user-facing work (see versioned_data.load, require_verified).",
+    "high_confidence": [
+      "ordinary bracket RATES (10/12/22/24/32/35/37) — made permanent by OBBBA",
+      "social_security_rate_employee 6.2%, medicare_rate_employee 1.45%, additional_medicare_rate 0.9%",
+      "additional_medicare_threshold and niit.threshold — fixed in statute, never indexed"
+    ],
+    "low_confidence": [
+      "every bracket THRESHOLD",
+      "standard_deduction amounts",
+      "social_security_wage_base",
+      "long_term_capital_gains thresholds"
+    ],
+    "source": "UNVERIFIED — populate from IRS Rev. Proc. for TY2026 + SSA 2026 wage base, then set verified: true with verified_by and verified_on",
+    "currency": "USD"
+  },
+  "ordinary_brackets": {
+    "single": [
+      { "rate": 0.1, "upto": 12400 },
+      { "rate": 0.12, "upto": 50400 },
+      { "rate": 0.22, "upto": 105700 },
+      { "rate": 0.24, "upto": 201775 },
+      { "rate": 0.32, "upto": 256225 },
+      { "rate": 0.35, "upto": 640600 },
+      { "rate": 0.37, "upto": null }
+    ],
+    "married_jointly": [
+      { "rate": 0.1, "upto": 24800 },
+      { "rate": 0.12, "upto": 100800 },
+      { "rate": 0.22, "upto": 211400 },
+      { "rate": 0.24, "upto": 403550 },
+      { "rate": 0.32, "upto": 512450 },
+      { "rate": 0.35, "upto": 768700 },
+      { "rate": 0.37, "upto": null }
+    ],
+    "married_separately": [
+      { "rate": 0.1, "upto": 12400 },
+      { "rate": 0.12, "upto": 50400 },
+      { "rate": 0.22, "upto": 105700 },
+      { "rate": 0.24, "upto": 201775 },
+      { "rate": 0.32, "upto": 256225 },
+      { "rate": 0.35, "upto": 384350 },
+      { "rate": 0.37, "upto": null }
+    ],
+    "head_of_household": [
+      { "rate": 0.1, "upto": 17700 },
+      { "rate": 0.12, "upto": 67450 },
+      { "rate": 0.22, "upto": 105700 },
+      { "rate": 0.24, "upto": 201775 },
+      { "rate": 0.32, "upto": 256200 },
+      { "rate": 0.35, "upto": 640600 },
+      { "rate": 0.37, "upto": null }
+    ]
+  },
+  "standard_deduction": {
+    "single": 16100,
+    "married_jointly": 32200,
+    "married_separately": 16100,
+    "head_of_household": 24150
+  },
+  "fica": {
+    "social_security_rate_employee": 0.062,
+    "social_security_wage_base": 184500,
+    "medicare_rate_employee": 0.0145,
+    "additional_medicare_rate": 0.009,
+    "additional_medicare_threshold": {
+      "single": 200000,
+      "married_jointly": 250000,
+      "married_separately": 125000,
+      "head_of_household": 200000
+    }
+  },
+  "long_term_capital_gains": {
+    "single": [
+      { "rate": 0.0, "upto": 49450 },
+      { "rate": 0.15, "upto": 545500 },
+      { "rate": 0.2, "upto": null }
+    ],
+    "married_jointly": [
+      { "rate": 0.0, "upto": 98900 },
+      { "rate": 0.15, "upto": 613700 },
+      { "rate": 0.2, "upto": null }
+    ],
+    "married_separately": [
+      { "rate": 0.0, "upto": 49450 },
+      { "rate": 0.15, "upto": 306850 },
+      { "rate": 0.2, "upto": null }
+    ],
+    "head_of_household": [
+      { "rate": 0.0, "upto": 66200 },
+      { "rate": 0.15, "upto": 579600 },
+      { "rate": 0.2, "upto": null }
+    ]
+  },
+  "niit": {
+    "rate": 0.038,
+    "threshold": {
+      "single": 200000,
+      "married_jointly": 250000,
+      "married_separately": 125000,
+      "head_of_household": 200000
+    },
+    "note": "Fixed in statute since 2013; not inflation-indexed."
+  }
+}

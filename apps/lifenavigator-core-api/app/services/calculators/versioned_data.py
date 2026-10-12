@@ -49,6 +49,16 @@ class VersionedDataError(RuntimeError):
     """A dataset family is missing, malformed, or unacceptably stale."""
 
 
+class UnverifiedDataError(VersionedDataError):
+    """The table exists but has not been checked against its primary source.
+
+    A SEPARATE error type because the remedy is different and the caller may legitimately want to
+    distinguish them: a missing table means "build this", an unverified one means "check these
+    numbers against the IRS publication". The engine can be complete and correct while its data is
+    still pending verification, and conflating the two hides that.
+    """
+
+
 @dataclass(frozen=True)
 class DatasetFamily:
     """A calendar-versioned reference dataset.
@@ -80,6 +90,9 @@ FAMILIES: dict[str, DatasetFamily] = {
         # year-start is survivable if the figure is labelled — a wrong-year bracket is far worse
         # than a labelled prior-year one.
         DatasetFamily("tax_tables", "Federal tax brackets & deductions", CARRY_FORWARD, phase="B"),
+        # Per-STATE verification (see the table's _meta): the no-income-tax list is statutory and
+        # stable, individual rates are not. CARRY_FORWARD because a state rate rarely moves and a
+        # labelled prior-year rate beats refusing to compute the state portion at all.
         DatasetFamily("state_tax", "State income tax tables", CARRY_FORWARD, phase="B"),
         # Phase F. Published in the autumn for the following year; a gap here is a process miss.
         DatasetFamily("contribution_limits", "401k/IRA/HSA/FSA limits", STRICT, phase="F"),
@@ -105,6 +118,21 @@ class LoadedData:
     data: dict[str, Any]
 
     @property
+    def meta(self) -> dict[str, Any]:
+        return self.data.get("_meta") or {}
+
+    @property
+    def is_verified(self) -> bool:
+        """Has a human checked this table against its primary source?
+
+        Defaults to FALSE when `_meta.verified` is absent. A table that forgot to declare its
+        provenance is unverified by definition, and defaulting the other way would let the next
+        hand-written table serve figures silently — which is the `BRACKETS_2024` failure again with
+        extra steps.
+        """
+        return bool(self.meta.get("verified") is True)
+
+    @property
     def is_carried_forward(self) -> bool:
         return self.year_used != self.year_requested
 
@@ -114,9 +142,11 @@ class LoadedData:
         unlabelled prior-year figure is the defect this module exists to prevent."""
         fam = FAMILIES[self.family].label
         if self.is_carried_forward:
-            return (f"{fam}, {self.year_used} tables (the {self.year_requested} tables are not yet "
+            base = (f"{fam}, {self.year_used} tables (the {self.year_requested} tables are not yet "
                     f"loaded, so this uses {self.year_used})")
-        return f"{fam}, {self.year_used} tables"
+        else:
+            base = f"{fam}, {self.year_used} tables"
+        return base if self.is_verified else base + " — NOT YET VERIFIED against the primary source"
 
 
 def _root(root: Optional[str] = None) -> str:
@@ -146,12 +176,19 @@ def available_years(family: str, *, root: Optional[str] = None) -> list[int]:
     return sorted(years)
 
 
-def load(family: str, year: Optional[int] = None, *, root: Optional[str] = None) -> LoadedData:
+def load(family: str, year: Optional[int] = None, *, root: Optional[str] = None,
+         require_verified: bool = False) -> LoadedData:
     """Load `family` for `year` (default: the current calendar year).
 
     Raises `VersionedDataError` when the family has no data at all, when the exact year is missing
     under a STRICT policy, or when only LATER years exist (carrying *backwards* would apply next
     year's brackets to this year's income — wrong in a way that looks right).
+
+    `require_verified=True` additionally raises `UnverifiedDataError` unless `_meta.verified` is
+    True. Calculators that produce USER-FACING figures pass it; tests and development read the
+    table without it. That split is what lets the engine ship complete and tested while its current
+    -year data is still pending a human check against the IRS publication — rather than either
+    blocking the engine on the data or, far worse, quoting numbers nobody has verified.
     """
     fam = _family(family)
     want = int(year) if year is not None else date.today().year
@@ -161,7 +198,8 @@ def load(family: str, year: Optional[int] = None, *, root: Optional[str] = None)
             f"{family}: no data files found — phase {fam.phase or '?'} has not shipped this dataset"
         )
     if want in years:
-        return LoadedData(family, want, want, _read(family, want, root=root))
+        return _checked(LoadedData(family, want, want, _read(family, want, root=root)),
+                        require_verified)
 
     earlier = [y for y in years if y < want]
     if not earlier:
@@ -174,7 +212,20 @@ def load(family: str, year: Optional[int] = None, *, root: Optional[str] = None)
             f"{family}: no {want} table (have {years}) and policy is {STRICT!r} — this dataset is "
             f"published in advance, so a missing year is a process failure, not a timing gap"
         )
-    return LoadedData(family, want, earlier[-1], _read(family, earlier[-1], root=root))
+    return _checked(LoadedData(family, want, earlier[-1], _read(family, earlier[-1], root=root)),
+                    require_verified)
+
+
+def _checked(loaded: LoadedData, require_verified: bool) -> LoadedData:
+    if require_verified and not loaded.is_verified:
+        meta = loaded.meta
+        raise UnverifiedDataError(
+            f"{loaded.family}/{loaded.year_used}.json is not verified against its primary source, "
+            f"so it must not produce a user-facing figure. "
+            f"{meta.get('verification_required') or 'Check every value, then set _meta.verified: true.'} "
+            f"Source to use: {meta.get('source') or 'unstated'}"
+        )
+    return loaded
 
 
 @lru_cache(maxsize=64)
@@ -207,6 +258,31 @@ def _read_uncached(path: str) -> dict[str, Any]:
 
 
 # ── Drift gate support ────────────────────────────────────────────────────────────────────────────
+def unverified_families(*, year: Optional[int] = None,
+                        root: Optional[str] = None) -> list[dict[str, Any]]:
+    """Families whose table for `year` loads but is not verified. Drives its own drift gate.
+
+    Separate from `stale_families` because the two failures want different gates: staleness is "the
+    year is missing", and this is "the year is present but nobody has checked it". A table can pass
+    the staleness gate and still be unfit to quote.
+    """
+    want = int(year) if year is not None else date.today().year
+    out: list[dict[str, Any]] = []
+    for name, fam in sorted(FAMILIES.items()):
+        if not available_years(name, root=root):
+            continue
+        try:
+            loaded = load(name, want, root=root)
+        except VersionedDataError:
+            continue
+        if not loaded.is_verified:
+            out.append({"family": name, "label": fam.label, "year": loaded.year_used,
+                        "phase": fam.phase,
+                        "needs": loaded.meta.get("verification_required") or "verify and set _meta.verified",
+                        "source": loaded.meta.get("source") or "unstated"})
+    return out
+
+
 def stale_families(*, year: Optional[int] = None, root: Optional[str] = None) -> list[dict[str, Any]]:
     """Families that HAVE data but are missing the given year (default: current). Drives the gate.
 

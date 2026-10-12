@@ -1,0 +1,40 @@
+{
+  "_meta": {
+    "tax_year": 2024,
+    "verified": true,
+    "verified_by": "Only the no_income_tax list is verified here — it is statutory, not inflation-indexed, and stable across years. Rate data for individual states carries its OWN per-state `verified` flag and is unverified until an owner checks it.",
+    "verified_on": "2026-10-11",
+    "source": "no_income_tax list: state constitutions/statutes. Per-state rates: UNVERIFIED, see each state's `verified` field.",
+    "purpose": "PER-STATE verification, because the confidence genuinely differs. 'Texas has no income tax' is a fact that does not move; 'Illinois is 4.95%' is a number that changes by legislature. A single file-level flag would force both to the lower confidence and make the engine useless, or both to the higher and make it dishonest.",
+    "policy": "A state absent from every section raises UNMODELLED_STATE. It is NEVER treated as zero — a silent zero would understate a Californian's total tax by five figures and look like a complete answer."
+  },
+  "no_income_tax": {
+    "verified": true,
+    "note": "No tax on wage/salary income. NH and WA tax some investment/capital-gains income but not wages, so a wage-only calculation is correctly zero; a capital-gains question in those states is NOT answered by this calculator.",
+    "states": ["AK", "FL", "NV", "NH", "SD", "TN", "TX", "WA", "WY"],
+    "caveats": {
+      "NH": "No wage income tax. Interest & dividends tax was phased out (repealed from 2025).",
+      "WA": "No wage income tax, but a 7% tax applies to long-term capital gains above a statutory standard deduction."
+    }
+  },
+  "flat": {
+    "IL": { "rate": 0.0495, "verified": false, "note": "verify against IL DOR for the tax year" },
+    "IN": { "rate": 0.0305, "verified": false, "note": "verify; county add-ons are NOT modelled" },
+    "MI": {
+      "rate": 0.0425,
+      "verified": false,
+      "note": "verify; city taxes (e.g. Detroit) NOT modelled"
+    },
+    "NC": { "rate": 0.045, "verified": false, "note": "verify against NC DOR for the tax year" },
+    "PA": { "rate": 0.0307, "verified": false, "note": "verify; local EIT is NOT modelled" },
+    "CO": { "rate": 0.044, "verified": false, "note": "verify against CO DOR for the tax year" },
+    "UT": { "rate": 0.0465, "verified": false, "note": "verify against UT STC for the tax year" },
+    "KY": {
+      "rate": 0.04,
+      "verified": false,
+      "note": "verify; rate is on a statutory reduction schedule"
+    }
+  },
+  "bracketed": {},
+  "not_modelled_note": "CA, NY, NJ, MA, VA, MD, GA, OH, AZ, WI, MN, OR and the rest are deliberately absent rather than guessed. The build plan commits to the top ~12 states by user count; they go in `bracketed` with per-status schedules, each individually verified."
+}
