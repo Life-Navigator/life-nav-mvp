@@ -183,6 +183,60 @@ All of Phase F, and all of it is a readout rather than a formula.
 
 ### Milestone 3 — the advisor can actually say it
 
+> **Status 2026-10-12: MILESTONE 3 IS COMPLETE.** All 40 advisor-facing calculators are wired,
+> **all 11 treatment rules reach the advisor** (3.1), and calculations and answers now persist
+> (3.6).
+>
+> **3.1 — determinations reach the user.** It was 0 of 11: eleven rules built and tested in Phase
+> B2 that no user could see. They travel in their own `treatments` section rather than through
+> `CalcResult`, which carries one figure and is the wrong shape for "is my HELOC interest
+> deductible?". Forcing it would discard the three fields that carry the value — the AUTHORITY, the
+> TEST that decided it ("not deductible because the proceeds paid off credit cards rather than
+> improving the residence securing the loan" names the lever; "not deductible" is a dead end), and
+> the TRAP. Only the quantified half is routed into the number gate. Four rules turn on a fact only
+> the user can state and are deliberately NOT stored: `proceeds_used_for` is the crux of the
+> §163(h)(3) tracing rule, it can differ per draw, and storing it would turn one draw's use into a
+> permanent characteristic.
+>
+> Three bugs, the first being the one that mattered: `to_calc_result()` rounded every amount to 2
+> decimals — right for dollars, destroys a rate, so an after-tax cost of 0.052298 became 0.05 and a
+> determination's own summary said "5.23%" while the figure beside it said 5%. Second, a rate
+> registered _nothing_ with the number gate (`_citable_forms` drops anything below 1.0 by design),
+> so the advisor was blocked from quoting the sentence the engine wrote for it. Third,
+> `fsa_hsa_compatibility` knew the alias `general` but not `general_purpose` — the spelling the
+> schema stores, and the only path that supplies it — so the rule refused for every user whose FSA
+> type came from the database.
+>
+> **3.6 — persistence.** Nothing stored a computed figure, so every turn recomputed and nothing
+> could be compared to anything. `finance.calculation_snapshots` keeps the packet whole (the audit
+> record) and `finance.answer_cache` serves a prior answer when the question, the facts AND the law
+> all match.
+>
+> The fingerprint has two halves and the second is the subtle one. `inputs_fingerprint` covers the
+> user's facts; `basis_fingerprint` covers the LAW actually used — not the year requested, because
+> every tax figure currently falls back to the newest _verified_ table (2024) while the request says 2026. An inputs-only cache is not merely stale here, it is wrong: the moment the CPA verifies the
+> 2026 tables every figure changes while nothing in the user's data does, so an inputs-only
+> fingerprint would see no reason to refresh and would answer a 2026 question with 2024 law.
+>
+> The question match is EXACT, never fuzzy. A near-match that occasionally serves another
+> question's answer trades the product's trustworthiness for a token saving, which is never the
+> right trade — so normalization covers case, punctuation, whitespace and a handful of filler
+> words, and nothing else. A question under four meaningful words is not cacheable at all. On top
+> of the fingerprints, every figure a cached answer asserted must still be one the gate would
+> allow. Storage failures are swallowed in both directions: a failed read is a miss (costs tokens),
+> a failed write is dropped (costs nothing).
+>
+> `what_changed` is what makes this advice rather than telemetry — it separates "your number moved
+> because your income rose" from "your number moved because the tax tables were verified", and the
+> user did nothing in the second case.
+>
+> One more bug found in my own code by its test: the cache read `hit_count` _after_ `_touch` had
+> updated the same row, so the first hit reported 2.
+>
+> **Owner actions:** apply migrations `20261012000000`, `20261012010000` and `20261012020000`.
+>
+> ---
+>
 > **Status 2026-10-12: the INPUT half of Milestone 3 is done. 40 of 40 advisor-facing calculators
 > are wired; 0 are blocked on inputs** (was 19 wired / 16 blocked). The remaining Milestone 3 work
 > is the 11 `TreatmentResult` rules and persistence.

@@ -116,8 +116,11 @@ def _gap(inputs: dict[str, Any], calculator: str, needs: list[str]) -> dict[str,
 class AdvisorCalculationPlanner:
     """Selects and runs calculators for one turn from canonical inputs."""
 
-    def __init__(self, resolver: Any) -> None:
+    def __init__(self, resolver: Any, store: Any = None) -> None:
         self._resolver = resolver  # FinancialInputResolver — provenance-carrying canonical inputs
+        # CalculationStore (optional). Absent in tests and in any caller that has no Supabase
+        # handle; persistence is an enhancement and the planner must work without it.
+        self._store = store
 
     async def compute(
         self,
@@ -643,7 +646,7 @@ class AdvisorCalculationPlanner:
 
         strict = [r for r in results if not r.is_scenario]
         scenario = [r for r in results if r.is_scenario]
-        return {
+        packet: dict[str, Any] = {
             "available": bool(results),
             "results": [r.as_dict() for r in results],
             # TIER 1 (advisor_validator's three-tier policy): arithmetic on the user's OWN figures.
@@ -674,6 +677,25 @@ class AdvisorCalculationPlanner:
                 "from one tax year as though it answered a question about another.",
             ] + (treatments.get("constraints") or []),
         }
+
+        # ── Persistence (Milestone 3.6) ──────────────────────────────────────────────────────────
+        #
+        # Written AFTER the packet is assembled and before it is returned, so what is stored is
+        # exactly what the advisor saw. Best-effort throughout: a storage failure must not cost the
+        # user their answer.
+        if self._store is not None:
+            try:
+                uid = getattr(ctx, "user_id", None)
+                if uid:
+                    # What moved since last time, so the advisor can say WHY a figure changed
+                    # rather than silently presenting a different number than it did in June.
+                    packet["changes_since_last"] = await self._store.what_changed(
+                        uid, packet, inputs)
+                    await self._store.save_snapshot(uid, packet, tax_year=tax_year, inputs=inputs)
+            except Exception as exc:  # noqa: BLE001 — never break a turn to store a snapshot
+                log.warning("calculation persistence skipped: %s", exc)
+
+        return packet
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────────────────────────
