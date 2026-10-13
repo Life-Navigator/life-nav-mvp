@@ -52,6 +52,16 @@ PENDING_VERIFICATION: dict[str, str] = {
                       "the file's _meta.unsourced_still: the dependent-care FSA limit and the RMD "
                       "age. NOTE the RULES in tax_wrappers.py and tax_debt_interest.py are "
                       "statutory structure and are NOT pending — only these amounts are.",
+    "va_disability": "2026.json is SOURCED from va.gov (compensation rates effective 2025-12-01, "
+                     "DIC spouse rates, and the 2025 past-rates page) with per-table citations, "
+                     "and it is cross-checked mechanically two independent ways by "
+                     "test_va_disability.py: every `alone` rate equals the 2025 rate x 1.028 to "
+                     "the cent, and all 54 published composite rows reproduce from the stored "
+                     "increments. What is still owed is a HUMAN confirming the figures against "
+                     "va.gov or an award letter — the arithmetic cannot catch a number that was "
+                     "mis-read consistently. Not a CPA item. Until then every VA figure is "
+                     "SCENARIO rather than STRICT, which is enforced by CalcResult's own "
+                     "assumptions-imply-scenario guard.",
 }
 
 

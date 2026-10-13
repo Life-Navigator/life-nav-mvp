@@ -102,6 +102,12 @@ FAMILIES: dict[str, DatasetFamily] = {
         # applied with last year's labelled threshold is far more useful than no determination at
         # all — and the label says which year it came from.
         DatasetFamily("tax_parameters", "Statutory thresholds for tax rules", CARRY_FORWARD, phase="B2"),
+        # Phase F. VA compensation and DIC rates. CARRY_FORWARD because they move once a year on a
+        # KNOWN date — December 1, matched by law to the Social Security COLA (38 U.S.C. 5312) — and
+        # a labelled prior-year rate is far better than refusing to state a veteran's own benefit.
+        # Note the year key is the year the rates are PAYABLE: the 2026 table is effective 2025-12-01.
+        DatasetFamily("va_disability", "VA disability compensation & DIC rates", CARRY_FORWARD,
+                      phase="F"),
         # Phase I. Annual index refresh; carrying forward a year barely moves a COL ratio.
         DatasetFamily("col_index", "Cost-of-living index by metro", CARRY_FORWARD, phase="I"),
         # Phase L. Rates move constantly, so a stale table is a materially wrong quote. Strict.

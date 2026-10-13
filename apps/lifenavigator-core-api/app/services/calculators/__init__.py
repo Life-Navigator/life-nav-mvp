@@ -31,6 +31,7 @@ from . import (  # noqa: F401
     tax_debt_interest,
     tax_wrappers,
     treatment,
+    va_disability,
     versioned_data,
 )
 from .base import (  # noqa: F401
@@ -50,5 +51,6 @@ __all__ = [
     "SCENARIO", "STRICT", "Assumption", "CalcResult", "CalculatorError",
     "REGISTRY", "available", "get", "effective_monthly_rate", "nominal_monthly_rate",
     "career", "cash", "debt", "education", "effective", "housing", "money", "primitives",
-    "retirement", "tax", "tax_debt_interest", "tax_wrappers", "treatment", "versioned_data",
+    "retirement", "tax", "tax_debt_interest", "tax_wrappers", "treatment", "va_disability",
+    "versioned_data",
 ]

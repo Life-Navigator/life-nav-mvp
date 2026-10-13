@@ -100,7 +100,7 @@ S/M/L — because estimates I invent are worth less than the ordering.
 
 ### Milestone 2 — "What should I do about it?" (ledger readouts)
 
-> **Status 2026-10-12: Milestone 1 and Milestone 2 are COMPLETE.** 1.1 Monte Carlo, 1.2 stress
+> **Status 2026-10-12: Milestone 1 and Milestone 2 are COMPLETE, including 2.6 VA disability.** 1.1 Monte Carlo, 1.2 stress
 > tests, 1.3 what-ifs + solve-for, 2.1 sequencing, 2.2 Roth ladder, 2.3 claiming ages **including
 > spousal and survivor**, 2.4 the three leaf calculators, 2.5 RMD table, pension lump sum and
 > spending guardrails.
@@ -124,6 +124,33 @@ S/M/L — because estimates I invent are worth less than the ordering.
 > year; `first_to_go` chosen by life **expectancy** instead of years remaining (wrong whenever the
 > spouses are different ages - an 80-year-old expected to reach 85 dies before a 62-year-old
 > expected to reach 84); and a spousal top-up paid before the worker had filed.
+>
+> **2.6 VA disability compensation** was added on the same principle and is the clearest example so
+> far of a domain where a general-purpose planning tool is simply wrong. Three facts drive it.
+> (1) It is **entirely tax-free** - 26 U.S.C. 104(a)(4) excludes it from gross income, so it never
+> reaches AGI and therefore never reaches MAGI. A veteran's compensation does not make their Social
+> Security taxable, does not count toward an IRMAA bracket and does not consume Roth-conversion
+> room, which usually means a veteran has MORE conversion headroom than their gross income
+> suggests. The test suite proves this through the actual tax calculation rather than asserting it:
+> the same $49,898 costs $0 as compensation and $2,069.80 as a pension.
+> (2) **Ratings do not add** - 38 CFR 4.25 combines them against remaining efficiency, so 60% and
+> 30% is 70%, not 90%. Note the trap: 50% and 30% combine to exactly 65, and Python's `round` rounds
+> half to EVEN, so `round(65, -1)` is 60 - one full rating step below what the regulation requires.
+> (3) **It stops at death and does NOT pass to a spouse**, which is the exact opposite of the
+> Social Security survivor rule next door. The survivor analogue is DIC, a flat and much smaller
+> schedule: a 100%-rated veteran with a spouse receives $4,158/mo and the DIC base is $1,699 - a 59%
+> fall in tax-free income landing in the same year the survivor starts filing single.
+> `survivor_income_cliff` puts a number on it, and DIC is never assumed, because eligibility is a
+> real test and granting it by default overstates a widow's income by ~$20,000/yr for life.
+>
+> The rate table is **verified mechanically two independent ways** rather than trusted: every
+> `alone` rate equals the 2025 published rate x 1.028 to the cent (which also confirms the COLA,
+> independently reproduced from the DIC base on a different VA page), and all 54 published composite
+> rows reproduce from the stored increments. What is still owed is a human confirming the figures
+> against va.gov or an award letter - arithmetic cannot catch a number mis-read consistently - so
+> the table stays `verified: false` and every VA figure is SCENARIO. Flipping that flag promotes
+> them all to STRICT with no code change, which is enforced by `CalcResult`'s own
+> assumptions-imply-scenario guard.
 >
 > Along the way the ledger gained **composable planned spending** (owner request): a goal can be
 > built from line items — flights, hotel, venue, caterer — with `optional` lines the household
@@ -151,6 +178,7 @@ All of Phase F, and all of it is a readout rather than a formula.
 | 2.2 | `roth_conversion_ladder` — fill brackets to the top each year against the ledger's own tax                                          | M    |
 | 2.3 | Social Security claiming (62 / FRA / 70, spousal + survivor) - `household_claiming` compares PAIRS                                  | M    |
 | 2.4 | `expense_ratio_drag`, real-vs-nominal toggle, `lump_sum_vs_dca`                                                                     | S    |
+| 2.6 | VA disability compensation, combined ratings (38 CFR 4.25) and DIC - `va_disability` + `planning/va_benefits`                       | M    |
 | 2.5 | RMD refinement (real uniform-lifetime table; the ledger currently approximates), pension lump sum vs annuity, withdrawal guardrails | M    |
 
 ### Milestone 3 — the advisor can actually say it

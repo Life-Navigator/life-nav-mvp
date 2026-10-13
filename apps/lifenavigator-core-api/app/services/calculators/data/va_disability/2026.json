@@ -1,0 +1,260 @@
+{
+  "_meta": {
+    "rate_year": 2026,
+    "effective_date": "2025-12-01",
+    "cola": 0.028,
+    "verified": false,
+    "sourced": true,
+    "sourced_on": "2026-10-12",
+    "sources": {
+      "compensation": "VA, Current Veterans disability compensation rates, effective 2025-12-01 (https://www.va.gov/disability/compensation-rates/veteran-rates/), retrieved 2026-10-12",
+      "compensation_prior_year": "VA, Past rates: 2025 (effective 2024-12-01) (https://www.va.gov/disability/compensation-rates/veteran-rates/past-rates-2025/), retrieved 2026-10-12 — used to verify the COLA arithmetic",
+      "dic": "VA, Current DIC rates for spouses and dependents, effective 2025-12-01 (https://www.va.gov/family-and-caregiver-benefits/survivor-compensation/dependency-indemnity-compensation/survivor-rates/), retrieved 2026-10-12",
+      "cola": "Derived and cross-checked two ways: every `alone` rate equals the 2025 rate x 1.028 to the cent, and the DIC base 1653.07 x 1.028 = 1699.36",
+      "tax_exemption": "26 U.S.C. 104(a)(4); 38 U.S.C. 5301(a). Excluded from gross income, so absent from AGI and MAGI",
+      "combined_rating": "38 CFR 4.25 — successive whole-person method; combined values ending in 5 adjust UPWARD; conversion to a multiple of 10 happens once, after all combining",
+      "dependent_floor": "38 U.S.C. 1115 — additional compensation for dependents requires a rating of at least 30%"
+    },
+    "verification_notes": [
+      "Every published composite row reproduces as alone + spouse + (parents x parent) and, for the child rows, + first_child. All 54 rows check.",
+      "Dependent increments below 100% are published as whole dollars and are NOT the prior year's increment x COLA, so they are stored as published rather than derived."
+    ],
+    "not_modelled": [
+      "Special Monthly Compensation (SMC) levels K through S — 38 CFR 3.350, a separate schedule",
+      "The bilateral factor — 38 CFR 4.26, which adds 10% of the combined value of paired-limb disabilities before combining with the rest",
+      "Total Disability based on Individual Unemployability (TDIU) — pays at the 100% rate; model it by passing rating=100",
+      "DIC for dependent parents — a separate income-tested schedule"
+    ]
+  },
+
+  "compensation_monthly": {
+    "10": { "alone": 180.42 },
+    "20": { "alone": 356.66 },
+    "30": {
+      "alone": 552.47,
+      "spouse": 65.0,
+      "parent": 52.0,
+      "first_child": 44.0,
+      "first_child_with_spouse": 49.0,
+      "additional_child_under_18": 32.0,
+      "child_over_18_in_school": 105.0,
+      "spouse_aid_attendance": 61.0
+    },
+    "40": {
+      "alone": 795.84,
+      "spouse": 87.0,
+      "parent": 70.0,
+      "first_child": 58.0,
+      "first_child_with_spouse": 65.0,
+      "additional_child_under_18": 43.0,
+      "child_over_18_in_school": 140.0,
+      "spouse_aid_attendance": 81.0
+    },
+    "50": {
+      "alone": 1132.9,
+      "spouse": 109.0,
+      "parent": 88.0,
+      "first_child": 73.0,
+      "first_child_with_spouse": 81.0,
+      "additional_child_under_18": 54.0,
+      "child_over_18_in_school": 176.0,
+      "spouse_aid_attendance": 101.0
+    },
+    "60": {
+      "alone": 1435.02,
+      "spouse": 131.0,
+      "parent": 105.0,
+      "first_child": 88.0,
+      "first_child_with_spouse": 97.0,
+      "additional_child_under_18": 65.0,
+      "child_over_18_in_school": 211.0,
+      "spouse_aid_attendance": 121.0
+    },
+    "70": {
+      "alone": 1808.45,
+      "spouse": 153.0,
+      "parent": 123.0,
+      "first_child": 102.0,
+      "first_child_with_spouse": 113.0,
+      "additional_child_under_18": 76.0,
+      "child_over_18_in_school": 246.0,
+      "spouse_aid_attendance": 141.0
+    },
+    "80": {
+      "alone": 2102.15,
+      "spouse": 175.0,
+      "parent": 140.0,
+      "first_child": 117.0,
+      "first_child_with_spouse": 129.0,
+      "additional_child_under_18": 87.0,
+      "child_over_18_in_school": 281.0,
+      "spouse_aid_attendance": 161.0
+    },
+    "90": {
+      "alone": 2362.3,
+      "spouse": 197.0,
+      "parent": 158.0,
+      "first_child": 132.0,
+      "first_child_with_spouse": 145.0,
+      "additional_child_under_18": 98.0,
+      "child_over_18_in_school": 317.0,
+      "spouse_aid_attendance": 181.0
+    },
+    "100": {
+      "alone": 3938.58,
+      "spouse": 219.59,
+      "parent": 176.24,
+      "first_child": 146.85,
+      "first_child_with_spouse": 160.82,
+      "additional_child_under_18": 109.11,
+      "child_over_18_in_school": 352.45,
+      "spouse_aid_attendance": 201.41
+    }
+  },
+
+  "published_rows": {
+    "comment": "Verification targets, copied from the VA tables. The loader never reads these; the drift gate reproduces each one from `compensation_monthly` and fails on any mismatch.",
+    "30": {
+      "alone": 552.47,
+      "spouse": 617.47,
+      "spouse_1parent": 669.47,
+      "spouse_2parents": 721.47,
+      "1parent": 604.47,
+      "2parents": 656.47,
+      "child": 596.47,
+      "spouse_child": 666.47,
+      "spouse_child_1parent": 718.47,
+      "spouse_child_2parents": 770.47,
+      "child_1parent": 648.47,
+      "child_2parents": 700.47
+    },
+    "40": {
+      "alone": 795.84,
+      "spouse": 882.84,
+      "spouse_1parent": 952.84,
+      "spouse_2parents": 1022.84,
+      "1parent": 865.84,
+      "2parents": 935.84,
+      "child": 853.84,
+      "spouse_child": 947.84,
+      "spouse_child_1parent": 1017.84,
+      "spouse_child_2parents": 1087.84,
+      "child_1parent": 923.84,
+      "child_2parents": 993.84
+    },
+    "50": {
+      "alone": 1132.9,
+      "spouse": 1241.9,
+      "spouse_1parent": 1329.9,
+      "spouse_2parents": 1417.9,
+      "1parent": 1220.9,
+      "2parents": 1308.9,
+      "child": 1205.9,
+      "spouse_child": 1322.9,
+      "spouse_child_1parent": 1410.9,
+      "spouse_child_2parents": 1498.9,
+      "child_1parent": 1293.9,
+      "child_2parents": 1381.9
+    },
+    "60": {
+      "alone": 1435.02,
+      "spouse": 1566.02,
+      "spouse_1parent": 1671.02,
+      "spouse_2parents": 1776.02,
+      "1parent": 1540.02,
+      "2parents": 1645.02,
+      "child": 1523.02,
+      "spouse_child": 1663.02,
+      "spouse_child_1parent": 1768.02,
+      "spouse_child_2parents": 1873.02,
+      "child_1parent": 1628.02,
+      "child_2parents": 1733.02
+    },
+    "70": {
+      "alone": 1808.45,
+      "spouse": 1961.45,
+      "spouse_1parent": 2084.45,
+      "spouse_2parents": 2207.45,
+      "1parent": 1931.45,
+      "2parents": 2054.45,
+      "child": 1910.45,
+      "spouse_child": 2074.45,
+      "spouse_child_1parent": 2197.45,
+      "spouse_child_2parents": 2320.45,
+      "child_1parent": 2033.45,
+      "child_2parents": 2156.45
+    },
+    "80": {
+      "alone": 2102.15,
+      "spouse": 2277.15,
+      "spouse_1parent": 2417.15,
+      "spouse_2parents": 2557.15,
+      "1parent": 2242.15,
+      "2parents": 2382.15,
+      "child": 2219.15,
+      "spouse_child": 2406.15,
+      "spouse_child_1parent": 2546.15,
+      "spouse_child_2parents": 2686.15,
+      "child_1parent": 2359.15,
+      "child_2parents": 2499.15
+    },
+    "90": {
+      "alone": 2362.3,
+      "spouse": 2559.3,
+      "spouse_1parent": 2717.3,
+      "spouse_2parents": 2875.3,
+      "1parent": 2520.3,
+      "2parents": 2678.3,
+      "child": 2494.3,
+      "spouse_child": 2704.3,
+      "spouse_child_1parent": 2862.3,
+      "spouse_child_2parents": 3020.3,
+      "child_1parent": 2652.3,
+      "child_2parents": 2810.3
+    },
+    "100": {
+      "alone": 3938.58,
+      "spouse": 4158.17,
+      "spouse_1parent": 4334.41,
+      "spouse_2parents": 4510.65,
+      "1parent": 4114.82,
+      "2parents": 4291.06,
+      "child": 4085.43,
+      "spouse_child": 4318.99,
+      "spouse_child_1parent": 4495.23,
+      "spouse_child_2parents": 4671.47,
+      "child_1parent": 4261.67,
+      "child_2parents": 4437.91
+    }
+  },
+
+  "prior_year_alone": {
+    "comment": "2025 rates (effective 2024-12-01). The gate asserts each `alone` rate equals these x (1 + cola), which is how the COLA and the transcription were verified.",
+    "10": 175.51,
+    "20": 346.95,
+    "30": 537.42,
+    "40": 774.16,
+    "50": 1102.04,
+    "60": 1395.93,
+    "70": 1759.19,
+    "80": 2044.89,
+    "90": 2297.96,
+    "100": 3831.3
+  },
+
+  "dic_monthly": {
+    "surviving_spouse_base": 1699.36,
+    "additional_child_under_18": 421.0,
+    "eight_year_provision": 360.85,
+    "aid_and_attendance": 421.0,
+    "housebound": 197.22,
+    "transitional_benefit": 359.0,
+    "transitional_benefit_years": 2,
+    "prior_year_base": 1653.07,
+    "eligibility": [
+      "The veteran died on or after 1993-01-01 (this base rate applies to that cohort)",
+      "Death resulted from a service-connected condition, OR",
+      "The veteran was rated totally disabling for at least 8 continuous years before death and the survivor was married to them for those same 8 years (which also unlocks the 8-year provision amount)"
+    ]
+  }
+}

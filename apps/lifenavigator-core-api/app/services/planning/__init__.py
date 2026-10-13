@@ -63,3 +63,9 @@ from .strategies import (  # noqa: F401
     survivor_factor,
     withdrawal_sequencing,
 )
+from .va_benefits import (  # noqa: F401
+    IncomeCliff,
+    VaStreams,
+    survivor_income_cliff,
+    va_streams,
+)

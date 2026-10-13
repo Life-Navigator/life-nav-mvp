@@ -163,6 +163,25 @@ REACHABLE: dict[str, Reach] = {r.calc_id: r for r in (
        note="how much more ordinary income fits before the next rate. Answers 'how big a bonus "
             "before it costs 32%', 'how much can I convert to Roth this year', 'how much gain can "
             "I realise' — and it is what the Phase F conversion ladder is built from"),
+
+    # VA benefits. Blocked on inputs that exist in the DOCUMENTS tier but have never been promoted
+    # to the resolver: `military.py` already reads a disability rating and monthly benefit off a
+    # parsed VA award letter, and nothing carries them to the advisor. So the advisor cannot state a
+    # veteran's own, tax-free, largest-single-line income — the figure they are most certain about.
+    _r("va.disability_compensation", ("va_disability_rating",),
+       optional=("va_dependent_parents", "va_children_under_18",
+                 "va_children_over_18_in_school", "va_spouse_aid_attendance"),
+       note="the rating already exists in documents (va_award_letter.disability_rating, read by "
+            "military.py) — promoting it to the resolver is the whole of the work. Spouse comes "
+            "from filing_status/dependents"),
+    _r("va.combined_rating", ("va_individual_ratings",),
+       note="a TURN input in practice ('I'm rated 60 for my back and 30 for tinnitus'), and worth "
+            "wiring because veterans systematically over-estimate the combined figure: 60 and 30 "
+            "combine to 70, not 90"),
+    _r("va.dic", (),
+       note="needs no user input at all beyond optional flags — the surviving-spouse base rate is "
+            "flat. Reachable TODAY, and it is the number a veteran's spouse most needs before the "
+            "death rather than after"),
 )}
 
 
