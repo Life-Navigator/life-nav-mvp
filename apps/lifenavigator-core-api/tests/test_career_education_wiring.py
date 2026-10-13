@@ -32,8 +32,15 @@ TARGETS = [{"user_id": U, "role_title": "Product Manager", "target_comp_median":
             "created_at": "2026-06-01"}]
 
 
+# Keys are SCHEMA-QUALIFIED on purpose. The fake now enforces them, so asking for
+# `programs` in the wrong schema returns nothing and these tests fail — which is how a
+# resolver pointed at the wrong schema should surface, rather than silently in production.
+_SCHEMA_OF = {"compensation_records": "career", "job_targets": "career",
+              "programs": "education", "financial_accounts": "finance"}
+
+
 def _sb(**tables):
-    return FakeSupabase(tables)
+    return FakeSupabase({f"{_SCHEMA_OF.get(k, 'finance')}.{k}": v for k, v in tables.items()})
 
 
 async def _resolve(**tables):
@@ -250,3 +257,59 @@ def test_the_two_similarly_named_shares_mean_different_things():
                           salary_forgone_share=0.5)
     assert r.inputs_used["salary_forgone_share"] == 0.5
     assert r.detail["foregone_share"] == pytest.approx(95_000 / 157_000, abs=0.001)
+
+
+# ── The packet must reach the agent whose job the question is ───────────────────────────────────
+def test_the_EDUCATION_ADVISOR_reaches_the_calculator_packet():
+    """THE DISCONNECT THIS FIXES, and it made the whole wiring above unreachable in practice.
+
+    The packet was gated on `finance_in_scope`, so the registry's own routing decided it: "Is the
+    Top-20 MBA worth it?" routes to ['education'] and the packet never ran — including for the
+    EDUCATION ADVISOR, whose entire job that question is, and for Arcana, which routes the same
+    way. Measured across the roster, 3 of 9 agents reached it. The packet is not finance
+    grounding: it spans finance, tax, debt, housing, two `career.*` calculators and the three
+    `education.degree_*` ones, so the honest gate is whether the turn touches anything it can
+    compute.
+    """
+    from app.services.advisor_agents import get_agent, domains_for
+    from app.services.advisor_context import _COMPUTED_DOMAINS
+
+    q = "Is the Top-20 MBA worth it compared to the state program?"
+    for agent_id in ("education_advisor", "career_advisor", "relationship_manager",
+                     "finance_advisor", "scenario_planner"):
+        doms = set(domains_for(get_agent(agent_id), q) or ())
+        assert _COMPUTED_DOMAINS & doms, f"{agent_id} cannot reach the calculators"
+
+
+def test_domains_with_NO_calculators_still_do_not_pay_for_the_packet():
+    """Widening the gate must not mean running it for everyone — health, family and documents have
+    no calculators, so building the packet for them is pure cost."""
+    from app.services.advisor_agents import get_agent, domains_for
+    from app.services.advisor_context import _COMPUTED_DOMAINS
+
+    q = "How is my sleep trending this month?"
+    for agent_id in ("health_advisor", "family_advisor", "document_advisor"):
+        doms = set(domains_for(get_agent(agent_id), q) or ())
+        assert not (_COMPUTED_DOMAINS & doms), f"{agent_id} should not build the packet"
+
+
+@pytest.mark.parametrize("question", [
+    "How much tax will I owe this year?",
+    "What would this degree cost me?",
+    "Should I itemize or take the standard deduction?",
+    "Is my HELOC interest deductible?",
+    "What is my VA disability benefit worth?",
+])
+def test_the_no_agent_keyword_fallback_covers_what_the_calculators_answer(question):
+    """`_FINANCE_WORDS` missed every one of these — verified, including the plain tax question —
+    so with no agent routed the packet never built. A separate predicate is used rather than
+    widening that list, because it also gates `finance_scenarios`, a different engine."""
+    from app.services.advisor_context import _mentions_computable
+    assert _mentions_computable(question) is True
+
+
+def test_the_keyword_fallback_does_not_fire_on_unrelated_turns():
+    from app.services.advisor_context import _mentions_computable
+    for q in ("How is my sleep trending?", "Remind me what my guardianship papers say",
+              "Who are my emergency contacts?"):
+        assert _mentions_computable(q) is False

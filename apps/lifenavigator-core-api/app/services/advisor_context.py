@@ -64,6 +64,36 @@ _FINANCE_WORDS = re.compile(
     re.IGNORECASE)
 _MONEY = re.compile(r"\$?\s?(\d[\d,]*(?:\.\d+)?)\s?([kmb])?\b", re.IGNORECASE)
 
+# ── What the CALCULATOR packet can compute, which is not the same as "finance" ────────────────────
+#
+# THE DISCONNECT THIS FIXES. The packet was gated on `finance_in_scope`, so the registry's own
+# routing decided it: "Is the Top-20 MBA worth it?" routes to ['education'] and the packet never
+# ran — including for the EDUCATION ADVISOR, whose entire job that question is, and for Arcana,
+# which routes the same way. Measured across the roster, 3 of 9 agents reached it.
+#
+# The packet is not finance grounding. It spans finance, tax, debt and housing AND
+# `career.uncaptured_match` / `career.offer_total_comp` AND the three `education.degree_*`
+# calculators, so the honest gate is whether the turn touches anything it can compute.
+_COMPUTED_DOMAINS = frozenset({"finance", "career", "education"})
+
+# The keyword fallback for when no agent is routed. Separate from `_FINANCE_WORDS` on purpose:
+# widening that one would also widen `finance_scenarios`, which is a different engine with its own
+# scope. These are the terms `_FINANCE_WORDS` misses that the calculators nonetheless answer —
+# verified: "How much tax will I owe?" and "What would this degree cost me?" both scored False.
+_COMPUTABLE_WORDS = re.compile(
+    r"\b(tax(es|able)?|deduct\w*|itemiz\w*|bracket|withhold\w*|capital gains?|"
+    r"degree|tuition|college|universit\w+|mba|masters?|grad(uate)? school|certificat\w+|"
+    r"student loans?|financial aid|scholarship|"
+    r"offer|salary|raise|promotion|total comp\w*|match|vest\w*|"
+    r"hsa|fsa|hdhp|heloc|va disabilit\w+|pension|annuit\w+|rmd)\b",
+    re.IGNORECASE)
+
+
+def _mentions_computable(message: str) -> bool:
+    """Does the message name something the calculator packet can actually compute?"""
+    m = message or ""
+    return bool(_COMPUTABLE_WORDS.search(m)) or bool(_FINANCE_WORDS.search(m))
+
 
 def _mentions_finance(message: str) -> bool:
     return bool(_FINANCE_WORDS.search(message or ""))
@@ -534,7 +564,13 @@ class AdvisorContextBuilder:
         # registering it IS the wiring.
         calculations: Optional[dict[str, Any]] = None
         scenario_numbers: set[str] = set()
-        if self._calculations is not None and finance_in_scope:
+        # Gated on what the packet can COMPUTE, not on whether the turn is "finance". See
+        # `_COMPUTED_DOMAINS`: the previous `finance_in_scope` gate hid the education calculators
+        # from the education advisor.
+        computable_in_scope = bool(_COMPUTED_DOMAINS & set(agent_domains or ())) or any(
+            f.get("domain") in _COMPUTED_DOMAINS for f in (domain_facts or [])
+        ) or (agent is None and _mentions_computable(message))
+        if self._calculations is not None and computable_in_scope:
             try:
                 _cash_flow = (finance_scenarios or {}).get("cash_flow") or {}
                 calculations = await self._calculations.compute(

@@ -59,8 +59,24 @@ class FakeSupabase:
             self._by_table = {}
         self.inserts: list[tuple[str, dict[str, Any]]] = []
 
-    async def select(self, table: str, *, filters: Any = None, **_: Any) -> list[dict[str, Any]]:
-        rows = list(self._by_table.get(table, []))
+    async def select(self, table: str, *, filters: Any = None, schema: str = "public",
+                     **_: Any) -> list[dict[str, Any]]:
+        # SCHEMA-AWARE LOOKUP, opt-in by how the fixture is keyed.
+        #
+        # `schema` used to be swallowed by `**_`, which hid a whole class of bug: a resolver asking
+        # for the WRONG schema would get [] in production while every test passed, because the fake
+        # matched on the bare table name. Keying a fixture as "career.compensation_records" now
+        # pins the schema; keying it as "compensation_records" keeps the old lenient behaviour, so
+        # existing fixtures are unaffected.
+        qualified = f"{schema}.{table}"
+        if qualified in self._by_table:
+            rows = list(self._by_table[qualified])
+        elif any("." in k for k in self._by_table) and any(
+                k.split(".", 1)[1] == table for k in self._by_table if "." in k):
+            # The fixture pinned this table to a DIFFERENT schema — the caller asked wrongly.
+            rows = []
+        else:
+            rows = list(self._by_table.get(table, []))
         # Apply `eq.` filters LENIENTLY: a row missing the filtered field passes (so
         # fixtures that omit user_id still return), but a present field must match —
         # this lets reference lookups (e.g. compensation_bands by occupation_code) work.
