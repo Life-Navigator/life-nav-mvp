@@ -253,8 +253,13 @@ class FinancialInputResolver:
             if payment is None:
                 debts_missing_payment.append(label)
                 continue
+            # `loan_type` travels with the row because deductibility is per-INSTRUMENT: a
+            # mortgage, a HELOC and a card are three different statutory tests on the same dollar
+            # of interest, and a flat debt list cannot tell them apart.
             debt_payments.append({"label": label, "balance": balance, "apr": _first(row, *apr_keys),
-                                  "minimum_payment": payment})
+                                  "minimum_payment": payment,
+                                  "loan_type": (row.get("loan_type") or row.get("debt_type")
+                                                or row.get("liability_type") or "other")})
 
         have_debt_data = bool(loan_rows or debt_rows or liability_rows or debt_accts)
         monthly_debts_total = round(sum(d["minimum_payment"] for d in debt_payments), 2)
@@ -326,6 +331,7 @@ class FinancialInputResolver:
         agi = _num(tax_row.get("adjusted_gross_income"))
         magi_val = _num(tax_row.get("modified_agi"))
         qualifying_children = _num(tax_row.get("qualifying_children_under_17"))
+        student_loan_interest = _num(tax_row.get("student_loan_interest_paid"))
 
         va_doc = docs.get("va_award_letter") or {}
         va_rating = _num(va_doc.get("disability_rating"))
@@ -466,6 +472,62 @@ class FinancialInputResolver:
                 origin="finance.tax_profiles.modified_agi", confidence=0.95,
                 prompt="What is your modified AGI? It drives the SALT phase-down above $505,000.",
                 unlocks=["SALT phase-down"]),
+            # ── Inputs the B2 treatment rules test against (migration 20261012010000) ──────────
+            "health_coverage_tier": _field(
+                profile.get("health_coverage_tier"), ADVISOR,
+                present=bool(profile.get("health_coverage_tier")),
+                origin="finance.user_financial_profile.health_coverage_tier", confidence=0.9,
+                prompt="Is your health coverage self-only or family?",
+                unlocks=["HDHP qualification", "HSA contribution limit"]),
+            "hdhp_annual_deductible": _field(
+                _num(profile.get("hdhp_annual_deductible")), ADVISOR,
+                present=_num(profile.get("hdhp_annual_deductible")) is not None,
+                origin="finance.user_financial_profile.hdhp_annual_deductible", confidence=0.9,
+                prompt="What is your health plan's annual deductible?",
+                unlocks=["HDHP qualification"]),
+            "hdhp_out_of_pocket_max": _field(
+                _num(profile.get("hdhp_out_of_pocket_max")), ADVISOR,
+                present=_num(profile.get("hdhp_out_of_pocket_max")) is not None,
+                origin="finance.user_financial_profile.hdhp_out_of_pocket_max", confidence=0.9,
+                prompt="What is your plan's out-of-pocket maximum?",
+                unlocks=["HDHP qualification"]),
+            "hsa_annual_contribution": _field(
+                _num(profile.get("hsa_annual_contribution")), ADVISOR,
+                present=_num(profile.get("hsa_annual_contribution")) is not None,
+                origin="finance.user_financial_profile.hsa_annual_contribution", confidence=0.9,
+                prompt="How much are you putting into your HSA this year?",
+                unlocks=["HSA triple-tax treatment", "excess-contribution warning"]),
+            "hsa_through_payroll": _field(
+                profile.get("hsa_through_payroll"), ADVISOR,
+                present=profile.get("hsa_through_payroll") is not None,
+                origin="finance.user_financial_profile.hsa_through_payroll", confidence=0.9,
+                prompt=("Do your HSA contributions come out of payroll? Payroll contributions "
+                        "escape FICA as well as income tax."),
+                unlocks=["FICA saving on HSA contributions"]),
+            "hsa_employer_contribution": _field(
+                _num(profile.get("hsa_employer_contribution")), ADVISOR,
+                present=_num(profile.get("hsa_employer_contribution")) is not None,
+                origin="finance.user_financial_profile.hsa_employer_contribution", confidence=0.9,
+                prompt="Does your employer contribute to your HSA, and how much?",
+                unlocks=["room left under the HSA limit"]),
+            "fsa_type": _field(
+                profile.get("fsa_type"), ADVISOR, present=bool(profile.get("fsa_type")),
+                origin="finance.user_financial_profile.fsa_type", confidence=0.9,
+                prompt=("Is your FSA general-purpose or limited-purpose? A general-purpose FSA "
+                        "disqualifies an HSA for the whole plan year."),
+                unlocks=["HSA/FSA compatibility"]),
+            "covered_by_workplace_plan": _field(
+                profile.get("covered_by_workplace_plan"), ADVISOR,
+                present=profile.get("covered_by_workplace_plan") is not None,
+                origin="finance.user_financial_profile.covered_by_workplace_plan", confidence=0.9,
+                prompt=("Are you covered by a retirement plan at work? It decides whether a "
+                        "traditional IRA contribution is deductible at your income."),
+                unlocks=["traditional IRA deductibility"]),
+            "student_loan_interest": _field(
+                student_loan_interest, DOC, present=student_loan_interest is not None,
+                origin="finance.tax_profiles.student_loan_interest_paid", confidence=0.95,
+                prompt="What student-loan interest did you pay? It is box 1 on Form 1098-E.",
+                unlocks=["student-loan interest deduction"]),
             "fsa_election": _field(
                 _num(profile.get("fsa_election_amount")), ADVISOR,
                 present=_num(profile.get("fsa_election_amount")) is not None,

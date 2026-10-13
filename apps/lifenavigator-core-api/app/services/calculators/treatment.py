@@ -91,6 +91,22 @@ class Test:
                 "decided_by": self.decided_by}
 
 
+# Precision by unit, because one rule does not fit both.
+#
+# THE BUG THIS FIXES. `to_calc_result` rounded every amount to 2 decimals. That is correct for
+# dollars and destroys a RATE: an after-tax cost of debt of 0.052298 became 0.05, so the
+# determination's own summary said "5.23% after tax" while the CalcResult it produced said 5%. The
+# packet then carried two different values for one figure, and because the number gate was told
+# about 5 and not 5.23, the advisor was BLOCKED from quoting the sentence the engine wrote for it.
+_ROUNDING: dict[str, int] = {
+    "usd": 2, "usd_per_month": 2, "usd_per_year": 2,
+    "months": 1, "years": 1, "count": 0,
+    # Six places keeps a rate accurate to a hundredth of a basis point, which is well inside what
+    # any lender or statute quotes.
+    "pct": 6, "ratio": 6,
+}
+
+
 @dataclass(frozen=True)
 class TreatmentResult:
     rule: str                                   # "debt_interest.heloc"
@@ -165,7 +181,8 @@ class TreatmentResult:
         if self.amount is None:
             raise TreatmentError(f"{self.rule}: no quantified amount to cite")
         return CalcResult(
-            calculator=self.rule, label=label or self.summary, value=round(self.amount, 2),
+            calculator=self.rule, label=label or self.summary,
+            value=round(self.amount, _ROUNDING[self.unit] if self.unit in _ROUNDING else 2),
             unit=self.unit, tier=STRICT if self.parameters_verified else SCENARIO,
             inputs_used=dict(self.inputs_used),
             detail={"determination": self.determination, "authority": self.authority,

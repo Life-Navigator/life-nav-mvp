@@ -243,7 +243,12 @@ def fsa_hsa_compatibility(*, fsa_type: str, tax_year: Optional[int] = None) -> T
     aliases = {"limited": "limited_purpose", "lpfsa": "limited_purpose",
                "general": "general_purpose_health", "health": "general_purpose_health",
                "healthcare": "general_purpose_health", "medical": "general_purpose_health",
-               "dcfsa": "dependent_care", "dependent": "dependent_care"}
+               "dcfsa": "dependent_care", "dependent": "dependent_care",
+               # `general_purpose` is the plain spelling and the one the schema stores
+               # (user_financial_profile.fsa_type). Its absence made the rule refuse for every
+               # user whose FSA type came out of the database — the only path that supplies it.
+               "general_purpose": "general_purpose_health",
+               "limited_purpose_health": "limited_purpose"}
     kind = aliases.get(kind, kind)
     known = ("limited_purpose", "general_purpose_health", "dependent_care")
     if kind not in known:

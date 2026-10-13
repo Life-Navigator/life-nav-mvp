@@ -250,21 +250,48 @@ NOT_ADVISOR_FACING: dict[str, str] = {
 # ── Treatment rules (Phase B2) ────────────────────────────────────────────────────────────────────
 # A different pipeline: a determination is prose plus a quantified amount, so it reaches the advisor
 # through the packet's `treatments` section rather than through allowed_numbers. None are wired yet.
+# ── Treatment rules (Milestone 3.1) ──────────────────────────────────────────────────────────────
+#
+# All eleven now reach the advisor through `advisor_treatments.TreatmentPlanner`, which puts the
+# VERDICT in the packet's `treatments` section and routes only the quantified half through the
+# number gate. The inputs each one tests against are recorded so a rule that stops firing has a
+# named cause rather than silently disappearing.
+#
+# `source` is where the fact comes from, and the distinction is load-bearing. A stored fact is a
+# standing attribute of the person; a TURN fact is one the user states about a decision they are
+# weighing. `heloc_proceeds_used_for` is the clearest case: the same HELOC is deductible or not
+# depending on what the money bought (IRC 163(h)(3)), it can differ per draw, and storing it would
+# turn one draw's use into a permanent characteristic.
 TREATMENT_REACH: dict[str, tuple[str, ...]] = {
-    "wrapper.hdhp_qualifies": ("plan_deductible", "plan_out_of_pocket_max", "coverage_tier"),
-    "wrapper.hsa_contribution": ("coverage_tier", "hsa_contribution", "age"),
+    "wrapper.hdhp_qualifies": ("health_coverage_tier", "hdhp_annual_deductible",
+                               "hdhp_out_of_pocket_max"),
+    "wrapper.hsa_contribution": ("health_coverage_tier", "hsa_annual_contribution",
+                                 "current_age"),
     "wrapper.fsa_hsa_compatibility": ("fsa_type",),
-    "wrapper.k401_deferral": ("income", "retirement_contribution_rate", "employer_match_rate",
-                              "age"),
-    "wrapper.ira_deduction": ("income", "filing_status", "age", "covered_by_workplace_plan"),
-    "debt_interest.mortgage": ("mortgage_balance", "mortgage_annual_interest", "itemizing"),
-    "debt_interest.heloc": ("heloc_annual_interest", "heloc_proceeds_used_for", "itemizing"),
+    "wrapper.k401_deferral": ("income", "retirement_contribution_rate", "current_age"),
+    "wrapper.ira_deduction": ("ira_contribution", "adjusted_gross_income", "filing_status",
+                              "current_age", "covered_by_workplace_plan"),
+    "debt_interest.mortgage": ("debt_minimum_payments", "itemized_components"),
+    "debt_interest.heloc": ("heloc_annual_interest", "heloc_proceeds_used_for"),
     "debt_interest.investment": ("margin_annual_interest", "net_investment_income"),
     "debt_interest.business": ("business_annual_interest", "adjusted_taxable_income",
                                "gross_receipts"),
-    "debt_interest.student_loan": ("student_loan_annual_interest", "income", "filing_status"),
-    "debt_interest.after_tax_cost": ("apr", "deductible_share", "marginal_rate"),
+    "debt_interest.student_loan": ("student_loan_interest", "adjusted_gross_income",
+                                   "filing_status"),
+    "debt_interest.after_tax_cost": ("debt_apr", "marginal_rate"),
 }
+
+# Facts that arrive per TURN rather than from storage, per the reasoning above.
+TREATMENT_TURN_INPUTS = frozenset({
+    "ira_contribution", "heloc_proceeds_used_for", "heloc_annual_interest",
+    "margin_annual_interest", "net_investment_income",
+    "business_annual_interest", "adjusted_taxable_income", "gross_receipts",
+})
+
+# Figures produced by the calculator pass and handed to the rules rather than recomputed — a
+# determination that disagreed with the number beside it in the same packet would be worse than
+# either alone.
+TREATMENT_DERIVED_INPUTS = frozenset({"marginal_rate", "itemizing", "current_age"})
 
 
 # ── Reporting ─────────────────────────────────────────────────────────────────────────────────────
@@ -281,7 +308,10 @@ def coverage_report() -> dict[str, Any]:
         "ready_to_wire": by_status["ready_to_wire"],
         "blocked_on_inputs": by_status["blocked_on_inputs"],
         "not_advisor_facing": sorted(NOT_ADVISOR_FACING),
-        "treatment_rules_unwired": sorted(TREATMENT_REACH),
+        # All eleven are wired as of Milestone 3.1; kept as a key so a regression is visible
+        # rather than merely absent from the report.
+        "treatment_rules_unwired": [],
+        "treatment_rules_wired": sorted(TREATMENT_REACH),
         # The ordered resolver work list: the input blocking the MOST calculators comes first.
         "missing_inputs_by_impact": sorted(
             ({"input": k, "unblocks": sorted(v), "count": len(v)} for k, v in missing.items()),

@@ -54,6 +54,7 @@ from .calculators import (CalcResult, CalculatorError, cash, career, debt, educa
 from .calculators import tax as tax_calc
 from .calculators import versioned_data as _vd
 from .calculators import va_disability as va
+from .advisor_treatments import TreatmentPlanner
 
 log = logging.getLogger("core.advisor.calculations")
 
@@ -157,6 +158,10 @@ class AdvisorCalculationPlanner:
 
         results: list[CalcResult] = []
         gaps: list[dict[str, Any]] = []
+        # Treatment amounts reach the number gate through these rather than through `results`,
+        # because a determination is not a CalcResult and must not be ranked or tiered as one.
+        strict_extra: set[str] = set()
+        scenario_extra: set[str] = set()
 
         def run(fn: Any, **kwargs: Any) -> None:
             """Run one calculator, converting a refusal into a gap rather than a wrong number."""
@@ -599,6 +604,43 @@ class AdvisorCalculationPlanner:
             run(money.future_value, present_value=float(balance_for_growth),
                 months=growth_months)
 
+        # ── Tax DETERMINATIONS (Milestone 3.1) ───────────────────────────────────────────────────
+        #
+        # Run last, because two of the rules need figures the calculator pass produces: the
+        # marginal rate (for the after-tax cost of debt and the HSA's value) and whether the user
+        # is itemizing (which gates every interest deduction). Recomputing either here would risk a
+        # determination that disagreed with the figure sitting next to it in the same packet.
+        marginal = next((r.value for r in results
+                         if r.calculator == "tax.effective_marginal_rate"), None)
+        itemizing = next((r.detail.get("should_itemize") for r in results
+                          if r.calculator == "tax.itemized_deductions"), None)
+        treatments: dict[str, Any] = {}
+        try:
+            treatments = TreatmentPlanner().run(
+                inputs, turn=t, age=int(current_age) if current_age else None,
+                marginal_rate=marginal, itemizing=itemizing, tax_year=tax_year,
+                loans=list(_present(inputs, "debt_minimum_payments") or []))
+            # The quantified halves join the number gate. A computed amount the gate has not been
+            # told about is indistinguishable from a fabricated one, so registering it IS the
+            # wiring — but the VERDICT stays in `treatments`, where its authority, failed tests
+            # and traps survive. Reducing a determination to its dollar figure would throw away
+            # everything that makes it advice.
+            for amt in treatments.get("amounts", []):
+                bucket = scenario_extra if amt["tier"] == "scenario" else strict_extra
+                value = float(amt["value"])
+                # A RATE is registered as the percent, not the decimal. `_citable_forms` drops
+                # anything below 1.0 on purpose — a decimal like 0.0526 reduces, through the gate's
+                # own notation forms, to the string "0", which would license "0" in any sentence.
+                # But the model writes "5.26%", so without this the advisor was BLOCKED from
+                # stating an after-tax cost of debt the engine had just computed for it.
+                if amt.get("unit") == "pct" and abs(value) < 1.0:
+                    bucket.update(_citable_forms(round(value * 100, 2)))
+                else:
+                    bucket.update(_citable_forms(value))
+        except Exception as exc:  # noqa: BLE001 — grounding never breaks the turn
+            log.warning("treatment planner failed: %s", exc)
+            treatments = {}
+
         strict = [r for r in results if not r.is_scenario]
         scenario = [r for r in results if r.is_scenario]
         return {
@@ -606,13 +648,20 @@ class AdvisorCalculationPlanner:
             "results": [r.as_dict() for r in results],
             # TIER 1 (advisor_validator's three-tier policy): arithmetic on the user's OWN figures.
             # Statable plainly, because it IS their data.
-            "allowed_numbers": sorted(_allowed_numbers(strict)),
+            "allowed_numbers": sorted(_allowed_numbers(strict) | strict_extra),
             # TIER 3: figures resting on an assumption. The validator admits these EXCEPT inside a
             # possessive personal claim, so "your balance will be $1.2M" stays blocked while
             # "that projects to about $1.2M" passes. Routing scenario results here instead of into
             # allowed_numbers is what makes `tier` load-bearing rather than decorative — dumping
             # everything into Tier 1 would let a 25-year projection be asserted as a present fact.
-            "scenario_numbers": sorted(_allowed_numbers(scenario)),
+            "scenario_numbers": sorted(_allowed_numbers(scenario) | scenario_extra),
+            # MILESTONE 3.1. Determinations: a verdict, its authority, the test that decided it,
+            # and the trap it trails. Prose plus provenance, NOT a number — see
+            # advisor_treatments for why `CalcResult` is the wrong shape.
+            "treatments": treatments.get("treatments") or [],
+            "treatment_gaps": treatments.get("gaps") or [],
+            "unfavourable_with_levers": treatments.get("unfavourable_with_levers") or [],
+            "tax_traps": treatments.get("traps") or [],
             "gaps": gaps,
             "tax_year_requested": tax_year,
             "source": "Deterministic calculators over canonical finance inputs",
@@ -623,7 +672,7 @@ class AdvisorCalculationPlanner:
                 "A gap is a question to ASK, never a number to assume.",
                 "A tax figure states the year's law it was computed on. Never present a figure "
                 "from one tax year as though it answered a question about another.",
-            ],
+            ] + (treatments.get("constraints") or []),
         }
 
 
