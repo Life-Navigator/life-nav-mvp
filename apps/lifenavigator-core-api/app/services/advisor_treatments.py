@@ -125,13 +125,21 @@ class TreatmentPlanner:
         rate = present("retirement_contribution_rate")
         if income and rate is not None and age is not None:
             pct = float(rate) / 100.0 if float(rate) > 1 else float(rate)
-            match = present("employer_match_rate")
-            match_pct = (float(match) / 100.0 if match and float(match) > 1
-                         else float(match) if match else None)
+            # THE EMPLOYER CONTRIBUTION NEEDS BOTH HALVES OF THE MATCH FORMULA. `min(pct, cap)`
+            # alone assumes dollar-for-dollar, so a "50% up to 6%" plan — the most common formula
+            # in the market — was reported at double its real value. That matters here beyond the
+            # dollar figure: the employer contribution feeds the 415(c) total-additions limit, so
+            # overstating it understates the headroom the rule reports.
+            cap = present("employer_match_rate")
+            cap_pct = (float(cap) / 100.0 if cap and float(cap) > 1
+                       else float(cap) if cap else None)
+            share = present("employer_match_percent")
+            share_pct = (float(share) / 100.0 if share and float(share) > 1
+                         else float(share) if share else 1.0)
             run(W.k401_deferral, employee_deferral=float(income) * pct, age=int(age),
                 compensation=float(income),
-                employer_contribution=(float(income) * min(pct, match_pct)
-                                       if match_pct is not None else 0.0),
+                employer_contribution=(float(income) * min(pct, cap_pct) * share_pct
+                                       if cap_pct is not None else 0.0),
                 tax_year=tax_year)
         elif income and rate is not None:
             gaps.append(_gap("wrapper.k401_deferral", ["current_age"],

@@ -107,6 +107,21 @@ def inputs_fingerprint(inputs: dict[str, Any],
     return _digest({"stored": facts, "turn": stated})
 
 
+def packet_fingerprints(packet: dict[str, Any], inputs: Optional[dict[str, Any]] = None,
+                        turn: Optional[dict[str, Any]] = None) -> tuple[str, str]:
+    """The authoritative (inputs, basis) pair for a packet.
+
+    Prefers the pair the planner attached, because that is the only place the resolved inputs and
+    the turn's stated facts both exist. Deriving them here from whatever the caller happens to hold
+    is the fallback, and it is how a caller with no inputs would silently key every user's cache on
+    the same empty fingerprint.
+    """
+    attached = (packet or {}).get("fingerprints") or {}
+    if attached.get("inputs") and attached.get("basis"):
+        return str(attached["inputs"]), str(attached["basis"])
+    return inputs_fingerprint(inputs or {}, turn), basis_fingerprint(packet)
+
+
 def basis_fingerprint(packet: dict[str, Any]) -> str:
     """Fingerprint of the LAW the figures rested on.
 
@@ -201,8 +216,7 @@ class CalculationStore:
         if not packet or not packet.get("available"):
             return None
         try:
-            fp_in = inputs_fingerprint(inputs or {})
-            fp_basis = basis_fingerprint(packet)
+            fp_in, fp_basis = packet_fingerprints(packet, inputs)
             present = sorted(n for n, f in (inputs or {}).items() if (f or {}).get("present"))
             await self._sb.insert(_SNAPSHOTS, {
                 "user_id": user_id,
@@ -284,7 +298,7 @@ class CalculationStore:
     # ── The answer cache ─────────────────────────────────────────────────────────────────────────
     async def lookup_answer(self, user_id: str, message: str,
                             packet: dict[str, Any],
-                            inputs: dict[str, Any],
+                            inputs: Optional[dict[str, Any]] = None,
                             turn: Optional[dict[str, Any]] = None) -> Optional[CachedAnswer]:
         """A prior answer to THIS question, valid for the current facts and the current law.
 
@@ -304,8 +318,7 @@ class CalculationStore:
             log.warning("answer cache unavailable: %s", exc)
             return None
 
-        fp_in = inputs_fingerprint(inputs, turn)
-        fp_basis = basis_fingerprint(packet)
+        fp_in, fp_basis = packet_fingerprints(packet, inputs, turn)
         for row in rows:
             if row.get("inputs_fingerprint") != fp_in:
                 continue
@@ -335,7 +348,7 @@ class CalculationStore:
         return None
 
     async def save_answer(self, user_id: str, message: str, answer: str,
-                          packet: dict[str, Any], inputs: dict[str, Any], *,
+                          packet: dict[str, Any], inputs: Optional[dict[str, Any]] = None, *,
                           turn: Optional[dict[str, Any]] = None,
                           model: Optional[str] = None) -> bool:
         """Cache an answer against the facts and the law it was computed on."""
@@ -352,13 +365,14 @@ class CalculationStore:
             # so this answer must be regenerated — with today's urgency — every time it is asked.
             return False
         try:
+            fp_in, fp_basis = packet_fingerprints(packet, inputs, turn)
             await self._sb.insert(_ANSWERS, {
                 "user_id": user_id,
                 "question_signature": sig,
                 "question_text": message[:2000],
                 "answer": answer,
-                "inputs_fingerprint": inputs_fingerprint(inputs, turn),
-                "basis_fingerprint": basis_fingerprint(packet),
+                "inputs_fingerprint": fp_in,
+                "basis_fingerprint": fp_basis,
                 "cited_numbers": cited_numbers(answer),
                 "model": model,
             }, schema=_SCHEMA)

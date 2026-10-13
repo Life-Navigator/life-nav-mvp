@@ -213,7 +213,17 @@ class FinancialInputResolver:
 
         k = docs.get("401k_statement") or {}
         rate = _num(k.get("contribution_rate"))
-        match = _num(k.get("employer_match"))
+
+        # A MATCH HAS TWO NUMBERS. `employer_match_limit_percent` is the share of pay matched UP TO
+        # and `employer_match_percent` is the cents per dollar — both have existed in
+        # finance.user_financial_profile since migration 062 and NOTHING ever read them. Only the
+        # document's single ambiguous `employer_match` was resolved, which every consumer then
+        # treated as a dollar-for-dollar cap: for anyone on the market's most common formula,
+        # "50% up to 6%", every match figure was DOUBLE.
+        match_cap = (_num(profile.get("employer_match_limit_percent"))
+                     if profile.get("employer_match_limit_percent") is not None
+                     else _num(k.get("employer_match")))
+        match_share = _num(profile.get("employer_match_percent"))
         th = (vis[0].get("prompts") or {}).get("time_horizon") if vis else None
 
         # finance.tax_profiles — the single highest-impact canonical addition: `filing_status`
@@ -362,8 +372,20 @@ class FinancialInputResolver:
             "retirement_contribution_rate": _field(rate, DOC if rate is not None else MISSING, origin="documents:401k_statement", confidence=0.85,
                                                    prompt="Enter your 401(k) contribution rate to unlock retirement projections, 401(k) match optimization, and scenario planning.",
                                                    unlocks=["retirement projection", "401(k) match optimization", "scenario planning"]),
-            "employer_match_rate": _field(match, DOC if match is not None else MISSING, origin="documents:401k_statement", confidence=0.85,
-                                          prompt="What's your employer's 401(k) match?", unlocks=["match-gap analysis"]),
+            "employer_match_rate": _field(
+                match_cap, DOC if match_cap is not None else MISSING,
+                origin=("finance.user_financial_profile.employer_match_limit_percent"
+                        if profile.get("employer_match_limit_percent") is not None
+                        else "documents:401k_statement"),
+                confidence=0.85,
+                prompt="What's your employer's 401(k) match? (e.g. 50% of the first 6% of pay)",
+                unlocks=["match-gap analysis"]),
+            "employer_match_percent": _field(
+                match_share, ADVISOR, present=match_share is not None,
+                origin="finance.user_financial_profile.employer_match_percent", confidence=0.9,
+                prompt=("How much does your employer match per dollar — all of it, or half? "
+                        "'50% up to 6%' pays half as much as 'up to 6%'."),
+                unlocks=["accurate match value", "true return on contributing"]),
             "risk_profile": _field(risk[0].get("behavior") if risk else None, ADVISOR, origin="life.risk_profiles", confidence=0.8,
                                    prompt="Tell your advisor how you handle uncertainty.", unlocks=["projection volatility", "allocation guidance"]),
             "time_horizon": _field(th, ADVISOR, origin="life.life_vision", confidence=0.75,

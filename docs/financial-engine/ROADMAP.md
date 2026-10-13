@@ -219,6 +219,46 @@ All of Phase F, and all of it is a readout rather than a formula.
 > Also fixed: `after_tax_cost_of_debt` now records its `label`, without which the per-debt results
 > were indistinguishable except by parsing prose.
 >
+> **GAPS CLOSED 2026-10-13.**
+>
+> **The employer match is two numbers.** `employer_match_rate` is the share of pay matched UP TO;
+> `employer_match_percent` is the cents per dollar. Only the first was ever modelled, so every
+> match figure assumed dollar-for-dollar — and for "50% up to 6%", the most common formula in the
+> market, every figure was DOUBLE. It reads as plausible because the SHAPE of the advice ("raise
+> your contribution to 6%") stays right while the dollar amount is twice what the user will get.
+> Both columns have existed in `finance.user_financial_profile` since migration 062 and **nothing
+> ever read them**, so no migration was needed — only the resolver, the calculator and the two
+> dispatch sites. `match_percent` defaults to 100, so every existing caller is byte-identical.
+> The error did not stay in one figure: the employer contribution feeds the §415(c) total-additions
+> limit, so overstating it understated the headroom `wrapper.k401_deferral` reported.
+>
+> **3.6 is no longer dead code.** `CalculationStore(supabase)` is now built in `dependencies.py`
+> and handed to both the planner (snapshots) and the orchestrator (the answer cache). The cache is
+> consulted in `_enhance` AFTER the context is built — so the figures it compares against are
+> freshly recomputed, which is the entire design — and BEFORE the provider is called; it stores
+> only on the success path, after the validator accepted and the text was composed. The
+> fingerprints now travel ON the packet, computed in the planner because that is the only place
+> the resolved inputs and the turn's stated facts both exist. One bug caught before shipping: the
+> cache-hit path set `base["response"]`, which nothing reads — the human-facing text is
+> `base["assistant_message"]`, so every hit would have returned a silent blank.
+>
+> **`ADVISOR_CALCULATORS_ENABLED` stays default-off, deliberately.** It was briefly flipped and
+> that was wrong. This is not a code gap but a measurement gate, and the day before, an audit of
+> this exact packet found three defects that produced actively wrong advice — all three found by
+> RUNNING it, none by review. The packet reaches every finance turn, so a defect in it degrades
+> all of them at once; that is the argument FOR the gate. What the gate needs is an A/B on the
+> advisor eval harness, which needs live model credentials this environment does not have.
+> `scripts/calc_packet_dryrun.py` closes the half that does not: it prints what the packet ADDS
+> for synthetic profiles — every figure with its tier, every determination with its authority,
+> every conflict, every gap — with no network, database or model call, so the content change is
+> reviewable now and for free.
+>
+> **Found while verifying, not fixed:** `debt.payoff_plan` does not flag a minimum payment that is
+> below the debt's own interest accrual. A $22,000 card at 22% with a $400 minimum accrues $403 a
+> month, so the balance grows until another debt frees up — the simulation models this correctly
+> and says nothing about it, when "your minimum does not cover the interest" is the single most
+> useful thing it knows about that debt.
+>
 > **Still open from the audit** (not wrong answers, but below standard): the store is never
 > constructed with a Supabase handle and nothing calls `lookup_answer`/`save_answer`, so 3.6 is
 > dead code in production; the whole packet sits behind `ADVISOR_CALCULATORS_ENABLED`, default

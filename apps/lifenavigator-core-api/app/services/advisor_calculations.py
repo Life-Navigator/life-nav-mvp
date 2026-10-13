@@ -54,6 +54,7 @@ from .calculators import (CalcResult, CalculatorError, cash, career, debt, educa
 from .calculators import tax as tax_calc
 from .calculators import versioned_data as _vd
 from .calculators import va_disability as va
+from . import calculation_store as _store_mod
 from .advisor_treatments import TreatmentPlanner
 
 log = logging.getLogger("core.advisor.calculations")
@@ -301,7 +302,11 @@ class AdvisorCalculationPlanner:
         contrib_rate = _present(inputs, "retirement_contribution_rate")
         if annual_income and match_rate is not None and contrib_rate is not None:
             run(career.uncaptured_match, income=annual_income,
-                current_rate=float(contrib_rate), employer_match_rate=float(match_rate))
+                current_rate=float(contrib_rate), employer_match_rate=float(match_rate),
+                # Defaults to 100 when unknown, preserving this calculator's long-standing
+                # assumption — but it is the REAL figure whenever the profile carries it, and a
+                # "50% up to 6%" plan was previously reported at double its value.
+                match_percent=float(_present(inputs, "employer_match_percent") or 100.0))
         elif annual_income:
             gaps.append(_gap(inputs, "career.uncaptured_match",
                              [k for k, v in (("retirement_contribution_rate", contrib_rate),
@@ -684,6 +689,16 @@ class AdvisorCalculationPlanner:
 
         # ── Persistence (Milestone 3.6) ──────────────────────────────────────────────────────────
         #
+        # THE FINGERPRINTS TRAVEL WITH THE PACKET. They are computed here because this is the only
+        # place the resolved inputs and the turn's stated facts both exist — the packet itself
+        # carries neither. Attaching them means every downstream consumer (the orchestrator's
+        # answer cache, a snapshot write, a later audit) keys on the same authoritative pair
+        # instead of re-deriving it from data it does not have.
+        packet["fingerprints"] = {
+            "inputs": _store_mod.inputs_fingerprint(inputs, t),
+            "basis": _store_mod.basis_fingerprint(packet),
+        }
+
         # Written AFTER the packet is assembled and before it is returned, so what is stored is
         # exactly what the advisor saw. Best-effort throughout: a storage failure must not cost the
         # user their answer.

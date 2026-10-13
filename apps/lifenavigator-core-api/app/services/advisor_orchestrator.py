@@ -356,7 +356,7 @@ class AdvisorOrchestrator:
     def __init__(self, relationship_manager: Any, context_builder: AdvisorContextBuilder, llm: AdvisorLLM,
                  *, enabled: bool = True, supabase: Any = None, router: Any = None,
                  hybrid_claude: Any = None, claude_domains: Any = None, claude_high_stakes_only: bool = True,
-                 fast_llm: Any = None) -> None:
+                 fast_llm: Any = None, answer_cache: Any = None) -> None:
         self._rm = relationship_manager
         self._ctx = context_builder
         self._llm = llm
@@ -365,6 +365,10 @@ class AdvisorOrchestrator:
         self._fast_llm = fast_llm
         self._enabled = enabled
         self._sb = supabase  # best-effort advisor-turn persistence (ops.advisor_turns)
+        # CalculationStore (optional). Serves a prior answer when the question, the user's facts
+        # AND the law are all unchanged, which is the only condition under which reusing prose is
+        # honest. None → every turn generates, exactly as before.
+        self._answer_cache = answer_cache
         self._router = router  # optional ModelRouter; only used when MODEL_ROUTER_ENABLED (default off)
         # Opus hybrid (flag-gated): a Claude LLM used as PRIMARY only for finance/health turns, with the
         # DI Gemini as same-tier fallback. None → unchanged behavior. Default off.
@@ -661,6 +665,42 @@ class AdvisorOrchestrator:
             base["citations"] = _citations_from_context(context)
             constraints = build_constraints(base, context)
             lap("plan")
+
+            # ── ANSWER CACHE (Milestone 3.6) ─────────────────────────────────────────────────────
+            #
+            # Consulted HERE and not earlier, deliberately. The deterministic turn and the whole
+            # calculator pass have already run, so the figures in front of us are freshly computed
+            # — and that is the point: recompute the cheap deterministic half every turn and reuse
+            # only the expensive prose, and only when the recomputed figures are identical.
+            # Checking before the context was built would have had nothing to compare against.
+            #
+            # The store refuses on any doubt: a different question, a changed fact, a changed
+            # turn, a flipped determination, a new tax conflict, a changed law basis, or a cited
+            # figure the gate would no longer allow. A miss costs tokens; a wrong hit costs trust.
+            cached = None
+            if self._answer_cache is not None and getattr(context, "calculations", None):
+                try:
+                    cached = await self._answer_cache.lookup_answer(
+                        ctx.user_id, message, context.calculations)
+                except Exception as exc:  # noqa: BLE001 — a cache fault must never cost a turn
+                    log.warning("answer cache lookup failed: %s", exc)
+                    cached = None
+            if cached is not None:
+                # The cached text already passed the validator when it was first produced, and the
+                # figures it cites have just been re-verified against this turn's packet. Compose
+                # is skipped too: the stored answer IS the composed answer.
+                base["assistant_message"] = cached.answer
+                base["llm_status"] = "cache"
+                base["served_from_cache"] = True
+                tr["llm_status"] = "cache"
+                tr["cache_hit"] = True
+                tr["cache_age"] = cached.created_at
+                tr["cache_hits"] = cached.hit_count
+                tr["provider_called"] = False
+                lap("answer_cache")
+                return
+
+            tr["cache_hit"] = False
             tr["provider_called"] = True  # we attempted the provider this turn (item 2 observability)
             _t_call = time.perf_counter()
             out = await active.generate(context, constraints)
@@ -783,6 +823,23 @@ class AdvisorOrchestrator:
             base["assistant_message"] = composed
             base["llm_status"] = "enhanced"
             base["prompt_version"] = self.prompt_version
+
+            # ── ANSWER CACHE: store (Milestone 3.6) ──────────────────────────────────────────────
+            #
+            # Only here, on the success path: the validator has accepted and the text has been
+            # composed, so what is stored is exactly what the user was shown. Caching a fallback or
+            # a repaired-then-rejected draft would serve prose that never passed the gate.
+            #
+            # Fire-and-forget — the user's answer is already finished, and a cache write must not
+            # add latency to a turn that is done.
+            if self._answer_cache is not None and getattr(context, "calculations", None):
+                try:
+                    import asyncio          # local, matching this module's existing convention
+                    asyncio.ensure_future(self._answer_cache.save_answer(
+                        ctx.user_id, message, composed, context.calculations,
+                        model=getattr(active, "model_name", None)))
+                except Exception as exc:  # noqa: BLE001 — never let a cache write affect the turn
+                    log.warning("answer cache store skipped: %s", exc)
             # Structured reasoning for the UI's expandable "Why / evidence" drawer (NOT dumped in the chat
             # message). Citations already travel in base["citations"]. Preserves evidence without the memo feel.
             reasoning = _reasoning_payload(safe)

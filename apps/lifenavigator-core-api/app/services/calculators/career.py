@@ -15,29 +15,56 @@ from .base import STRICT, CalcResult, CalculatorError, register, require_money, 
 
 
 @register("career.uncaptured_match")
-def uncaptured_match(*, income: float, current_rate: float, employer_match_rate: float) -> CalcResult:
-    """Employer money left on the table each year. STRICT — all three inputs are the user's.
+def uncaptured_match(*, income: float, current_rate: float, employer_match_rate: float,
+                     match_percent: float = 100.0) -> CalcResult:
+    """Employer money left on the table each year. STRICT — every input is the user's.
 
     Rates here are PERCENTAGES OF PAY (6 means 6%), not decimal fractions, which is the convention
     every 401(k) interface uses and the one the user will be reading off their own enrolment page.
     They are therefore validated as rates after conversion, not before — passing 6 to
     `require_rate` would be rejected as an unconverted percent (R5) when it is the correct input.
+
+    A MATCH HAS TWO NUMBERS AND THIS ONLY MODELLED ONE
+    --------------------------------------------------
+    `employer_match_rate` is the CAP — the share of pay the employer will match up to. On its own
+    it describes a dollar-for-dollar match, and this calculator assumed that: "matches up to 6%"
+    paid 6% of pay. But the most common formula in the market is "50% up to 6%", which pays 3%, and
+    for anyone on that plan every figure here was DOUBLE. It is the kind of error that reads as
+    plausible — the shape of the advice ("raise your contribution to 6%") stays right while the
+    dollar amount is twice what they will get.
+
+    `match_percent` is the cents per dollar (50 means 50%). It defaults to 100 so every existing
+    caller keeps its exact behaviour, and `finance.user_financial_profile.employer_match_percent`
+    has carried the real figure since migration 062 with nothing ever reading it.
+
+    Note what does NOT change with the match percentage: the rate the user should contribute to
+    capture the whole match is the CAP either way. A 50% match is still worth capturing in full.
     """
     inc = require_money("income", income, allow_zero=False)
     cur = require_rate("current_rate", current_rate / 100.0)
-    match = require_rate("employer_match_rate", employer_match_rate / 100.0)
-    uncaptured = inc * max(0.0, match - cur)
+    cap = require_rate("employer_match_rate", employer_match_rate / 100.0)
+    share = require_rate("match_percent", match_percent / 100.0)
+    uncaptured = inc * max(0.0, cap - cur) * share
+    dollar_for_dollar = abs(share - 1.0) < 1e-9
     return CalcResult(
         calculator="career.uncaptured_match", label="employer match left unclaimed each year",
         value=round(uncaptured, 2), unit="usd_per_year", tier=STRICT,
         inputs_used={"income": inc, "current_rate_pct": current_rate,
-                     "employer_match_rate_pct": employer_match_rate},
-        detail={"full_match_annual": round(inc * match, 2),
+                     "employer_match_rate_pct": employer_match_rate,
+                     "match_percent": match_percent},
+        detail={"full_match_annual": round(inc * cap * share, 2),
                 "recommended_rate_pct": max(current_rate, employer_match_rate),
-                "capturing_full_match": cur >= match,
-                # An instant, risk-free 100% return on the contributed amount is the comparison that
-                # makes this figure act on, so it is stated rather than left to be inferred.
-                "note": "a full match is an immediate 100% return on the matched portion"},
+                "capturing_full_match": cur >= cap,
+                "match_formula": (f"{match_percent:g}% of the first "
+                                  f"{employer_match_rate:g}% of pay"),
+                # The return depends on the formula, and quoting 100% for a 50% match overstates
+                # the single most persuasive figure in the whole analysis.
+                "immediate_return_on_contribution_pct": round(match_percent, 2),
+                "note": ("a full match is an immediate 100% return on the matched portion"
+                         if dollar_for_dollar else
+                         f"a full match is an immediate {match_percent:g}% return on the matched "
+                         f"portion — still the best available return, but not dollar-for-dollar"),
+                "assumed_dollar_for_dollar": dollar_for_dollar},
     )
 
 

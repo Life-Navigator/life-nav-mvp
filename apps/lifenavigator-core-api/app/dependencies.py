@@ -370,15 +370,41 @@ def get_advisor_orchestrator(
     # Tier 3). The same reasoning the GRAPH_GROUNDING_ENABLED block above states applies with more
     # force here — the honest gate is a measured win on the advisor eval harness, not a config edit.
     # None → the advisor behaves exactly as it does today.
+    #
+    # REVISITED 2026-10-13 AND LEFT OFF. It was briefly flipped to default-on while closing the
+    # Milestone 3 gaps, and that was wrong: the day before, an audit of this exact code found three
+    # defects that produced actively wrong advice (credit-card interest reported as deductible, an
+    # HSA deduction asserted on a plan the same packet called ineligible, and a cache that served
+    # "deductible" after the engine decided "not deductible"). All three were found by RUNNING it,
+    # none by review. That is the argument FOR this gate, not against it: the packet reaches every
+    # finance turn, so a defect in it degrades all of them at once.
+    #
+    # What closing this gap actually requires is a measurement, and the measurement needs live
+    # model credentials this environment does not have. `scripts/calc_packet_dryrun.py` shows what
+    # the packet ADDS for a given profile without spending a token, so the content change can be
+    # reviewed now; the A/B on the advisor eval harness remains the owner's gate before flipping.
     calculations: Any = None
+    calc_store = None          # annotation omitted: `Any` is not in this module's import scope
     if os.environ.get("ADVISOR_CALCULATORS_ENABLED", "false").lower() in ("1", "true", "yes"):
         try:
             from .services.advisor_calculations import AdvisorCalculationPlanner
+            from .services.calculation_store import CalculationStore
+            # Milestone 3.6. Persists each turn's packet (the audit record and plan-vs-actual
+            # history) and backs the answer cache. Built here because it was the missing link: the
+            # store existed, was tested, and was never handed a Supabase client — so nothing was
+            # ever written and the cache could never hit.
+            #
+            # Independently guarded: if the migration has not been applied, every call inside the
+            # store swallows its own failure, a read becomes a miss and a write is dropped. So a
+            # store that cannot reach its tables costs tokens, never correctness.
+            calc_store = CalculationStore(supabase)
             calculations = AdvisorCalculationPlanner(
-                FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase))
+                FinancialInputResolver(supabase, CompensationBenefitsEngine(supabase)),
+                calc_store,
             )
         except Exception:  # noqa: BLE001 — grounding is optional; never block advisor construction
             calculations = None
+            calc_store = None
     builder = AdvisorContextBuilder(supabase, coverage=coverage, life=life, scenarios=scenarios,
                                     retriever=retriever, calculations=calculations)
     if use_claude:
@@ -460,7 +486,8 @@ def get_advisor_orchestrator(
 
     return AdvisorOrchestrator(rm, builder, llm, enabled=enabled, supabase=supabase, router=router,
                                hybrid_claude=hybrid_claude, claude_domains=claude_domains,
-                               claude_high_stakes_only=high_stakes_only, fast_llm=fast_llm)
+                               claude_high_stakes_only=high_stakes_only, fast_llm=fast_llm,
+                               answer_cache=calc_store)
 
 
 def get_recommendation_os(
