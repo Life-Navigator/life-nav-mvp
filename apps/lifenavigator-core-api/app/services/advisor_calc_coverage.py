@@ -52,6 +52,11 @@ CANONICAL_INPUTS = frozenset({
                                   # input, because it is stored and should not be re-asked
     "va_disability_rating",       # documents:va_award_letter — tax-free income, read since Sprint 20
     "hsa_eligible", "hsa_balance", "fsa_election",   # the B2 tax-treatment rules
+    # Added 2026-10-13. The computed path read thirteen tables and every one was finance, so the
+    # advisor could DESCRIBE a degree (advisor_facts, Phase 8) and compute nothing about it.
+    "salary_before",          # career.compensation_records.base
+    "education_programs",     # education.programs — tuition, duration, median salary, grad rate
+    "target_compensation", "target_role",   # career.job_targets
 })
 
 # Values the ADVISOR TURN supplies (parsed from the message or passed by the caller), not resolved
@@ -175,12 +180,20 @@ REACHABLE: dict[str, Reach] = {r.calc_id: r for r in (
             "simulated without one. debt_list alone is enough for the ORDER, which is wired"),
     _r("debt.avalanche_order", ("debt_list",), wired=True),
     _r("career.offer_total_comp", ("offers",), wired=True),
-    _r("education.degree_total_cost", ("tuition_total", "years_in_school", "salary_before"),
-       wired=True),
-    _r("education.degree_payback_years", ("tuition_total", "years_in_school", "salary_before",
-                                           "salary_after"), wired=True),
-    _r("education.degree_lifetime_value", ("tuition_total", "years_in_school", "salary_before",
-                                            "salary_after"), wired=True),
+    _r("education.degree_total_cost", ("education_programs", "salary_before"), wired=True,
+       optional=("tuition_total", "years_in_school"),
+       note="runs PER PROGRAM: more than one candidate is a comparison, not an ambiguity. Reads "
+            "education.programs and career.compensation_records; the turn still overrides, "
+            "because 'what if it cost $120k' is a real question"),
+    _r("education.degree_payback_years",
+       ("education_programs", "salary_before"), wired=True,
+       optional=("salary_after", "target_compensation"),
+       note="salary_after prefers the program's published median, then the user's stated target — "
+            "a target is what they aim at, not what the program delivers, so the source is "
+            "recorded on the result"),
+    _r("education.degree_lifetime_value",
+       ("education_programs", "salary_before"), wired=True,
+       optional=("salary_after", "target_compensation")),
     _r("tax.federal_income_tax", ("income", "filing_status"), wired=True),
     _r("tax.fica", ("income", "filing_status"), wired=True),
     _r("tax.state_income_tax", ("income", "filing_status", "tax_state"), wired=True),

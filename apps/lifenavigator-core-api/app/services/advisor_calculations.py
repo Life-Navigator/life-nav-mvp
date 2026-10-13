@@ -513,6 +513,9 @@ class AdvisorCalculationPlanner:
             run(money.monthly_contribution_for_target, target=savings_goal_amount,
                 current=_present(inputs, "cash_balance") or 0.0, months=int(savings_goal_months))
 
+        # Per-program context for the degree figures, so each result can be attributed.
+        education_detail: list[dict[str, Any]] = []
+
         # Shared inputs for the growth and interest figures below.
         balance_for_growth = _present(inputs, "investment_balance")
         _hz = _present(inputs, "time_horizon")
@@ -527,19 +530,64 @@ class AdvisorCalculationPlanner:
         # the input, so the input could never arrive and the calculator could never fire. The
         # inventory said ready; the code said unreachable.
 
-        # A degree, with the cost of the years NOT working included.
-        tuition, years = _tv("tuition_total"), _tv("years_in_school")
-        sal_before, sal_after = _tv("salary_before"), _tv("salary_after")
-        if tuition is not None and years and sal_before is not None:
+        # ── A degree, with the cost of the years NOT working included ────────────────────────────
+        #
+        # STORED FIRST, TURN AS AN OVERRIDE. Every one of these four inputs is a column —
+        # education.programs.tuition / .duration_months / .median_salary and
+        # career.compensation_records.base — and all four were turn-only, so the advisor asked the
+        # user to type figures the database already held. The turn still wins when the user states
+        # something different, because "what if it cost $120k instead" is a real question.
+        sal_before = _tv("salary_before") or _present(inputs, "salary_before")
+        stored_programs = list(_present(inputs, "education_programs") or [])
+        turn_tuition, turn_years = _tv("tuition_total"), _tv("years_in_school")
+        turn_after = _tv("salary_after")
+
+        # One entry per candidate. More than one program is a COMPARISON, not an ambiguity, and
+        # comparing them is the question the user actually has — so the calculators run per
+        # program, exactly as the after-tax cost of debt runs per instrument.
+        candidates: list[dict[str, Any]] = []
+        if turn_tuition is not None and turn_years:
+            candidates.append({"name": "the program you described",
+                               "tuition_total": float(turn_tuition),
+                               "years_in_school": float(turn_years),
+                               "median_salary": turn_after})
+        else:
+            candidates = [dict(p) for p in stored_programs]
+
+        for cand in candidates:
+            label = str(cand.get("name") or "program")
+            tuition, years = cand.get("tuition_total"), cand.get("years_in_school")
+            # `salary_after` prefers the program's published median, then the user's own target.
+            # A target is what they are AIMING at rather than what the program delivers, so it is
+            # used only as a fallback and the distinction is recorded on the result.
+            after = (turn_after if turn_after is not None else cand.get("median_salary"))
+            after_source = "program median"
+            if after is None:
+                after = _present(inputs, "target_compensation")
+                after_source = "your stated target"
+            if tuition is None or not years or sal_before is None:
+                gaps.append(_gap(inputs, "education.degree_total_cost",
+                                 [k for k, v in (("education_programs", tuition),
+                                                 ("salary_before", sal_before)) if v is None]))
+                continue
             run(education.degree_total_cost, tuition_total=float(tuition),
                 years_in_school=float(years), salary_before=float(sal_before))
-            if sal_after is not None:
-                run(education.degree_payback_years, tuition_total=float(tuition),
-                    years_in_school=float(years), salary_before=float(sal_before),
-                    salary_after=float(sal_after))
-                run(education.degree_lifetime_value, tuition_total=float(tuition),
-                    years_in_school=float(years), salary_before=float(sal_before),
-                    salary_after=float(sal_after))
+            if after is not None:
+                for fn in (education.degree_payback_years, education.degree_lifetime_value):
+                    run(fn, tuition_total=float(tuition), years_in_school=float(years),
+                        salary_before=float(sal_before), salary_after=float(after))
+            else:
+                gaps.append({"calculator": "education.degree_payback_years",
+                             "needs": ["salary_after"],
+                             "ask": [f"What would you expect to earn after {label}? Without it we "
+                                     f"can price the degree but not say whether it pays back."]})
+            education_detail.append({
+                "program": label, "tuition_total": tuition, "years_in_school": years,
+                "salary_after": after, "salary_after_source": after_source,
+                # Carried, not applied: completion risk is risk-adjusted by education_roi, and
+                # applying it in two places would compound the same haircut twice.
+                "graduation_rate": cand.get("graduation_rate"),
+                "source": cand.get("source")})
 
         # A pension offer. Answered as an implied return, because "which is bigger" depends
         # entirely on how long you live and what the money would otherwise earn.
@@ -672,6 +720,9 @@ class AdvisorCalculationPlanner:
             # coverage, for instance. Not a gap (a missing fact) and not a trap (a future risk):
             # a conflict is a loss in progress, and it outranks everything else in the packet.
             "tax_conflicts": treatments.get("conflicts") or [],
+            # Which program each degree figure belongs to, and where its post-graduation salary
+            # came from. Without this the per-program results are indistinguishable.
+            "education_programs_compared": education_detail,
             "unfavourable_with_levers": treatments.get("unfavourable_with_levers") or [],
             "tax_traps": treatments.get("traps") or [],
             "gaps": gaps,

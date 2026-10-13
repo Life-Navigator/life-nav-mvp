@@ -146,7 +146,8 @@ class FinancialInputResolver:
         # series the added tax and planning inputs would have roughly doubled the resolver's
         # latency on every advisor turn, for queries that do not depend on each other.
         (accounts, assets, plans, doc_rows, risk, vis,
-         loan_rows, debt_rows, liability_rows, holdings, cashflows, profiles) = await asyncio.gather(
+         loan_rows, debt_rows, liability_rows, holdings, cashflows, profiles,
+         comp_rows, target_rows, program_rows) = await asyncio.gather(
             self._rows("financial_accounts", "finance", uid=uid),
             self._rows("assets", "finance", uid=uid),
             self._rows("retirement_plans", "finance", uid=uid),
@@ -159,6 +160,14 @@ class FinancialInputResolver:
             self._rows("investment_holdings", "finance", uid=uid),
             self._rows("cash_flow_snapshots", "finance", uid=uid),
             self._rows("user_financial_profile", "finance", uid=uid),
+            # Career and education. The computed path read THIRTEEN tables and every one was
+            # finance, so the advisor could describe a user's degree and goals (advisor_facts,
+            # Phase 8) while being unable to compute anything about them — the three education
+            # calculators asked the user to type a tuition figure that education.programs.tuition
+            # has held all along.
+            self._rows("compensation_records", "career", uid=uid),
+            self._rows("job_targets", "career", uid=uid),
+            self._rows("programs", "education", uid=uid),
         )
         docs = {d.get("doc_type"): (d.get("extracted_json") or {}) for d in doc_rows}
         profile = profiles[0] if profiles else {}
@@ -342,6 +351,45 @@ class FinancialInputResolver:
         magi_val = _num(tax_row.get("modified_agi"))
         qualifying_children = _num(tax_row.get("qualifying_children_under_17"))
         student_loan_interest = _num(tax_row.get("student_loan_interest_paid"))
+
+        # ── Career and education, for the computed path ─────────────────────────────────────────
+        #
+        # `salary_before` is BASE pay, not total compensation. The figure's job is to measure
+        # earnings forgone while in school, and a bonus is contingent while equity is neither
+        # guaranteed nor cash — counting them would overstate the opportunity cost of studying and
+        # so understate every degree's value.
+        def _latest(rows: list[dict], *date_keys: str) -> dict:
+            if not rows:
+                return {}
+            return max(rows, key=lambda r: str(next(
+                (r.get(k) for k in date_keys if r.get(k)), r.get("created_at") or "")))
+
+        comp_now = _latest(comp_rows, "effective_date", "as_of_date")
+        salary_before = _num(comp_now.get("base"))
+
+        # Programs under consideration. Kept as a LIST because more than one is a comparison, not
+        # an ambiguity — and comparing them is the question the user actually has.
+        programs = [
+            {"name": r.get("name"), "level": r.get("level"), "major": r.get("major"),
+             "tuition_total": _num(r.get("tuition")),
+             "years_in_school": (round(_num(r.get("duration_months")) / 12.0, 2)
+                                 if _num(r.get("duration_months")) else None),
+             "median_salary": _num(r.get("median_salary")),
+             "graduation_rate": _num(r.get("graduation_rate")),
+             "source": r.get("source"), "confidence": _num(r.get("confidence"))}
+            for r in program_rows
+            if _num(r.get("tuition")) is not None and _num(r.get("duration_months"))
+        ]
+        programs_incomplete = [r.get("name") for r in program_rows
+                               if _num(r.get("tuition")) is None
+                               or not _num(r.get("duration_months"))]
+
+        # A target role's pay is the honest `salary_after` when the program does not publish a
+        # median: it is what the USER is aiming at, and it is labelled as their target rather than
+        # as an outcome the program achieves.
+        target_now = _latest(target_rows, "created_at")
+        target_comp = _num(target_now.get("target_comp_median")) or \
+            _num(target_now.get("target_comp_low"))
 
         va_doc = docs.get("va_award_letter") or {}
         va_rating = _num(va_doc.get("disability_rating"))
@@ -545,6 +593,30 @@ class FinancialInputResolver:
                 prompt=("Are you covered by a retirement plan at work? It decides whether a "
                         "traditional IRA contribution is deductible at your income."),
                 unlocks=["traditional IRA deductibility"]),
+            # ── Career and education (2026-10-13) ───────────────────────────────────────────────
+            "salary_before": _field(
+                salary_before, DOC, present=salary_before is not None,
+                origin="career.compensation_records.base (latest by effective_date)",
+                confidence=0.9,
+                prompt="What do you earn now? It sets the earnings forgone while studying.",
+                unlocks=["degree cost", "degree payback", "degree lifetime value"]),
+            "education_programs": _field(
+                programs or None, DOC, present=bool(programs),
+                origin="education.programs (tuition, duration_months, median_salary)",
+                confidence=0.85,
+                prompt=("Which programs are you considering, and what do they cost? Add them and "
+                        "we can compare them against your actual finances."),
+                unlocks=["degree ROI per program", "college comparison"]),
+            "target_compensation": _field(
+                target_comp, ADVISOR, present=target_comp is not None,
+                origin="career.job_targets.target_comp_median", confidence=0.8,
+                prompt="What role and pay are you aiming for?",
+                unlocks=["degree payback against your own target", "career gap analysis"]),
+            "target_role": _field(
+                target_now.get("role_title"), ADVISOR,
+                present=bool(target_now.get("role_title")),
+                origin="career.job_targets.role_title", confidence=0.85,
+                prompt="What role are you targeting?", unlocks=["skill-gap analysis"]),
             "student_loan_interest": _field(
                 student_loan_interest, DOC, present=student_loan_interest is not None,
                 origin="finance.tax_profiles.student_loan_interest_paid", confidence=0.95,
@@ -567,6 +639,10 @@ class FinancialInputResolver:
             "capital_gain_is_unrealized": True,
             "itemized_components_stated": sorted(stated_components),
             "itemized_components_absent": sorted(set(itemized_components) - set(stated_components)),
+            # Programs missing a tuition or a duration are EXCLUDED from the comparison rather
+            # than defaulted to zero, which would make them look free.
+            "education_programs_incomplete": programs_incomplete,
+            "salary_before_excludes": (["bonus", "equity"] if salary_before is not None else []),
         }
         missing = [{"input": k2, "prompt": v["prompt"], "unlocks": v["unlocks"]} for k2, v in inputs.items() if not v["present"]]
         return {"inputs": inputs, "present_count": sum(1 for v in inputs.values() if v["present"]),

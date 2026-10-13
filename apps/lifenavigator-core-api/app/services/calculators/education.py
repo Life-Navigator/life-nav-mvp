@@ -15,6 +15,7 @@ returns a present value via `primitives.npv`, and `degree_payback_years` uses th
 from __future__ import annotations
 
 from .base import (
+    require_rate,
     SCENARIO,
     STRICT,
     CalcResult,
@@ -28,23 +29,37 @@ from .primitives import npv, payback_period
 
 @register("education.degree_total_cost")
 def degree_total_cost(*, tuition_total: float, years_in_school: float,
-                      salary_before: float) -> CalcResult:
+                      salary_before: float,
+                      salary_forgone_share: float = 1.0) -> CalcResult:
     """Tuition plus foregone earnings. STRICT — the user's own tuition, years and current salary.
 
     Foregone earnings are usually the larger half and the one people omit. A two-year program at
     $80k tuition against a $90k salary costs $260k, not $80k.
+
+    `salary_forgone_share` is how much of that salary actually stops. It defaults to 1.0 —
+    full-time study, every caller's previous behaviour — and is the parameter that lets ONE cost
+    model serve both enrolment modes. It was previously a hardcoded constant in two places: 1.0
+    implicitly here and 0.5 in `education_roi._PART_TIME_FORGONE`, which meant two implementations
+    of the same formula that could only ever disagree. `education.programs.modality` makes the
+    share a stored fact rather than either module's assumption.
     """
     tuition = require_money("tuition_total", tuition_total)
     years = require_money("years_in_school", years_in_school, allow_zero=False)
     before = require_money("salary_before", salary_before)
-    lost = before * years
+    share = require_rate("salary_forgone_share", salary_forgone_share)
+    lost = before * years * share
     return CalcResult(
         calculator="education.degree_total_cost", label="total cost of the degree",
         value=round(tuition + lost, 2), unit="usd", tier=STRICT,
         inputs_used={"tuition_total": tuition, "years_in_school": years,
-                     "salary_before": before},
+                     "salary_before": before, "salary_forgone_share": share},
         detail={"tuition": tuition, "foregone_earnings": round(lost, 2),
-                "foregone_share": round(lost / (tuition + lost), 3) if (tuition + lost) else 0.0},
+                # NOTE the two similarly-named figures measure different things:
+                # `salary_forgone_share` is how much of the salary stops (an input);
+                # `foregone_share` is how much of the TOTAL COST is lost earnings (an output).
+                "foregone_share": round(lost / (tuition + lost), 3) if (tuition + lost) else 0.0,
+                "enrolment": ("full-time" if share >= 0.999 else
+                              "part-time" if share > 0 else "no earnings forgone")},
     )
 
 

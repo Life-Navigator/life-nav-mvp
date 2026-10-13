@@ -67,6 +67,20 @@ PROFILES: dict[str, dict[str, Any]] = {
         "hdhp_out_of_pocket_max": 4_000, "hsa_annual_contribution": 4_300,
         "fsa_type": "general_purpose", "fsa_election": 2_000,
     },
+    # Two degrees against one salary: the comparison the education calculators could not make
+    # until career/education reached the computed path.
+    "career_change_mba": {
+        "_turn": {"current_age": 31},
+        "income": 95_000, "filing_status": "single", "adjusted_gross_income": 95_000,
+        "salary_before": 95_000, "target_compensation": 150_000, "target_role": "Product Manager",
+        "cash_balance": 40_000, "retirement_balance": 85_000, "time_horizon": 30,
+        "monthly_expenses": 4_200, "annual_savings": 14_000,
+        "education_programs": [
+            {"name": "State MBA", "tuition_total": 62_000, "years_in_school": 2.0,
+             "median_salary": 138_000, "graduation_rate": 0.91, "source": "IPEDS"},
+            {"name": "Top-20 MBA", "tuition_total": 168_000, "years_in_school": 2.0,
+             "median_salary": 175_000, "graduation_rate": 0.95, "source": "IPEDS"}],
+    },
     "veteran_family": {
         "_turn": {"current_age": 52, "va_individual_ratings": [60, 30, 10]},
         "income": 96_000, "filing_status": "married_jointly", "dependents": 1,
@@ -147,6 +161,14 @@ def report(name: str, p: dict[str, Any]) -> None:
         why = g.get("refused") or (g.get("ask") or [""])[0] if isinstance(g.get("ask"), list) \
             else g.get("ask") or g.get("refused") or ""
         print(f"      {who}: {str(why)[:88]}")
+
+    progs = p.get("education_programs_compared") or []
+    if progs:
+        print(f"\n  PROGRAMS COMPARED — {len(progs)}")
+        for e in progs:
+            print(f"      {e['program']}: ${e['tuition_total']:,.0f} over {e['years_in_school']}y, "
+                  f"after ${e['salary_after']:,.0f} ({e['salary_after_source']}), "
+                  f"completion {e.get('graduation_rate')}")
 
     nums = len(p.get("allowed_numbers") or []) + len(p.get("scenario_numbers") or [])
     print(f"\n  NUMBER GATE — {len(p.get('allowed_numbers') or [])} citable plainly, "

@@ -12,6 +12,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from .calculators.base import CalculatorError
+from .calculators.education import degree_total_cost
+
 _PART_TIME_FORGONE = 0.5  # documented assumption: half of current income forgone while enrolled
 
 
@@ -75,10 +78,21 @@ class EducationROIEngine:
 
         net_cost = tuition
         duration_yrs = (duration_m / 12.0) if duration_m else None
-        opportunity_cost = (
-            round(current_median * duration_yrs * _PART_TIME_FORGONE, 0)
-            if (current_median is not None and duration_yrs is not None) else None
-        )
+        # DELEGATED. This computed `tuition + salary x years x 0.5` inline, which was a second
+        # implementation of `education.degree_total_cost` differing only by the forgone-salary
+        # share — two copies of one formula that could only ever drift apart. The calculator now
+        # takes the share as a parameter, so this passes its part-time assumption in and the two
+        # paths cannot disagree. The figures here are unchanged.
+        opportunity_cost = None
+        if current_median is not None and duration_yrs is not None and net_cost is not None:
+            try:
+                _cost = degree_total_cost(
+                    tuition_total=float(net_cost), years_in_school=float(duration_yrs),
+                    salary_before=float(current_median),
+                    salary_forgone_share=_PART_TIME_FORGONE)
+                opportunity_cost = round(_cost.detail["foregone_earnings"], 0)
+            except CalculatorError:
+                opportunity_cost = None
         income_lift = (
             round(median_salary - current_median, 0)
             if (median_salary is not None and current_median is not None) else None
