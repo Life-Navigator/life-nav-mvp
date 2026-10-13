@@ -25,24 +25,31 @@ def _field(value, present=True, prompt="Add it."):
 
 
 def _resolver(**overrides):
-    """A fake FinancialInputResolver carrying the real field shape (value/present/prompt)."""
-    inputs = {
-        "income": _field(None, False, "What's your annual income?"),
-        "cash_balance": _field(None, False, "Enter your cash balance."),
-        "investment_balance": _field(None, False, "Add investments."),
-        "retirement_balance": _field(None, False, "No retirement balances on file."),
-        "debt_total": _field(None, False, "Add your debts to optimize payoff."),
-        "debt_apr": _field(None, False, "What APR are you paying on your debt?"),
-        "retirement_contribution_rate": _field(None, False, "Enter your 401(k) rate."),
-        "employer_match_rate": _field(None, False, "What's your match?"),
-        "risk_profile": _field(None, False, "How do you handle uncertainty?"),
-        "time_horizon": _field(None, False, "When do you hope to reach your goal?"),
-        "housing_target": _field(None, False, "What home price are you considering?"),
-        "filing_status": _field(None, False, "How do you file?"),
-        "dependents": _field(None, False, "How many dependents do you claim?"),
-        "tax_state": _field(None, False, "Which state do you file in?"),
-        "debt_list": _field(None, False, "Add your individual debts."),
+    """A fake FinancialInputResolver carrying the real field shape (value/present/prompt).
+
+    The absent-by-default set is derived from `CANONICAL_INPUTS` rather than listed by hand. It WAS
+    listed by hand, and it drifted: new canonical inputs were not added here, so the
+    "complete profile" test below silently stopped being complete and could not notice that a
+    newly wired calculator never fired for want of an input the stub had never heard of.
+    """
+    from app.services.advisor_calc_coverage import CANONICAL_INPUTS
+
+    # The real resolver's own wording for the few prompts tests assert on, so a gap still carries
+    # the question the advisor should actually ask. Everything else gets a generic placeholder —
+    # the point of deriving the KEY SET from CANONICAL_INPUTS is coverage, not prompt fidelity.
+    real_prompts = {
+        "income": "What's your annual income?",
+        "cash_balance": "Connect a sample profile or enter your cash balance.",
+        "retirement_balance": "No retirement balances on file — connect a profile or add them.",
+        "investment_balance": "No investment balances on file — connect a profile or add them.",
+        "debt_total": "Add your debts to optimize payoff.",
+        "debt_apr": "What APR are you paying on your debt?",
+        "filing_status": "How do you file?",
+        "monthly_debts": "Add your debts and their monthly payments to unlock home affordability.",
     }
+    inputs = {k: _field(None, False,
+                        real_prompts.get(k, f"Provide {k.replace('_', ' ')}."))
+              for k in sorted(CANONICAL_INPUTS)}
     for k, v in overrides.items():
         inputs[k] = _field(v, v is not None)
 
@@ -492,11 +499,36 @@ async def test_every_calculator_marked_wired_actually_appears_for_a_complete_pro
                   retirement_contribution_rate=3, employer_match_rate=6,
                   time_horizon=10,
                   debt_list=[{"label": "card", "balance": 8000, "apr": 22.0},
-                             {"label": "auto", "balance": 22000, "apr": 4.9}])
+                             {"label": "auto", "balance": 22000, "apr": 4.9}],
+                  # Added 2026-10-12 with the tax/planning inputs. A profile that omits them is
+                  # not "complete", and the gate below is only meaningful against a complete one.
+                  debt_minimum_payments=[
+                      {"label": "card", "balance": 8000, "apr": 22.0, "minimum_payment": 200},
+                      {"label": "auto", "balance": 22000, "apr": 4.9, "minimum_payment": 420}],
+                  monthly_debts=620, annual_savings=24000, monthly_expenses=4000,
+                  capital_gain=40000, capital_gain_long_term=30000,
+                  capital_gain_short_term=10000,
+                  va_disability_rating=70, qualifying_children=2,
+                  adjusted_gross_income=110000, modified_agi=110000,
+                  itemized_components={"state_local_taxes": 12000, "mortgage_interest": 9000},
+                  hsa_eligible=True, hsa_balance=15000, fsa_election=1200)
     ).compute(_Ctx(), monthly_expenses=4000, monthly_income=10000,
               monthly_debt_payment=800, home_price_goal=500000,
               current_age=40, target_retirement_age=65,
-              savings_goal_amount=50000, savings_goal_months=24)
+              savings_goal_amount=50000, savings_goal_months=24,
+              # The per-turn half of a complete profile. These calculators answer a decision the
+              # user is weighing rather than a stored fact, so they are reachable ONLY through
+              # `turn` — and they were each marked ready-to-wire while `compute()` had no
+              # parameter that could carry them.
+              turn={"down_payment": 100000, "monthly_rent": 2800,
+                    "tuition_total": 90000, "years_in_school": 2,
+                    "salary_before": 95000, "salary_after": 140000,
+                    "lump_sum_amount": 50000, "spread_months": 12,
+                    "pension_lump_sum": 400000, "pension_annual_annuity": 28000,
+                    "va_individual_ratings": [60, 30],
+                    "expense_ratio": 0.0075,
+                    "offers": [{"label": "A", "base": 150000},
+                               {"label": "B", "base": 140000, "bonus": 20000}]})
 
     fired = {r["calculator"] for r in p["results"]}
     gapped = {g.get("calculator") for g in p["gaps"]}
@@ -554,3 +586,182 @@ async def test_percent_aprs_from_the_database_are_normalized_for_the_order():
                              {"label": "b", "balance": 1000, "apr": 0.049}])
     ).compute(_Ctx())
     assert _by_id(p, "debt.avalanche_order") is not None
+
+
+# ── The tax and planning inputs reach the calculators (2026-10-12) ───────────────────────────────
+@pytest.mark.asyncio
+async def test_capital_gains_runs_ONCE_PER_HOLDING_PERIOD_not_on_the_blend():
+    """Long-term gain is taxed at 0/15/20% and short-term as ordinary income up to 37%. A single
+    call on the blended total would have to pick one rate and be wrong by up to 22 percentage
+    points on the other, so each period is its own result."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=200_000, filing_status="married_jointly",
+                  capital_gain=40_000, capital_gain_long_term=30_000,
+                  capital_gain_short_term=10_000)
+    ).compute(_Ctx())
+    gains = [r for r in p["results"] if r["calculator"] == "tax.capital_gains_tax"]
+    if gains:                      # skipped when the tax table is unverified
+        assert len(gains) == 2
+        assert {g["inputs_used"]["long_term"] for g in gains} == {True, False}
+
+
+@pytest.mark.asyncio
+async def test_capital_gains_uses_TAXABLE_income_not_gross():
+    """The gain stacks on top of ordinary TAXABLE income. Passing gross would place it too high in
+    the 0/15/20% stack and overstate the tax — which is why it chains off the federal result."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=200_000, filing_status="single", capital_gain_long_term=50_000)
+    ).compute(_Ctx())
+    gains = [r for r in p["results"] if r["calculator"] == "tax.capital_gains_tax"]
+    fed = _by_id(p, "tax.federal_income_tax")
+    if gains and fed:
+        assert gains[0]["inputs_used"]["ordinary_taxable_income"] == fed["detail"]["taxable_income"]
+        assert gains[0]["inputs_used"]["ordinary_taxable_income"] < 200_000
+
+
+@pytest.mark.asyncio
+async def test_tax_credits_asks_for_the_CHILD_count_rather_than_guessing_it():
+    """With dependents but no child split the advisor must ASK. Treating all three dependents as
+    qualifying children would overstate the credit by $1,700 each."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=90_000, filing_status="married_jointly", dependents=3)
+    ).compute(_Ctx())
+    gap = _gap_for(p, "tax.tax_credits")
+    if _by_id(p, "tax.federal_income_tax") is not None:
+        assert gap is not None
+        assert "qualifying_children" in gap["needs"]
+
+
+@pytest.mark.asyncio
+async def test_tax_credits_splits_children_from_other_dependents():
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=90_000, filing_status="married_jointly", dependents=3,
+                  qualifying_children=2)
+    ).compute(_Ctx())
+    r = _by_id(p, "tax.tax_credits")
+    if r is not None:
+        assert r["inputs_used"]["qualifying_children"] == 2
+        assert r["inputs_used"]["other_dependents"] == 1
+
+
+@pytest.mark.asyncio
+async def test_home_affordability_is_a_GAP_when_the_debt_figure_is_unknown():
+    """Never a zero. A missing debt figure makes affordability look BETTER, so defaulting it would
+    be the one error the buyer never catches."""
+    p = await AdvisorCalculationPlanner(_resolver(income=150_000)).compute(_Ctx())
+    assert _by_id(p, "housing.max_monthly_payment") is None
+    gap = _gap_for(p, "housing.max_monthly_payment")
+    assert gap is not None and "monthly_debts" in gap["needs"]
+
+
+@pytest.mark.asyncio
+async def test_a_debt_with_an_unknown_APR_blocks_the_payoff_ORDER_and_says_why():
+    """Ordering debts by rate is the entire point of a payoff plan, so an unknown APR is named
+    rather than treated as 0%."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=90_000,
+                  debt_minimum_payments=[
+                      {"label": "card", "balance": 8_000, "apr": 22.0, "minimum_payment": 200},
+                      {"label": "family loan", "balance": 5_000, "apr": None,
+                       "minimum_payment": 100}])
+    ).compute(_Ctx())
+    assert _by_id(p, "debt.payoff_plan") is None
+    gap = _gap_for(p, "debt.payoff_plan")
+    assert gap is not None and "family loan" in " ".join(gap["ask"])
+
+
+@pytest.mark.asyncio
+async def test_the_payoff_plan_maps_the_resolvers_keys_to_the_calculators():
+    """THE MISMATCH THIS GUARDS. The resolver returns DB-shaped rows (`minimum_payment`) and the
+    calculator wants `min_payment`; passing the row straight through made `require_money` refuse on
+    every debt, so the whole plan vanished into a gap that read like missing data.
+    """
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=90_000,
+                  debt_minimum_payments=[
+                      {"label": "card", "balance": 8_000, "apr": 22.0, "minimum_payment": 300},
+                      {"label": "auto", "balance": 12_000, "apr": 4.9, "minimum_payment": 320}])
+    ).compute(_Ctx(), monthly_debt_payment=200)
+    r = _by_id(p, "debt.payoff_plan")
+    assert r is not None, "the plan must actually run"
+    assert not _gap_for(p, "debt.payoff_plan")
+
+
+@pytest.mark.asyncio
+async def test_a_percent_APR_is_normalized_before_the_payoff_plan():
+    """22 read as 2,200%/yr would produce a confidently absurd payoff order. Migration 062 calls
+    the column a decimal while other code treats it as a percent, so both must work."""
+    pct = await AdvisorCalculationPlanner(
+        _resolver(income=90_000, debt_minimum_payments=[
+            {"label": "card", "balance": 8_000, "apr": 22.0, "minimum_payment": 300}])
+    ).compute(_Ctx())
+    dec = await AdvisorCalculationPlanner(
+        _resolver(income=90_000, debt_minimum_payments=[
+            {"label": "card", "balance": 8_000, "apr": 0.22, "minimum_payment": 300}])
+    ).compute(_Ctx())
+    a, b = _by_id(pct, "debt.payoff_plan"), _by_id(dec, "debt.payoff_plan")
+    assert a is not None and b is not None
+    assert a["value"] == b["value"]
+
+
+@pytest.mark.asyncio
+async def test_va_compensation_fires_WITHOUT_income_or_filing_status():
+    """A veteran's rating alone determines the figure, so gating it behind the tax block would keep
+    it unreachable for exactly the users who had uploaded the award letter."""
+    p = await AdvisorCalculationPlanner(_resolver(va_disability_rating=70)).compute(_Ctx())
+    r = _by_id(p, "va.disability_compensation")
+    assert r is not None
+    assert r["value"] > 0
+
+
+@pytest.mark.asyncio
+async def test_a_non_veteran_is_not_handed_a_survivor_benefit():
+    """DIC needs no input at all, so it would otherwise fire for everyone."""
+    p = await AdvisorCalculationPlanner(_resolver(income=90_000)).compute(_Ctx())
+    assert _by_id(p, "va.dic") is None
+
+
+@pytest.mark.asyncio
+async def test_turn_only_decisions_are_unreachable_without_a_turn_and_reachable_with_one():
+    """They describe a hypothetical the user is weighing, so they are deliberately not stored —
+    which means `compute()` must carry them, and for a while it had no parameter that could."""
+    base = _resolver(income=120_000, investment_balance=200_000, time_horizon=20)
+    without = await AdvisorCalculationPlanner(base).compute(_Ctx(), current_age=55)
+    assert _by_id(without, "retirement.pension_lump_sum_vs_annuity") is None
+
+    with_turn = await AdvisorCalculationPlanner(base).compute(
+        _Ctx(), current_age=55,
+        turn={"pension_lump_sum": 400_000, "pension_annual_annuity": 28_000,
+              "va_individual_ratings": [60, 30], "expense_ratio": 0.0075})
+    assert _by_id(with_turn, "retirement.pension_lump_sum_vs_annuity") is not None
+    assert _by_id(with_turn, "money.expense_ratio_drag") is not None
+    combined = _by_id(with_turn, "va.combined_rating")
+    assert combined is not None and combined["value"] == 70.0, "60 and 30 combine to 70, not 90"
+
+
+@pytest.mark.asyncio
+async def test_itemizing_is_judged_on_the_CAPPED_total():
+    """Feeding `standard_vs_itemized` the raw sum of components — the obvious shortcut — would
+    recommend itemizing to a household whose SALT is mostly disallowed."""
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=700_000, filing_status="married_jointly",
+                  adjusted_gross_income=700_000, modified_agi=700_000,
+                  itemized_components={"state_local_taxes": 60_000})
+    ).compute(_Ctx())
+    it = _by_id(p, "tax.itemized_deductions")
+    sv = _by_id(p, "tax.standard_vs_itemized")
+    if it is not None and sv is not None:
+        assert it["value"] == pytest.approx(10_000), "SALT phased down to the floor"
+        assert sv["inputs_used"]["itemized_deductions"] == it["value"]
+
+
+@pytest.mark.asyncio
+async def test_itemizing_asks_for_AGI_rather_than_treating_medical_as_fully_deductible():
+    p = await AdvisorCalculationPlanner(
+        _resolver(income=180_000, filing_status="married_jointly",
+                  itemized_components={"medical_expenses": 9_000})
+    ).compute(_Ctx())
+    assert _by_id(p, "tax.itemized_deductions") is None
+    gap = _gap_for(p, "tax.itemized_deductions")
+    if _by_id(p, "tax.federal_income_tax") is not None or gap is not None:
+        assert gap is not None and "adjusted_gross_income" in gap["needs"]

@@ -39,13 +39,41 @@ CANONICAL_INPUTS = frozenset({
     "filing_status", "dependents", "tax_state",
     # Per-debt rows, so a payoff ORDER is computable rather than only an aggregate.
     "debt_list",
+    # Added 2026-10-12 — the tax- and planning-critical inputs. Each resolves from a REAL column
+    # that already existed; none is derived, estimated or defaulted. See financial_resolver.
+    "monthly_debts",              # asset_loans.monthly_payment + debts/liabilities.minimum_payment
+    "debt_minimum_payments",      # per-debt, so a payoff PLAN is computable
+    "capital_gain",               # investment_holdings: current_value - cost_basis (UNREALIZED)
+    "itemized_components", "adjusted_gross_income", "modified_agi", "qualifying_children",
+    "capital_gain_long_term",     # split by purchase_date, because the rates differ by up to 22pp
+    "capital_gain_short_term",
+    "annual_savings",             # cash_flow_snapshots.net_cash_flow, measured not self-reported
+    "monthly_expenses",           # user_financial_profile.monthly_expenses — PROMOTED from a turn
+                                  # input, because it is stored and should not be re-asked
+    "va_disability_rating",       # documents:va_award_letter — tax-free income, read since Sprint 20
+    "hsa_eligible", "hsa_balance", "fsa_election",   # the B2 tax-treatment rules
 })
 
 # Values the ADVISOR TURN supplies (parsed from the message or passed by the caller), not resolved
 # from stored data. Distinct from canonical inputs because they are per-turn and unpersisted.
 TURN_INPUTS = frozenset({
+    # `monthly_expenses` is ALSO canonical now (user_financial_profile). It stays here because a
+    # turn may override the stored figure — "what if I cut spending to $4,000?" — and the override
+    # must not be mistaken for the stored fact.
     "home_price_goal", "monthly_income", "monthly_expenses", "monthly_debt_payment",
     "savings_goal_amount", "savings_goal_months", "current_age", "target_retirement_age",
+    # Added 2026-10-12. These are genuinely per-turn and should NOT be stored: they describe a
+    # decision the user is weighing right now ("should I take the $400k lump sum?", "this degree
+    # costs $90k"), not a standing fact about them. Storing them would make a hypothetical look
+    # like a commitment on the next turn.
+    "down_payment", "monthly_rent",
+    "tuition_total", "years_in_school", "salary_before", "salary_after",
+    "lump_sum_amount", "spread_months",
+    "pension_lump_sum", "pension_annual_annuity",
+    "va_individual_ratings",
+    "offers",
+    # No column stores a fund expense ratio, so it only ever arrives in conversation.
+    "expense_ratio",
 })
 
 AVAILABLE = CANONICAL_INPUTS | TURN_INPUTS
@@ -110,7 +138,7 @@ REACHABLE: dict[str, Reach] = {r.calc_id: r for r in (
     _r("cash.months_covered", ("cash_balance", "monthly_expenses"), wired=True),
     _r("cash.emergency_fund_target", ("monthly_expenses",), wired=True),
     _r("cash.emergency_fund_gap", ("cash_balance", "monthly_expenses"), wired=True),
-    _r("money.future_value", ("investment_balance", "time_horizon"),
+    _r("money.future_value", ("investment_balance", "time_horizon"), wired=True,
        optional=("monthly_income",)),
     # Restates any projected balance in today's dollars. Not independently reachable — it is a
     # TRANSFORM on another calculator's output — so it is wired onto the retirement projection,
@@ -119,46 +147,68 @@ REACHABLE: dict[str, Reach] = {r.calc_id: r for r in (
                                    "target_retirement_age"), wired=True,
        note="the honest reframe of every projection: $2.1M in 30 years is ~$1.0M of today's "
             "purchasing power, and 52% of the headline is inflation rather than growth"),
-    _r("money.expense_ratio_drag", ("investment_balance", "time_horizon", "expense_ratio"),
+    _r("money.expense_ratio_drag", ("investment_balance", "time_horizon", "expense_ratio"), wired=True,
        note="the single most actionable number in a portfolio review — a 0.95% ratio on $500k over "
             "30 years costs 24% of the terminal balance. BLOCKED on the user's actual fund fees; a "
             "typical ratio would be an invented assumption about their portfolio"),
-    _r("money.lump_sum_vs_dca", ("lump_sum_amount", "spread_months")),
+    _r("money.lump_sum_vs_dca", ("lump_sum_amount", "spread_months"), wired=True),
     _r("retirement.pension_lump_sum_vs_annuity",
-       ("pension_lump_sum", "pension_annual_annuity", "current_age"),
+       ("pension_lump_sum", "pension_annual_annuity", "current_age"), wired=True,
        note="an irreversible, high-stakes election. Needs the two figures from the pension's own "
             "offer letter, which no canonical source holds — but it is a strong candidate for "
             "Document Intelligence extraction rather than a chat question"),
-    _r("debt.total_interest", ("home_price_goal",),
+    _r("debt.total_interest", ("home_price_goal",), wired=True,
        note="same registry-sourced scenario path as amortized_payment"),
 
     # BLOCKED ON INPUTS — the resolver cannot supply these yet.
-    _r("cash.savings_rate", ("income", "annual_savings")),
+    _r("cash.savings_rate", ("income", "annual_savings"), wired=True),
     # `monthly_debts` is the DTI input, and it needs actual monthly PAYMENTS — blocked on the same
     # missing minimum_payment column as debt.payoff_plan.
-    _r("housing.max_monthly_payment", ("income", "monthly_debts")),
-    _r("housing.max_home_price", ("income", "monthly_debts", "down_payment")),
-    _r("housing.rent_vs_buy", ("home_price_goal", "monthly_rent")),
-    _r("debt.payoff_plan", ("debt_list", "debt_minimum_payments"),
+    _r("housing.max_monthly_payment", ("income", "monthly_debts"), wired=True,
+       note="monthly_debts is reported MISSING when any debt's payment is unknown, because "
+            "understating obligations overstates what the borrower can afford"),
+    _r("housing.max_home_price", ("income", "monthly_debts", "down_payment"), wired=True),
+    _r("housing.rent_vs_buy", ("home_price_goal", "monthly_rent"), wired=True),
+    _r("debt.payoff_plan", ("debt_list", "debt_minimum_payments"), wired=True,
        note="BLOCKED ON A MIGRATION, not on wiring: finance.financial_accounts has no "
             "minimum_payment column, and months-to-debt-free plus total interest cannot be "
             "simulated without one. debt_list alone is enough for the ORDER, which is wired"),
     _r("debt.avalanche_order", ("debt_list",), wired=True),
-    _r("career.offer_total_comp", ("offers",)),
-    _r("education.degree_total_cost", ("tuition_total", "years_in_school", "salary_before")),
+    _r("career.offer_total_comp", ("offers",), wired=True),
+    _r("education.degree_total_cost", ("tuition_total", "years_in_school", "salary_before"),
+       wired=True),
     _r("education.degree_payback_years", ("tuition_total", "years_in_school", "salary_before",
-                                           "salary_after")),
+                                           "salary_after"), wired=True),
     _r("education.degree_lifetime_value", ("tuition_total", "years_in_school", "salary_before",
-                                            "salary_after")),
+                                            "salary_after"), wired=True),
     _r("tax.federal_income_tax", ("income", "filing_status"), wired=True),
     _r("tax.fica", ("income", "filing_status"), wired=True),
     _r("tax.state_income_tax", ("income", "filing_status", "tax_state"), wired=True),
-    _r("tax.capital_gains_tax", ("filing_status", "capital_gain")),
-    _r("tax.standard_vs_itemized", ("filing_status", "itemized_deductions")),
+    _r("tax.capital_gains_tax", ("filing_status", "capital_gain"), wired=True,
+       optional=("capital_gain_long_term", "capital_gain_short_term"),
+       note="the gain is UNREALIZED — what a sale today would trigger. Long/short are split by "
+            "purchase_date because the rates differ by up to 22 percentage points"),
+    _r("tax.standard_vs_itemized",
+       ("filing_status", "adjusted_gross_income", "itemized_components"), wired=True,
+       note="fed by tax.itemized_deductions, which turns the stored COMPONENTS into a capped "
+            "total. Kept distinct because this one answers 'is itemizing worth it' while that one "
+            "answers 'how much can I actually deduct'"),
+    _r("tax.itemized_deductions",
+       ("filing_status", "adjusted_gross_income", "itemized_components"), wired=True,
+       optional=("modified_agi",),
+       note="applies the IRC 164(b)(6) SALT cap AND its MAGI phase-down, plus the 7.5%-of-AGI "
+            "medical floor. Summing the raw components instead would overstate the itemized total "
+            "and recommend itemizing when the standard deduction wins. The IRC 68 2/37ths "
+            "limitation (new for 2026) is DETECTED and flagged, not modelled"),
     _r("tax.effective_marginal_rate", ("income", "filing_status"), wired=True,
        note="THE highest-value tax figure for the advisor — every Roth, pre-tax and raise question "
             "turns on it, and it needs only income + filing status"),
-    _r("tax.tax_credits", ("income", "filing_status", "dependents")),
+    _r("tax.tax_credits", ("income", "filing_status", "qualifying_children"), wired=True,
+       optional=("dependents",),
+       note="needs the CHILD count, not the dependent count: the child credit is $2,200 and the "
+            "other-dependent credit $500, so treating an adult dependent as a child overstates it "
+            "by $1,700 each. Chained off tax.federal_income_tax for tax-before-credits, because "
+            "nonrefundable credits can only reduce liability to zero"),
     _r("tax.bracket_headroom", ("income", "filing_status"), wired=True,
        note="how much more ordinary income fits before the next rate. Answers 'how big a bonus "
             "before it costs 32%', 'how much can I convert to Roth this year', 'how much gain can "
@@ -168,17 +218,17 @@ REACHABLE: dict[str, Reach] = {r.calc_id: r for r in (
     # to the resolver: `military.py` already reads a disability rating and monthly benefit off a
     # parsed VA award letter, and nothing carries them to the advisor. So the advisor cannot state a
     # veteran's own, tax-free, largest-single-line income — the figure they are most certain about.
-    _r("va.disability_compensation", ("va_disability_rating",),
+    _r("va.disability_compensation", ("va_disability_rating",), wired=True,
        optional=("va_dependent_parents", "va_children_under_18",
                  "va_children_over_18_in_school", "va_spouse_aid_attendance"),
        note="the rating already exists in documents (va_award_letter.disability_rating, read by "
             "military.py) — promoting it to the resolver is the whole of the work. Spouse comes "
             "from filing_status/dependents"),
-    _r("va.combined_rating", ("va_individual_ratings",),
+    _r("va.combined_rating", ("va_individual_ratings",), wired=True,
        note="a TURN input in practice ('I'm rated 60 for my back and 30 for tinnitus'), and worth "
             "wiring because veterans systematically over-estimate the combined figure: 60 and 30 "
             "combine to 70, not 90"),
-    _r("va.dic", (),
+    _r("va.dic", (), wired=True,
        note="needs no user input at all beyond optional flags — the surviving-spouse base rate is "
             "flat. Reachable TODAY, and it is the number a veteran's spouse most needs before the "
             "death rather than after"),

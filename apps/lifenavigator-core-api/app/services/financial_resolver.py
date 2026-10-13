@@ -9,6 +9,8 @@ silent default.
 """
 from __future__ import annotations
 
+import asyncio
+from datetime import date, datetime
 from typing import Any, Optional
 
 from ..models.common import UserContext
@@ -88,6 +90,45 @@ def _field(value: Any, source: str, *, origin: str = "", present: Optional[bool]
             "unlocks": unlocks or []}
 
 
+# ── Helpers for the tax- and planning-critical inputs ─────────────────────────────────────────────
+#
+# WHY A COLUMN-NAME FALLBACK IS NOT DEFENSIVE PROGRAMMING FOR ITS OWN SAKE
+# ------------------------------------------------------------------------
+# `finance.debts` is defined TWICE in the migrations with different column names: 062 uses
+# (current_balance, interest_rate) and 117 — whose own comment says "finance.debts was defined in
+# 062 but never applied to prod; define here" — uses (balance, apr). Both are CREATE TABLE IF NOT
+# EXISTS, so which spelling production actually has depends on which migration ran first, and that
+# is not knowable from the repo. Reading one spelling would return nothing and, because `_rows`
+# swallows errors, would do so SILENTLY: a user with $40,000 of credit-card debt would look
+# debt-free and be told they can afford a larger house. So each figure is read by trying the known
+# spellings in order.
+def _first(row: dict, *keys: str) -> Optional[float]:
+    for k in keys:
+        v = _num(row.get(k))
+        if v is not None:
+            return v
+    return None
+
+
+def _is_long_term(raw: Any) -> Optional[bool]:
+    """True when a holding has been held more than a year, or None when the date is unusable.
+
+    THE REASON THIS IS NOT A DETAIL. Long-term gain is taxed at 0/15/20%; short-term gain is taxed
+    as ordinary income, up to 37%. Treating one as the other misstates the tax on a sale by more
+    than half, so an unparseable date yields None and the holding is reported separately rather
+    than assumed long-term — the assumption that happens to flatter the answer.
+    """
+    if not raw:
+        return None
+    text = str(raw).strip()[:10]
+    try:
+        bought = datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+    return (date.today() - bought).days > 365
+
+
+
 class FinancialInputResolver:
     def __init__(self, supabase: Any, comp: Any = None) -> None:
         self._sb = supabase
@@ -101,12 +142,26 @@ class FinancialInputResolver:
 
     async def resolve(self, ctx: UserContext) -> dict[str, Any]:
         uid = ctx.user_id
-        accounts = await self._rows("financial_accounts", "finance", uid=uid)
-        assets = await self._rows("assets", "finance", uid=uid)
-        plans = await self._rows("retirement_plans", "finance", uid=uid)
-        docs = {d.get("doc_type"): (d.get("extracted_json") or {}) for d in await self._rows("documents", "documents", uid=uid)}
-        risk = await self._rows("risk_profiles", "life", uid=uid)
-        vis = await self._rows("life_vision", "life", uid=uid)
+        # Fetched CONCURRENTLY. This was six sequential awaits and is now thirteen tables; run in
+        # series the added tax and planning inputs would have roughly doubled the resolver's
+        # latency on every advisor turn, for queries that do not depend on each other.
+        (accounts, assets, plans, doc_rows, risk, vis,
+         loan_rows, debt_rows, liability_rows, holdings, cashflows, profiles) = await asyncio.gather(
+            self._rows("financial_accounts", "finance", uid=uid),
+            self._rows("assets", "finance", uid=uid),
+            self._rows("retirement_plans", "finance", uid=uid),
+            self._rows("documents", "documents", uid=uid),
+            self._rows("risk_profiles", "life", uid=uid),
+            self._rows("life_vision", "life", uid=uid),
+            self._rows("asset_loans", "finance", uid=uid),
+            self._rows("debts", "finance", uid=uid),
+            self._rows("liabilities", "finance", uid=uid),
+            self._rows("investment_holdings", "finance", uid=uid),
+            self._rows("cash_flow_snapshots", "finance", uid=uid),
+            self._rows("user_financial_profile", "finance", uid=uid),
+        )
+        docs = {d.get("doc_type"): (d.get("extracted_json") or {}) for d in doc_rows}
+        profile = profiles[0] if profiles else {}
 
         # how each finance row got here (persona connect vs manual)
         acct_source = _acct_source(accounts)  # honest: Plaid only with a real marker; synthetic-beta labeled distinctly
@@ -169,6 +224,115 @@ class FinancialInputResolver:
         dependents = _num(tax_row.get("dependents"))
         tax_state = (str(tax_row.get("state")).strip().upper() or None) if tax_row.get("state") else None
 
+        # ── Monthly debt service, for DTI ────────────────────────────────────────────────────
+        #
+        # WHY AN INCOMPLETE FIGURE IS REPORTED AS MISSING RATHER THAN AS A SUM.
+        # `monthly_debts` feeds `housing.max_home_price` and `housing.max_monthly_payment`, where
+        # it is SUBTRACTED from the borrower's capacity. Understating it therefore OVERSTATES how
+        # much house someone can afford — the single most expensive direction to be wrong in this
+        # whole resolver. So a debt whose payment is unknown does not quietly contribute zero: it
+        # makes the entire input absent, and the prompt names how many debts need a figure.
+        debt_payments: list[dict[str, Any]] = []
+        debts_missing_payment: list[str] = []
+        for row, label_keys, pay_keys, bal_keys, apr_keys in (
+            # Asset-backed loans (mortgage, auto, HELOC) live in their own canonical table, and
+            # their `monthly_payment` is the full payment rather than a minimum.
+            *[(r, ("loan_type",), ("monthly_payment",), ("current_balance",), ("interest_rate",))
+              for r in loan_rows if r.get("is_active") is not False],
+            *[(r, ("debt_name", "debt_type"), ("minimum_payment",),
+               ("current_balance", "balance"), ("interest_rate", "apr"))
+              for r in debt_rows if r.get("is_active") is not False],
+            *[(r, ("name", "liability_type"), ("minimum_payment",), ("balance",),
+               ("interest_rate",)) for r in liability_rows],
+        ):
+            label = next((str(row.get(k)) for k in label_keys if row.get(k)), "debt")
+            balance = _first(row, *bal_keys) or 0.0
+            if balance <= 0:
+                continue                      # a cleared debt has no payment to make
+            payment = _first(row, *pay_keys)
+            if payment is None:
+                debts_missing_payment.append(label)
+                continue
+            debt_payments.append({"label": label, "balance": balance, "apr": _first(row, *apr_keys),
+                                  "minimum_payment": payment})
+
+        have_debt_data = bool(loan_rows or debt_rows or liability_rows or debt_accts)
+        monthly_debts_total = round(sum(d["minimum_payment"] for d in debt_payments), 2)
+        # Zero is a REAL, knowable answer — a debt-free borrower — but `_field` treats 0 as absent,
+        # so `present` is passed explicitly. Without this a debt-free user, who is in the BEST
+        # position to buy, would have been told their debt figure was missing.
+        monthly_debts_known = have_debt_data and not debts_missing_payment
+
+        # ── Unrealized capital gain, for tax planning ────────────────────────────────────────────
+        gain_long = gain_short = 0.0
+        gain_unknown_term = 0.0
+        holdings_missing_basis: list[str] = []
+        for h in holdings:
+            value = _num(h.get("current_value"))
+            basis = _num(h.get("cost_basis"))
+            symbol = str(h.get("symbol") or h.get("name") or "holding")
+            if value is None or basis is None:
+                holdings_missing_basis.append(symbol)
+                continue
+            gain = value - basis
+            term = _is_long_term(h.get("purchase_date"))
+            if term is True:
+                gain_long += gain
+            elif term is False:
+                gain_short += gain
+            else:
+                gain_unknown_term += gain
+        priced_holdings = [h for h in holdings
+                           if _num(h.get("current_value")) is not None
+                           and _num(h.get("cost_basis")) is not None]
+        total_gain = round(gain_long + gain_short + gain_unknown_term, 2)
+
+        # ── Savings, expenses, and the tax-advantaged account facts ──────────────────────────────
+        # Most recent completed period wins; `net_cash_flow` is measured rather than self-reported,
+        # so it is preferred over the onboarding figure.
+        latest_cf = max(cashflows, key=lambda r: str(r.get("period_end") or ""), default=None) \
+            if cashflows else None
+        annual_savings = None
+        savings_origin = ""
+        if latest_cf is not None and _num(latest_cf.get("net_cash_flow")) is not None:
+            annual_savings = round((_num(latest_cf.get("net_cash_flow")) or 0.0) * 12, 2)
+            savings_origin = "finance.cash_flow_snapshots.net_cash_flow (x12)"
+        elif _num(profile.get("monthly_discretionary_income")) is not None:
+            annual_savings = round((_num(profile.get("monthly_discretionary_income")) or 0.0) * 12, 2)
+            savings_origin = "finance.user_financial_profile.monthly_discretionary_income (x12)"
+
+        monthly_expenses_val = _num(profile.get("monthly_expenses"))
+        expenses_origin = "finance.user_financial_profile.monthly_expenses"
+        if monthly_expenses_val is None and latest_cf is not None:
+            monthly_expenses_val = _num(latest_cf.get("total_expenses"))
+            expenses_origin = "finance.cash_flow_snapshots.total_expenses"
+
+        # ── VA disability, already parsed and never carried forward ──────────────────────────────
+        # `military.py` has read `disability_rating` off a parsed VA award letter since Sprint 20
+        # and nothing ever carried it to the advisor — so the advisor could not state a veteran's
+        # largest, most certain and entirely tax-free income line.
+        # ── Itemized deduction components (migration 20261012000000) ────────────────────────────
+        # Stored as amounts PAID, never pre-capped: the SALT cap, its MAGI phase-down and the 7.5%
+        # medical floor are applied by `tax.itemized_deductions` on every run, so a change in the
+        # law reaches the user's answer without touching their record.
+        itemized_components = {
+            "state_local_taxes": _num(tax_row.get("state_local_taxes_paid")),
+            "mortgage_interest": _num(tax_row.get("mortgage_interest_paid")),
+            "charitable_contributions": _num(tax_row.get("charitable_contributions")),
+            "medical_expenses": _num(tax_row.get("medical_expenses_paid")),
+            "other_itemized": _num(tax_row.get("other_itemized_deductions")),
+        }
+        stated_components = {k: v for k, v in itemized_components.items() if v is not None}
+        agi = _num(tax_row.get("adjusted_gross_income"))
+        magi_val = _num(tax_row.get("modified_agi"))
+        qualifying_children = _num(tax_row.get("qualifying_children_under_17"))
+
+        va_doc = docs.get("va_award_letter") or {}
+        va_rating = _num(va_doc.get("disability_rating"))
+        if va_rating is not None and 0 < va_rating <= 1:
+            va_rating = va_rating * 100          # a rating stored as 0.70 rather than 70
+        va_rating = round(va_rating) if va_rating is not None else None
+
         last_updated = next((a.get("last_synced_at") for a in accounts if a.get("last_synced_at")), None)
         inputs = {
             "income": _field(income, income_src, origin="documents:offer_letter / compensation", confidence=0.85,
@@ -212,10 +376,118 @@ class FinancialInputResolver:
             "tax_state": _field(tax_state, DOC if tax_state else MISSING,
                                 origin="finance.tax_profiles.state", confidence=0.95,
                                 prompt="Which state do you file in?", unlocks=["state income tax"]),
+
+            # ── Added 2026-10-12: the tax and financial-planning inputs ─────────────────────────
+            "monthly_debts": _field(
+                monthly_debts_total, MANUAL, present=monthly_debts_known,
+                origin="finance.asset_loans.monthly_payment + finance.debts.minimum_payment + "
+                       "finance.liabilities.minimum_payment",
+                confidence=0.9,
+                prompt=(f"What are the minimum monthly payments on {len(debts_missing_payment)} of "
+                        f"your debts ({', '.join(debts_missing_payment[:3])})? Without them we "
+                        f"would understate your obligations and overstate what you can borrow."
+                        if debts_missing_payment else
+                        "Add your debts and their monthly payments to unlock home affordability."),
+                unlocks=["home affordability", "max monthly payment", "debt-to-income"]),
+            "debt_minimum_payments": _field(
+                debt_payments or None, MANUAL, present=bool(debt_payments) and monthly_debts_known,
+                origin="finance.debts + finance.liabilities + finance.asset_loans (per-debt)",
+                confidence=0.9,
+                prompt="Add the minimum payment on each debt so we can build a payoff plan.",
+                unlocks=["payoff plan", "avalanche vs snowball", "interest saved"]),
+            "capital_gain": _field(
+                total_gain, MANUAL, present=bool(priced_holdings),
+                origin="finance.investment_holdings (current_value - cost_basis)", confidence=0.85,
+                prompt=("Add the cost basis for your holdings so we can work out the tax on a sale."
+                        if holdings else
+                        "Add your investment holdings to unlock capital-gains planning."),
+                unlocks=["tax on a sale", "tax-gain harvesting", "bracket planning"]),
+            "capital_gain_long_term": _field(
+                round(gain_long, 2), MANUAL, present=bool(priced_holdings),
+                origin="finance.investment_holdings held > 1 year", confidence=0.85,
+                prompt="Add purchase dates so we can split long- from short-term gain.",
+                unlocks=["0/15/20% long-term rates"]),
+            "capital_gain_short_term": _field(
+                round(gain_short, 2), MANUAL, present=bool(priced_holdings),
+                origin="finance.investment_holdings held <= 1 year", confidence=0.85,
+                prompt="Add purchase dates so we can split long- from short-term gain.",
+                unlocks=["short-term gain taxed as ordinary income"]),
+            "annual_savings": _field(
+                annual_savings, MANUAL, present=annual_savings is not None,
+                origin=savings_origin, confidence=0.85,
+                prompt="How much are you saving each month?",
+                unlocks=["savings rate", "goal funding"]),
+            "monthly_expenses": _field(
+                monthly_expenses_val, ADVISOR if monthly_expenses_val is not None else MISSING,
+                present=monthly_expenses_val is not None, origin=expenses_origin, confidence=0.85,
+                prompt="What do you spend in a typical month?",
+                unlocks=["monthly surplus", "emergency-fund months", "savings rate"]),
+            "va_disability_rating": _field(
+                va_rating, DOC, present=va_rating is not None,
+                origin="documents:va_award_letter.disability_rating", confidence=0.9,
+                prompt="What is your VA combined disability rating?",
+                unlocks=["VA compensation (tax-free)", "survivor income cliff"]),
+            "hsa_eligible": _field(
+                profile.get("hsa_eligible"), ADVISOR,
+                present=profile.get("hsa_eligible") is not None,
+                origin="finance.user_financial_profile.hsa_eligible", confidence=0.85,
+                prompt="Are you covered by a high-deductible health plan (HSA-eligible)?",
+                unlocks=["HSA triple-tax treatment", "HDHP vs PPO comparison"]),
+            "hsa_balance": _field(
+                _num(profile.get("hsa_current_balance")), ADVISOR,
+                present=_num(profile.get("hsa_current_balance")) is not None,
+                origin="finance.user_financial_profile.hsa_current_balance", confidence=0.85,
+                prompt="What is your current HSA balance?", unlocks=["HSA as a retirement account"]),
+            "itemized_components": _field(
+                stated_components or None, DOC, present=bool(stated_components),
+                origin="finance.tax_profiles (state_local_taxes_paid, mortgage_interest_paid, "
+                       "charitable_contributions, medical_expenses_paid, other_itemized_deductions)",
+                confidence=0.9,
+                prompt=("What did you pay in state and local taxes, mortgage interest, charitable "
+                        "gifts and unreimbursed medical costs? We apply the caps — you give the "
+                        "amounts paid."),
+                unlocks=["itemize vs standard deduction", "SALT cap and phase-down",
+                         "medical-expense floor", "bunching strategy"]),
+            "adjusted_gross_income": _field(
+                agi, DOC, present=agi is not None,
+                origin="finance.tax_profiles.adjusted_gross_income", confidence=0.95,
+                prompt="What was your adjusted gross income? It sets the medical-expense floor.",
+                unlocks=["medical-expense deduction", "itemize vs standard"]),
+            "qualifying_children": _field(
+                int(qualifying_children) if qualifying_children is not None else None, DOC,
+                present=qualifying_children is not None,
+                origin="finance.tax_profiles.qualifying_children_under_17", confidence=0.95,
+                prompt=("How many of your dependents are children under 17? The child credit is "
+                        "$2,200 and the other-dependent credit is $500, so the split changes the "
+                        "number."),
+                unlocks=["child tax credit", "other-dependent credit"]),
+            "modified_agi": _field(
+                magi_val, DOC, present=magi_val is not None,
+                origin="finance.tax_profiles.modified_agi", confidence=0.95,
+                prompt="What is your modified AGI? It drives the SALT phase-down above $505,000.",
+                unlocks=["SALT phase-down"]),
+            "fsa_election": _field(
+                _num(profile.get("fsa_election_amount")), ADVISOR,
+                present=_num(profile.get("fsa_election_amount")) is not None,
+                origin="finance.user_financial_profile.fsa_election_amount", confidence=0.85,
+                prompt="How much did you elect to your FSA this year?",
+                unlocks=["limited-purpose FSA alongside an HSA", "use-it-or-lose-it timing"]),
+        }
+        # Provenance the calculators need but that is not itself an input: WHICH figures were
+        # incomplete, so the advisor can say "this excludes two holdings with no cost basis" rather
+        # than presenting a partial total as a complete one.
+        caveats = {
+            "debts_missing_payment": debts_missing_payment,
+            "holdings_missing_cost_basis": holdings_missing_basis,
+            "capital_gain_unknown_term": round(gain_unknown_term, 2),
+            "capital_gain_is_unrealized": True,
+            "itemized_components_stated": sorted(stated_components),
+            "itemized_components_absent": sorted(set(itemized_components) - set(stated_components)),
         }
         missing = [{"input": k2, "prompt": v["prompt"], "unlocks": v["unlocks"]} for k2, v in inputs.items() if not v["present"]]
         return {"inputs": inputs, "present_count": sum(1 for v in inputs.values() if v["present"]),
                 "total": len(inputs), "missing": missing, "last_updated": last_updated,
+                "caveats": caveats,
                 "note": "Every value resolves from Supabase with its source; missing inputs are named, never defaulted."}
 
     async def summary(self, ctx: UserContext) -> dict[str, Any]:

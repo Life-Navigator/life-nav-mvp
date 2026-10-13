@@ -183,6 +183,67 @@ All of Phase F, and all of it is a readout rather than a formula.
 
 ### Milestone 3 — the advisor can actually say it
 
+> **Status 2026-10-12: the INPUT half of Milestone 3 is done. 40 of 40 advisor-facing calculators
+> are wired; 0 are blocked on inputs** (was 19 wired / 16 blocked). The remaining Milestone 3 work
+> is the 11 `TreatmentResult` rules and persistence.
+>
+> The gap was never the calculators — it was that they could not get their inputs, so the advice
+> was computed from whatever happened to be reachable. Everything below resolves from a **real
+> column that already existed**; nothing is derived, estimated or defaulted.
+>
+> | Input                                                                 | Source                                                                     | Unblocked                                       |
+> | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------- |
+> | `monthly_debts`, `debt_minimum_payments`                              | `asset_loans.monthly_payment` + `debts`/`liabilities.minimum_payment`      | home affordability, payoff plan, total interest |
+> | `capital_gain` (+ long/short split)                                   | `investment_holdings.current_value - cost_basis`, split by `purchase_date` | capital-gains tax, bracket planning             |
+> | `annual_savings`, `monthly_expenses`                                  | `cash_flow_snapshots.net_cash_flow`, `user_financial_profile`              | savings rate, surplus                           |
+> | `va_disability_rating`                                                | `documents:va_award_letter` — read since Sprint 20, never carried          | VA compensation, DIC                            |
+> | `itemized_components`, `adjusted_gross_income`, `qualifying_children` | `finance.tax_profiles` (**migration 20261012000000**)                      | itemize vs standard, credits                    |
+> | `hsa_eligible`, `hsa_balance`, `fsa_election`                         | `user_financial_profile`                                                   | the B2 treatment rules                          |
+>
+> **The most consequential new piece is `tax.itemized_deductions`.** Three of the four large
+> itemized categories are capped or floored, so the obvious move — add up the components — is wrong
+> by thousands and recommends itemizing to people for whom the standard deduction wins. It now
+> applies the IRC 164(b)(6) SALT cap ($40,400 for 2026) **and its MAGI phase-down** (30 cents per
+> dollar above $505,000, never below $10,000) and the 7.5%-of-AGI medical floor (IRC 213(a)). The
+> IRC 68 2/37ths limitation, new for 2026, is **detected and flagged rather than modelled** —
+> it hits exactly the households most likely to itemize, so silence there would overstate their
+> deduction.
+>
+> Five things were found while wiring, each one a wrong answer rather than a tidiness issue:
+>
+> 1. **`finance.debts` is defined twice with different column names.** 062 uses
+>    `(current_balance, interest_rate)`; 117 — whose own comment says 062 "was never applied to
+>    prod" — uses `(balance, apr)`. Both are `CREATE TABLE IF NOT EXISTS`, so which spelling
+>    production has is not knowable from the repo, and because `_rows` swallows errors, reading the
+>    wrong one would have made a user with $40,000 of debt look **debt-free** and told them they
+>    could afford a larger house. Both spellings are now read.
+> 2. **An incomplete debt total is reported as MISSING, not as a sum.** `monthly_debts` is
+>    subtracted from borrowing capacity, so omitting a debt _overstates_ affordability — the one
+>    direction of error a buyer never catches. Zero, by contrast, is a real answer, and `_field`
+>    treated `0` as absent, so a debt-free borrower was being told their debt figure was unknown.
+> 3. **`tax.capital_gains_tax` wants ordinary TAXABLE income**, not gross. It now chains off the
+>    federal result; passing gross would stack the gain too high in the 0/15/20% bands.
+> 4. **`tax.tax_credits` needs the CHILD count, not the dependent count** — $2,200 vs $500, so an
+>    adult dependent counted as a child overstates the credit by $1,700. The split is stored
+>    (migration) and the calculator stays a named gap until it is known.
+> 5. **A cross-year mix that biases the itemize verdict.** `tax_tables` is verification-gated and
+>    falls back to the newest _verified_ year while `tax_parameters` is not, so a 2026 SALT cap was
+>    being compared against the **2024** standard deduction ($29,200 instead of $32,200) — too low,
+>    biasing toward itemizing. The verdict is now recomputed against both years and reported as a
+>    decision only when it does not flip.
+>
+> Two structural gates were added because both inventories had silently drifted: the advisor-test
+> resolver stub now derives its key set from `CANONICAL_INPUTS` (it was hand-maintained, so the
+> "complete profile" test had quietly stopped being complete), and a new test asserts every
+> declared canonical input is actually produced by the resolver.
+>
+> **Owner actions:** apply migration `20261012000000_tax_itemized_components.sql`; have the CPA
+> verify the 2026 SALT/medical parameters and the 2024 `credits` section (`tax.tax_credits`
+> currently returns a spoken refusal because the credits are ungated-unverified by design).
+>
+> Still genuinely unreachable: nothing. `money.expense_ratio_drag` has no stored column for an
+> expense ratio and arrives per turn, which is correct — it describes a fund, not the user.
+
 Largest gap between _built_ and _useful_: **0 of 11 treatment rules reach the advisor**, and 11
 calculators are blocked on inputs.
 

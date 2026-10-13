@@ -911,3 +911,188 @@ def tax_credits(*, agi: float, filing_status: str, tax_before_credits: float = 0
                                  "refundable, so an error lands on the filers least able to absorb it",
                 "table_provenance": t.provenance},
     )
+
+
+# ── Itemized deductions, with the caps actually applied ───────────────────────────────────────────
+#
+# WHY THIS EXISTS RATHER THAN A SUM IN THE RESOLVER
+# ------------------------------------------------
+# `standard_vs_itemized` takes ONE figure, so something has to turn a user's receipts into it. The
+# obvious move — add up mortgage interest, state and local taxes, charity and medical — is wrong by
+# thousands of dollars, because three of those four are capped or floored:
+#
+#   * STATE AND LOCAL TAXES are capped (IRC 164(b)(6)). For 2026 the cap is $40,400, but it phases
+#     DOWN by 30 cents per dollar of MAGI above $505,000 and never below $10,000. A high earner in
+#     a high-tax state who paid $60,000 of SALT may deduct $10,000 of it.
+#   * MEDICAL EXPENSES only count above 7.5% of AGI (IRC 213(a)). A household with $100,000 of AGI
+#     and $6,000 of medical bills deducts nothing.
+#   * MORTGAGE INTEREST is limited to interest on $750,000 of acquisition debt, which
+#     `tax_debt_interest` already models.
+#
+# Summing the raw components would overstate the itemized total and tell someone to itemize — and
+# to spend money chasing deductions — when the standard deduction actually wins. That is advice
+# that costs the user real money, which is why the caps live in the engine and not in a comment.
+_SALT_PHASE_DOWN_SUNSET_YEAR = 2029
+
+
+@register("tax.itemized_deductions")
+def itemized_deductions(*, filing_status: str, agi: float,
+                        state_local_taxes: float = 0.0,
+                        mortgage_interest: float = 0.0,
+                        charitable_contributions: float = 0.0,
+                        medical_expenses: float = 0.0,
+                        other_itemized: float = 0.0,
+                        magi: Optional[float] = None,
+                        tax_year: Optional[int] = None) -> CalcResult:
+    """The deductible itemized total, after the SALT cap and the medical AGI floor.
+
+    `magi` defaults to `agi` for the SALT phase-down, which is correct for the great majority of
+    filers — the modifications only matter with foreign or possession income.
+    """
+    status = _status(filing_status)
+    agi_v = require_money("agi", agi)
+    magi_v = require_money("magi", magi) if magi is not None else agi_v
+    salt_paid = require_money("state_local_taxes", state_local_taxes)
+    interest = require_money("mortgage_interest", mortgage_interest)
+    charity = require_money("charitable_contributions", charitable_contributions)
+    medical_paid = require_money("medical_expenses", medical_expenses)
+    other = require_money("other_itemized", other_itemized)
+
+    p = V.load("tax_parameters", tax_year)
+    it = p.data["itemized"]
+
+    # SALT: cap, then phase the cap down, then floor it.
+    cap = float(it["salt_cap"][status])
+    threshold = float(it["salt_phase_down_threshold"][status])
+    floor = float(it["salt_floor"][status])
+    rate = float(it["salt_phase_down_rate"])
+    reduced_cap = cap
+    if magi_v > threshold:
+        reduced_cap = max(floor, cap - rate * (magi_v - threshold))
+    salt_allowed = min(salt_paid, reduced_cap)
+
+    # Medical: only the excess over the AGI floor counts.
+    med_floor_rate = float(it["medical_agi_floor"])
+    med_floor = agi_v * med_floor_rate
+    medical_allowed = max(0.0, medical_paid - med_floor)
+
+    total = salt_allowed + interest + charity + medical_allowed + other
+
+    t = _table(tax_year)
+    standard = float(t.data["standard_deduction"][status])
+
+    # CROSS-YEAR MIXING, MADE VISIBLE RATHER THAN ABSORBED.
+    #
+    # `tax_tables` is verification-gated and falls back to the newest VERIFIED year; `tax_parameters`
+    # is not, by deliberate design (the rule matters more than the threshold). The consequence is
+    # that this one comparison can put a 2026 SALT cap against a 2024 standard deduction — and in
+    # that direction the standard deduction is too LOW, so `should_itemize` is biased toward
+    # itemizing. Observed live: a $40,400 cap compared against $29,200 instead of $32,200.
+    #
+    # So when the years diverge, the verdict is recomputed against the parameter year's own
+    # standard deduction and reported as ROBUST only if both years agree. A verdict that flips is
+    # not a verdict, and saying so is the only honest option.
+    years_mixed = p.year_used != t.year_used
+    standard_param_year: Optional[float] = None
+    verdict_robust = True
+    if years_mixed:
+        try:
+            alt = V.load("tax_tables", p.year_used)
+            standard_param_year = float(alt.data["standard_deduction"][status])
+        except Exception:  # noqa: BLE001 — the parameter year may have no table at all
+            standard_param_year = None
+
+    # IRC 68, new for 2026: itemized deductions are reduced for taxpayers in the top bracket. NOT
+    # modelled — so rather than quietly overstating the benefit for exactly the households most
+    # likely to itemize, exposure is DETECTED and said out loud.
+    top_rate = float(it["section_68_bracket"])
+    # The table stores each bracket's CEILING (`upto`, null for the top one), so the 37% bracket
+    # BEGINS where the 35% bracket ends — the previous row's ceiling, not a `threshold` field.
+    rows = t.data["ordinary_brackets"][status]
+    top_threshold = None
+    for i, b in enumerate(rows):
+        if abs(float(b["rate"]) - top_rate) < 1e-9 and i > 0:
+            top_threshold = float(rows[i - 1]["upto"])
+            break
+    section_68_applies = top_threshold is not None and agi_v > top_threshold
+
+    if standard_param_year is not None:
+        verdict_robust = (total > standard) == (total > standard_param_year)
+
+    limitations = [
+        "Mortgage interest is passed through as given; the $750,000 acquisition-debt limit is "
+        "applied by tax_debt_interest.mortgage_interest_deductible, not here.",
+        "Charitable contributions are passed through as given; the AGI percentage limits "
+        "(60%/30%/20% by gift and donee type) are not modelled.",
+    ]
+    if years_mixed and standard_param_year is not None and not verdict_robust:
+        limitations.append(
+            f"THE ITEMIZE/STANDARD VERDICT IS NOT ROBUST. The caps come from {p.year_used} but the "
+            f"verified standard deduction is {t.year_used}'s (${standard:,.0f} vs "
+            f"${standard_param_year:,.0f} for {p.year_used}). The answer FLIPS between them, so "
+            f"this is not yet a decision — it needs the {p.year_used} table verified.")
+    elif years_mixed and standard_param_year is not None:
+        limitations.append(
+            f"The caps are {p.year_used} figures and the verified standard deduction is "
+            f"{t.year_used}'s (${standard:,.0f} vs ${standard_param_year:,.0f}), but the verdict "
+            f"is the same either way, so the conclusion holds.")
+    if section_68_applies:
+        limitations.append(
+            f"IRC 68 APPLIES AND IS NOT MODELLED. From 2026 itemized deductions are reduced by "
+            f"2/37 of the lesser of the itemized total or the excess of taxable income over the "
+            f"{top_rate:.0%} bracket threshold (${top_threshold:,.0f}). This AGI is above that "
+            f"threshold, so the figure here OVERSTATES the deduction. Have a CPA confirm it.")
+
+    assumptions = list(_carry_forward_note(t))
+    if not p.data.get("_meta", {}).get("verified"):
+        assumptions.append(Assumption(
+            key="itemized_parameters_unverified", value=p.year_used,
+            rationale=(f"The {p.year_used} SALT cap, phase-down threshold and medical floor are "
+                       f"sourced but not yet verified by a human.")))
+    if magi is None and magi_v > threshold:
+        assumptions.append(Assumption(
+            key="magi_equals_agi", value=round(agi_v, 2),
+            rationale=("MAGI was not supplied, so AGI stands in for it in the SALT phase-down. "
+                       "They differ only with foreign or US-possession income.")))
+
+    return CalcResult(
+        calculator="tax.itemized_deductions",
+        label="deductible itemized total",
+        value=round(total, 2), unit="usd",
+        tier=SCENARIO if assumptions else STRICT,
+        inputs_used={"filing_status": status, "agi": agi_v, "magi": magi_v,
+                     "state_local_taxes": salt_paid, "mortgage_interest": interest,
+                     "charitable_contributions": charity, "medical_expenses": medical_paid,
+                     "other_itemized": other, "tax_year": t.year_used},
+        assumptions=tuple(assumptions),
+        detail={
+            "salt_paid": round(salt_paid, 2),
+            "salt_allowed": round(salt_allowed, 2),
+            "salt_cap": round(cap, 2),
+            "salt_cap_after_phase_down": round(reduced_cap, 2),
+            "salt_disallowed": round(salt_paid - salt_allowed, 2),
+            "salt_phase_down_applies": magi_v > threshold,
+            "salt_cap_reverts_to_floor_after": _SALT_PHASE_DOWN_SUNSET_YEAR,
+            "medical_paid": round(medical_paid, 2),
+            "medical_floor": round(med_floor, 2),
+            "medical_allowed": round(medical_allowed, 2),
+            "medical_disallowed": round(medical_paid - medical_allowed, 2),
+            "mortgage_interest": round(interest, 2),
+            "charitable_contributions": round(charity, 2),
+            "other_itemized": round(other, 2),
+            "standard_deduction": standard,
+            "should_itemize": total > standard,
+            "benefit_over_standard": round(max(0.0, total - standard), 2),
+            "shortfall_to_itemize": round(max(0.0, standard - total), 2),
+            "parameter_year": p.year_used,
+            "standard_deduction_year": t.year_used,
+            "years_mixed": years_mixed,
+            "standard_deduction_parameter_year": standard_param_year,
+            "verdict_robust_across_years": verdict_robust,
+            "section_68_applies": section_68_applies,
+            "section_68_threshold": top_threshold,
+            "limitations": limitations,
+            "parameters_provenance": p.provenance,
+            "table_provenance": t.provenance,
+        },
+    )

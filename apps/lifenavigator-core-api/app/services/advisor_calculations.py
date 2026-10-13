@@ -49,9 +49,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
-from .calculators import CalcResult, CalculatorError, cash, career, debt, money, retirement
+from .calculators import (CalcResult, CalculatorError, cash, career, debt, education, housing,
+                          money, retirement)
 from .calculators import tax as tax_calc
 from .calculators import versioned_data as _vd
+from .calculators import va_disability as va
 
 log = logging.getLogger("core.advisor.calculations")
 
@@ -75,6 +77,24 @@ def _as_decimal_rate(raw: Any) -> Optional[float]:
     if v != v or v <= 0:  # NaN or non-positive
         return None
     return v / 100.0 if v > _RATE_IS_PERCENT_ABOVE else v
+
+
+def _months_to_clear(balance: float, apr: float, payment: float) -> Optional[int]:
+    """Months for a fixed payment to clear a balance, or None when it never does.
+
+    `debt.total_interest` needs a TERM, and a minimum payment implies one rather than stating it.
+    Returns None when the payment does not cover the interest — the honest answer, and the case
+    that produced "600-month payoffs" in the engine this replaced.
+    """
+    monthly = apr / 12.0
+    if payment <= balance * monthly:
+        return None
+    n = 0
+    bal = balance
+    while bal > 0 and n < 600:
+        bal = bal * (1 + monthly) - payment
+        n += 1
+    return n if bal <= 0 else None
 
 
 def _present(inputs: dict[str, Any], key: str) -> Optional[Any]:
@@ -111,8 +131,23 @@ class AdvisorCalculationPlanner:
         current_age: Optional[int] = None,
         target_retirement_age: Optional[int] = None,
         tax_year: Optional[int] = None,
+        turn: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
-        """Run every calculator this user's real data supports. Never raises into the turn."""
+        """Run every calculator this user's real data supports. Never raises into the turn.
+
+        `turn` carries the DECISION the user is weighing right now — a degree's cost, a pension
+        offer, a lump sum, the individual ratings on a VA letter. These are deliberately not
+        stored and not resolved: they describe a hypothetical, and persisting one would make it
+        look like a standing fact on the next turn ("your tuition is $90,000"). Supplying them
+        here, per turn, is what makes the education, pension, lump-sum and combined-rating
+        calculators reachable at all.
+        """
+        t = turn or {}
+
+        def _tv(key: str) -> Optional[Any]:
+            """A turn value, or None. Never a default — same rule as the resolver."""
+            v = t.get(key)
+            return v if v not in (None, "") else None
         try:
             resolved = await self._resolver.resolve(ctx)
             inputs = resolved.get("inputs") or {}
@@ -309,12 +344,24 @@ class AdvisorCalculationPlanner:
                 except Exception as exc:  # noqa: BLE001
                     log.warning("tax calculator %s failed: %s", getattr(fn, "calc_id", fn), exc)
 
+            def run_tax_get(fn: Any, **kwargs: Any) -> Optional[CalcResult]:
+                """As `run_tax`, but hands the result back so a later calculator can CHAIN off it.
+
+                Needed because two of these take figures only the federal calculation knows.
+                `tax.capital_gains_tax` wants ORDINARY TAXABLE income — passing gross income would
+                place the gain too high in the 0/15/20% stack and overstate the tax — and
+                `tax.tax_credits` wants tax BEFORE credits, which is the federal result itself.
+                """
+                before = len(results)
+                run_tax(fn, **kwargs)
+                return results[-1] if len(results) > before else None
+
             # PRIOR-YEAR QUESTIONS. "What did I pay in 2024?" is answerable because every table is
             # kept, not replaced — but only if the year reaches the calculators. Without this the
             # advisor silently answered every tax question on the current year, which is wrong in a
             # way the user cannot see: the figure looks like an answer to what they asked.
-            run_tax(tax_calc.federal_income_tax, gross_income=annual_income,
-                    filing_status=filing_status, tax_year=tax_year)
+            fed = run_tax_get(tax_calc.federal_income_tax, gross_income=annual_income,
+                              filing_status=filing_status, tax_year=tax_year)
             run_tax(tax_calc.fica, wages=annual_income, filing_status=filing_status,
                     tax_year=tax_year)
             # The highest-value tax figure for an advisor: every Roth, pre-tax-contribution and
@@ -330,13 +377,227 @@ class AdvisorCalculationPlanner:
             if tax_state:
                 run_tax(tax_calc.state_income_tax, taxable_income=annual_income,
                         state=str(tax_state), filing_status=filing_status, tax_year=tax_year)
+
+            # CREDITS. Chained off the federal result, because the credit calculation needs the
+            # tax BEFORE credits — nonrefundable credits can only reduce liability to zero.
+            #
+            # `qualifying_children` is NOT taken from the dependent count. The child credit is
+            # $2,200 and the other-dependent credit is $500, so treating an adult dependent as a
+            # child overstates the credit by $1,700 each. Until the split is stored (migration
+            # 20261012000000) this is a named gap rather than a guess.
+            children = _present(inputs, "qualifying_children")
+            dependents = _present(inputs, "dependents")
+            if fed is not None and children is not None:
+                run_tax(tax_calc.tax_credits, agi=float(fed.detail["agi"]),
+                        filing_status=filing_status,
+                        tax_before_credits=float(fed.value),
+                        qualifying_children=int(children),
+                        other_dependents=max(0, int(dependents or 0) - int(children)),
+                        tax_year=tax_year)
+            elif fed is not None and dependents:
+                gaps.append(_gap(inputs, "tax.tax_credits", ["qualifying_children"]))
+
+            # CAPITAL GAINS. The gain is UNREALIZED — what selling today would trigger — which is
+            # what answers "what would it cost me to get out of this position?"
+            #
+            # Run ONCE PER HOLDING PERIOD rather than on the blended total: long-term gain is taxed
+            # at 0/15/20% and short-term as ordinary income up to 37%, so a single call would have
+            # to pick one and be wrong by up to 22 percentage points on the other.
+            ordinary_taxable = float(fed.detail["taxable_income"]) if fed is not None else None
+            if ordinary_taxable is not None:
+                for key, is_long in (("capital_gain_long_term", True),
+                                     ("capital_gain_short_term", False)):
+                    g = _present(inputs, key)
+                    if g:
+                        run_tax(tax_calc.capital_gains_tax, gain=float(g), long_term=is_long,
+                                ordinary_taxable_income=ordinary_taxable,
+                                filing_status=filing_status, tax_year=tax_year)
+
+            # ITEMIZE VS STANDARD. Only with AGI, because the medical floor is a percentage of it;
+            # without AGI the engine would silently treat every medical dollar as deductible.
+            components = _present(inputs, "itemized_components") or {}
+            agi = _present(inputs, "adjusted_gross_income")
+            if components and agi is not None:
+                itemized = run_tax_get(
+                    tax_calc.itemized_deductions, filing_status=filing_status,
+                    agi=float(agi), magi=_present(inputs, "modified_agi"),
+                    tax_year=tax_year, **{k: float(v) for k, v in components.items()})
+                # Chained: `standard_vs_itemized` answers "is itemizing worth it", and the only
+                # defensible input is the CAPPED total from above. Feeding it the raw sum of
+                # components — the obvious shortcut — would recommend itemizing to people whose
+                # SALT is mostly disallowed.
+                if itemized is not None:
+                    run_tax(tax_calc.standard_vs_itemized, filing_status=filing_status,
+                            itemized_deductions=float(itemized.value), tax_year=tax_year)
+            elif components:
+                gaps.append(_gap(inputs, "tax.itemized_deductions", ["adjusted_gross_income"]))
         elif annual_income:
             gaps.append(_gap(inputs, "tax.effective_marginal_rate", ["filing_status"]))
+
+        # ── VA disability: tax-free income, read off an award letter since Sprint 20 ─────────────
+        #
+        # Wired here rather than in the tax block because it needs NEITHER income nor filing
+        # status: a veteran's rating alone determines the figure. Gating it behind the tax block
+        # would have kept it unreachable for exactly the users who had uploaded the document.
+        va_rating = _present(inputs, "va_disability_rating")
+        if va_rating is not None:
+            run(va.disability_compensation, rating=int(va_rating),
+                spouse=str(_present(inputs, "filing_status") or "").startswith("married"),
+                children_under_18=int(_present(inputs, "dependents") or 0))
+
+        # ── Debt payoff ORDER, not just a payoff date ───────────────────────────────────────────
+        debt_list = _present(inputs, "debt_list")
+        minimums = _present(inputs, "debt_minimum_payments")
+        if minimums:
+            # Mapped explicitly rather than passed through. The resolver returns DB-shaped rows
+            # (`minimum_payment`) and the calculator wants `min_payment`; handing the row straight
+            # over would make `require_money` refuse on every debt and the whole plan would vanish
+            # into a gap that read like missing data rather than a key mismatch.
+            #
+            # The APR goes through `_as_decimal_rate` for the percent-vs-decimal ambiguity
+            # documented at the top of this module: migration 062 calls `interest_rate` a decimal
+            # while other code treats it as a percent, and 22 read as 2,200%/yr would produce a
+            # confidently absurd payoff order.
+            priced = [
+                {"label": d.get("label"), "balance": d.get("balance"),
+                 "apr": _as_decimal_rate(d.get("apr")),
+                 "min_payment": d.get("minimum_payment")}
+                for d in minimums
+            ]
+            unpriced = [d["label"] for d in priced if d["apr"] is None]
+            if unpriced:
+                # An unknown APR is not a zero one. Ordering debts by interest rate is the entire
+                # point of a payoff plan, so a missing rate is named rather than defaulted.
+                gaps.append({"calculator": "debt.payoff_plan",
+                             "needs": ["debt_apr"],
+                             "ask": [f"What APR are you paying on {', '.join(unpriced[:3])}? "
+                                     f"Without it we cannot say which debt to attack first."]})
+            else:
+                run(debt.payoff_plan, debts=priced,
+                    extra_payment=float(_present(inputs, "monthly_debt_payment") or 0.0))
+        elif debt_list:
+            gaps.append(_gap(inputs, "debt.payoff_plan", ["debt_minimum_payments"]))
+
+        # ── Savings rate ───────────────────────────────────────────────────────────────────────
+        annual_savings = _present(inputs, "annual_savings")
+        if annual_income and annual_savings is not None:
+            run(cash.savings_rate, annual_income=annual_income, annual_savings=float(annual_savings))
+        elif annual_income:
+            gaps.append(_gap(inputs, "cash.savings_rate", ["annual_savings"]))
+
+        # ── Home affordability: DTI needs the debt side ────────────────────────────────────────
+        monthly_debts = _present(inputs, "monthly_debts")
+        if annual_income and monthly_debts is not None:
+            run(housing.max_monthly_payment, annual_income=annual_income,
+                monthly_debts=float(monthly_debts))
+        elif annual_income:
+            # Named rather than assumed: a missing debt figure makes affordability look BETTER, so
+            # defaulting it to zero would be the one error the user never catches.
+            gaps.append(_gap(inputs, "housing.max_monthly_payment", ["monthly_debts"]))
 
         # ── A savings goal the user named ────────────────────────────────────────────────────────
         if savings_goal_amount and savings_goal_months:
             run(money.monthly_contribution_for_target, target=savings_goal_amount,
                 current=_present(inputs, "cash_balance") or 0.0, months=int(savings_goal_months))
+
+        # Shared inputs for the growth and interest figures below.
+        balance_for_growth = _present(inputs, "investment_balance")
+        _hz = _present(inputs, "time_horizon")
+        try:
+            growth_months = int(float(_hz) * 12) if _hz else None
+        except (TypeError, ValueError):
+            growth_months = None
+
+        # ── Decisions the user named this turn ───────────────────────────────────────────────────
+        #
+        # Each of these was declared "ready to wire" while `compute()` had no parameter to carry
+        # the input, so the input could never arrive and the calculator could never fire. The
+        # inventory said ready; the code said unreachable.
+
+        # A degree, with the cost of the years NOT working included.
+        tuition, years = _tv("tuition_total"), _tv("years_in_school")
+        sal_before, sal_after = _tv("salary_before"), _tv("salary_after")
+        if tuition is not None and years and sal_before is not None:
+            run(education.degree_total_cost, tuition_total=float(tuition),
+                years_in_school=float(years), salary_before=float(sal_before))
+            if sal_after is not None:
+                run(education.degree_payback_years, tuition_total=float(tuition),
+                    years_in_school=float(years), salary_before=float(sal_before),
+                    salary_after=float(sal_after))
+                run(education.degree_lifetime_value, tuition_total=float(tuition),
+                    years_in_school=float(years), salary_before=float(sal_before),
+                    salary_after=float(sal_after))
+
+        # A pension offer. Answered as an implied return, because "which is bigger" depends
+        # entirely on how long you live and what the money would otherwise earn.
+        lump, annuity = _tv("pension_lump_sum"), _tv("pension_annual_annuity")
+        if lump and annuity and current_age:
+            run(retirement.pension_lump_sum_vs_annuity, lump_sum=float(lump),
+                annual_annuity=float(annuity), current_age=int(current_age))
+
+        # Invest it now or spread it out.
+        ls_amount, spread = _tv("lump_sum_amount"), _tv("spread_months")
+        if ls_amount and spread:
+            run(money.lump_sum_vs_dca, amount=float(ls_amount), spread_months=int(spread))
+
+        # Fund drag over the user's OWN stated horizon, taken from the canonical `time_horizon`
+        # (years) and converted to months. Not defaulted: a drag figure is meaningless without
+        # knowing how long the money compounds, and inventing 30 years would manufacture the
+        # headline number.
+        er = _tv("expense_ratio")
+        balance = _present(inputs, "investment_balance")
+        horizon_years = _present(inputs, "time_horizon")
+        if er is not None and balance and horizon_years:
+            try:
+                months = int(float(horizon_years) * 12)
+            except (TypeError, ValueError):
+                months = 0
+            if months > 0:
+                run(money.expense_ratio_drag, balance=float(balance),
+                    expense_ratio=float(er), months=months)
+
+        # VA: individual ratings combine against remaining efficiency, never by adding.
+        ratings = _tv("va_individual_ratings")
+        if ratings:
+            run(va.combined_rating, ratings=[float(r) for r in ratings])
+
+        # DIC needs no input at all — the surviving-spouse base rate is flat. Only run it when the
+        # household is actually a veteran's, so a non-veteran is not handed a survivor benefit.
+        if _present(inputs, "va_disability_rating") is not None:
+            run(va.dic)
+
+        # Home affordability, once the down payment is known.
+        down = _tv("down_payment")
+        monthly_debts_v = _present(inputs, "monthly_debts")
+        if annual_income and monthly_debts_v is not None and down:
+            run(housing.max_home_price, annual_income=annual_income,
+                monthly_debts=float(monthly_debts_v), down_payment=float(down))
+        rent = _tv("monthly_rent")
+        if rent and home_price_goal:
+            run(housing.rent_vs_buy, monthly_rent=float(rent),
+                home_price=float(home_price_goal))
+
+        # Competing job offers, compared on TOTAL compensation rather than salary.
+        offers = _tv("offers")
+        if offers:
+            run(career.offer_total_comp, offers=offers)
+
+        # What a debt costs in total, not just when it clears. The figure people are most surprised
+        # by, and the one `tools.py` accumulated and then threw away.
+        if annual_income is not None:
+            for d in (_present(inputs, "debt_minimum_payments") or []):
+                apr_d = _as_decimal_rate(d.get("apr"))
+                bal, pay = d.get("balance"), d.get("minimum_payment")
+                if apr_d and bal and pay:
+                    months_p = _months_to_clear(float(bal), apr_d, float(pay))
+                    if months_p:
+                        run(debt.total_interest, principal=float(bal), apr=apr_d,
+                            term_months=months_p)
+
+        # Growth of what they already hold, over their OWN horizon.
+        if balance_for_growth is not None and growth_months:
+            run(money.future_value, present_value=float(balance_for_growth),
+                months=growth_months)
 
         strict = [r for r in results if not r.is_scenario]
         scenario = [r for r in results if r.is_scenario]

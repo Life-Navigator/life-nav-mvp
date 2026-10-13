@@ -13,13 +13,17 @@
       "debt_interest.section_163j": "IRS Rev. Proc. 2025-32 (https://www.irs.gov/pub/irs-drop/rp-25-32.pdf), retrieved 2026-10-11 s.3.30 (IRC 448(c)): $32,000,000",
       "debt_interest.mortgage_acquisition_cap": "Statutory IRC 163(h)(3)(F); the $750,000 cap was made permanent by OBBBA s.70108. NOT indexed.",
       "passive_activity": "Statutory IRC 469(i) ($25,000 allowance, $100k-$150k phase-out) and IRC 168 / 1250. NONE of these are inflation-indexed.",
-      "retirement.uniform_lifetime_table": "IRS Publication 590-B (2025), Appendix B Table III (https://www.irs.gov/pub/irs-pdf/p590b.pdf), retrieved 2026-10-12. Life-expectancy tables were last revised effective 2022-01-01 and are NOT annually indexed."
+      "retirement.uniform_lifetime_table": "IRS Publication 590-B (2025), Appendix B Table III (https://www.irs.gov/pub/irs-pdf/p590b.pdf), retrieved 2026-10-12. Life-expectancy tables were last revised effective 2022-01-01 and are NOT annually indexed.",
+      "itemized.salt": "IRC 164(b)(6) as amended by P.L. 119-21 (OBBBA). 2026 cap $40,400 ($20,200 MFS), reduced by 30% of MAGI over $505,000 ($252,500 MFS), never below $10,000 ($5,000 MFS). Sourced from The Tax Adviser, 'Cap raised, strings attached: the 2025 SALT shake-up' and CRS IN12686, retrieved 2026-10-12. CROSS-CHECKED ARITHMETICALLY: the cited full-phase-down point of $606,333 equals 505,000 + (40,400 - 10,000)/0.30, which also corrected a secondary source that gave the MFS threshold as $202,500 \u2014 $252,500 is the only value consistent with its own stated $303,167 phase-out point.",
+      "itemized.medical_agi_floor": "IRC 213(a) \u2014 7.5% of AGI, made permanent by the Consolidated Appropriations Act, 2021.",
+      "itemized.section_68_bracket": "IRC 68 as amended by P.L. 119-21: from 2026 itemized deductions are reduced by 2/37 of the lesser of total itemized deductions or the excess of taxable income over the 37% bracket threshold. The 37% figure is stored so the engine can DETECT exposure; the limitation itself is NOT modelled \u2014 see _meta.unsourced_still."
     },
     "verification_required": "Sourced from primary documents, NOT yet signed off by the owner's CPA. `verified` stays false until then.",
     "why_split_from_tax_tables": "Deliberate: tax_tables holds rate SCHEDULES; this holds the thresholds statutory RULES test against. The rules (tax_wrappers.py, tax_debt_interest.py) are stable across years and need no re-verification; these amounts do.",
     "unsourced_still": [
       "fsa.dependent_care_limit \u2014 OBBBA may have changed the $5,000 limit for 2026; NOT confirmed, left at the long-standing statutory $5,000 and flagged here rather than asserted.",
-      "retirement.rmd_age \u2014 73 per SECURE 2.0 s.107 (rising to 75 in 2033); statutory, high confidence, not re-fetched."
+      "retirement.rmd_age \u2014 73 per SECURE 2.0 s.107 (rising to 75 in 2033); statutory, high confidence, not re-fetched.",
+      "itemized: the IRC 68 2/37ths limitation (new for 2026) is detected but NOT applied. It reduces itemized deductions for taxpayers in the 37% bracket, so above that threshold `tax.itemized_deductions` flags the result rather than computing through it. Needs a primary-source reading of the statute before being encoded."
     ]
   },
   "hsa": {
@@ -159,5 +163,28 @@
     "augusta_rule_days": 14,
     "residential_depreciation_years": 27.5,
     "section_1250_recapture_rate": 0.25
+  },
+  "itemized": {
+    "salt_cap": {
+      "single": 40400.0,
+      "married_jointly": 40400.0,
+      "head_of_household": 40400.0,
+      "married_separately": 20200.0
+    },
+    "salt_phase_down_threshold": {
+      "single": 505000.0,
+      "married_jointly": 505000.0,
+      "head_of_household": 505000.0,
+      "married_separately": 252500.0
+    },
+    "salt_phase_down_rate": 0.3,
+    "salt_floor": {
+      "single": 10000.0,
+      "married_jointly": 10000.0,
+      "head_of_household": 10000.0,
+      "married_separately": 5000.0
+    },
+    "medical_agi_floor": 0.075,
+    "section_68_bracket": 0.37
   }
 }
