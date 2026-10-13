@@ -663,6 +663,10 @@ class AdvisorCalculationPlanner:
             # advisor_treatments for why `CalcResult` is the wrong shape.
             "treatments": treatments.get("treatments") or [],
             "treatment_gaps": treatments.get("gaps") or [],
+            # Fact patterns actively costing the user money — an HSA funded without qualifying
+            # coverage, for instance. Not a gap (a missing fact) and not a trap (a future risk):
+            # a conflict is a loss in progress, and it outranks everything else in the packet.
+            "tax_conflicts": treatments.get("conflicts") or [],
             "unfavourable_with_levers": treatments.get("unfavourable_with_levers") or [],
             "tax_traps": treatments.get("traps") or [],
             "gaps": gaps,

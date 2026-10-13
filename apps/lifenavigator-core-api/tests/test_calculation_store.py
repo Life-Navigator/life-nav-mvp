@@ -400,3 +400,78 @@ async def test_the_planner_stores_a_snapshot_and_reports_changes_when_given_a_st
     second = await AdvisorCalculationPlanner(res, store).compute(_Ctx())
     assert second["changes_since_last"]["has_history"] is True
     assert second["changes_since_last"]["moved"] == [], "nothing changed, so nothing moved"
+
+
+# ── P0 audit fixes: the cache must refuse on a flipped verdict or a changed turn ─────────────────
+def _with_det(determination, amount=3000.0):
+    return {**_packet(1000.0), "treatments": [
+        {"rule": "debt_interest.heloc", "determination": determination, "amount": amount,
+         "parameter_year": 2026, "parameters_verified": False}]}
+
+
+@pytest.mark.asyncio
+async def test_a_FLIPPED_DETERMINATION_refuses_the_cache():
+    """THE WORST THING A CACHE CAN DO, and it did it. `basis_fingerprint` hashed only
+    (rule, parameter_year, parameters_verified), so a verdict that flipped left it unchanged:
+    verified live, the cache served "Yes — it is deductible" after the engine had decided the same
+    HELOC interest was NOT deductible. Inverting tax advice, to save tokens.
+    """
+    store = CalculationStore(FakeDB())
+    q, inputs = "is my heloc interest deductible this year", _inputs(income=150_000.0)
+    await store.save_answer(U, q, "Yes — it is deductible, worth about 1000.",
+                            _with_det("deductible"), inputs,
+                            turn={"heloc_proceeds_used_for": "home_improvement"})
+    assert await store.lookup_answer(
+        U, q, _with_det("not_deductible", 0.0), inputs,
+        turn={"heloc_proceeds_used_for": "debt_payoff"}) is None
+    # ...and still serves a genuine repeat, so the fix did not simply disable the cache.
+    assert await store.lookup_answer(
+        U, q, _with_det("deductible"), inputs,
+        turn={"heloc_proceeds_used_for": "home_improvement"}) is not None
+
+
+@pytest.mark.asyncio
+async def test_a_CHANGED_TURN_FACT_refuses_the_cache():
+    """The turn is part of the facts. "When can I retire?" asked at 45 must not be answered again
+    at 55 from cache, and age arrives per turn rather than from storage."""
+    store = CalculationStore(FakeDB())
+    q, inputs = "when can I afford to retire", _inputs(income=150_000.0)
+    await store.save_answer(U, q, "You can retire at about 1000.", _packet(), inputs,
+                            turn={"current_age": 45})
+    assert await store.lookup_answer(U, q, _packet(), inputs,
+                                     turn={"current_age": 55}) is None
+    assert await store.lookup_answer(U, q, _packet(), inputs,
+                                     turn={"current_age": 45}) is not None
+
+
+@pytest.mark.asyncio
+async def test_an_answer_given_during_a_CONFLICT_is_never_cached():
+    """The remedy is time-sensitive — an excess HSA contribution has to come out before the return
+    is due — so this answer must be regenerated, with today's urgency, every time it is asked."""
+    store = CalculationStore(FakeDB())
+    conflicted = {**_packet(), "tax_conflicts": [
+        {"what": "excess HSA contributions", "because": "no HDHP", "amount_at_risk": 8_000}]}
+    assert await store.save_answer(U, "should I keep funding my hsa", "Yes, about 1000.",
+                                   conflicted, _inputs(income=1.0)) is False
+
+
+@pytest.mark.asyncio
+async def test_a_NEW_CONFLICT_refuses_a_previously_cached_answer():
+    store = CalculationStore(FakeDB())
+    q, inputs = "how much tax will I owe this year", _inputs(income=100_000.0)
+    await store.save_answer(U, q, "About 1000.", _packet(), inputs)
+    now_conflicted = {**_packet(), "tax_conflicts": [
+        {"what": "excess HSA contributions", "because": "no HDHP", "amount_at_risk": 8_000}]}
+    assert await store.lookup_answer(U, q, now_conflicted, inputs) is None
+
+
+@pytest.mark.asyncio
+async def test_what_changed_reports_a_FLIPPED_DETERMINATION():
+    """Usually the most important thing that happened, and comparing only `results` reported
+    nothing when a deduction became a non-deduction."""
+    store = CalculationStore(FakeDB())
+    inputs = _inputs(income=150_000.0)
+    await store.save_snapshot(U, _with_det("deductible"), inputs=inputs)
+    changed = await store.what_changed(U, _with_det("not_deductible", 0.0), inputs)
+    assert changed["determinations_flipped"] == [
+        {"rule": "debt_interest.heloc", "was": "deductible", "now": "not_deductible"}]

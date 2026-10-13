@@ -183,6 +183,51 @@ All of Phase F, and all of it is a readout rather than a formula.
 
 ### Milestone 3 — the advisor can actually say it
 
+> **AUDIT 2026-10-12 (post-Milestone-3).** A review of 3.1 and 3.6 against the engine's own
+> standard found three defects that produced WRONG ADVICE rather than missing features. All three
+> were found by running the code against realistic households, not by reading it — each looked
+> correct in review and each failed in use. Fixed, with a regression test naming the failure:
+>
+> 1. **`after_tax_cost` told users credit-card debt was tax-deductible.** It ran once on `debt_apr`
+>    — a balance-weighted blend across EVERY debt, cards included — with a deductible share derived
+>    only from the mortgage/HELOC/student rules that happened to fire. A household with a $450k
+>    mortgage and a $20k card at 22% got "blended debt costs 6.53% after tax, deductible_share
+>    1.0": the card's interest never entered the denominator. That makes carrying a balance look
+>    cheap and would push someone to prepay a mortgage ahead of a card. Now run **per instrument**,
+>    because the statute tests interest per instrument — and the per-debt form is the better answer
+>    anyway: "your mortgage costs 4.98% after tax, your card costs the full 22%" IS the payoff
+>    order. Consumer debt gets a hard 0.0 share (IRC 163(h)(1)); an unrecognised instrument gets a
+>    GAP, because an unknown share is not a zero one.
+> 2. **The HSA rule contradicted the HDHP rule in the same packet.** `hdhp_ok` was computed and
+>    never consulted, so the packet could carry "this plan does not qualify as an HDHP, so an HSA
+>    is not available" beside "$8,000 is deductible above the line". A model handed both states the
+>    deduction; the real outcome is an excess contribution, taxable and penalised at 6% a year
+>    (IRC 4973). The favourable determination is now withheld and a new **`tax_conflicts`** channel
+>    carries the loss, its cause, the amount at risk and the remedy. A conflict is neither a gap (a
+>    missing fact) nor a trap (a future risk) — it is a loss in progress, and the packet instructs
+>    the model to lead with it and never present the favourable reading beside it.
+> 3. **The answer cache inverted tax advice.** `basis_fingerprint` hashed only
+>    `(rule, parameter_year, parameters_verified)`, so a verdict that FLIPPED left it unchanged —
+>    verified live, the cache served "Yes, it is deductible" after the engine had decided the same
+>    HELOC interest was not. The determination and amount are now part of the basis; the TURN is
+>    part of the inputs fingerprint (HELOC use and the user's age are per-turn facts, so "when can
+>    I retire?" asked at 45 was being served again at 55); a new conflict invalidates a cached
+>    answer; and an answer given during a conflict is never cached at all, because the remedy is
+>    time-sensitive. `what_changed` now reports flipped determinations, which it had ignored
+>    entirely.
+>
+> Also fixed: `after_tax_cost_of_debt` now records its `label`, without which the per-debt results
+> were indistinguishable except by parsing prose.
+>
+> **Still open from the audit** (not wrong answers, but below standard): the store is never
+> constructed with a Supabase handle and nothing calls `lookup_answer`/`save_answer`, so 3.6 is
+> dead code in production; the whole packet sits behind `ADVISOR_CALCULATORS_ENABLED`, default
+> false; employer match is modelled as dollar-for-dollar up to X% (2x overstatement for "50% up to
+> 6%", a convention inherited from `career.uncaptured_match` and now in two places); no upsert on
+> a repeat `save_answer`; unbounded snapshot growth with no retention; `TREATMENT_TURN_INPUTS` and
+> `TREATMENT_DERIVED_INPUTS` are dead declarations; and no test asserts `treatments` reaches the
+> prompt.
+>
 > **Status 2026-10-12: MILESTONE 3 IS COMPLETE.** All 40 advisor-facing calculators are wired,
 > **all 11 treatment rules reach the advisor** (3.1), and calculations and answers now persist
 > (3.6).

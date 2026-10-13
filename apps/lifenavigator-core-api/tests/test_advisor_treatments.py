@@ -24,8 +24,14 @@ FULL = dict(
     health_coverage_tier="family", hdhp_annual_deductible=3_500,
     hdhp_out_of_pocket_max=9_000, hsa_annual_contribution=8_000, hsa_through_payroll=True,
     fsa_type="limited_purpose", covered_by_workplace_plan=True, student_loan_interest=2_400,
-    debt_minimum_payments=[{"label": "mortgage", "balance": 450_000, "apr": 0.065,
-                            "minimum_payment": 2_900, "loan_type": "mortgage"}],
+    debt_minimum_payments=[
+        {"label": "mortgage", "balance": 450_000, "apr": 0.065,
+         "minimum_payment": 2_900, "loan_type": "mortgage"},
+        {"label": "heloc", "balance": 60_000, "apr": 0.079,
+         "minimum_payment": 400, "loan_type": "heloc"},
+        {"label": "card", "balance": 20_000, "apr": 0.22,
+         "minimum_payment": 600, "loan_type": "credit_card"},
+    ],
 )
 # The facts that arrive per turn because they describe a decision, not a person.
 TURN = {"ira_contribution": 7_000, "heloc_proceeds_used_for": "home_improvement",
@@ -172,17 +178,69 @@ async def test_the_rules_use_the_packets_OWN_marginal_rate_and_itemizing_verdict
         assert atc["inputs_used"]["marginal_rate"] == marginal
 
 
+def _after_tax(packet):
+    """After-tax cost results keyed by the debt they describe — one per instrument."""
+    return {t["inputs_used"]["label"]: t
+            for t in packet["treatments"] if t["rule"] == "debt_interest.after_tax_cost"}
+
+
 @pytest.mark.asyncio
-async def test_the_deductible_share_comes_from_the_tracing_rules_not_an_assumption():
-    """The point of an after-tax cost is that a 7% deductible mortgage can be cheaper than a 5%
-    non-deductible car loan — which is only true if the share reflects the actual determinations."""
-    deductible = await _packet(turn={**TURN, "heloc_proceeds_used_for": "home_improvement"})
-    not_deductible = await _packet(turn={**TURN, "heloc_proceeds_used_for": "debt_payoff"})
-    a = _rule(deductible, "debt_interest.after_tax_cost")
-    b = _rule(not_deductible, "debt_interest.after_tax_cost")
-    assert a and b
+async def test_the_after_tax_cost_is_PER_INSTRUMENT_not_a_single_blended_rate():
+    """THE BUG THIS GUARDS, and it was the worst of the three found in the 3.1 audit.
+
+    This ran once on `debt_apr` — a balance-weighted blend across EVERY debt, cards included — with
+    a deductible share derived only from the mortgage, HELOC and student rules that happened to
+    fire. For a household with a $450,000 mortgage and a $20,000 card at 22% it produced "blended
+    debt costs 6.53% after tax" with deductible_share = 1.0: the card's interest never entered the
+    denominator, so the engine claimed 22% credit-card interest was fully deductible. That makes
+    carrying a balance look cheap and would push someone to prepay a mortgage ahead of a card.
+    """
+    p = await _packet()
+    costs = _after_tax(p)
+    assert len(costs) >= 2, "one result per debt, not one blended result"
+
+    card = next(v for k, v in costs.items() if "card" in k)
+    assert card["inputs_used"]["deductible_share"] == 0.0, "IRC 163(h)(1) disallows personal interest"
+    assert card["amount"] == pytest.approx(0.22), "a card costs its full rate after tax"
+
+    mortgage = next(v for k, v in costs.items() if "mortgage" in k)
+    assert mortgage["inputs_used"]["deductible_share"] > 0.0
+    assert mortgage["amount"] < 0.065, "a deductible mortgage costs less than its stated rate"
+    # And the comparison that makes the figure worth having at all.
+    assert mortgage["amount"] < card["amount"]
+
+
+@pytest.mark.asyncio
+async def test_each_debts_share_comes_from_the_tracing_rule_that_governs_IT():
+    """The HELOC's own after-tax cost must move with what the money bought, and the mortgage's must
+    not — which a single blended share could never express."""
+    improved = _after_tax(await _packet(
+        turn={**TURN, "heloc_proceeds_used_for": "home_improvement"}))
+    paid_off = _after_tax(await _packet(
+        turn={**TURN, "heloc_proceeds_used_for": "debt_payoff"}))
+
+    a = next(v for k, v in improved.items() if "heloc" in k)
+    b = next(v for k, v in paid_off.items() if "heloc" in k)
     assert a["inputs_used"]["deductible_share"] > b["inputs_used"]["deductible_share"]
-    assert a["amount"] < b["amount"], "more deductible interest means a lower after-tax cost"
+    assert a["amount"] < b["amount"], "deductible interest means a lower after-tax cost"
+
+    # The mortgage is untouched by the HELOC's use.
+    m1 = next(v for k, v in improved.items() if "mortgage" in k)
+    m2 = next(v for k, v in paid_off.items() if "mortgage" in k)
+    assert m1["amount"] == m2["amount"]
+
+
+@pytest.mark.asyncio
+async def test_a_debt_of_UNKNOWN_deductibility_is_a_gap_not_a_zero():
+    """An unknown share is not a zero one — ranking a debt on an invented share would corrupt the
+    payoff order, which is the one thing this figure exists to inform."""
+    p = await _packet(turn={}, debt_minimum_payments=[
+        {"label": "mystery loan", "balance": 30_000, "apr": 0.11,
+         "minimum_payment": 400, "loan_type": "unknown_instrument"}])
+    assert not _after_tax(p)
+    gap = next(g for g in p["treatment_gaps"]
+               if g.get("rule") == "debt_interest.after_tax_cost")
+    assert "mystery loan" in gap["ask"]
 
 
 # ── Gaps, never defaults ─────────────────────────────────────────────────────────────────────────
@@ -282,3 +340,61 @@ def test_the_planner_returns_a_shape_even_with_nothing_to_run():
 async def test_the_treatments_are_serializable():
     import json
     json.dumps(await _packet())
+
+
+# ── Conflicts: a loss in progress, not a gap and not a trap ──────────────────────────────────────
+@pytest.mark.asyncio
+async def test_an_HSA_funded_on_a_NON_QUALIFYING_plan_reports_a_conflict_not_a_deduction():
+    """THE BUG THIS GUARDS. `hdhp_ok` was computed and never consulted, so the packet carried a
+    flat contradiction: "this plan does not qualify as an HDHP, so an HSA is not available" beside
+    "$8,000 is deductible above the line". A model handed both will state the deduction — and the
+    real outcome is an excess contribution, taxable and penalised at 6% for every year it stays in
+    the account. Reporting the deduction at all is the harm.
+    """
+    p = await _packet(turn={}, hdhp_annual_deductible=1_000, hdhp_out_of_pocket_max=5_000)
+    hdhp = _rule(p, "wrapper.hdhp_qualifies")
+    assert hdhp is not None and hdhp["determination"] == T.INELIGIBLE
+    assert _rule(p, "wrapper.hsa_contribution") is None, "no favourable reading of these facts"
+
+    conflict = next(c for c in p["tax_conflicts"] if "HSA" in c["what"])
+    assert conflict["amount_at_risk"] == 8_000
+    assert "6%" in conflict["consequence"]
+    assert "4973" in conflict["authority"]
+    assert "Withdraw the excess" in conflict["what_to_do"]
+
+
+@pytest.mark.asyncio
+async def test_a_GENERAL_PURPOSE_FSA_also_voids_an_HSA_contribution():
+    """The plan qualifies, but a general-purpose FSA disqualifies an HSA for the whole year — so
+    the contribution is just as much an excess contribution."""
+    p = await _packet(turn={}, fsa_type="general_purpose")
+    assert _rule(p, "wrapper.hdhp_qualifies")["determination"] == T.ELIGIBLE
+    assert _rule(p, "wrapper.hsa_contribution") is None
+    conflict = next(c for c in p["tax_conflicts"] if "HSA" in c["what"])
+    assert "general-purpose FSA" in conflict["because"]
+
+
+@pytest.mark.asyncio
+async def test_a_LIMITED_purpose_FSA_does_NOT_void_the_contribution():
+    """The owner's own "HSA with HDHP and limited FSA" case: it works precisely because the FSA is
+    limited-purpose, so the favourable determination must still be produced."""
+    p = await _packet(turn={}, fsa_type="limited_purpose")
+    assert p["tax_conflicts"] == []
+    hsa = _rule(p, "wrapper.hsa_contribution")
+    assert hsa is not None and hsa["amount"] == 8_000
+
+
+@pytest.mark.asyncio
+async def test_a_zero_HSA_contribution_on_a_bad_plan_is_not_a_conflict():
+    """Nothing is at risk if nothing was contributed — a conflict must describe an actual loss."""
+    p = await _packet(turn={}, hsa_annual_contribution=0,
+                      hdhp_annual_deductible=1_000, hdhp_out_of_pocket_max=5_000)
+    assert p["tax_conflicts"] == []
+
+
+@pytest.mark.asyncio
+async def test_the_packet_tells_the_model_a_conflict_outranks_everything():
+    p = await _packet(turn={}, fsa_type="general_purpose")
+    joined = " ".join(p["constraints"])
+    assert "money being lost RIGHT NOW" in joined
+    assert "never present the favourable reading" in joined

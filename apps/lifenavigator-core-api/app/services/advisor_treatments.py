@@ -45,6 +45,22 @@ log = logging.getLogger(__name__)
 _PROCEEDS_USES = ("home_improvement", "home_purchase", "debt_payoff", "investment", "business",
                   "personal")
 
+# Which determination governs which instrument. Interest is tested per-instrument by statute, so
+# the after-tax cost has to be too.
+_RULE_TO_LOAN_TYPE = {
+    "debt_interest.mortgage": "mortgage",
+    "debt_interest.heloc": "heloc",
+    "debt_interest.student_loan": "student_loan",
+}
+
+# Personal interest is flatly disallowed by IRC 163(h)(1). This is a statutory fact rather than a
+# conservative default, which is why these get a share instead of a gap.
+_CONSUMER_DEBT = frozenset({
+    "credit_card", "card", "auto", "auto_loan", "car", "personal", "personal_loan",
+    "medical_debt", "medical", "family_loan", "other",
+})
+_CONSUMER_SHARE = 0.0
+
 
 def _gap(rule: str, needs: list[str], ask: str) -> dict[str, Any]:
     """A determination that cannot be made, phrased as the question that would settle it.
@@ -71,6 +87,10 @@ class TreatmentPlanner:
         t = turn or {}
         results: list[TreatmentResult] = []
         gaps: list[dict[str, Any]] = []
+        # Conflicts are not gaps. A gap is a missing fact to ask about; a conflict is a fact
+        # pattern that is actively costing the user money right now, and it must outrank every
+        # other thing in the packet.
+        conflicts: list[dict[str, Any]] = []
 
         def present(key: str) -> Optional[Any]:
             f = (inputs or {}).get(key) or {}
@@ -234,9 +254,51 @@ class TreatmentPlanner:
                 "self-only or family coverage? HSA contributions made without qualifying coverage "
                 "are excess contributions and carry a 6% annual penalty."))
 
-        # ── HSA contribution ─────────────────────────────────────────────────────────────────────
+        # ── FSA / HSA compatibility ──────────────────────────────────────────────────────────────
+        # Determined BEFORE the contribution, because it can void it outright: a general-purpose
+        # FSA disqualifies an HSA for the ENTIRE plan year, which people discover after they have
+        # already contributed.
+        fsa_type = present("fsa_type")
+        if fsa_type and str(fsa_type).lower() == "none":
+            fsa_type = None          # "no FSA" is an answer, not a type to run the rule against
+        fsa_compatible: Optional[bool] = None
+        if fsa_type:
+            r = run(W.fsa_hsa_compatibility, fsa_type=str(fsa_type), tax_year=tax_year)
+            if r is not None:
+                fsa_compatible = r.is_favourable
+        elif present("fsa_election") is not None:
+            gaps.append(_gap("wrapper.fsa_hsa_compatibility", ["fsa_type"],
+                             "Is your FSA general-purpose or limited-purpose? A general-purpose "
+                             "FSA disqualifies an HSA for the whole plan year."))
+
+        # ── HSA contribution, GATED on the coverage that makes it legal ──────────────────────────
+        #
+        # THE BUG THIS FIXES. `hdhp_ok` was computed and then never consulted, so the packet could
+        # carry a flat contradiction: "this plan does not qualify as an HDHP, so an HSA is not
+        # available" sitting beside "$8,000 is deductible above the line". A model handed both will
+        # state the deduction — and the real outcome is an EXCESS contribution, taxable and
+        # penalised at 6% for every year it stays in the account. Reporting the deduction at all is
+        # the harm, so it is withheld and the conflict is raised instead.
         hsa_amount = present("hsa_annual_contribution")
-        if hsa_amount is not None and tier and age is not None:
+        if hsa_amount is not None and hsa_amount > 0 and (hdhp_ok is False
+                                                          or fsa_compatible is False):
+            reason = ("the health plan does not qualify as an HDHP" if hdhp_ok is False
+                      else "a general-purpose FSA disqualifies an HSA for the whole plan year")
+            conflicts.append({
+                "what": "HSA contributions are being made without qualifying coverage",
+                "because": reason,
+                "amount_at_risk": float(hsa_amount),
+                "consequence": (
+                    f"${float(hsa_amount):,.0f} is an EXCESS contribution, not a deduction. It is "
+                    f"included in income and carries a 6% excise tax for every year it remains in "
+                    f"the account (IRC 4973)."),
+                "what_to_do": (
+                    "Withdraw the excess plus its earnings before the return due date to avoid the "
+                    "excise tax, and stop further contributions until coverage qualifies. Confirm "
+                    "with a CPA."),
+                "authority": "IRC 223(a), 223(c)(1); 4973(a)(5)",
+            })
+        elif hsa_amount is not None and tier and age is not None:
             run(W.hsa_contribution, coverage=str(tier), amount=float(hsa_amount), age=int(age),
                 through_payroll=bool(present("hsa_through_payroll")),
                 employer_contribution=float(present("hsa_employer_contribution") or 0.0),
@@ -246,30 +308,40 @@ class TreatmentPlanner:
                              "Is your coverage self-only or family? The HSA limit is roughly "
                              "double for family coverage."))
 
-        # ── FSA / HSA compatibility ──────────────────────────────────────────────────────────────
-        # Run whenever an FSA is on file, because the unfavourable answer is the valuable one: a
-        # general-purpose FSA disqualifies an HSA for the ENTIRE plan year, which people discover
-        # after they have already contributed.
-        fsa_type = present("fsa_type")
-        if fsa_type and str(fsa_type).lower() == "none":
-            fsa_type = None          # "no FSA" is an answer, not a type to run the rule against
-        if fsa_type:
-            run(W.fsa_hsa_compatibility, fsa_type=str(fsa_type), tax_year=tax_year)
-        elif present("fsa_election") is not None:
-            gaps.append(_gap("wrapper.fsa_hsa_compatibility", ["fsa_type"],
-                             "Is your FSA general-purpose or limited-purpose? A general-purpose "
-                             "FSA disqualifies an HSA for the whole plan year."))
-
-        # ── After-tax cost of debt ───────────────────────────────────────────────────────────────
-        # Chained off the determinations above rather than assumed: the deductible share IS the
-        # output of the tracing rules, and the whole point of this figure is that a 7% deductible
-        # mortgage can cost less than a 5% non-deductible car loan.
-        apr = present("debt_apr")
-        if apr is not None and marginal_rate is not None:
-            deductible_share = self._deductible_share(results)
-            run(DI.after_tax_cost_of_debt, apr=float(apr),
-                deductible_share=deductible_share, marginal_rate=float(marginal_rate),
-                label="blended debt")
+        # ── After-tax cost of debt, PER INSTRUMENT ───────────────────────────────────────────────
+        #
+        # THE BUG THIS REPLACES. This ran once on `debt_apr` — a balance-weighted blend across
+        # EVERY debt, cards included — with a deductible share derived only from the mortgage,
+        # HELOC and student-loan rules that happened to fire. For a household with a $400,000
+        # mortgage and a $20,000 card at 22% it produced "blended debt costs 6.53% after tax" with
+        # deductible_share = 1.0: the card's interest never entered the denominator, so the engine
+        # claimed 22% credit-card interest was fully deductible. That makes carrying a balance look
+        # cheap and would push someone to prepay a mortgage ahead of a card.
+        #
+        # Deductibility is per-INSTRUMENT because the statute is: a mortgage, a HELOC and a card
+        # are three different tests on the same dollar of interest. So is the answer — and the
+        # per-debt form is the useful one anyway, because "your mortgage costs 4.9% after tax and
+        # your card costs 22%" IS the payoff-order advice.
+        if marginal_rate is not None:
+            by_type = self._shares_by_type(results)
+            for row in loans:
+                row_apr = row.get("apr")
+                kind = str(row.get("loan_type") or "other").lower()
+                share = by_type.get(kind)
+                if share is None:
+                    share = _CONSUMER_SHARE if kind in _CONSUMER_DEBT else None
+                if row_apr is None or share is None:
+                    # An unknown deductibility is not a zero one. Naming it keeps the payoff order
+                    # honest rather than ranking a debt on an invented share.
+                    if row_apr is not None:
+                        gaps.append(_gap(
+                            "debt_interest.after_tax_cost", [f"deductibility of {kind}"],
+                            f"Is the interest on {row.get('label') or kind} deductible? Without "
+                            f"that we cannot compare its true cost to your other debts."))
+                    continue
+                run(DI.after_tax_cost_of_debt, apr=float(row_apr),
+                    deductible_share=float(share), marginal_rate=float(marginal_rate),
+                    label=str(row.get("label") or kind))
 
         return {
             "available": bool(results),
@@ -285,6 +357,8 @@ class TreatmentPlanner:
             ],
             "traps": sorted({trap for r in results for trap in r.traps}),
             "hdhp_qualifies": hdhp_ok,
+            "fsa_hsa_compatible": fsa_compatible,
+            "conflicts": conflicts,
             "constraints": [
                 "A determination is a verdict with an authority. Cite the authority as given; "
                 "never paraphrase or generalise the rule.",
@@ -299,24 +373,28 @@ class TreatmentPlanner:
                 "reverse.",
                 "A gap is a question to ASK. Never assume a determination: assuming interest is "
                 "deductible overstates a deduction and assuming it is not understates one.",
+                "A `conflict` is money being lost RIGHT NOW. Lead with it, state the consequence "
+                "and the remedy, and never present the favourable reading of the same facts "
+                "alongside it.",
             ],
         }
 
     @staticmethod
-    def _deductible_share(results: list[TreatmentResult]) -> float:
-        """Share of interest the determinations above actually found deductible.
+    def _shares_by_type(results: list[TreatmentResult]) -> dict[str, float]:
+        """Deductible share of interest PER loan type, from the determinations that actually ran.
 
-        Weighted by amount where the rules quantified one, so a large non-deductible balance is not
-        offset by a small deductible one. Falls back to 0.0 — the conservative direction, because
-        overstating deductibility understates the true cost of the debt and makes borrowing look
-        cheaper than it is.
+        A type with no determination is absent rather than 0.0, so the caller can tell "not
+        deductible" from "we do not know" — a distinction a single blended figure destroyed.
         """
-        interest_rules = [r for r in results if r.rule.startswith("debt_interest.")
-                          and r.rule != "debt_interest.after_tax_cost" and r.amount is not None]
-        if not interest_rules:
-            return 0.0
-        claimed = sum(float(r.inputs_used.get("annual_interest") or 0.0) for r in interest_rules)
-        if claimed <= 0:
-            return 0.0
-        allowed = sum(float(r.amount or 0.0) for r in interest_rules)
-        return max(0.0, min(1.0, allowed / claimed))
+        out: dict[str, float] = {}
+        for r in results:
+            if not r.rule.startswith("debt_interest.") or r.amount is None:
+                continue
+            kind = _RULE_TO_LOAN_TYPE.get(r.rule)
+            if kind is None:
+                continue
+            claimed = float(r.inputs_used.get("annual_interest") or 0.0)
+            if claimed <= 0:
+                continue
+            out[kind] = max(0.0, min(1.0, float(r.amount) / claimed))
+        return out

@@ -469,7 +469,11 @@ def after_tax_cost_of_debt(*, apr: float, deductible_share: float, marginal_rate
         traps=("A deduction is only worth the marginal rate it offsets. If you take the standard "
                "deduction, or your marginal rate falls, the after-tax cost rises toward the stated "
                "rate — so this figure is not fixed for the life of the loan.",),
-        inputs_used={"apr": rate, "deductible_share": share, "marginal_rate": marginal},
+        # `label` is recorded because this rule is now run ONCE PER DEBT: without it the results
+        # are indistinguishable except by parsing the summary prose, so nothing downstream could
+        # attribute a rate to the loan it describes.
+        inputs_used={"apr": rate, "deductible_share": share, "marginal_rate": marginal,
+                     "label": label},
         parameters_verified=True,   # pure arithmetic on supplied inputs; no statutory threshold
         notes=(f"pre-tax {rate:.2%} → after-tax {after_tax:.2%} (saving {saving:.2%})",),
     )

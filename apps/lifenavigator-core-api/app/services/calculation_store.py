@@ -84,19 +84,27 @@ def _digest(payload: Any) -> str:
     ).hexdigest()[:32]
 
 
-def inputs_fingerprint(inputs: dict[str, Any]) -> str:
-    """Fingerprint of the user's own facts — PRESENT values only.
+def inputs_fingerprint(inputs: dict[str, Any],
+                       turn: Optional[dict[str, Any]] = None) -> str:
+    """Fingerprint of every fact the answer was computed from — stored AND per-turn.
 
-    Absent inputs are excluded rather than hashed as null, so adding an unrelated missing field to
-    the resolver does not invalidate every user's cache. What matters is whether the facts the
-    figures were computed FROM have changed.
+    Absent stored inputs are excluded rather than hashed as null, so adding an unrelated missing
+    field to the resolver does not invalidate every user's cache.
+
+    THE TURN IS PART OF THE FACTS. This covered stored inputs only, which left a hole with the
+    same shape as the question: "is my HELOC interest deductible?" turns entirely on
+    `heloc_proceeds_used_for`, a per-turn fact, so the identical question with the identical stored
+    data could be answered "yes" for a kitchen renovation and then served that same "yes" after the
+    user said the money paid off credit cards. The user's age is per-turn too, so "when can I
+    retire?" asked at 45 would have been served again at 55.
     """
     facts = {
         name: (field or {}).get(_VALUE_KEY)
         for name, field in sorted((inputs or {}).items())
         if (field or {}).get("present")
     }
-    return _digest(facts)
+    stated = {k: v for k, v in sorted((turn or {}).items()) if v not in (None, "")}
+    return _digest({"stored": facts, "turn": stated})
 
 
 def basis_fingerprint(packet: dict[str, Any]) -> str:
@@ -120,7 +128,17 @@ def basis_fingerprint(packet: dict[str, Any]) -> str:
             detail.get("rate_year"),
         ])
     for t in (packet or {}).get("treatments") or []:
-        basis.append([t.get("rule"), t.get("parameter_year"), t.get("parameters_verified")])
+        # THE DETERMINATION ITSELF IS PART OF THE BASIS. This hashed only
+        # (rule, parameter_year, parameters_verified), so a verdict that FLIPPED left the
+        # fingerprint unchanged: verified live, the cache served "Yes — it is deductible" after the
+        # engine had decided the same HELOC interest was NOT deductible. Inverting tax advice is
+        # the worst thing a cache can do, and it cost nothing to prevent.
+        basis.append([t.get("rule"), t.get("determination"), t.get("amount"),
+                      t.get("parameter_year"), t.get("parameters_verified")])
+    # A conflict appearing (or clearing) changes the answer completely — "you are making excess
+    # HSA contributions" is not a footnote on last week's reply.
+    for c in (packet or {}).get("tax_conflicts") or []:
+        basis.append(["conflict", c.get("what"), c.get("because"), c.get("amount_at_risk")])
     basis.append((packet or {}).get("tax_year_requested"))
     return _digest(basis)
 
@@ -237,11 +255,22 @@ class CalculationStore:
             if isinstance(old[k], (int, float)) and isinstance(new[k], (int, float))
             and abs(float(new[k]) - float(old[k])) > 0.005
         ]
+        # DETERMINATIONS CHANGE TOO, and a flip is usually the most important thing that
+        # happened. Comparing only `results` reported nothing when a deduction became a
+        # non-deduction.
+        old_det = {t.get("rule"): t.get("determination")
+                   for t in (old_packet.get("treatments") or [])}
+        new_det = {t.get("rule"): t.get("determination")
+                   for t in (packet.get("treatments") or [])}
+        flipped = [{"rule": k, "was": old_det[k], "now": new_det[k]}
+                   for k in sorted(set(old_det) & set(new_det))
+                   if old_det[k] != new_det[k]]
         old_inputs = set(prev.get("inputs_present") or [])
         return {
             "has_history": True,
             "as_of": prev.get("created_at"),
             "moved": moved,
+            "determinations_flipped": flipped,
             "newly_computable": sorted(set(new) - set(old)),
             "no_longer_computable": sorted(set(old) - set(new)),
             "basis_changed": prev.get("basis_fingerprint") != basis_fingerprint(packet),
@@ -255,7 +284,8 @@ class CalculationStore:
     # ── The answer cache ─────────────────────────────────────────────────────────────────────────
     async def lookup_answer(self, user_id: str, message: str,
                             packet: dict[str, Any],
-                            inputs: dict[str, Any]) -> Optional[CachedAnswer]:
+                            inputs: dict[str, Any],
+                            turn: Optional[dict[str, Any]] = None) -> Optional[CachedAnswer]:
         """A prior answer to THIS question, valid for the current facts and the current law.
 
         Returns None on any doubt. The calculators have already re-run by the time this is called —
@@ -274,7 +304,7 @@ class CalculationStore:
             log.warning("answer cache unavailable: %s", exc)
             return None
 
-        fp_in = inputs_fingerprint(inputs)
+        fp_in = inputs_fingerprint(inputs, turn)
         fp_basis = basis_fingerprint(packet)
         for row in rows:
             if row.get("inputs_fingerprint") != fp_in:
@@ -306,6 +336,7 @@ class CalculationStore:
 
     async def save_answer(self, user_id: str, message: str, answer: str,
                           packet: dict[str, Any], inputs: dict[str, Any], *,
+                          turn: Optional[dict[str, Any]] = None,
                           model: Optional[str] = None) -> bool:
         """Cache an answer against the facts and the law it was computed on."""
         sig = question_signature(message)
@@ -315,13 +346,18 @@ class CalculationStore:
             # An answer computed with no grounding has no fingerprint worth keying on, and caching
             # it would serve ungrounded prose after the grounding arrived.
             return False
+        if packet.get("tax_conflicts"):
+            # Never cache an answer given while the user is actively losing money. The remedy is
+            # time-sensitive (an excess HSA contribution must come out before the return is due),
+            # so this answer must be regenerated — with today's urgency — every time it is asked.
+            return False
         try:
             await self._sb.insert(_ANSWERS, {
                 "user_id": user_id,
                 "question_signature": sig,
                 "question_text": message[:2000],
                 "answer": answer,
-                "inputs_fingerprint": inputs_fingerprint(inputs),
+                "inputs_fingerprint": inputs_fingerprint(inputs, turn),
                 "basis_fingerprint": basis_fingerprint(packet),
                 "cited_numbers": cited_numbers(answer),
                 "model": model,
