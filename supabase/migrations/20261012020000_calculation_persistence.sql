@@ -47,10 +47,15 @@ CREATE INDEX IF NOT EXISTS calc_snapshots_fingerprint_idx
     ON finance.calculation_snapshots (user_id, inputs_fingerprint, basis_fingerprint);
 
 ALTER TABLE finance.calculation_snapshots ENABLE ROW LEVEL SECURITY;
+-- DROP-then-CREATE, because `CREATE POLICY` has no IF NOT EXISTS in Postgres. Without this the
+-- whole migration aborts on a re-run or on a retry after a partial failure — the worst time to
+-- discover it. 317 other migrations in this repo use the same pattern.
 -- Owner-readable: unlike advisor_turns this is the user's OWN financial picture, and "show me what
 -- changed since June" is a feature, not diagnostics.
+DROP POLICY IF EXISTS "calc_snapshots_owner_read" ON finance.calculation_snapshots;
 CREATE POLICY "calc_snapshots_owner_read" ON finance.calculation_snapshots
     FOR SELECT USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "calc_snapshots_service" ON finance.calculation_snapshots;
 CREATE POLICY "calc_snapshots_service" ON finance.calculation_snapshots
     FOR ALL TO service_role USING (true) WITH CHECK (true);
 
@@ -83,6 +88,7 @@ CREATE INDEX IF NOT EXISTS answer_cache_lookup_idx
 ALTER TABLE finance.answer_cache ENABLE ROW LEVEL SECURITY;
 -- No owner policy at all: a cache entry is machine state, the user reads it only as a delivered
 -- answer, and a client that could read the table could read another turn's prose.
+DROP POLICY IF EXISTS "answer_cache_service" ON finance.answer_cache;
 CREATE POLICY "answer_cache_service" ON finance.answer_cache
     FOR ALL TO service_role USING (true) WITH CHECK (true);
 
